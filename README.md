@@ -30,17 +30,20 @@ Product-game/
 │   └── js/main.js                   # charge les JSON de data/ et rend le DOM dynamiquement
 └── game/                            # projet Godot 4 — voir game/README.md
     ├── project.godot
-    ├── scenes/Main.tscn
+    ├── resources/theme/main_theme.tres  # thème partagé (couleurs de marque)
+    ├── scenes/screens/
+    │   ├── start_screen.tscn         # écran d'accueil — run/main_scene
+    │   └── placeholder_sprint.tscn   # écran de transition ("Nouvelle partie")
     └── scripts/
-        ├── main.gd
-        └── autoload/game_data.gd    # charge tous les data/*.json au démarrage
+        ├── autoload/game_data.gd    # charge tous les data/*.json au démarrage
+        └── screens/                 # logique des écrans (start_screen.gd, ...)
 ```
 
 - [`docs/carnet-de-regles.md`](docs/carnet-de-regles.md) — le carnet de règles complet : structure temporelle, ressources, système de cartes, effets persistants, roadmap, recrutement, époques, fins de mandat, et les questions ouvertes encore à trancher.
 - [`docs/data-schema.md`](docs/data-schema.md) — le détail du schéma de chaque fichier JSON.
 - [`docs/tech-stack.md`](docs/tech-stack.md) — le choix du moteur de jeu (Godot 4) et les alternatives écartées (Three.js, Unity, Unreal, stack web).
 - [`landing/index.html`](landing/index.html) — une page de présentation interactive du concept : cartes retournables, jauges de ressources, aperçu d'écrans de jeu (inbox, roadmap, recrutement), présentation des époques et des fins de mandat. Toutes ses données viennent de `data/`, pas de contenu codé en dur.
-- [`game/`](game/README.md) — le projet Godot 4 de base : un autoload `GameData` charge les mêmes `data/*.json` que la landing page, avec un écran minimal qui confirme le chargement. Pas encore un jeu jouable — voir `game/README.md` pour les prochaines étapes.
+- [`game/`](game/README.md) — le projet Godot 4 : un autoload `GameData` charge les mêmes `data/*.json` que la landing page, et un écran d'accueil (titre, règles, nouvelle partie) est en place. Les écrans de sprint restent à construire — voir `game/README.md` pour les prochaines étapes.
 
 ## Voir la landing page
 

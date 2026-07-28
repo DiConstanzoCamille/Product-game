@@ -2,27 +2,45 @@
 
 Projet de base [Godot 4.3+](https://godotengine.org/) (GDScript). Voir [`docs/tech-stack.md`](../docs/tech-stack.md) pour le choix du moteur et [`docs/data-schema.md`](../docs/data-schema.md) pour le contenu des données consommées ici.
 
-Ce dossier est un squelette de départ, pas un jeu jouable : il valide que le chargement des données fonctionne et sert de point d'ancrage pour construire les écrans (Inbox, Roadmap, Recrutement, Fondations, HUD) décrits dans le [carnet de règles](../docs/carnet-de-regles.md).
+Ce dossier a un premier écran jouable (l'accueil), mais n'est pas encore un jeu complet : les écrans de sprint (Inbox, Roadmap, Recrutement, Fondations, HUD) décrits dans le [carnet de règles](../docs/carnet-de-regles.md) restent à construire.
 
 ## Ouvrir le projet
 
 1. Installer [Godot 4.3 ou supérieur](https://godotengine.org/download) (édition Standard, pas .NET — le projet utilise GDScript).
 2. Dans Godot, "Importer", puis sélectionner `game/project.godot`.
-3. Lancer la scène principale (F5) — un écran minimal affiche le nombre de ressources/cartes/époques/fins de mandat chargées depuis `data/`, ce qui confirme que le pont JSON → Godot fonctionne.
+3. Lancer le projet (F5) — l'écran d'accueil s'affiche : titre, tagline, boutons "Nouvelle partie" / "Règles du jeu" / "Quitter".
 
 ## Structure
 
 ```
 game/
-├── project.godot            # configuration du projet, déclare l'autoload GameData
+├── project.godot                        # configuration du projet, autoload GameData, thème par défaut
 ├── icon.svg
+├── resources/
+│   └── theme/main_theme.tres             # thème partagé (couleurs de marque : navy-deep, ambre...)
 ├── scenes/
-│   └── Main.tscn             # écran de démarrage minimal
+│   └── screens/
+│       ├── start_screen.tscn             # écran d'accueil — run/main_scene
+│       └── placeholder_sprint.tscn       # écran de transition ("Nouvelle partie"), à remplacer par l'Inbox
 └── scripts/
-    ├── main.gd                # logique de Main.tscn
-    └── autoload/
-        └── game_data.gd       # singleton : charge tous les data/*.json au démarrage
+    ├── autoload/
+    │   └── game_data.gd                  # singleton : charge tous les data/*.json au démarrage
+    └── screens/
+        ├── start_screen.gd
+        └── placeholder_sprint.gd
 ```
+
+## Écran d'accueil
+
+`start_screen.tscn` est le point d'entrée (`run/main_scene`). Il affiche le titre, la tagline du concept, et trois actions :
+
+- **Nouvelle partie** — mène à `placeholder_sprint.tscn`, un écran de transition qui confirme que les données sont chargées et sert de point d'ancrage pour le premier vrai écran de sprint (l'Inbox, à construire).
+- **Règles du jeu** — ouvre un panneau scrollable avec un résumé condensé du concept et de la boucle de sprint. Le texte est écrit en dur dans `start_screen.gd` (`_populate_rules_text`) : c'est un raccourci pour l'écran-titre, pas une source de vérité — en cas de désaccord, le [carnet de règles](../docs/carnet-de-regles.md) fait foi.
+- **Quitter** — ferme l'application.
+
+Le thème visuel (`resources/theme/main_theme.tres`) reprend la palette de la landing page (navy-deep en fond, ambre pour les accents, texte clair) et s'applique par défaut à tout le projet (`[gui] theme/custom` dans `project.godot`) — les prochains écrans en hériteront automatiquement, pas besoin de re-styliser bouton par bouton.
+
+**Limite connue** : aucune police de marque n'est encore embarquée (IBM Plex / Space Grotesk utilisées sur la landing page) — l'écran utilise la police par défaut de Godot. À bundler plus tard si la fidélité visuelle avec la landing page devient importante.
 
 ## Chargement des données
 
