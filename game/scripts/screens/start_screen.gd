@@ -1,7 +1,7 @@
 extends Control
 ## Écran d'accueil. Point d'entrée du jeu (run/main_scene dans project.godot).
 
-const PLACEHOLDER_SPRINT_SCENE := "res://scenes/screens/placeholder_sprint.tscn"
+const INBOX_SCENE := "res://scenes/screens/inbox_screen.tscn"
 
 @onready var new_game_button: Button = $CenterContainer/VBoxContainer/MenuButtons/NewGameButton
 @onready var rules_button: Button = $CenterContainer/VBoxContainer/MenuButtons/RulesButton
@@ -23,7 +23,8 @@ func _ready() -> void:
 
 
 func _on_new_game_pressed() -> void:
-	get_tree().change_scene_to_file(PLACEHOLDER_SPRINT_SCENE)
+	SprintState.sprint_number = 1
+	get_tree().change_scene_to_file(INBOX_SCENE)
 
 
 func _on_rules_pressed() -> void:
