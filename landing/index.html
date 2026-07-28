@@ -1,0 +1,890 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Product Tycoon — concept de jeu</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#EEF1F6;
+    --bg-panel:#FFFFFF;
+    --grid-line:#D9E0EB;
+    --ink:#12161F;
+    --ink-soft:#4B5566;
+    --ink-faint:#8891A0;
+    --navy:#1F3A66;
+    --navy-deep:#122040;
+    --green-bg:#DDF3E3;
+    --green-ink:#1C7A46;
+    --red-bg:#FBE3E1;
+    --red-ink:#B3271E;
+    --amber-bg:#FCEACB;
+    --amber-ink:#8A5A08;
+    --radius:10px;
+    --font-display:'Space Grotesk', sans-serif;
+    --font-body:'IBM Plex Sans', sans-serif;
+    --font-mono:'IBM Plex Mono', monospace;
+  }
+
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    margin:0;
+    background:
+      repeating-linear-gradient(0deg, transparent, transparent 47px, var(--grid-line) 48px),
+      repeating-linear-gradient(90deg, transparent, transparent 47px, var(--grid-line) 48px),
+      var(--bg);
+    color:var(--ink);
+    font-family:var(--font-body);
+    line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  h1,h2,h3{font-family:var(--font-display); margin:0; letter-spacing:-0.01em;}
+  p{margin:0;}
+  a{color:inherit;}
+  :focus-visible{outline:2px solid var(--navy); outline-offset:3px;}
+
+  .wrap{max-width:1080px; margin:0 auto; padding:0 24px;}
+
+  /* NAV */
+  .nav{position:sticky; top:0; z-index:20; background:rgba(255,255,255,0.92); backdrop-filter:blur(6px); border-bottom:1px solid var(--grid-line);}
+  .nav-inner{max-width:1080px; margin:0 auto; padding:14px 24px; display:flex; align-items:center; gap:18px;}
+  .logo{display:flex; align-items:center; gap:10px;}
+  .logo-mark{width:30px; height:30px; background:var(--navy-deep); border-radius:6px; display:flex; align-items:center; justify-content:center; font-family:var(--font-mono); font-weight:600; color:#fff; font-size:12px; flex-shrink:0;}
+  .logo-text{font-family:var(--font-display); font-weight:700; font-size:15px; letter-spacing:0.02em;}
+  .badge-concept{font-family:var(--font-mono); font-size:10px; letter-spacing:0.06em; background:var(--amber-bg); color:var(--amber-ink); padding:2px 7px; border-radius:20px; font-weight:600;}
+  .nav-links{display:flex; gap:20px; margin-left:8px; flex:1; flex-wrap:wrap;}
+  .nav-link{font-size:13px; color:var(--ink-faint); cursor:not-allowed; user-select:none;}
+  .workspace-pill{font-family:var(--font-mono); font-size:11px; color:var(--ink-soft); background:var(--bg); border:1px solid var(--grid-line); padding:5px 10px; border-radius:20px; white-space:nowrap;}
+  @media (max-width:640px){ .nav-links{display:none;} }
+
+  /* HERO */
+  .hero{padding:64px 0 56px;}
+  .eyebrow{font-family:var(--font-mono); font-size:11px; letter-spacing:0.09em; color:var(--navy); font-weight:600; text-transform:uppercase; display:inline-block; margin-bottom:14px;}
+  .toast{display:inline-flex; align-items:center; gap:8px; background:var(--bg-panel); border:1px solid var(--grid-line); border-left:3px solid var(--green-ink); padding:8px 14px; border-radius:8px; font-size:13px; color:var(--ink-soft); margin-bottom:22px;}
+  .hero-title{font-size:clamp(30px,5vw,48px); font-weight:700; line-height:1.08; max-width:820px;}
+  .hero-sub{font-size:16px; color:var(--ink-soft); max-width:620px; margin-top:18px;}
+  .stat-ticker{display:flex; flex-wrap:wrap; gap:10px; margin-top:30px;}
+  .stat-chip{font-family:var(--font-mono); font-size:12px; background:var(--bg-panel); border:1px solid var(--grid-line); border-radius:8px; padding:8px 12px; display:flex; align-items:center; gap:7px;}
+  .stat-chip b{color:var(--ink);}
+  .cta-row{display:flex; gap:12px; margin-top:32px; flex-wrap:wrap;}
+  .btn{font-family:var(--font-mono); font-size:13px; font-weight:500; padding:11px 18px; border-radius:8px; border:1px solid transparent; cursor:pointer; text-decoration:none; display:inline-block;}
+  .btn-primary{background:var(--navy-deep); color:#fff;}
+  .btn-primary:hover{background:var(--navy);}
+  .btn-ghost{background:transparent; border-color:var(--grid-line); color:var(--ink);}
+  .btn-ghost:hover{border-color:var(--navy);}
+
+  /* SECTIONS */
+  .section{padding:64px 0;}
+  .section-alt{background:rgba(255,255,255,0.55); border-top:1px solid var(--grid-line); border-bottom:1px solid var(--grid-line);}
+  .section-head{max-width:640px; margin-bottom:38px;}
+  .section-title{font-size:clamp(22px,3vw,30px); font-weight:700;}
+  .section-lead{color:var(--ink-soft); margin-top:12px; font-size:15px;}
+
+  /* LOOP */
+  .loop-row{display:flex; align-items:stretch; gap:0; flex-wrap:wrap; margin-top:8px;}
+  .loop-step{flex:1; min-width:150px; background:var(--bg-panel); border:1px solid var(--grid-line); border-radius:var(--radius); padding:16px; }
+  .loop-step .n{font-family:var(--font-mono); font-size:11px; color:var(--navy); font-weight:600;}
+  .loop-step .t{font-family:var(--font-display); font-weight:600; font-size:15px; margin-top:6px;}
+  .loop-step .d{font-size:12.5px; color:var(--ink-soft); margin-top:4px;}
+  .loop-arrow{display:flex; align-items:center; justify-content:center; width:36px; color:var(--ink-faint); font-family:var(--font-mono); flex-shrink:0;}
+  @media (max-width:760px){ .loop-arrow{width:100%; height:24px; transform:rotate(90deg);} }
+
+  /* TEAM TOGGLE */
+  .team-toggle{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px;}
+  .team-btn{font-family:var(--font-mono); font-size:12.5px; padding:9px 14px; border-radius:20px; border:1px solid var(--grid-line); background:var(--bg-panel); cursor:pointer; color:var(--ink-soft);}
+  .team-btn.active{background:var(--navy-deep); border-color:var(--navy-deep); color:#fff;}
+  .legend{font-family:var(--font-mono); font-size:11.5px; color:var(--ink-faint); margin:14px 0 26px; display:flex; gap:16px; flex-wrap:wrap;}
+  .legend span{display:inline-flex; align-items:center; gap:6px;}
+  .dot{width:8px; height:8px; border-radius:50%; display:inline-block;}
+  .dot.green{background:var(--green-ink);}
+  .dot.red{background:var(--red-ink);}
+
+  /* CARDS */
+  .cards-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:20px;}
+  .card-flip{height:420px; perspective:1200px; cursor:pointer;}
+  .card-inner{position:relative; width:100%; height:100%; transition:transform .55s cubic-bezier(.4,.2,.2,1); transform-style:preserve-3d;}
+  .card-flip.is-flipped .card-inner{transform:rotateY(180deg);}
+  .card-front, .card-back{position:absolute; inset:0; backface-visibility:hidden; border-radius:var(--radius); border:1px solid var(--grid-line); background:var(--bg-panel); padding:20px; display:flex; flex-direction:column;}
+  .card-back{transform:rotateY(180deg); overflow-y:auto;}
+  .card-id{font-family:var(--font-mono); font-size:10.5px; color:var(--ink-faint); text-align:right;}
+  .card-eyebrow{font-family:var(--font-mono); font-size:10.5px; letter-spacing:0.07em; color:var(--navy); font-weight:600; text-transform:uppercase; margin-top:10px;}
+  .card-title{font-size:22px; font-weight:700; margin-top:10px;}
+  .card-tagline{font-size:13.5px; color:var(--ink-soft); margin-top:12px; flex:1;}
+  .card-hint{font-family:var(--font-mono); font-size:10.5px; color:var(--ink-faint); border-top:1px dashed var(--grid-line); padding-top:10px; margin-top:10px;}
+  .card-back .card-eyebrow{margin-top:0;}
+  .axis-row{margin-top:14px;}
+  .axis-row:first-of-type{margin-top:12px;}
+  .axis-top{display:flex; justify-content:space-between; align-items:baseline; font-size:12.5px;}
+  .axis-label{color:var(--ink-soft); font-weight:500;}
+  .axis-value{font-family:var(--font-mono); font-weight:600; font-size:12.5px;}
+  .axis-bar{height:6px; border-radius:4px; background:var(--grid-line); margin-top:5px; overflow:hidden;}
+  .axis-fill{height:100%; border-radius:4px;}
+  .axis-fill.positive{background:var(--green-ink);}
+  .axis-fill.negative{background:var(--red-ink);}
+  .axis-value.positive{color:var(--green-ink);}
+  .axis-value.negative{color:var(--red-ink);}
+  .axis-note{font-size:11.5px; color:var(--ink-faint); margin-top:3px; line-height:1.35;}
+  .demo-caption{font-size:12px; color:var(--ink-faint); margin-top:18px; font-style:italic;}
+
+  /* GAMEPLAY SCREENS */
+  .screen-panel{background:var(--bg-panel); border:1px solid var(--grid-line); border-radius:var(--radius); padding:24px; margin-top:18px;}
+  .screen-label{font-family:var(--font-mono); font-size:11px; text-transform:uppercase; letter-spacing:0.06em; color:var(--navy); font-weight:600; display:flex; align-items:center; gap:8px; margin-bottom:16px;}
+  .screen-label .live-dot{width:7px; height:7px; border-radius:50%; background:var(--green-ink); flex-shrink:0;}
+
+  /* Inbox */
+  .inbox-card{border:1px solid var(--grid-line); border-radius:8px; overflow:hidden;}
+  .inbox-head{background:var(--bg); padding:11px 16px; border-bottom:1px solid var(--grid-line); display:flex; justify-content:space-between; flex-wrap:wrap; gap:6px; font-size:11.5px; font-family:var(--font-mono); color:var(--ink-soft);}
+  .inbox-body{padding:18px 16px;}
+  .inbox-from{font-weight:600; font-size:13.5px;}
+  .inbox-subject{font-size:16px; font-weight:700; margin-top:5px; font-family:var(--font-display);}
+  .inbox-text{font-size:13.5px; color:var(--ink-soft); margin-top:10px; line-height:1.55;}
+  .inbox-choices{display:flex; flex-direction:column; gap:8px; margin-top:16px;}
+  .inbox-choice{text-align:left; background:var(--bg); border:1px solid var(--grid-line); border-radius:8px; padding:11px 14px; font-size:13px; cursor:pointer; font-family:var(--font-body); color:var(--ink); width:100%;}
+  .inbox-choice:hover{border-color:var(--navy);}
+  .inbox-choice.chosen{border-color:var(--navy); background:#EAF0FA;}
+  .inbox-reveal{margin-top:12px; font-size:12.5px; font-family:var(--font-mono); background:var(--bg); border-left:3px solid var(--navy); padding:10px 12px; border-radius:4px; color:var(--ink-soft); display:none;}
+  .inbox-reveal.show{display:block;}
+
+  /* Roadmap */
+  .capacity-row{display:flex; justify-content:space-between; align-items:center; font-size:12.5px; font-family:var(--font-mono); margin-bottom:8px;}
+  .capacity-bar{height:8px; background:var(--grid-line); border-radius:4px; overflow:hidden; margin-bottom:14px;}
+  .capacity-fill{height:100%; background:var(--green-ink); border-radius:4px; transition:width .3s, background .3s;}
+  .capacity-fill.over{background:var(--red-ink);}
+  .capacity-warning{display:none; background:var(--red-bg); color:var(--red-ink); font-size:12.5px; padding:9px 12px; border-radius:6px; margin-bottom:14px;}
+  .capacity-warning.show{display:block;}
+  .feature-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:14px;}
+  .feature-card{border:1px solid var(--grid-line); border-radius:8px; padding:14px; cursor:pointer; text-align:left; background:var(--bg-panel); font-family:var(--font-body); width:100%;}
+  .feature-card.selected{border-color:var(--navy); background:#EAF0FA;}
+  .feature-check{width:16px; height:16px; border:1.5px solid var(--grid-line); border-radius:4px; display:inline-flex; align-items:center; justify-content:center; font-size:11px; margin-bottom:8px; color:transparent;}
+  .feature-card.selected .feature-check{background:var(--navy); border-color:var(--navy); color:#fff;}
+  .feature-name{font-weight:700; font-size:13.5px; display:block;}
+  .feature-promise{font-size:11.5px; color:var(--ink-soft); margin-top:5px; font-style:italic; display:block;}
+  .feature-icons{margin-top:9px; font-size:12px; color:var(--ink-faint); display:block;}
+
+  /* Recruitment */
+  .shop-toggle{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:18px;}
+  .candidate-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:14px;}
+  .candidate-card{border:1px solid var(--grid-line); border-radius:8px; padding:16px;}
+  .candidate-avatar{width:34px; height:34px; border-radius:50%; background:var(--bg); border:1px solid var(--grid-line); display:flex; align-items:center; justify-content:center; font-size:15px;}
+  .candidate-name{font-weight:700; font-size:13.5px; margin-top:10px;}
+  .candidate-role{font-size:11.5px; color:var(--ink-soft);}
+  .candidate-badges{display:flex; gap:6px; flex-wrap:wrap; margin-top:10px;}
+  .candidate-badge{font-family:var(--font-mono); font-size:10px; background:var(--bg); border:1px solid var(--grid-line); border-radius:20px; padding:3px 8px; color:var(--ink-soft);}
+  .candidate-cost{font-family:var(--font-mono); font-size:12.5px; margin-top:10px; font-weight:600;}
+  .candidate-btn{margin-top:12px; width:100%; font-family:var(--font-mono); font-size:12px; padding:9px; border-radius:6px; border:1px solid var(--navy-deep); background:var(--navy-deep); color:#fff; cursor:pointer;}
+  .candidate-btn:disabled{cursor:default;}
+  .ad-card{border:1px dashed var(--ink-faint); padding:14px; font-family:var(--font-mono); font-size:11.5px; background:#FBF9F3; color:var(--ink); line-height:1.6;}
+  .ad-title{font-weight:700; text-transform:uppercase; font-size:12px; margin-bottom:6px;}
+  .ad-btn{margin-top:10px; font-family:var(--font-mono); font-size:11px; padding:7px 10px; border:1px solid var(--ink); background:transparent; cursor:pointer; width:100%;}
+  .ad-btn:disabled{cursor:default; opacity:0.65;}
+  .skin-grid{display:none;}
+  .skin-grid.show{display:grid;}
+
+  /* FONDATIONS BOARD */
+  .fondation-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:14px;}
+  .fondation-card{border:1px solid var(--grid-line); border-radius:8px; padding:16px; background:var(--bg-panel);}
+  .fondation-card.waiting{background:var(--bg); border-style:dashed;}
+  .fondation-status{font-family:var(--font-mono); font-size:10.5px; text-transform:uppercase; letter-spacing:0.05em; padding:3px 8px; border-radius:20px; display:inline-block; font-weight:600;}
+  .fondation-status.waiting{background:var(--amber-bg); color:var(--amber-ink);}
+  .fondation-status.active{background:var(--green-bg); color:var(--green-ink);}
+  .fondation-family{font-family:var(--font-mono); font-size:10px; color:var(--ink-faint); margin-top:10px; text-transform:uppercase; letter-spacing:0.04em;}
+  .fondation-name{font-weight:700; font-size:14.5px; margin-top:4px;}
+  .fondation-detail{font-size:12px; color:var(--ink-soft); margin-top:7px; line-height:1.5;}
+
+  /* ERAS */
+  .era-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:20px;}
+  .era-card{background:var(--bg-panel); border:1px solid var(--grid-line); border-radius:var(--radius); padding:22px;}
+  .era-badge{font-family:var(--font-mono); font-size:11px; background:var(--bg); border:1px solid var(--grid-line); border-radius:20px; padding:4px 10px; display:inline-block; color:var(--ink-soft);}
+  .era-name{font-size:18px; font-weight:700; margin-top:14px;}
+  .era-desc{font-size:13.5px; color:var(--ink-soft); margin-top:10px;}
+  .era-meta{margin-top:16px; padding-top:14px; border-top:1px dashed var(--grid-line);}
+  .era-meta div{font-size:12px; margin-top:6px;}
+  .era-meta .k{font-family:var(--font-mono); color:var(--ink-faint); text-transform:uppercase; font-size:10px; letter-spacing:0.05em;}
+
+  /* RESOURCES */
+  .resource-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:18px;}
+  .resource-card{background:var(--bg-panel); border:1px solid var(--grid-line); border-radius:var(--radius); padding:18px;}
+  .resource-icon{font-size:20px;}
+  .resource-name{font-weight:700; font-size:15px; margin-top:8px;}
+  .resource-def{font-size:12.5px; color:var(--ink-soft); margin-top:8px;}
+  .resource-drivers{margin-top:12px; padding-top:10px; border-top:1px dashed var(--grid-line); font-size:11.5px; color:var(--ink-soft);}
+  .resource-drivers div{margin-top:5px;}
+  .resource-drivers .k{font-family:var(--font-mono); text-transform:uppercase; letter-spacing:0.05em; color:var(--ink-faint); font-size:10px;}
+  .resource-zero{margin-top:10px; font-size:11.5px; color:var(--red-ink); font-weight:500;}
+
+  .tension-list{margin-top:28px; display:flex; flex-direction:column; gap:10px;}
+  .tension-item{background:var(--amber-bg); color:var(--amber-ink); border-radius:8px; padding:11px 14px; font-size:13px; display:flex; gap:9px; align-items:flex-start;}
+
+  .hud{margin-top:40px; background:var(--navy-deep); border-radius:14px; padding:26px; color:#EAEFF7;}
+  .hud-top{display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; padding-bottom:16px; border-bottom:1px solid rgba(255,255,255,0.12); margin-bottom:20px;}
+  .hud-era{font-family:var(--font-mono); font-size:12px; background:rgba(255,255,255,0.08); padding:5px 10px; border-radius:20px;}
+  .hud-sprint{font-family:var(--font-mono); font-size:12px; color:#AAB6CC;}
+  .hud-gauges{display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:16px;}
+  .gauge-top{display:flex; justify-content:space-between; font-size:12.5px;}
+  .gauge-label{display:flex; gap:6px; align-items:center; color:#EAEFF7;}
+  .gauge-value{font-family:var(--font-mono); font-weight:600;}
+  .gauge-value.good{color:#7FE3A5;}
+  .gauge-value.bad{color:#F3897F;}
+  .gauge-bar{height:6px; background:rgba(255,255,255,0.14); border-radius:4px; margin-top:5px; overflow:hidden;}
+  .gauge-fill{height:100%; border-radius:4px; background:#7FE3A5;}
+  .gauge-fill.warn{background:#F0B44A;}
+  .gauge-fill.danger{background:#F3897F;}
+
+  .hud-journal{margin-top:26px; padding-top:20px; border-top:1px solid rgba(255,255,255,0.12);}
+  .hud-journal-title{font-family:var(--font-mono); font-size:11px; text-transform:uppercase; letter-spacing:0.06em; color:#AAB6CC; margin-bottom:6px;}
+  .journal-entry{font-size:12.5px; padding:10px 0; border-bottom:1px dashed rgba(255,255,255,0.1); color:#EAEFF7;}
+  .journal-entry:last-child{border-bottom:none;}
+  .journal-deltas{font-family:var(--font-mono); font-size:11.5px; color:#AAB6CC; margin-top:4px;}
+
+  .hud-alert{margin-top:18px; background:rgba(240,180,74,0.15); border:1px solid rgba(240,180,74,0.4); color:#F0B44A; border-radius:8px; padding:11px 14px; font-size:12.5px;}
+
+  /* ENDINGS */
+  .ending-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:14px;}
+  .ending-badge{background:var(--bg-panel); border:1px solid var(--grid-line); border-radius:var(--radius); padding:16px;}
+  .ending-label{font-weight:600; font-size:14px;}
+  .ending-note{font-size:12.5px; color:var(--ink-soft); margin-top:6px; font-style:italic;}
+
+  /* FOOTER */
+  .footer{background:var(--navy-deep); color:#EAEFF7; padding:44px 0 34px;}
+  .footer-title{font-family:var(--font-display); font-weight:700; font-size:16px;}
+  .footer-note{font-size:12.5px; color:#AAB6CC; margin-top:12px; max-width:640px; line-height:1.6;}
+
+  @media (prefers-reduced-motion:reduce){
+    html{scroll-behavior:auto;}
+    .card-inner{transition:none;}
+  }
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-inner">
+    <div class="logo">
+      <div class="logo-mark">PT</div>
+      <div class="logo-text">PRODUCT&nbsp;TYCOON</div>
+      <div class="badge-concept">CONCEPT</div>
+    </div>
+    <div class="nav-links">
+      <span class="nav-link" title="Module non disponible dans cette démo">Feuille de route</span>
+      <span class="nav-link" title="Module non disponible dans cette démo">Équipe</span>
+      <span class="nav-link" title="Module non disponible dans cette démo">Facturation</span>
+    </div>
+    <div class="workspace-pill">Espace : Le Garage SAS ▾</div>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="wrap">
+    <span class="eyebrow">Module 00 — Onboarding</span>
+    <div class="toast">🎉 Félicitations. Vous êtes nommé·e CPO à partir d'aujourd'hui.</div>
+    <h1 class="hero-title">Chaque bonne pratique a un prix. Vous allez le découvrir en le payant.</h1>
+    <p class="hero-sub">Product Tycoon est un roguelike où vous reprenez la direction produit d'une organisation que vous n'avez pas construite. Contexte tiré au sort, équipe héritée, décisions rarement réversibles.</p>
+    <div class="stat-ticker">
+      <div class="stat-chip">💰 Runway <b>14 mois</b></div>
+      <div class="stat-chip">🫠 Moral équipe <b>62%</b></div>
+      <div class="stat-chip">🧱 Dette organisationnelle <b>38%</b></div>
+      <div class="stat-chip">🎯 Confiance du board <b>71%</b></div>
+    </div>
+    <div class="cta-row">
+      <a class="btn btn-primary" href="#ressources">Voir les ressources ↓</a>
+      <a class="btn btn-ghost" href="#mecanique">Comment ça marche ↓</a>
+      <a class="btn btn-ghost" href="#ecrans">Voir les écrans ↓</a>
+      <a class="btn btn-ghost" href="#epoques">Découvrir les contextes ↓</a>
+    </div>
+  </div>
+</header>
+
+<section class="section">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">Module 01 — Brief de mission</span>
+      <h2 class="section-title">Vous ne partez jamais d'une page blanche.</h2>
+      <p class="section-lead">À chaque run, un contexte est tiré au sort : les débuts de la Silicon Valley, une transformation agile imposée par le siège, ou un futur où l'IA prend de plus en plus de décisions. Vous héritez d'une équipe existante — âges, ancienneté et rapport au changement différents à chaque fois — et d'une trésorerie qui ne pardonne pas grand-chose.</p>
+    </div>
+    <div class="loop-row">
+      <div class="loop-step"><div class="n">01</div><div class="t">Contexte</div><div class="d">Une époque est tirée au sort, avec ses règles et ses modes.</div></div>
+      <div class="loop-arrow">→</div>
+      <div class="loop-step"><div class="n">02</div><div class="t">Équipe héritée</div><div class="d">Âges et maturités variables. Chaque profil réagit différemment.</div></div>
+      <div class="loop-arrow">→</div>
+      <div class="loop-step"><div class="n">03</div><div class="t">Décisions / sprint</div><div class="d">Vous déployez outils, process et rituels, sprint après sprint.</div></div>
+      <div class="loop-arrow">→</div>
+      <div class="loop-step"><div class="n">04</div><div class="t">Fin de mandat</div><div class="d">IPO, faillite, burn-out, ou pire. Rarement ce que vous aviez prévu.</div></div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="ressources">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">Module 02 — Ressources du mandat</span>
+      <h2 class="section-title">Six jauges. Aucune à optimiser seule.</h2>
+      <p class="section-lead">Les axes des cartes (coût humain, financier, time-to-market, productivité) sont la loupe : ce qu'une décision précise coûte dans l'instant. Les ressources ci-dessous sont le baromètre : ce que ces décisions, cumulées sprint après sprint, font à l'organisation dans son ensemble.</p>
+    </div>
+
+    <div class="resource-grid">
+      <div class="resource-card">
+        <div class="resource-icon">💰</div>
+        <div class="resource-name">Trésorerie</div>
+        <p class="resource-def">Le temps qu'il vous reste avant que la question de survie devienne la seule qui compte.</p>
+        <div class="resource-drivers">
+          <div><span class="k">Monte</span> — levée de fonds, ventes, coupes budgétaires</div>
+          <div><span class="k">Descend</span> — masse salariale, outillage, tout ce qui promet un ROI « plus tard »</div>
+        </div>
+        <p class="resource-zero">À sec → faillite.</p>
+      </div>
+
+      <div class="resource-card">
+        <div class="resource-icon">🫶</div>
+        <div class="resource-name">Moral &amp; confiance d'équipe</div>
+        <p class="resource-def">S'effondre en un sprint, se reconstruit en dix.</p>
+        <div class="resource-drivers">
+          <div><span class="k">Monte</span> — autonomie réelle, reconnaissance, décisions cohérentes avec le discours</div>
+          <div><span class="k">Descend</span> — pivots non expliqués, reporting excessif, promesses non tenues</div>
+        </div>
+        <p class="resource-zero">Au plancher → exode d'équipe.</p>
+      </div>
+
+      <div class="resource-card">
+        <div class="resource-icon">🧱</div>
+        <div class="resource-name">Dette organisationnelle</div>
+        <p class="resource-def">Le prix différé de chaque raccourci — technique, process ou décisionnel.</p>
+        <div class="resource-drivers">
+          <div><span class="k">Monte</span> — livrer vite, sauter les revues, empiler les exceptions « juste cette fois »</div>
+          <div><span class="k">Descend</span> — sprints de remise à plat, refus assumés de certaines demandes</div>
+        </div>
+        <p class="resource-zero">Au maximum → entreprise zombie : tout tourne, plus rien n'avance.</p>
+      </div>
+
+      <div class="resource-card">
+        <div class="resource-icon">🎯</div>
+        <div class="resource-name">Capital politique</div>
+        <p class="resource-def">Votre crédibilité auprès du board et des investisseurs — votre droit à vous tromper une fois de plus.</p>
+        <div class="resource-drivers">
+          <div><span class="k">Monte</span> — résultats visibles, alliés bien placés, reporting rassurant</div>
+          <div><span class="k">Descend</span> — objectifs manqués, silence en période de crise</div>
+        </div>
+        <p class="resource-zero">À zéro → le board reprend la main : rachat hostile.</p>
+      </div>
+
+      <div class="resource-card">
+        <div class="resource-icon">📈</div>
+        <div class="resource-name">Valeur perçue</div>
+        <p class="resource-def">Ce que le marché pense que vous valez, pas ce que vous croyez avoir construit.</p>
+        <div class="resource-drivers">
+          <div><span class="k">Monte</span> — features qui résolvent un vrai problème, bouche-à-oreille</div>
+          <div><span class="k">Descend</span> — retards visibles, concurrents qui avancent pendant vos réorganisations</div>
+        </div>
+        <p class="resource-zero">Au plancher → les utilisateurs partent avant vos investisseurs.</p>
+      </div>
+
+      <div class="resource-card">
+        <div class="resource-icon">🎭</div>
+        <div class="resource-name">Cynisme</div>
+        <p class="resource-def">La jauge invisible. Monte quand une pratique est copiée sans la culture qui va avec.</p>
+        <div class="resource-drivers">
+          <div><span class="k">Monte</span> — process imposés sans contexte, méthodes « parce que ça se fait ailleurs »</div>
+          <div><span class="k">Descend</span> — pratiques expliquées, adoptées sincèrement, ajustées avec l'équipe</div>
+        </div>
+        <p class="resource-zero">Au maximum → vos meilleures pratiques ne produisent plus que leurs effets pervers.</p>
+      </div>
+    </div>
+
+    <div class="tension-list">
+      <div class="tension-item">⚖️ <span><b>Capital politique ↑ / Moral équipe ↓</b> — rassurer le board coûte souvent la confiance du terrain.</span></div>
+      <div class="tension-item">⚖️ <span><b>Trésorerie ↑ / Dette organisationnelle ↑</b> — couper les coins ronds fait gagner du cash à court terme, à rembourser plus tard avec intérêts.</span></div>
+      <div class="tension-item">⚖️ <span><b>Valeur perçue ↑ / Moral équipe ↓</b> — pousser une feature en urgence impressionne le marché et épuise l'équipe qui l'a livrée.</span></div>
+      <div class="tension-item">⚖️ <span><b>Cynisme ↑</b> quand une pratique est copiée sans la culture qui va avec — et plus il est haut, pires deviennent tous vos futurs choix.</span></div>
+    </div>
+
+    <div class="hud">
+      <div class="hud-top">
+        <span class="hud-era">🛠️ Les années garage — Sprint 7</span>
+        <span class="hud-sprint">CPO : Vous</span>
+      </div>
+      <div class="hud-gauges">
+        <div class="gauge">
+          <div class="gauge-top"><span class="gauge-label">💰 Trésorerie</span><span class="gauge-value bad">11 mois (−3)</span></div>
+          <div class="gauge-bar"><div class="gauge-fill warn" style="width:46%"></div></div>
+        </div>
+        <div class="gauge">
+          <div class="gauge-top"><span class="gauge-label">🫶 Moral équipe</span><span class="gauge-value bad">47% (−15)</span></div>
+          <div class="gauge-bar"><div class="gauge-fill danger" style="width:47%"></div></div>
+        </div>
+        <div class="gauge">
+          <div class="gauge-top"><span class="gauge-label">🧱 Dette organisationnelle</span><span class="gauge-value bad">58% (+9)</span></div>
+          <div class="gauge-bar"><div class="gauge-fill danger" style="width:58%"></div></div>
+        </div>
+        <div class="gauge">
+          <div class="gauge-top"><span class="gauge-label">🎯 Capital politique</span><span class="gauge-value good">74% (+6)</span></div>
+          <div class="gauge-bar"><div class="gauge-fill" style="width:74%"></div></div>
+        </div>
+        <div class="gauge">
+          <div class="gauge-top"><span class="gauge-label">📈 Valeur perçue</span><span class="gauge-value bad">63% (−4)</span></div>
+          <div class="gauge-bar"><div class="gauge-fill warn" style="width:63%"></div></div>
+        </div>
+        <div class="gauge">
+          <div class="gauge-top"><span class="gauge-label">🎭 Cynisme</span><span class="gauge-value bad">41% (+11)</span></div>
+          <div class="gauge-bar"><div class="gauge-fill warn" style="width:41%"></div></div>
+        </div>
+      </div>
+
+      <div class="hud-journal">
+        <div class="hud-journal-title">Journal du sprint</div>
+        <div class="journal-entry">Sprint 5 — Décision : passage à Jira pour le suivi.<div class="journal-deltas">🫶 Moral −18 · 🧱 Dette −12 · 🎯 Capital politique +6</div></div>
+        <div class="journal-entry">Sprint 6 — Décision : activation du RICE Scoring.<div class="journal-deltas">🫶 Moral −9 · 📈 Valeur perçue +4 · 🎭 Cynisme +7</div></div>
+        <div class="journal-entry">Sprint 7 — Événement : un lead senior menace de partir.<div class="journal-deltas">🫶 Moral −15 · 💰 Trésorerie −3 (prime de rétention)</div></div>
+      </div>
+
+      <div class="hud-alert">⚠️ Tension active — Capital politique en hausse, Moral en baisse depuis 2 sprints : un évènement de type « mutinerie » devient plus probable au prochain tour.</div>
+    </div>
+
+    <p class="demo-caption">Interface indicative — les seuils de déclenchement (zombie, exode, rachat hostile...) restent à équilibrer en playtest.</p>
+  </div>
+</section>
+
+<section class="section section-alt" id="mecanique">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">Module 03 — Le cœur du jeu</span>
+      <h2 class="section-title">Une carte, deux visages.</h2>
+      <p class="section-lead">Chaque pratique affiche une promesse théorique. Cliquez sur une carte pour la retourner et voir son effet réel — qui dépend de qui la reçoit. Changez le profil d'équipe ci-dessous pour voir les cartes se recalibrer. Une fois activée, chacune de ces cartes devient une <strong>Fondation</strong> qui vit sur le plateau au-delà du sprint — voir le plateau en bas de la page suivante.</p>
+    </div>
+
+    <div class="team-toggle" role="group" aria-label="Choisir la maturité de l'équipe">
+      <button class="team-btn active" data-team="junior">🌱 Équipe junior — startup, 18 mois</button>
+      <button class="team-btn" data-team="senior">🏛️ Équipe senior — grand groupe, 12 ans</button>
+    </div>
+    <div class="legend"><span><span class="dot green"></span>Bénéfice</span><span><span class="dot red"></span>Coût</span></div>
+
+    <div class="cards-grid">
+
+      <div class="card-flip" data-card="rice" tabindex="0" role="button" aria-pressed="false" aria-label="Retourner la carte RICE">
+        <div class="card-inner">
+          <div class="card-front">
+            <div class="card-id">#PRD-014</div>
+            <div class="card-eyebrow">Module priorisation</div>
+            <div class="card-title">RICE Scoring</div>
+            <p class="card-tagline">Reach × Impact × Confidence ÷ Effort. La science contre le petit doigt mouillé.</p>
+            <div class="card-hint">cliquer pour retourner →</div>
+          </div>
+          <div class="card-back">
+            <div class="card-eyebrow">Effet réel — équipe junior</div>
+            <div class="axis-row" data-axis="humain"><div class="axis-top"><span class="axis-label">Coût humain</span><span class="axis-value"></span></div><div class="axis-bar"><div class="axis-fill"></div></div><p class="axis-note"></p></div>
+            <div class="axis-row" data-axis="financier"><div class="axis-top"><span class="axis-label">Coût financier</span><span class="axis-value"></span></div><div class="axis-bar"><div class="axis-fill"></div></div><p class="axis-note"></p></div>
+            <div class="axis-row" data-axis="ttm"><div class="axis-top"><span class="axis-label">Time-to-market</span><span class="axis-value"></span></div><div class="axis-bar"><div class="axis-fill"></div></div><p class="axis-note"></p></div>
+            <div class="axis-row" data-axis="productivite"><div class="axis-top"><span class="axis-label">Productivité</span><span class="axis-value"></span></div><div class="axis-bar"><div class="axis-fill"></div></div><p class="axis-note"></p></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card-flip" data-card="notion" tabindex="0" role="button" aria-pressed="false" aria-label="Retourner la carte Notion">
+        <div class="card-inner">
+          <div class="card-front">
+            <div class="card-id">#DOC-002</div>
+            <div class="card-eyebrow">Module documentation</div>
+            <div class="card-title">Notion</div>
+            <p class="card-tagline">Un espace blanc infini. Tout y est possible, y compris s'y perdre.</p>
+            <div class="card-hint">cliquer pour retourner →</div>
+          </div>
+          <div class="card-back">
+            <div class="card-eyebrow">Effet réel — équipe junior</div>
+            <div class="axis-row" data-axis="humain"><div class="axis-top"><span class="axis-label">Coût humain</span><span class="axis-value"></span></div><div class="axis-bar"><div class="axis-fill"></div></div><p class="axis-note"></p></div>
+            <div class="axis-row" data-axis="financier"><div class="axis-top"><span class="axis-label">Coût financier</span><span class="axis-value"></span></div><div class="axis-bar"><div class="axis-fill"></div></div><p class="axis-note"></p></div>
+            <div class="axis-row" data-axis="ttm"><div class="axis-top"><span class="axis-label">Time-to-market</span><span class="axis-value"></span></div><div class="axis-bar"><div class="axis-fill"></div></div><p class="axis-note"></p></div>
+            <div class="axis-row" data-axis="productivite"><div class="axis-top"><span class="axis-label">Productivité</span><span class="axis-value"></span></div><div class="axis-bar"><div class="axis-fill"></div></div><p class="axis-note"></p></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card-flip" data-card="jira" tabindex="0" role="button" aria-pressed="false" aria-label="Retourner la carte Jira">
+        <div class="card-inner">
+          <div class="card-front">
+            <div class="card-id">#DOC-003</div>
+            <div class="card-eyebrow">Module suivi &amp; doc</div>
+            <div class="card-title">Jira</div>
+            <p class="card-tagline">Chaque ticket a un statut. Chaque statut a un mensonge.</p>
+            <div class="card-hint">cliquer pour retourner →</div>
+          </div>
+          <div class="card-back">
+            <div class="card-eyebrow">Effet réel — équipe junior</div>
+            <div class="axis-row" data-axis="humain"><div class="axis-top"><span class="axis-label">Coût humain</span><span class="axis-value"></span></div><div class="axis-bar"><div class="axis-fill"></div></div><p class="axis-note"></p></div>
+            <div class="axis-row" data-axis="financier"><div class="axis-top"><span class="axis-label">Coût financier</span><span class="axis-value"></span></div><div class="axis-bar"><div class="axis-fill"></div></div><p class="axis-note"></p></div>
+            <div class="axis-row" data-axis="ttm"><div class="axis-top"><span class="axis-label">Time-to-market</span><span class="axis-value"></span></div><div class="axis-bar"><div class="axis-fill"></div></div><p class="axis-note"></p></div>
+            <div class="axis-row" data-axis="productivite"><div class="axis-top"><span class="axis-label">Productivité</span><span class="axis-value"></span></div><div class="axis-bar"><div class="axis-fill"></div></div><p class="axis-note"></p></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+    <p class="demo-caption">Exemple de calibrage, pas encore équilibré — les valeurs finales dépendront des tests de jeu.</p>
+  </div>
+</section>
+
+<section class="section" id="ecrans">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">Module 04 — Aperçu des écrans</span>
+      <h2 class="section-title">À quoi ressemble un sprint, concrètement.</h2>
+      <p class="section-lead">Trois moments d'un même sprint. Cliquez, sélectionnez, changez d'époque — tout est manipulable.</p>
+    </div>
+
+    <div class="screen-panel">
+      <div class="screen-label"><span class="live-dot"></span>Phase 1 — Inbox</div>
+      <div class="inbox-card">
+        <div class="inbox-head">
+          <span>De : Priya, Lead Engineering</span>
+          <span>Sprint 8 · non lu</span>
+        </div>
+        <div class="inbox-body">
+          <div class="inbox-subject">On peut parler deux minutes ?</div>
+          <p class="inbox-text">Un ingénieur senior très respecté demande un entretien improvisé. Il a reçu une offre ailleurs et veut savoir si son rôle va évoluer avant de répondre.</p>
+          <div class="inbox-choices">
+            <button class="inbox-choice" data-reveal="💰 Trésorerie −4 · 🫶 Moral +6 — il reste, et les autres l'apprennent vite.">Négocier une augmentation</button>
+            <button class="inbox-choice" data-reveal="🫶 Moral +2 · 🎭 Cynisme +5 — une promesse de plus à tenir un jour ou l'autre.">Lui promettre plus d'autonomie, sans budget</button>
+            <button class="inbox-choice" data-reveal="🎯 Capital politique −3 · 🫶 Moral −8 — il part dans trois semaines.">Ne rien changer, temporiser</button>
+          </div>
+          <div class="inbox-reveal" id="inbox-reveal"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="screen-panel">
+      <div class="screen-label"><span class="live-dot"></span>Phase 2 — Roadmap</div>
+      <div class="capacity-row">
+        <span>Capacité de l'équipe ce sprint</span>
+        <span id="capacity-count">2/3</span>
+      </div>
+      <div class="capacity-bar"><div class="capacity-fill" id="capacity-fill" style="width:66%"></div></div>
+      <div class="capacity-warning" id="capacity-warning">⚠️ Surchauffe — capacité dépassée : 🧱 Dette et 🎭 Cynisme vont grimper ce sprint.</div>
+      <div class="feature-grid">
+        <button class="feature-card selected">
+          <span class="feature-check">✓</span>
+          <span class="feature-name">Export multi-comptes</span>
+          <span class="feature-promise">« Débloque un gros compte enterprise »</span>
+          <span class="feature-icons">🎯 📈</span>
+        </button>
+        <button class="feature-card selected">
+          <span class="feature-check">✓</span>
+          <span class="feature-name">Refonte de l'onboarding</span>
+          <span class="feature-promise">« Réduit le churn des 30 premiers jours »</span>
+          <span class="feature-icons">📈 🫶</span>
+        </button>
+        <button class="feature-card">
+          <span class="feature-check">✓</span>
+          <span class="feature-name">Dark mode</span>
+          <span class="feature-promise">« Ce que tout le monde réclame sur Twitter »</span>
+          <span class="feature-icons">🫶</span>
+        </button>
+        <button class="feature-card">
+          <span class="feature-check">✓</span>
+          <span class="feature-name">Audit RGPD</span>
+          <span class="feature-promise">« Le board va adorer »</span>
+          <span class="feature-icons">🎯 🧱</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="screen-panel">
+      <div class="screen-label"><span class="live-dot"></span>Phase 4 — Recrutement</div>
+      <div class="shop-toggle" role="group" aria-label="Choisir l'habillage du shop">
+        <button class="shop-btn active" data-skin="moderne">🏙️ Époque moderne</button>
+        <button class="shop-btn" data-skin="annonces">🗞️ Petites annonces — garage days</button>
+      </div>
+
+      <div class="candidate-grid skin-grid show" data-skin="moderne">
+        <div class="candidate-card">
+          <div class="candidate-avatar">🧑‍💼</div>
+          <div class="candidate-name">Sofia — PM Senior</div>
+          <div class="candidate-role">Employée, temps plein</div>
+          <div class="candidate-badges"><span class="candidate-badge">Culture fit : élevé</span><span class="candidate-badge">Préavis : 1 mois</span></div>
+          <div class="candidate-cost">€€€ / sprint</div>
+          <button class="candidate-btn">Embaucher</button>
+        </div>
+        <div class="candidate-card">
+          <div class="candidate-avatar">🧑‍💻</div>
+          <div class="candidate-name">Contractuel — Dev Backend</div>
+          <div class="candidate-role">Consultant, mission courte</div>
+          <div class="candidate-badges"><span class="candidate-badge">Sans engagement long terme</span></div>
+          <div class="candidate-cost">€€€€ / sprint</div>
+          <button class="candidate-btn">Mandater</button>
+        </div>
+        <div class="candidate-card">
+          <div class="candidate-avatar">🧑</div>
+          <div class="candidate-name">Kevin — Ops Junior</div>
+          <div class="candidate-role">Employé, temps plein</div>
+          <div class="candidate-badges"><span class="candidate-badge">Culture fit : moyen</span></div>
+          <div class="candidate-cost">€ / sprint</div>
+          <button class="candidate-btn">Embaucher</button>
+        </div>
+      </div>
+
+      <div class="candidate-grid skin-grid" data-skin="annonces">
+        <div class="ad-card">
+          <div class="ad-title">Cherche codeur motivé</div>
+          Stock-options en lieu de salaire. Nuits courtes tolérées. Se présenter avant vendredi, garage au fond de l'impasse.
+          <button class="candidate-btn ad-btn">Répondre à l'annonce</button>
+        </div>
+        <div class="ad-card">
+          <div class="ad-title">Consultant disponible</div>
+          Ancien de chez GrosCorp. Facture à la journée. Slides PowerPoint fournies. Résultats non garantis.
+          <button class="candidate-btn ad-btn">Répondre à l'annonce</button>
+        </div>
+        <div class="ad-card">
+          <div class="ad-title">Stagiaire cherche expérience</div>
+          Apprend vite, coûte presque rien, repart dans six mois avec toute la mémoire du projet.
+          <button class="candidate-btn ad-btn">Répondre à l'annonce</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="screen-panel">
+      <div class="screen-label"><span class="live-dot"></span>Toujours visible — Plateau des Fondations</div>
+      <p style="font-size:13px; color:var(--ink-soft); margin-bottom:16px;">Pas un compte à rebours : soit une décision est déjà active, soit elle attend une condition précise sur le plateau — jamais un simple minuteur.</p>
+      <div class="fondation-grid">
+        <div class="fondation-card waiting">
+          <span class="fondation-status waiting">🕐 En attente</span>
+          <div class="fondation-family">Méthodologie d'orga</div>
+          <div class="fondation-name">Passage en Shape Up</div>
+          <div class="fondation-detail">Manque : 1 Lead formé. S'active automatiquement au sprint suivant le recrutement du bon profil.</div>
+        </div>
+        <div class="fondation-card">
+          <span class="fondation-status active">✅ Actif depuis le sprint 6</span>
+          <div class="fondation-family">Outil / process</div>
+          <div class="fondation-name">Notion</div>
+          <div class="fondation-detail">+ Valeur perçue sur toute feature Roadmap taguée documentation.</div>
+        </div>
+        <div class="fondation-card">
+          <span class="fondation-status active">✅ Actif depuis le sprint 3</span>
+          <div class="fondation-family">Stack technique</div>
+          <div class="fondation-name">Stack React</div>
+          <div class="fondation-detail">Profils Dev Frontend ×2 plus fréquents dans le shop, coût réduit.</div>
+        </div>
+      </div>
+    </div>
+
+    <p class="demo-caption">Écrans indicatifs — la mise en page finale dépendra du moteur de jeu choisi.</p>
+  </div>
+</section>
+
+<section class="section" id="epoques">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">Module 05 — Contextes de run</span>
+      <h2 class="section-title">Le contexte change les règles du jeu.</h2>
+      <p class="section-lead">Même carte, même joueur·se, résultat différent selon l'époque dans laquelle vous atterrissez.</p>
+    </div>
+    <div class="era-grid">
+      <div class="era-card">
+        <span class="era-badge">🛠️ 1976 – 1984</span>
+        <div class="era-name">Les années garage</div>
+        <p class="era-desc">Deux fondateurs, un garage, zéro process. Vous inventez les règles au fur et à mesure — et elles finissent par vous inventer en retour.</p>
+        <div class="era-meta">
+          <div><span class="k">Tension</span><br>Liberté totale ↔ épuisement fondateur</div>
+          <div><span class="k">Boss de fin</span><br>Le pitch devant les investisseurs</div>
+        </div>
+      </div>
+      <div class="era-card">
+        <span class="era-badge">📋 2006 – 2014</span>
+        <div class="era-name">La grande transformation agile</div>
+        <p class="era-desc">Un cabinet de conseil a convaincu la direction. Un coach agile débarque avec des post-it. Le vrai jeu commence maintenant.</p>
+        <div class="era-meta">
+          <div><span class="k">Tension</span><br>Rituels sincères ↔ théâtre d'entreprise</div>
+          <div><span class="k">Boss de fin</span><br>La revue de sprint devant le comité de direction</div>
+        </div>
+      </div>
+      <div class="era-card">
+        <span class="era-badge">🤖 20XX</span>
+        <div class="era-name">L'IA qui remplace tout le monde</div>
+        <p class="era-desc">L'IA était un outil. Puis une collègue. La frontière s'est brouillée pendant que vous signiez les budgets.</p>
+        <div class="era-meta">
+          <div><span class="k">Tension</span><br>Productivité affichée ↔ légitimité humaine</div>
+          <div><span class="k">Boss de fin</span><br>Le board demande pourquoi garder des humains</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section section-alt">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">Module 06 — Sorties de run</span>
+      <h2 class="section-title">Il y a plus d'une façon de perdre. Et de gagner.</h2>
+    </div>
+    <div class="ending-grid">
+      <div class="ending-badge"><div class="ending-label">🚀 IPO</div><div class="ending-note">Vous sonnez la cloche. Personne ne sait ce que fait vraiment le produit.</div></div>
+      <div class="ending-badge"><div class="ending-label">🤝 Rachat</div><div class="ending-note">Un plus gros vous avale. Votre roadmap devient un slide dans leur QBR.</div></div>
+      <div class="ending-badge"><div class="ending-label">💸 Faillite</div><div class="ending-note">Le runway touche zéro avant le product-market fit.</div></div>
+      <div class="ending-badge"><div class="ending-label">🔥 Burn-out fondateur·rice</div><div class="ending-note">Vous démissionnez. La légende veut que vous ayez eu raison, en privé.</div></div>
+      <div class="ending-badge"><div class="ending-label">🚪 Exode d'équipe</div><div class="ending-note">Ils partent tous la même semaine. Vous découvrez un canal Slack sans vous.</div></div>
+      <div class="ending-badge"><div class="ending-label">🤖 Remplacé·e par l'IA</div><div class="ending-note">Le board a fini par répondre à sa propre question.</div></div>
+      <div class="ending-badge"><div class="ending-label">🧟 Entreprise zombie</div><div class="ending-note">Tout continue de tourner. Plus personne ne sait pourquoi.</div></div>
+      <div class="ending-badge"><div class="ending-label">🏛️ Rachat hostile</div><div class="ending-note">Vous n'étiez pas dans la salle où ça s'est décidé.</div></div>
+    </div>
+  </div>
+</section>
+
+<footer class="footer">
+  <div class="wrap">
+    <div class="footer-title">PRODUCT TYCOON</div>
+    <p class="footer-note">Document de travail, pas un produit fini — cette page sert de base de réflexion sur le gameplay. RICE est un framework de priorisation public ; Notion et Jira sont cités à titre de référence, sans affiliation. Aucune métrique n'a été blessée pendant la conception de cette page — beaucoup d'egos, en revanche.</p>
+  </div>
+</footer>
+
+<script>
+  const cardData = {
+    rice: {
+      junior: {
+        humain: {value:25, note:"Cadre qui rassure une équipe qui manque encore de repères."},
+        financier: {value:-5, note:"Quasi nul — un tableur suffit."},
+        ttm: {value:-15, note:"Premier sprint ralenti le temps d'apprendre la grille."},
+        productivite: {value:30, note:"Priorisation plus lisible, moins de débats sans fin."}
+      },
+      senior: {
+        humain: {value:-35, note:"Perçu comme un contrôle sur un instinct qui marchait déjà bien."},
+        financier: {value:-5, note:"Toujours quasi nul."},
+        ttm: {value:-25, note:"Réunions interminables pour négocier les scores."},
+        productivite: {value:10, note:"Léger gain d'alignement, si tout le monde joue vraiment le jeu."}
+      }
+    },
+    notion: {
+      junior: {
+        humain: {value:30, note:"Équipe conquise par la liberté de mise en page."},
+        financier: {value:-10, note:"Abonnement modéré par utilisateur."},
+        ttm: {value:15, note:"Mise en place en une après-midi."},
+        productivite: {value:-10, note:"Premiers signes de pages orphelines et de doublons."}
+      },
+      senior: {
+        humain: {value:-10, note:"La conformité s'inquiète de l'absence de structure."},
+        financier: {value:-10, note:"Coût comparable, mais moins bien justifié en interne."},
+        ttm: {value:-5, note:"Il faut poser des règles de gouvernance avant d'ouvrir les vannes."},
+        productivite: {value:-30, note:"Perte de traçabilité sur un historique critique."}
+      }
+    },
+    jira: {
+      junior: {
+        humain: {value:-30, note:"Vécu comme une mise sous surveillance d'une équipe de six personnes."},
+        financier: {value:-20, note:"Licences qui pèsent lourd pour un budget serré."},
+        ttm: {value:-20, note:"Paramétrage des workflows avant la première ligne de code."},
+        productivite: {value:15, note:"Un vrai gain, une fois la friction initiale passée."}
+      },
+      senior: {
+        humain: {value:5, note:"Une routine connue, personne n'est surpris."},
+        financier: {value:-15, note:"Coût récurrent, mais déjà budgété depuis longtemps."},
+        ttm: {value:5, note:"L'équipe sait déjà s'en servir."},
+        productivite: {value:35, note:"Traçabilité qui rassure l'audit et la direction."}
+      }
+    }
+  };
+
+  const teamLabels = { junior: "équipe junior", senior: "équipe senior" };
+  let currentTeam = "junior";
+
+  function renderCards(){
+    document.querySelectorAll(".card-flip").forEach(cardEl => {
+      const key = cardEl.getAttribute("data-card");
+      const data = cardData[key][currentTeam];
+      cardEl.querySelector(".card-back .card-eyebrow").textContent = "Effet réel — " + teamLabels[currentTeam];
+      cardEl.querySelectorAll(".axis-row").forEach(row => {
+        const axis = row.getAttribute("data-axis");
+        const d = data[axis];
+        const fill = row.querySelector(".axis-fill");
+        const valueEl = row.querySelector(".axis-value");
+        const noteEl = row.querySelector(".axis-note");
+        const isPositive = d.value >= 0;
+        fill.style.width = Math.min(Math.abs(d.value), 100) + "%";
+        fill.className = "axis-fill " + (isPositive ? "positive" : "negative");
+        valueEl.className = "axis-value " + (isPositive ? "positive" : "negative");
+        valueEl.textContent = (isPositive ? "+" : "−") + Math.abs(d.value);
+        noteEl.textContent = d.note;
+      });
+    });
+  }
+
+  document.querySelectorAll(".team-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".team-btn").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      currentTeam = btn.getAttribute("data-team");
+      renderCards();
+    });
+  });
+
+  function toggleFlip(cardEl){
+    const flipped = cardEl.classList.toggle("is-flipped");
+    cardEl.setAttribute("aria-pressed", flipped ? "true" : "false");
+  }
+
+  document.querySelectorAll(".card-flip").forEach(cardEl => {
+    cardEl.addEventListener("click", () => toggleFlip(cardEl));
+    cardEl.addEventListener("keydown", (e) => {
+      if(e.key === "Enter" || e.key === " "){
+        e.preventDefault();
+        toggleFlip(cardEl);
+      }
+    });
+  });
+
+  renderCards();
+
+  // INBOX
+  document.querySelectorAll(".inbox-choice").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".inbox-choice").forEach(b => b.classList.remove("chosen"));
+      btn.classList.add("chosen");
+      const reveal = document.getElementById("inbox-reveal");
+      reveal.textContent = btn.getAttribute("data-reveal");
+      reveal.classList.add("show");
+    });
+  });
+
+  // ROADMAP — capacité
+  const CAPACITY_MAX = 3;
+  function updateCapacity(){
+    const selected = document.querySelectorAll(".feature-card.selected").length;
+    document.getElementById("capacity-count").textContent = selected + "/" + CAPACITY_MAX;
+    const pct = Math.min((selected / CAPACITY_MAX) * 100, 100);
+    const fill = document.getElementById("capacity-fill");
+    fill.style.width = pct + "%";
+    const over = selected > CAPACITY_MAX;
+    fill.classList.toggle("over", over);
+    document.getElementById("capacity-warning").classList.toggle("show", over);
+  }
+  document.querySelectorAll(".feature-card").forEach(card => {
+    card.addEventListener("click", () => {
+      card.classList.toggle("selected");
+      updateCapacity();
+    });
+  });
+  updateCapacity();
+
+  // RECRUTEMENT — toggle d'habillage
+  document.querySelectorAll(".shop-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".shop-btn").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      const skin = btn.getAttribute("data-skin");
+      document.querySelectorAll(".skin-grid").forEach(grid => {
+        grid.classList.toggle("show", grid.getAttribute("data-skin") === skin);
+      });
+    });
+  });
+
+  // RECRUTEMENT — feedback de clic
+  document.querySelectorAll(".candidate-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      if(!btn.disabled){
+        btn.textContent = btn.textContent + " ✓";
+        btn.disabled = true;
+        btn.style.opacity = "0.65";
+      }
+    });
+  });
+</script>
+
+</body>
+</html>
