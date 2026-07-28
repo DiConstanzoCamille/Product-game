@@ -1,0 +1,80 @@
+{
+  "axes": [
+    { "id": "humain", "label": "Coût humain" },
+    { "id": "financier", "label": "Coût financier" },
+    { "id": "ttm", "label": "Time-to-market" },
+    { "id": "productivite", "label": "Productivité" }
+  ],
+  "teamProfiles": [
+    { "id": "junior", "label": "🌱 Équipe junior — startup, 18 mois", "shortLabel": "équipe junior" },
+    { "id": "senior", "label": "🏛️ Équipe senior — grand groupe, 12 ans", "shortLabel": "équipe senior" }
+  ],
+  "cards": [
+    {
+      "id": "rice",
+      "refId": "PRD-014",
+      "family": "outil-process",
+      "category": "Module priorisation",
+      "name": "RICE Scoring",
+      "tagline": "Reach × Impact × Confidence ÷ Effort. La science contre le petit doigt mouillé.",
+      "effects": {
+        "junior": {
+          "humain": { "value": 25, "note": "Cadre qui rassure une équipe qui manque encore de repères." },
+          "financier": { "value": -5, "note": "Quasi nul — un tableur suffit." },
+          "ttm": { "value": -15, "note": "Premier sprint ralenti le temps d'apprendre la grille." },
+          "productivite": { "value": 30, "note": "Priorisation plus lisible, moins de débats sans fin." }
+        },
+        "senior": {
+          "humain": { "value": -35, "note": "Perçu comme un contrôle sur un instinct qui marchait déjà bien." },
+          "financier": { "value": -5, "note": "Toujours quasi nul." },
+          "ttm": { "value": -25, "note": "Réunions interminables pour négocier les scores." },
+          "productivite": { "value": 10, "note": "Léger gain d'alignement, si tout le monde joue vraiment le jeu." }
+        }
+      }
+    },
+    {
+      "id": "notion",
+      "refId": "DOC-002",
+      "family": "outil-process",
+      "category": "Module documentation",
+      "name": "Notion",
+      "tagline": "Un espace blanc infini. Tout y est possible, y compris s'y perdre.",
+      "effects": {
+        "junior": {
+          "humain": { "value": 30, "note": "Équipe conquise par la liberté de mise en page." },
+          "financier": { "value": -10, "note": "Abonnement modéré par utilisateur." },
+          "ttm": { "value": 15, "note": "Mise en place en une après-midi." },
+          "productivite": { "value": -10, "note": "Premiers signes de pages orphelines et de doublons." }
+        },
+        "senior": {
+          "humain": { "value": -10, "note": "La conformité s'inquiète de l'absence de structure." },
+          "financier": { "value": -10, "note": "Coût comparable, mais moins bien justifié en interne." },
+          "ttm": { "value": -5, "note": "Il faut poser des règles de gouvernance avant d'ouvrir les vannes." },
+          "productivite": { "value": -30, "note": "Perte de traçabilité sur un historique critique." }
+        }
+      }
+    },
+    {
+      "id": "jira",
+      "refId": "DOC-003",
+      "family": "outil-process",
+      "category": "Module suivi & doc",
+      "name": "Jira",
+      "tagline": "Chaque ticket a un statut. Chaque statut a un mensonge.",
+      "effects": {
+        "junior": {
+          "humain": { "value": -30, "note": "Vécu comme une mise sous surveillance d'une équipe de six personnes." },
+          "financier": { "value": -20, "note": "Licences qui pèsent lourd pour un budget serré." },
+          "ttm": { "value": -20, "note": "Paramétrage des workflows avant la première ligne de code." },
+          "productivite": { "value": 15, "note": "Un vrai gain, une fois la friction initiale passée." }
+        },
+        "senior": {
+          "humain": { "value": 5, "note": "Une routine connue, personne n'est surpris." },
+          "financier": { "value": -15, "note": "Coût récurrent, mais déjà budgété depuis longtemps." },
+          "ttm": { "value": 5, "note": "L'équipe sait déjà s'en servir." },
+          "productivite": { "value": 35, "note": "Traçabilité qui rassure l'audit et la direction." }
+        }
+      }
+    }
+  ]
+}

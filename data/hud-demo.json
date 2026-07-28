@@ -1,0 +1,30 @@
+{
+  "era": "🛠️ Les années garage — Sprint 7",
+  "cpo": "Vous",
+  "gauges": [
+    { "id": "tresorerie", "label": "💰 Trésorerie", "display": "11 mois (−3)", "percent": 46, "state": "warn" },
+    { "id": "moral", "label": "🫶 Moral équipe", "display": "47% (−15)", "percent": 47, "state": "danger" },
+    { "id": "dette-organisationnelle", "label": "🧱 Dette organisationnelle", "display": "58% (+9)", "percent": 58, "state": "danger" },
+    { "id": "capital-politique", "label": "🎯 Capital politique", "display": "74% (+6)", "percent": 74, "state": "good" },
+    { "id": "valeur-percue", "label": "📈 Valeur perçue", "display": "63% (−4)", "percent": 63, "state": "warn" },
+    { "id": "cynisme", "label": "🎭 Cynisme", "display": "41% (+11)", "percent": 41, "state": "warn" }
+  ],
+  "journal": [
+    {
+      "sprint": 5,
+      "text": "Décision : passage à Jira pour le suivi.",
+      "deltas": "🫶 Moral −18 · 🧱 Dette −12 · 🎯 Capital politique +6"
+    },
+    {
+      "sprint": 6,
+      "text": "Décision : activation du RICE Scoring.",
+      "deltas": "🫶 Moral −9 · 📈 Valeur perçue +4 · 🎭 Cynisme +7"
+    },
+    {
+      "sprint": 7,
+      "text": "Événement : un lead senior menace de partir.",
+      "deltas": "🫶 Moral −15 · 💰 Trésorerie −3 (prime de rétention)"
+    }
+  ],
+  "alert": "⚠️ Tension active — Capital politique en hausse, Moral en baisse depuis 2 sprints : un évènement de type « mutinerie » devient plus probable au prochain tour."
+}

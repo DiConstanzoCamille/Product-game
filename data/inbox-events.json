@@ -1,0 +1,29 @@
+{
+  "events": [
+    {
+      "id": "priya-lead-engineering",
+      "from": "Priya, Lead Engineering",
+      "sprint": 8,
+      "status": "non lu",
+      "subject": "On peut parler deux minutes ?",
+      "text": "Un ingénieur senior très respecté demande un entretien improvisé. Il a reçu une offre ailleurs et veut savoir si son rôle va évoluer avant de répondre.",
+      "choices": [
+        {
+          "id": "negocier-augmentation",
+          "label": "Négocier une augmentation",
+          "reveal": "💰 Trésorerie −4 · 🫶 Moral +6 — il reste, et les autres l'apprennent vite."
+        },
+        {
+          "id": "promettre-autonomie",
+          "label": "Lui promettre plus d'autonomie, sans budget",
+          "reveal": "🫶 Moral +2 · 🎭 Cynisme +5 — une promesse de plus à tenir un jour ou l'autre."
+        },
+        {
+          "id": "temporiser",
+          "label": "Ne rien changer, temporiser",
+          "reveal": "🎯 Capital politique −3 · 🫶 Moral −8 — il part dans trois semaines."
+        }
+      ]
+    }
+  ]
+}

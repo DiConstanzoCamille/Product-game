@@ -1,0 +1,46 @@
+{
+  "eras": [
+    {
+      "id": "garage",
+      "icon": "🛠️",
+      "period": "1976–1984",
+      "name": "Les années garage",
+      "description": "Deux fondateurs, un garage, zéro process. Vous inventez les règles au fur et à mesure — et elles finissent par vous inventer en retour.",
+      "tension": "Liberté totale ↔ épuisement fondateur",
+      "boss": "Le pitch devant les investisseurs",
+      "systemicEffects": [
+        "Pas de cartes « process » avant un jalon",
+        "Décisions informelles moins coûteuses en cynisme",
+        "Seuil de cynisme plus tolérant"
+      ]
+    },
+    {
+      "id": "agile-transformation",
+      "icon": "📋",
+      "period": "2006–2014",
+      "name": "La grande transformation agile",
+      "description": "Un cabinet de conseil a convaincu la direction. Un coach agile débarque avec des post-it. Le vrai jeu commence maintenant.",
+      "tension": "Rituels sincères ↔ théâtre d'entreprise",
+      "boss": "La revue de sprint devant le comité de direction",
+      "systemicEffects": [
+        "Cartes rituelles disponibles dès le départ",
+        "Impact cynisme des cartes rituelles ×1.5",
+        "Seuil de cynisme plus bas (l'organisation est déjà sceptique)"
+      ]
+    },
+    {
+      "id": "ai-era",
+      "icon": "🤖",
+      "period": "20XX",
+      "name": "L'IA qui remplace tout le monde",
+      "description": "L'IA était un outil. Puis une collègue. La frontière s'est brouillée pendant que vous signiez les budgets.",
+      "tension": "Productivité affichée ↔ légitimité humaine",
+      "boss": "Le board demande pourquoi garder des humains",
+      "systemicEffects": [
+        "Employés-agents IA disponibles au shop",
+        "Gains de productivité plus généreux, coûts moral plus élevés",
+        "Seuil de capital politique plus bas"
+      ]
+    }
+  ]
+}
