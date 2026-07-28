@@ -10,7 +10,8 @@ Ce dépôt rassemble les documents de conception du jeu. **C'est un document de 
 Product-game/
 ├── docs/
 │   ├── carnet-de-regles.md   # les règles complètes, en prose (référence en cas de désaccord)
-│   └── data-schema.md        # description de chaque fichier JSON dans data/
+│   ├── data-schema.md        # description de chaque fichier JSON dans data/
+│   └── tech-stack.md         # choix du moteur de jeu (Godot 4) et pourquoi
 ├── data/                     # données de jeu structurées, extraites du carnet de règles
 │   ├── resources.json               # les 6 jauges + leurs tensions
 │   ├── cards.json                   # cartes structurelles calibrées (RICE, Notion, Jira)
@@ -31,6 +32,7 @@ Product-game/
 
 - [`docs/carnet-de-regles.md`](docs/carnet-de-regles.md) — le carnet de règles complet : structure temporelle, ressources, système de cartes, effets persistants, roadmap, recrutement, époques, fins de mandat, et les questions ouvertes encore à trancher.
 - [`docs/data-schema.md`](docs/data-schema.md) — le détail du schéma de chaque fichier JSON.
+- [`docs/tech-stack.md`](docs/tech-stack.md) — le choix du moteur de jeu (Godot 4) et les alternatives écartées (Three.js, Unity, Unreal, stack web).
 - [`landing/index.html`](landing/index.html) — une page de présentation interactive du concept : cartes retournables, jauges de ressources, aperçu d'écrans de jeu (inbox, roadmap, recrutement), présentation des époques et des fins de mandat. Toutes ses données viennent de `data/`, pas de contenu codé en dur.
 
 ## Voir la landing page
