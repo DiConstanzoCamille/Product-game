@@ -30,8 +30,11 @@ Product-game/
 │   └── js/main.js                   # charge les JSON de data/ et rend le DOM dynamiquement
 └── game/                            # projet Godot 4 — voir game/README.md
     ├── project.godot
-    ├── resources/theme/main_theme.tres  # thème partagé (couleurs de marque)
-    ├── scenes/screens/                  # 7 écrans : accueil + les 5 phases de sprint + fondations
+    ├── assets/                       # polices, icônes, avatars — licences dans THIRD_PARTY_NOTICES.md
+    ├── resources/
+    │   ├── theme/main_theme.tres     # thème partagé (couleurs de marque)
+    │   └── shaders/                  # fond quadrillé façon landing page
+    ├── scenes/screens/               # 7 écrans : accueil + les 5 phases de sprint + fondations
     │   ├── start_screen.tscn
     │   ├── inbox_screen.tscn
     │   ├── roadmap_screen.tscn
@@ -41,7 +44,7 @@ Product-game/
     │   └── foundations_screen.tscn
     └── scripts/
         ├── autoload/          # game_data.gd (charge data/*.json) + sprint_state.gd (état partagé)
-        ├── ui_helpers.gd      # styles partagés (barres, couleurs d'état)
+        ├── ui_helpers.gd      # polices, icônes, avatars, animations, styles partagés
         └── screens/           # un script par écran
 ```
 
@@ -49,7 +52,7 @@ Product-game/
 - [`docs/data-schema.md`](docs/data-schema.md) — le détail du schéma de chaque fichier JSON.
 - [`docs/tech-stack.md`](docs/tech-stack.md) — le choix du moteur de jeu (Godot 4) et les alternatives écartées (Three.js, Unity, Unreal, stack web).
 - [`landing/index.html`](landing/index.html) — une page de présentation interactive du concept : cartes retournables, jauges de ressources, aperçu d'écrans de jeu (inbox, roadmap, recrutement), présentation des époques et des fins de mandat. Toutes ses données viennent de `data/`, pas de contenu codé en dur.
-- [`game/`](game/README.md) — le projet Godot 4 : la boucle complète d'un sprint est jouable (Accueil → Inbox → Roadmap → Grandes décisions → Recrutement → Résolution → sprint suivant), avec les mêmes `data/*.json` que la landing page. Pas encore une simulation équilibrée — voir `game/README.md` pour le détail et les limites connues.
+- [`game/`](game/README.md) — le projet Godot 4 : la boucle complète d'un sprint est jouable (Accueil → Inbox → Roadmap → Grandes décisions → Recrutement → Résolution → sprint suivant), avec les mêmes `data/*.json` que la landing page, une identité visuelle propre (polices de marque, icônes, portraits, fond quadrillé, animations légères — toutes licences libres, détail dans `game/assets/THIRD_PARTY_NOTICES.md`). Pas encore une simulation équilibrée — voir `game/README.md` pour le détail et les limites connues.
 
 ## Voir la landing page
 

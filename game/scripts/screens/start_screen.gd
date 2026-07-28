@@ -9,6 +9,10 @@ const INBOX_SCENE := "res://scenes/screens/inbox_screen.tscn"
 @onready var rules_panel: PanelContainer = $RulesPanel
 @onready var rules_text: RichTextLabel = $RulesPanel/VBoxContainer/ScrollContainer/RulesText
 @onready var rules_close_button: Button = $RulesPanel/VBoxContainer/CloseButton
+@onready var eyebrow_label: Label = $CenterContainer/VBoxContainer/Eyebrow
+@onready var title_label: Label = $CenterContainer/VBoxContainer/Title
+@onready var footer_label: Label = $CenterContainer/VBoxContainer/Footer
+@onready var rules_title_label: Label = $RulesPanel/VBoxContainer/RulesTitle
 
 
 func _ready() -> void:
@@ -19,6 +23,15 @@ func _ready() -> void:
 	quit_button.pressed.connect(_on_quit_pressed)
 	rules_close_button.pressed.connect(_on_rules_close_pressed)
 
+	for btn in [new_game_button, rules_button, quit_button]:
+		UIHelpers.add_hover_bounce(btn)
+
+	UIHelpers.apply_mono(eyebrow_label, 13, true)
+	UIHelpers.apply_heading(title_label, 52, 700.0)
+	UIHelpers.apply_mono(footer_label, 11)
+	UIHelpers.apply_heading(rules_title_label, 22, 600.0)
+
+	UIHelpers.fade_in(self)
 	_populate_rules_text()
 
 

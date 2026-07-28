@@ -10,14 +10,22 @@ La boucle complète d'un sprint est jouable de bout en bout (Accueil → Inbox �
 2. Dans Godot, "Importer", puis sélectionner `game/project.godot`.
 3. Lancer le projet (F5) — l'écran d'accueil s'affiche. Cliquer "Nouvelle partie" pour parcourir un sprint complet.
 
+**Première ouverture** : Godot doit importer les polices avant de pouvoir charger le thème qui les référence. Si le premier lancement affiche des erreurs `Parse Error` sur `main_theme.tres`, c'est cet ordre d'import qui n'a pas encore eu lieu — rouvrez simplement le projet une seconde fois (ou relancez F5), l'erreur ne se reproduit pas ensuite.
+
 ## Structure
 
 ```
 game/
 ├── project.godot                        # config du projet, autoloads, thème par défaut
 ├── icon.svg
+├── assets/
+│   ├── THIRD_PARTY_NOTICES.md            # licences de tout ce qui suit
+│   ├── fonts/                            # Space Grotesk, IBM Plex Sans/Mono (OFL)
+│   ├── icons/                            # set Lucide, trait blanc teintable (ISC)
+│   └── avatars/                          # portraits DiceBear générés localement (CC0)
 ├── resources/
-│   └── theme/main_theme.tres             # thème partagé (couleurs de marque : navy-deep, ambre...)
+│   ├── theme/main_theme.tres             # thème partagé (couleurs de marque : navy-deep, ambre...)
+│   └── shaders/grid_background*          # fond quadrillé façon landing page
 ├── scenes/screens/
 │   ├── start_screen.tscn                 # écran d'accueil — run/main_scene
 │   ├── inbox_screen.tscn                 # phase 1 — événement + choix
@@ -30,7 +38,7 @@ game/
     ├── autoload/
     │   ├── game_data.gd                  # singleton : charge tous les data/*.json au démarrage
     │   └── sprint_state.gd               # singleton léger : n° de sprint, profil d'équipe courant
-    ├── ui_helpers.gd                     # styles de barres de progression, couleurs d'état partagés
+    ├── ui_helpers.gd                     # polices, icônes, avatars, barres, fade-in, hover (voir plus bas)
     └── screens/                          # un script par écran ci-dessus
 ```
 
@@ -48,6 +56,18 @@ Chaque écran a un bouton **← Accueil** (retour au menu à tout moment) et un 
 
 Le thème visuel (`resources/theme/main_theme.tres`) est appliqué par défaut à tout le projet (`[gui] theme/custom`) — un nouvel écran hérite des couleurs de marque sans re-stylisation manuelle.
 
+## Habillage visuel
+
+Tout ce qui n'est pas généré par shader vit dans `assets/`, avec les licences détaillées dans [`assets/THIRD_PARTY_NOTICES.md`](assets/THIRD_PARTY_NOTICES.md) (toutes libres d'usage commercial : OFL, ISC, CC0).
+
+- **Polices** — Space Grotesk (titres) et IBM Plex Sans/Mono (corps, labels mono), les mêmes familles que `landing/`. Le poids des titres est piloté par code via `UIHelpers.apply_heading()` / `apply_mono()` (variation de police à la volée), pas par un thème pré-figé — un nouvel écran les récupère avec un seul appel.
+- **Icônes** — set [Lucide](https://lucide.dev/) (trait, teintable via `modulate`) à la place des emoji pour les ressources, les profils d'équipe et le statut des Fondations. `UIHelpers.make_icon(nom, taille, couleur)`.
+- **Avatars** — portraits [DiceBear](https://www.dicebear.com/) (style Notionists) générés une fois hors-ligne pour les personnages nommés (Priya, Sofia, Kevin...), affichés sur l'Inbox et le Recrutement. `UIHelpers.make_avatar(seed, taille)` retombe sur une icône générique si aucun portrait ne correspond au nom (ex. les candidats des petites annonces, anonymes par nature).
+- **Fond quadrillé** — `resources/shaders/grid_background.gdshader` reproduit en shader le fond à grille de `landing/css/style.css`, appliqué à tous les écrans.
+- **Animations** — `UIHelpers.fade_in()` (arrivée en fondu sur chaque écran), `UIHelpers.add_hover_bounce()` (léger zoom au survol des boutons), et un flip `scale.x` sur les cartes de Grandes décisions qui fait écho au retournement de carte de la landing page.
+
+Pas de dépendance/plugin externe : tout est construit avec les nœuds et l'API standard de Godot (`FontVariation`, `Tween`, `ShaderMaterial`, `TextureRect`).
+
 ## Chargement des données
 
 `GameData` (autoload) charge chaque fichier de `data/` au démarrage : `GameData.resources`, `GameData.cards`, `GameData.eras`, `GameData.endings`, `GameData.foundations`, `GameData.roadmap_features`, `GameData.inbox_events`, `GameData.recruitment_archetypes`, `GameData.recruitment_demo`, `GameData.hud_demo`, `GameData.structure`.
@@ -58,8 +78,8 @@ Le thème visuel (`resources/theme/main_theme.tres`) est appliqué par défaut �
 
 - **Pas de simulation persistante** : les choix faits sur un écran (feature sélectionnée, carte activée, employé recruté) ne modifient pas encore les ressources ni ne persistent au sprint suivant — chaque écran affiche les mêmes données d'exemple à chaque passage. Calculer et faire persister les 6 ressources (§4 du carnet de règles) à travers la boucle est la prochaine étape naturelle côté logique de jeu.
 - **Export packagé** : le chemin de chargement des données (`res://../data/`) fonctionne depuis l'éditeur et en lancement debug, mais pas depuis un export `.pck` — à résoudre avant de distribuer une build (copier `data/` dans `res://data/` au moment du build, ou charger depuis un chemin à côté de l'exécutable).
-- **Polices** : aucune police de marque embarquée (IBM Plex / Space Grotesk utilisées sur la landing page) — police par défaut de Godot pour l'instant.
 - **Un seul événement Inbox** dans `data/inbox-events.json` — le code gère déjà un nombre arbitraire d'événements (tirage par index de sprint), il suffira d'en ajouter dans le JSON.
+- **Portraits** : seuls 5 personnages ont un avatar dédié (voir `assets/THIRD_PARTY_NOTICES.md`) — les autres candidats retombent sur une icône générique, ce qui est voulu pour les profils anonymes des petites annonces mais mériterait des portraits dédiés si de nouveaux personnages nommés sont ajoutés aux données.
 
 ## Prochaines étapes possibles
 

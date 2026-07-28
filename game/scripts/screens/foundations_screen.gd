@@ -8,12 +8,17 @@ const START_SCREEN_SCENE := "res://scenes/screens/start_screen.tscn"
 
 @onready var back_button: Button = $Margin/VBox/TopBar/BackButton
 @onready var home_button: Button = $Margin/VBox/TopBar/HomeButton
+@onready var title_label: Label = $Margin/VBox/Title
 @onready var board_grid: GridContainer = $Margin/VBox/Scroll/BoardGrid
 
 
 func _ready() -> void:
 	back_button.pressed.connect(func(): get_tree().change_scene_to_file(RESOLUTION_SCENE))
 	home_button.pressed.connect(func(): get_tree().change_scene_to_file(START_SCREEN_SCENE))
+	UIHelpers.add_hover_bounce(back_button)
+	UIHelpers.add_hover_bounce(home_button)
+	UIHelpers.apply_heading(title_label, 22, 600.0)
+	UIHelpers.fade_in(self)
 	_load_board()
 
 
@@ -41,15 +46,21 @@ func _build_foundation_card(foundation: Dictionary, families: Array) -> Control:
 	panel.add_child(vbox)
 
 	var is_waiting: bool = foundation.get("status", "") == "waiting"
+	var status_color := UIHelpers.COLOR_WARN if is_waiting else UIHelpers.COLOR_GOOD
+
+	var status_row := HBoxContainer.new()
+	status_row.add_theme_constant_override("separation", 6)
+	vbox.add_child(status_row)
+	status_row.add_child(UIHelpers.make_icon("clock" if is_waiting else "circle-check", 15, status_color))
 
 	var status_label := Label.new()
 	if is_waiting:
-		status_label.text = "🕐 En attente"
-		status_label.add_theme_color_override("font_color", UIHelpers.COLOR_WARN)
+		status_label.text = "En attente"
 	else:
-		status_label.text = "✅ Actif depuis le sprint %d" % foundation.get("activeSinceSprint", 0)
-		status_label.add_theme_color_override("font_color", UIHelpers.COLOR_GOOD)
-	vbox.add_child(status_label)
+		status_label.text = "Actif depuis le sprint %d" % foundation.get("activeSinceSprint", 0)
+	status_label.add_theme_color_override("font_color", status_color)
+	UIHelpers.apply_mono(status_label, 11, true)
+	status_row.add_child(status_label)
 
 	var family_label := Label.new()
 	family_label.text = _family_label(foundation.get("family", ""), families)
@@ -59,7 +70,7 @@ func _build_foundation_card(foundation: Dictionary, families: Array) -> Control:
 
 	var name_label := Label.new()
 	name_label.text = foundation.get("name", "")
-	name_label.add_theme_font_size_override("font_size", 16)
+	UIHelpers.apply_heading(name_label, 17, 600.0)
 	vbox.add_child(name_label)
 
 	var detail_label := Label.new()

@@ -19,11 +19,25 @@ const START_SCREEN_SCENE := "res://scenes/screens/start_screen.tscn"
 @onready var foundations_button: Button = $Margin/VBox/BottomBar/FoundationsButton
 @onready var next_sprint_button: Button = $Margin/VBox/BottomBar/NextSprintButton
 
+const GAUGE_ICONS := {
+	"tresorerie": "wallet",
+	"moral": "heart-handshake",
+	"dette-organisationnelle": "brick-wall",
+	"capital-politique": "target",
+	"valeur-percue": "trending-up",
+	"cynisme": "drama",
+}
+
 
 func _ready() -> void:
 	back_button.pressed.connect(func(): get_tree().change_scene_to_file(START_SCREEN_SCENE))
 	foundations_button.pressed.connect(func(): get_tree().change_scene_to_file(FOUNDATIONS_SCENE))
 	next_sprint_button.pressed.connect(_on_next_sprint_pressed)
+	UIHelpers.add_hover_bounce(back_button)
+	UIHelpers.add_hover_bounce(foundations_button)
+	UIHelpers.add_hover_bounce(next_sprint_button)
+	UIHelpers.apply_mono(sprint_label, 12)
+	UIHelpers.fade_in(self)
 
 	sprint_label.text = "Sprint %d — Phase 5 : Résolution" % SprintState.sprint_number
 	_load_hud()
@@ -32,6 +46,7 @@ func _ready() -> void:
 func _load_hud() -> void:
 	var hud: Dictionary = GameData.hud_demo
 
+	UIHelpers.apply_heading(era_label, 17, 600.0)
 	era_label.text = hud.get("era", "")
 	cpo_label.text = "CPO : %s" % hud.get("cpo", "")
 
@@ -57,16 +72,23 @@ func _build_gauge(gauge: Dictionary) -> Control:
 	vbox.add_theme_constant_override("separation", 4)
 
 	var top := HBoxContainer.new()
+	top.add_theme_constant_override("separation", 8)
 	vbox.add_child(top)
 
+	var state: String = gauge.get("state", "warn")
+	var gauge_id: String = gauge.get("id", "")
+	var icon_name: String = GAUGE_ICONS.get(gauge_id, "target")
+	top.add_child(UIHelpers.make_icon(icon_name, 18, UIHelpers.state_color(state)))
+
+	var raw_label: String = gauge.get("label", "")
 	var label := Label.new()
-	label.text = gauge.get("label", "")
+	label.text = raw_label.substr(raw_label.find(" ") + 1)
 	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	top.add_child(label)
 
 	var value_label := Label.new()
 	value_label.text = gauge.get("display", "")
-	value_label.add_theme_color_override("font_color", UIHelpers.state_color(gauge.get("state", "warn")))
+	value_label.add_theme_color_override("font_color", UIHelpers.state_color(state))
 	top.add_child(value_label)
 
 	var bar := ProgressBar.new()

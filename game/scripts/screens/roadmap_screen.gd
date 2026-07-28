@@ -20,6 +20,10 @@ var feature_buttons: Array[Button] = []
 func _ready() -> void:
 	back_button.pressed.connect(func(): get_tree().change_scene_to_file(START_SCREEN_SCENE))
 	next_button.pressed.connect(func(): get_tree().change_scene_to_file(NEXT_SCENE))
+	UIHelpers.add_hover_bounce(back_button)
+	UIHelpers.add_hover_bounce(next_button)
+	UIHelpers.apply_mono(sprint_label, 12)
+	UIHelpers.fade_in(self)
 
 	sprint_label.text = "Sprint %d — Phase 2 : Roadmap" % SprintState.sprint_number
 	capacity_bar.add_theme_stylebox_override("fill", UIHelpers.make_bar_fill_style(UIHelpers.COLOR_GOOD))
@@ -46,6 +50,7 @@ func _load_features() -> void:
 			" ".join(feature.get("icons", [])),
 		]
 		btn.pressed.connect(_update_capacity)
+		UIHelpers.add_hover_bounce(btn, 1.02)
 		feature_grid.add_child(btn)
 		feature_buttons.append(btn)
 

@@ -18,6 +18,10 @@ var skin_group := ButtonGroup.new()
 func _ready() -> void:
 	back_button.pressed.connect(func(): get_tree().change_scene_to_file(START_SCREEN_SCENE))
 	next_button.pressed.connect(func(): get_tree().change_scene_to_file(NEXT_SCENE))
+	UIHelpers.add_hover_bounce(back_button)
+	UIHelpers.add_hover_bounce(next_button)
+	UIHelpers.apply_mono(sprint_label, 12)
+	UIHelpers.fade_in(self)
 
 	sprint_label.text = "Sprint %d — Phase 4 : Recrutement" % SprintState.sprint_number
 
@@ -66,14 +70,13 @@ func _build_candidate_card(candidate: Dictionary) -> Control:
 	vbox.add_theme_constant_override("separation", 6)
 	panel.add_child(vbox)
 
-	var avatar := Label.new()
-	avatar.text = candidate.get("avatar", "")
-	avatar.add_theme_font_size_override("font_size", 26)
-	vbox.add_child(avatar)
+	var candidate_name: String = candidate.get("name", "")
+	var first_name := candidate_name.split(" — ")[0].strip_edges()
+	vbox.add_child(UIHelpers.make_avatar(first_name, 48))
 
 	var name_label := Label.new()
-	name_label.text = candidate.get("name", "")
-	name_label.add_theme_font_size_override("font_size", 15)
+	name_label.text = candidate_name
+	UIHelpers.apply_heading(name_label, 15, 600.0)
 	vbox.add_child(name_label)
 
 	var role_label := Label.new()
@@ -94,6 +97,7 @@ func _build_candidate_card(candidate: Dictionary) -> Control:
 	var action_btn := Button.new()
 	action_btn.text = candidate.get("action", "")
 	action_btn.pressed.connect(_on_hire_pressed.bind(action_btn))
+	UIHelpers.add_hover_bounce(action_btn, 1.03)
 	vbox.add_child(action_btn)
 
 	return panel
@@ -109,7 +113,7 @@ func _build_ad_card(ad: Dictionary) -> Control:
 
 	var title_label := Label.new()
 	title_label.text = ad.get("title", "")
-	title_label.add_theme_font_size_override("font_size", 14)
+	UIHelpers.apply_heading(title_label, 14, 600.0)
 	vbox.add_child(title_label)
 
 	var text_label := Label.new()
@@ -121,6 +125,7 @@ func _build_ad_card(ad: Dictionary) -> Control:
 	var action_btn := Button.new()
 	action_btn.text = ad.get("action", "")
 	action_btn.pressed.connect(_on_hire_pressed.bind(action_btn))
+	UIHelpers.add_hover_bounce(action_btn, 1.03)
 	vbox.add_child(action_btn)
 
 	return panel

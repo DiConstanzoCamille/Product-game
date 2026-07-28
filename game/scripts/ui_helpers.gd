@@ -1,11 +1,20 @@
 class_name UIHelpers
 extends RefCounted
 ## Petits utilitaires de style partagés entre les écrans de sprint.
+## Licences des assets référencés : game/assets/THIRD_PARTY_NOTICES.md
 
 const COLOR_GOOD := Color(0.498039, 0.890196, 0.647059)   # #7FE3A5
 const COLOR_WARN := Color(0.941176, 0.705882, 0.290196)   # #F0B44A
 const COLOR_DANGER := Color(0.952941, 0.537255, 0.498039) # #F3897F
 const COLOR_SOFT_TEXT := Color(0.666667, 0.713725, 0.8)   # #AAB6CC
+const COLOR_AMBER := Color(0.988235, 0.917647, 0.796078)  # #FCEACB
+
+const FONT_SPACE_GROTESK := preload("res://assets/fonts/SpaceGrotesk-Variable.ttf")
+const FONT_MONO_MEDIUM := preload("res://assets/fonts/IBMPlexMono-Medium.ttf")
+const FONT_MONO_SEMIBOLD := preload("res://assets/fonts/IBMPlexMono-SemiBold.ttf")
+
+const ICON_DIR := "res://assets/icons/"
+const AVATAR_DIR := "res://assets/avatars/"
 
 
 static func state_color(state: String) -> Color:
@@ -36,3 +45,72 @@ static func make_bar_background_style() -> StyleBoxFlat:
 	style.corner_radius_bottom_right = 4
 	style.corner_radius_bottom_left = 4
 	return style
+
+
+## Police des titres (Space Grotesk), à un poids donné (400-700).
+static func heading_font(weight: float = 600.0) -> FontVariation:
+	var variation := FontVariation.new()
+	variation.base_font = FONT_SPACE_GROTESK
+	variation.variation_opentype = {"wght": weight}
+	return variation
+
+
+static func apply_heading(label: Label, size: int = 20, weight: float = 600.0) -> void:
+	label.add_theme_font_override("font", heading_font(weight))
+	label.add_theme_font_size_override("font_size", size)
+
+
+## Police mono (IBM Plex Mono) pour les labels de type "eyebrow" / compteurs.
+static func apply_mono(label: Label, size: int = 12, semibold: bool = false) -> void:
+	label.add_theme_font_override("font", FONT_MONO_SEMIBOLD if semibold else FONT_MONO_MEDIUM)
+	label.add_theme_font_size_override("font_size", size)
+
+
+static func icon_texture(icon_name: String) -> Texture2D:
+	return load(ICON_DIR + icon_name + ".svg")
+
+
+## Icône Lucide (trait blanc) teintée via modulate — voir assets/THIRD_PARTY_NOTICES.md.
+static func make_icon(icon_name: String, size: int = 20, color: Color = Color.WHITE) -> TextureRect:
+	var rect := TextureRect.new()
+	rect.texture = icon_texture(icon_name)
+	rect.custom_minimum_size = Vector2(size, size)
+	rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	rect.modulate = color
+	return rect
+
+
+## Portrait DiceBear si dispo pour `seed_name` (minuscules), sinon icône générique.
+static func make_avatar(seed_name: String, size: int = 48) -> TextureRect:
+	var rect := TextureRect.new()
+	var path := AVATAR_DIR + seed_name.to_lower() + ".svg"
+	if ResourceLoader.exists(path):
+		rect.texture = load(path)
+	else:
+		rect.texture = icon_texture("user-round")
+		rect.modulate = Color(1, 1, 1, 0.55)
+	rect.custom_minimum_size = Vector2(size, size)
+	rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	return rect
+
+
+static func fade_in(control: Control, duration: float = 0.3) -> void:
+	control.modulate.a = 0.0
+	var tween := control.create_tween()
+	tween.tween_property(control, "modulate:a", 1.0, duration)
+
+
+## Léger effet de survol (zoom) sur un bouton — purement cosmétique.
+static func add_hover_bounce(button: Button, scale_amount: float = 1.04) -> void:
+	button.pivot_offset = button.size / 2.0
+	button.resized.connect(func(): button.pivot_offset = button.size / 2.0)
+	button.mouse_entered.connect(func():
+		var tween := button.create_tween()
+		tween.tween_property(button, "scale", Vector2.ONE * scale_amount, 0.12)
+	)
+	button.mouse_exited.connect(func():
+		var tween := button.create_tween()
+		tween.tween_property(button, "scale", Vector2.ONE, 0.12)
+	)

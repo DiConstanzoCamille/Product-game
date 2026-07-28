@@ -21,6 +21,10 @@ var card_refs: Dictionary = {}
 func _ready() -> void:
 	back_button.pressed.connect(func(): get_tree().change_scene_to_file(START_SCREEN_SCENE))
 	next_button.pressed.connect(func(): get_tree().change_scene_to_file(NEXT_SCENE))
+	UIHelpers.add_hover_bounce(back_button)
+	UIHelpers.add_hover_bounce(next_button)
+	UIHelpers.apply_mono(sprint_label, 12)
+	UIHelpers.fade_in(self)
 
 	sprint_label.text = "Sprint %d — Phase 3 : Grandes décisions" % SprintState.sprint_number
 
@@ -32,6 +36,12 @@ func _ready() -> void:
 	senior_button.button_pressed = SprintState.team_profile == "senior"
 	junior_button.pressed.connect(_on_team_selected.bind("junior"))
 	senior_button.pressed.connect(_on_team_selected.bind("senior"))
+	junior_button.icon = UIHelpers.icon_texture("sprout")
+	senior_button.icon = UIHelpers.icon_texture("landmark")
+	junior_button.add_theme_constant_override("icon_max_width", 18)
+	senior_button.add_theme_constant_override("icon_max_width", 18)
+	UIHelpers.add_hover_bounce(junior_button, 1.02)
+	UIHelpers.add_hover_bounce(senior_button, 1.02)
 
 	_build_cards()
 	_refresh_cards()
@@ -51,13 +61,13 @@ func _build_cards() -> void:
 
 		var category_label := Label.new()
 		category_label.text = card.get("category", "")
-		category_label.add_theme_color_override("font_color", Color(0.988235, 0.917647, 0.796078))
-		category_label.add_theme_font_size_override("font_size", 12)
+		category_label.add_theme_color_override("font_color", UIHelpers.COLOR_AMBER)
+		UIHelpers.apply_mono(category_label, 11, true)
 		vbox.add_child(category_label)
 
 		var name_label := Label.new()
 		name_label.text = card.get("name", "")
-		name_label.add_theme_font_size_override("font_size", 20)
+		UIHelpers.apply_heading(name_label, 21, 600.0)
 		vbox.add_child(name_label)
 
 		var tagline_label := Label.new()
@@ -97,20 +107,39 @@ func _build_cards() -> void:
 		vbox.add_child(toggle_btn)
 		toggle_btn.pressed.connect(_on_card_toggle.bind(card.get("id", "")))
 
+		UIHelpers.add_hover_bounce(toggle_btn, 1.02)
+
 		card_refs[card.get("id", "")] = {
+			"panel": panel,
 			"axis_rows": axis_rows,
 			"tagline": tagline_label,
 			"axes_box": axes_box,
 			"toggle_btn": toggle_btn,
+			"flipping": false,
 		}
 
 
+## Petit effet de "retournement" (scale.x 1 → 0 → 1) au moment où le contenu
+## bascule tagline ↔ détail des axes — écho au flip 3D de la landing page.
 func _on_card_toggle(card_id: String) -> void:
 	var refs: Dictionary = card_refs[card_id]
-	var showing_axes: bool = refs.axes_box.visible
-	refs.axes_box.visible = not showing_axes
-	refs.tagline.visible = showing_axes
-	refs.toggle_btn.text = "← Voir la carte" if not showing_axes else "Voir l'effet →"
+	if refs.flipping:
+		return
+	refs.flipping = true
+
+	var panel: PanelContainer = refs.panel
+	panel.pivot_offset = panel.size / 2.0
+
+	var tween := panel.create_tween()
+	tween.tween_property(panel, "scale:x", 0.0, 0.12).set_trans(Tween.TRANS_SINE)
+	tween.tween_callback(func():
+		var showing_axes: bool = refs.axes_box.visible
+		refs.axes_box.visible = not showing_axes
+		refs.tagline.visible = showing_axes
+		refs.toggle_btn.text = "← Voir la carte" if not showing_axes else "Voir l'effet →"
+	)
+	tween.tween_property(panel, "scale:x", 1.0, 0.12).set_trans(Tween.TRANS_SINE)
+	tween.tween_callback(func(): refs.flipping = false)
 
 
 func _on_team_selected(team: String) -> void:

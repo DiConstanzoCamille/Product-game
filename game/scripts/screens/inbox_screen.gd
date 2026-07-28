@@ -7,7 +7,8 @@ const START_SCREEN_SCENE := "res://scenes/screens/start_screen.tscn"
 
 @onready var sprint_label: Label = $Margin/VBox/TopBar/SprintLabel
 @onready var back_button: Button = $Margin/VBox/TopBar/BackButton
-@onready var from_label: Label = $Margin/VBox/Scroll/Content/FromLabel
+@onready var from_row: HBoxContainer = $Margin/VBox/Scroll/Content/FromRow
+@onready var from_label: Label = $Margin/VBox/Scroll/Content/FromRow/FromLabel
 @onready var subject_label: Label = $Margin/VBox/Scroll/Content/SubjectLabel
 @onready var body_label: Label = $Margin/VBox/Scroll/Content/BodyLabel
 @onready var choices_container: VBoxContainer = $Margin/VBox/Scroll/Content/ChoicesContainer
@@ -23,6 +24,12 @@ func _ready() -> void:
 	next_button.disabled = true
 	reveal_label.visible = false
 
+	UIHelpers.apply_mono(sprint_label, 12)
+	UIHelpers.apply_heading(subject_label, 26, 600.0)
+	UIHelpers.add_hover_bounce(back_button)
+	UIHelpers.add_hover_bounce(next_button)
+	UIHelpers.fade_in(self)
+
 	sprint_label.text = "Sprint %d — Phase 1 : Inbox" % SprintState.sprint_number
 	_load_event()
 
@@ -35,7 +42,13 @@ func _load_event() -> void:
 
 	event = events[(SprintState.sprint_number - 1) % events.size()]
 
-	from_label.text = "De : %s · %s" % [event.get("from", ""), event.get("status", "")]
+	var sender: String = event.get("from", "")
+	var first_name := sender.split(",")[0].strip_edges()
+	var avatar := UIHelpers.make_avatar(first_name, 40)
+	from_row.add_child(avatar)
+	from_row.move_child(avatar, 0)
+
+	from_label.text = "De : %s · %s" % [sender, event.get("status", "")]
 	subject_label.text = event.get("subject", "")
 	body_label.text = event.get("text", "")
 
@@ -45,6 +58,7 @@ func _load_event() -> void:
 		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		btn.pressed.connect(_on_choice_pressed.bind(choice.get("reveal", "")))
 		choices_container.add_child(btn)
+		UIHelpers.add_hover_bounce(btn, 1.015)
 
 
 func _on_choice_pressed(reveal: String) -> void:
