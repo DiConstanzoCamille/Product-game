@@ -9,10 +9,10 @@ extends Node
 ## l'ajoute au panier via add_pending(). L'écran de Résolution applique tout
 ## le panier d'un coup via apply_pending_and_check() — plus la masse
 ## salariale, les effets de roster/pratiques, la décroissance de la Valeur
-## perçue, le revenu du modèle économique et le flux de pièces — affiche le
-## delta réel, joue la revue de board au sprint 6, et détecte une éventuelle
-## fin de mandat. Voir docs/carnet-de-regles.md §14-17 pour le détail des
-## décisions de conception.
+## perçue, le revenu du modèle économique, le flux de pièces et la
+## régénération d'Énergie du joueur — affiche le delta réel, joue la revue
+## de board au sprint 6, et détecte une éventuelle fin de mandat. Voir
+## docs/carnet-de-regles.md §14-18 pour le détail des décisions de conception.
 
 signal ending_reached(id: String)
 
@@ -49,6 +49,13 @@ var delivered_feature_ids: Array = []  # features livrées ce sprint (posées pa
 var board_review_state: String = "pending"  # "pending" | "passed" | "failed"
 var board_review_result: Dictionary = {}    # {sprint, passed, title, conditions:[{label, ok}]} — pour l'overlay de verdict
 var current_shop_offer: Dictionary = {}     # {sprint, candidates:[...], practices:[ids]} — tirage du Marché, pas de re-tirage
+
+# --- Phase B : l'économie du joueur (spec profondeur §7) ---
+var energy: int = 70                   # ⚡ jauge personnelle du CPO (0..energy.max), côté jeu uniquement
+var energy_spent_this_sprint: int = 0  # ⚡ réellement dépensés en actions personnelles depuis la dernière Résolution
+var self_work_capacity: int = 0        # points de capacité ajoutés par "Faire le taf soi-même" ce sprint
+var breather_planned: bool = false     # Souffler pris à la dernière Résolution : actions bloquées ce sprint, bonus de régén à la prochaine
+var last_energy_report: Dictionary = {}  # détail du delta Énergie de la dernière Résolution (pour l'affichage)
 
 var _inbox_event_bag: Array = []       # ids restants à tirer dans le "sac" courant
 var _last_inbox_event_id: String = ""  # évite une répétition immédiate entre deux sacs
@@ -87,6 +94,11 @@ func reset_run(chosen_era_id: String = "", chosen_company_id: String = "") -> vo
 	board_review_state = "pending"
 	board_review_result.clear()
 	current_shop_offer.clear()
+	energy = int(get_energy_conf().get("start", 70))
+	energy_spent_this_sprint = 0
+	self_work_capacity = 0
+	breather_planned = false
+	last_energy_report.clear()
 
 	var company: Dictionary = get_company()
 	pieces = int(company.get("startingPieces", 0))
@@ -198,7 +210,8 @@ func get_role_weight(role_id: String) -> float:
 
 ## Capacité de roadmap produite par le roster ce sprint (spec §4.2) :
 ## Devs et PM produisent des points (rendements décroissants au-delà du cap
-## de cumul de leur rôle), les Pépites révélées ajoutent leur bonus.
+## de cumul de leur rôle), les Pépites révélées ajoutent leur bonus, et
+## "Faire le taf soi-même" (§7.2) ajoute les points payés en Énergie.
 func get_effective_capacity() -> int:
 	var roles: Dictionary = GameData.balance.get("roles", {})
 	var total := 0.0
@@ -220,7 +233,7 @@ func get_effective_capacity() -> int:
 			var hidden_trait: Dictionary = get_hidden_trait(employee.get("hidden_trait", ""))
 			total += float(hidden_trait.get("effects", {}).get("capacityBonus", 0))
 
-	return int(floor(max(total, 0.0)))
+	return int(floor(max(total, 0.0))) + self_work_capacity
 
 
 ## Masse salariale du sprint — prélevée à chaque Résolution (spec §4.3).
@@ -249,6 +262,138 @@ func find_practice(practice_id: String) -> Dictionary:
 		if practice.get("id", "") == practice_id:
 			return practice
 	return {}
+
+
+# --- L'économie du joueur : Énergie ⚡ et actions personnelles (spec §7) ---
+
+func get_energy_conf() -> Dictionary:
+	return GameData.balance.get("energy", {})
+
+
+func get_energy_max() -> int:
+	return int(get_energy_conf().get("max", 100))
+
+
+func get_personal_action_conf(action_id: String) -> Dictionary:
+	return get_energy_conf().get("actions", {}).get(action_id, {})
+
+
+func get_personal_action_cost(action_id: String) -> int:
+	return int(get_personal_action_conf(action_id).get("cost", 0))
+
+
+## Facteur de régénération d'Énergie selon le Moral de l'équipe (§7.1) —
+## une équipe qui va mal vous épuise. Paliers dans balance.json →
+## energy.moralRegenTiers (×1 si Moral ≥ 60, ×0.5 si 30-60, ×0 sous 30).
+func get_energy_regen_factor() -> float:
+	var moral: float = resource_values.get("moral", 0.0)
+	for tier in get_energy_conf().get("moralRegenTiers", []):
+		if moral >= float(tier.get("moralMin", 0)):
+			return float(tier.get("factor", 1.0))
+	return 0.0
+
+
+## Une action personnelle payante est-elle jouable ? "" si oui, sinon la
+## raison du refus : "souffler" (retrait annoncé à la dernière Résolution)
+## ou "epuise" (jauge à zéro). Une seule ressource limite les actions —
+## l'Énergie — et on peut puiser dans la réserve jusqu'à 0 (et le payer).
+func personal_action_refusal() -> String:
+	if breather_planned:
+		return "souffler"
+	if energy <= 0:
+		return "epuise"
+	return ""
+
+
+## Dépense l'Énergie d'une action (plancher 0 — on ne paie que ce qui
+## reste dans la jauge ; le burn-out, lui, se joue à la Résolution).
+func _spend_energy(cost: int) -> void:
+	var spent: int = min(cost, energy)
+	energy -= spent
+	energy_spent_this_sprint += spent
+
+
+## 🤝 1:1 (§7.2) — révèle le trait caché d'un candidat du Marché (avant
+## embauche) ou d'un employé du roster. Sur un employé, les traits à
+## déclencheur (Négociateur, Réseau) tombent immédiatement : la
+## conversation met le sujet sur la table. Retourne "" si l'action a eu lieu.
+func do_one_on_one(person: Dictionary) -> String:
+	var refusal := personal_action_refusal()
+	if refusal != "":
+		return refusal
+	if person.get("hiddenRevealed", false):
+		return "deja-revele"
+
+	var cost := get_personal_action_cost("oneOnOne")
+	_spend_energy(cost)
+	person["hiddenRevealed"] = true
+
+	var hidden_trait := get_hidden_trait(person.get("hidden_trait", ""))
+	var verdict := ""
+	if hidden_trait.is_empty():
+		verdict = "rien à signaler. Vraiment."
+	else:
+		verdict = "%s %s — %s" % [
+			hidden_trait.get("icon", ""), hidden_trait.get("name", ""), hidden_trait.get("description", "")
+		]
+	var extra := ""
+	if person.has("hiredSprint"):  # employé du roster (un candidat n'a pas encore de sprint d'embauche)
+		extra = _apply_trait_triggers(person)
+	pending_journal_lines.append("🤝 1:1 avec %s (−%d ⚡) : %s%s" % [
+		person.get("name", ""), cost, verdict, extra
+	])
+	return ""
+
+
+## 🔧 Faire le taf soi-même (§7.2) — +N points de capacité ce sprint,
+## payés en Énergie. Cumulable tant qu'il reste de l'Énergie.
+func do_self_work() -> String:
+	var refusal := personal_action_refusal()
+	if refusal != "":
+		return refusal
+	var conf := get_personal_action_conf("selfWork")
+	var bonus := int(conf.get("capacityBonus", 2))
+	_spend_energy(int(conf.get("cost", 25)))
+	self_work_capacity += bonus
+	pending_journal_lines.append("🔧 Vous faites le taf vous-même (−%d ⚡) : +%d points de capacité ce sprint. Le CPO code, l'équipe regarde ailleurs." % [
+		int(conf.get("cost", 25)), bonus
+	])
+	return ""
+
+
+## 🏛️ Négocier une rallonge (§7.2) — votre Capital politique contre des
+## Pièces pour l'entreprise. Les pièces tombent immédiatement (le Marché du
+## sprint en profite) ; le Capital politique se règle à la Résolution,
+## comme tous les effets de ressources.
+func do_negotiate_extension() -> String:
+	var refusal := personal_action_refusal()
+	if refusal != "":
+		return refusal
+	var conf := get_personal_action_conf("extension")
+	var gained := int(conf.get("pieces", 4))
+	var capital := int(conf.get("capitalPolitique", -8))
+	_spend_energy(int(conf.get("cost", 10)))
+	pieces += gained
+	add_pending({"capital-politique": float(capital)},
+		"🏛️ Rallonge négociée au board (−%d ⚡) : +%d 🪙 immédiats, 🎯 Capital politique %d — tout le monde a noté que vous êtes venu·e quémander" % [
+			int(conf.get("cost", 10)), gained, capital
+		])
+	return ""
+
+
+## 🧘 Souffler (§7.2) — pris à la Résolution : renoncer aux actions
+## personnelles du prochain sprint contre un bonus de régénération à la
+## prochaine Résolution. Gratuit — ça coûte du temps, pas de l'énergie.
+func plan_breather() -> String:
+	if breather_planned:
+		return "deja-planifie"
+	breather_planned = true
+	journal.append({
+		"sprint": sprint_number,
+		"text": "🧘 Vous soufflez : aucune action personnelle au prochain sprint, +%d de régénération d'Énergie à la clé. Le téléphone dort dans l'entrée." % int(get_energy_conf().get("breatherRegenBonus", 10)),
+		"deltas": "",
+	})
+	return ""
 
 
 # --- Le Marché : tirage du sprint (spec profondeur §5) ---
@@ -541,6 +686,11 @@ func apply_pending_and_check() -> String:
 	if last_pieces_delta != 0:
 		applied["pieces"] = last_pieces_delta
 
+	_apply_energy_flow()
+	var energy_sprint_delta := int(last_energy_report.get("sprintDelta", 0))
+	if energy_sprint_delta != 0:
+		applied["energie"] = energy_sprint_delta
+
 	journal.append({
 		"sprint": sprint_number,
 		"text": " · ".join(pending_journal_lines) if not pending_journal_lines.is_empty() else "Sprint calme — aucune décision marquante.",
@@ -660,6 +810,60 @@ func _apply_pieces_flow() -> void:
 	pending_journal_lines.append("🪙 Pièces : %s (solde %d)" % [" · ".join(parts), pieces])
 
 
+## Flux d'Énergie de la Résolution (§7.1) : régénération modulée par le
+## Moral — lu après application des effets du sprint, l'état dans lequel
+## l'équipe le termine —, bonus de Souffler, deltas d'événements Inbox
+## (pseudo-ressource "energie"), le tout borné 0..max. Les dépenses
+## d'actions personnelles ont déjà été prélevées en direct pendant le sprint.
+func _apply_energy_flow() -> void:
+	var conf := get_energy_conf()
+	var base := int(conf.get("regenPerSprint", 12))
+	var factor := get_energy_regen_factor()
+	var regen := int(round(base * factor))
+
+	var bonus := 0
+	if breather_planned:
+		bonus = int(conf.get("breatherRegenBonus", 10))
+		breather_planned = false
+
+	var events := int(round(pending_deltas.get("energie", 0.0)))
+	pending_deltas.erase("energie")
+
+	var before := energy
+	energy = clampi(energy + regen + bonus + events, 0, get_energy_max())
+
+	last_energy_report = {
+		"spent": energy_spent_this_sprint,
+		"regenBase": base,
+		"factor": factor,
+		"regen": regen,
+		"breatherBonus": bonus,
+		"events": events,
+		"sprintDelta": (energy - before) - energy_spent_this_sprint,
+		"value": energy,
+	}
+
+	var parts: Array = ["régén +%d (%d %s Moral)" % [regen, base, energy_factor_label(factor)]]
+	if bonus > 0:
+		parts.append("Souffler +%d" % bonus)
+	if events != 0:
+		parts.append("événements %s%d" % ["+" if events > 0 else "−", abs(events)])
+	if energy_spent_this_sprint > 0:
+		parts.append("actions personnelles −%d" % energy_spent_this_sprint)
+	pending_journal_lines.append("⚡ Énergie : %s (jauge %d/%d)" % [" · ".join(parts), energy, get_energy_max()])
+
+	energy_spent_this_sprint = 0
+	self_work_capacity = 0
+
+
+func energy_factor_label(factor: float) -> String:
+	if factor == 1.0:
+		return "×1"
+	if factor == 0.0:
+		return "×0"
+	return "×%s" % String.num(factor, 2)
+
+
 ## Fin de période d'essai (§4.5) : embauche + trialPeriodSprints sprints —
 ## le trait caché se révèle, ses effets s'appliquent désormais, et les
 ## traits à déclencheur (Négociateur, Réseau) tombent maintenant.
@@ -682,15 +886,7 @@ func _resolve_trial_periods() -> void:
 			continue
 
 		var hidden_trait := get_hidden_trait(trait_id)
-		var extra := ""
-		var effects: Dictionary = hidden_trait.get("effects", {})
-		if effects.has("salaryRaiseAtTrialEnd"):
-			var raise_amount := int(effects.get("salaryRaiseAtTrialEnd", 1))
-			employee["salary"] = int(employee.get("salary", 1)) + raise_amount
-			extra = " Une offre concurrente sur la table : +%d de salaire, ou un départ." % raise_amount
-		if effects.has("nextHireDiscountPieces"):
-			next_hire_discount += int(effects.get("nextHireDiscountPieces", 0))
-			extra = " Son carnet d'adresses vaut %d 🪙 sur le prochain recrutement." % int(effects.get("nextHireDiscountPieces", 0))
+		var extra := _apply_trait_triggers(employee)
 
 		journal.append({
 			"sprint": sprint_number,
@@ -700,6 +896,23 @@ func _resolve_trial_periods() -> void:
 			],
 			"deltas": "",
 		})
+
+
+## Traits cachés à déclencheur (Négociateur, Réseau) — appliqués au moment
+## où le trait d'un employé se révèle : fin de période d'essai, ou 1:1
+## anticipé (§7.2). Retourne le complément de phrase pour le journal.
+func _apply_trait_triggers(employee: Dictionary) -> String:
+	var hidden_trait := get_hidden_trait(employee.get("hidden_trait", ""))
+	var effects: Dictionary = hidden_trait.get("effects", {})
+	var extra := ""
+	if effects.has("salaryRaiseAtTrialEnd"):
+		var raise_amount := int(effects.get("salaryRaiseAtTrialEnd", 1))
+		employee["salary"] = int(employee.get("salary", 1)) + raise_amount
+		extra = " Une offre concurrente sur la table : +%d de salaire, ou un départ." % raise_amount
+	if effects.has("nextHireDiscountPieces"):
+		next_hire_discount += int(effects.get("nextHireDiscountPieces", 0))
+		extra = " Son carnet d'adresses vaut %d 🪙 sur le prochain recrutement." % int(effects.get("nextHireDiscountPieces", 0))
+	return extra
 
 
 ## Démissions silencieuses (§4.5) : l'employé au trait révélé part sans
@@ -778,15 +991,24 @@ func _run_board_review() -> void:
 	}
 
 
+## Fins négatives par seuil (balance.json → endingThresholds). La
+## pseudo-ressource "energie" y est acceptée : elle lit la jauge personnelle
+## du joueur — le burn-out fondateur·rice se déclenche sur Énergie ≤ 0
+## (spec §8.3, remappé en Phase B ; l'ancien couperet Valeur perçue a
+## disparu en Phase A).
 func _check_bad_endings() -> String:
 	var thresholds: Array = GameData.balance.get("endingThresholds", [])
 	var overrides: Dictionary = GameData.balance.get("endingThresholdOverrides", {}).get(era_id, {})
 
 	for threshold in thresholds:
 		var resource_id: String = threshold.get("resource", "")
-		if not resource_values.has(resource_id):
+		var value: float = 0.0
+		if resource_id == "energie":
+			value = float(energy)
+		elif resource_values.has(resource_id):
+			value = resource_values[resource_id]
+		else:
 			continue
-		var value: float = resource_values[resource_id]
 		var limit: float = overrides.get(resource_id, threshold.get("value", 0))
 		var comparison: String = threshold.get("comparison", "lte")
 		var triggered := (comparison == "lte" and value <= limit) or (comparison == "gte" and value >= limit)

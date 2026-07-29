@@ -121,7 +121,8 @@ static func gauge_state(resource_id: String, value: float) -> String:
 
 ## Formate un dictionnaire de deltas en texte façon journal de sprint, ex.
 ## "💰 Trésorerie −4 · 🫶 Moral +6". Ignore les deltas nuls, ordre stable
-## (celui de resources.json), pseudo-ressource "pieces" (🪙) en dernier.
+## (celui de resources.json), pseudo-ressources "pieces" (🪙) puis
+## "energie" (⚡, jauge personnelle du joueur) en dernier.
 static func format_deltas(deltas: Dictionary) -> String:
 	var parts: Array = []
 	for resource in GameData.resources:
@@ -136,6 +137,9 @@ static func format_deltas(deltas: Dictionary) -> String:
 	var pieces_value := int(round(deltas.get("pieces", 0.0)))
 	if pieces_value != 0:
 		parts.append("🪙 Pièces %s%d" % ["+" if pieces_value > 0 else "−", abs(pieces_value)])
+	var energie_value := int(round(deltas.get("energie", 0.0)))
+	if energie_value != 0:
+		parts.append("⚡ Énergie %s%d" % ["+" if energie_value > 0 else "−", abs(energie_value)])
 	if parts.is_empty():
 		return "Aucun changement mesurable."
 	return " · ".join(parts)
