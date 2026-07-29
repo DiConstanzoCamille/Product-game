@@ -67,8 +67,8 @@
         {
           "id": "defendre-budget",
           "label": "Défendre le budget avec des chiffres",
-          "reveal": "🎯 Capital politique +5 · 💰 Trésorerie −1 — le board est convaincu, pour cette fois.",
-          "effects": { "capital-politique": 5, "tresorerie": -1 }
+          "reveal": "🎯 Capital politique +5 · 💰 Trésorerie −1 · 🪙 +2 — le board est convaincu, et relâche un peu de budget d'action.",
+          "effects": { "capital-politique": 5, "tresorerie": -1, "pieces": 2 }
         },
         {
           "id": "couper-budget",
@@ -179,8 +179,8 @@
         {
           "id": "demo-soignee",
           "label": "Improviser une démo soignée",
-          "reveal": "🎯 Capital politique +4 · 🫶 Moral −3 — l'équipe a tout lâché pour préparer ça en urgence.",
-          "effects": { "capital-politique": 4, "moral": -3 }
+          "reveal": "🎯 Capital politique +4 · 🫶 Moral −3 · 🪙 +2 — l'investisseur repart conquis et glisse un mot au board.",
+          "effects": { "capital-politique": 4, "moral": -3, "pieces": 2 }
         },
         {
           "id": "montrer-envers-decor",
@@ -235,8 +235,8 @@
         {
           "id": "remise-personnalisee",
           "label": "Négocier une remise personnalisée",
-          "reveal": "💰 Trésorerie −6 · 📈 Valeur perçue +3 — il reste, à un prix qui fera précédent.",
-          "effects": { "tresorerie": -6, "valeur-percue": 3 }
+          "reveal": "💰 Trésorerie −6 · 📈 Valeur perçue +3 · 🪙 −1 — il reste, à un prix qui fera précédent, et le board retient la remise.",
+          "effects": { "tresorerie": -6, "valeur-percue": 3, "pieces": -1 }
         },
         {
           "id": "feature-sur-mesure",

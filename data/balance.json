@@ -1,13 +1,17 @@
 {
-  "_comment": "Données de simulation MVP — consommées uniquement par game/ (pas par landing/). Toutes les valeurs sont indicatives, à ajuster en playtest. Décisions documentées dans docs/carnet-de-regles.md §14.",
+  "_comment": "Données de simulation — consommées uniquement par game/ (pas par landing/). Toutes les valeurs sont indicatives, à ajuster en playtest. Décisions documentées dans docs/carnet-de-regles.md §14-17. Phase A (spec profondeur §12) : roster, salaires, pièces, shop, pression.",
 
   "startingResources": {
-    "tresorerie": 60,
+    "tresorerie": 50,
     "moral": 60,
     "dette-organisationnelle": 15,
     "capital-politique": 55,
     "valeur-percue": 50,
     "cynisme": 10
+  },
+
+  "startingResourceOverrides": {
+    "karavel-scaleup": { "tresorerie": 25 }
   },
 
   "resourceBounds": { "min": 0, "max": 100 },
@@ -31,7 +35,6 @@
     { "resource": "moral", "comparison": "lte", "value": 0, "ending": "exode-equipe" },
     { "resource": "dette-organisationnelle", "comparison": "gte", "value": 100, "ending": "entreprise-zombie" },
     { "resource": "capital-politique", "comparison": "lte", "value": 0, "ending": "rachat-hostile" },
-    { "resource": "valeur-percue", "comparison": "lte", "value": 0, "ending": "burnout-fondateur" },
     { "resource": "cynisme", "comparison": "gte", "value": 100, "ending": "remplace-par-ia" }
   ],
 
@@ -62,15 +65,12 @@
     "agile-transformation": "saas-mrr"
   },
 
-  "eraRecruitmentSkin": {
-    "agile-transformation": "moderne"
-  },
-
   "businessModels": {
     "saas-mrr": {
       "label": "SaaS — revenu récurrent (MRR)",
-      "description": "Un revenu tombe chaque sprint, proportionnel à la Valeur perçue, érodé par un Moral bas (churn).",
-      "revenuePerValeurPercuePoint": 0.2,
+      "description": "Un revenu tombe chaque sprint, proportionnel à la Valeur perçue au-dessus du seuil de notoriété, érodé par un Moral bas (churn). Sous le seuil de décrochage, plus aucun revenu.",
+      "revenuePerValeurPercuePoint": 0.6,
+      "revenueValeurPercueOffset": 30,
       "moralChurnFloor": 0.3,
       "moralChurnCeiling": 1.1
     },
@@ -78,6 +78,7 @@
       "label": "Vente à la version (waterfall)",
       "description": "Pas de revenu récurrent — de gros paliers de revenu tombent à la sortie d'une version. Pas encore implémenté (scénario Garage, à venir).",
       "revenuePerValeurPercuePoint": 0,
+      "revenueValeurPercueOffset": 0,
       "moralChurnFloor": 1.0,
       "moralChurnCeiling": 1.0
     }
@@ -89,24 +90,89 @@
     "ai-era": { "dette-organisationnelle": 1.15, "moral": 1.2, "tresorerie": 0.85 }
   },
 
+  "salaries": { "junior": 1, "senior": 2 },
+
+  "roles": {
+    "dev": {
+      "label": "Dev",
+      "icon": "💻",
+      "capacityPerEmployee": { "junior": 2, "senior": 3 },
+      "fullYieldCount": 4,
+      "extraYieldFactor": 0.5
+    },
+    "pm": {
+      "label": "PM",
+      "icon": "📋",
+      "capacityPerEmployee": { "junior": 1, "senior": 1 },
+      "fullYieldCount": 3,
+      "extraYieldFactor": 0.5,
+      "overloadReductionPerPm": 0.25,
+      "overloadReductionMax": 0.5
+    },
+    "designer": {
+      "label": "Designer",
+      "icon": "🎨",
+      "capacityPerEmployee": { "junior": 0, "senior": 0 },
+      "valeurPerFeatureDelivered": 1,
+      "valeurPerFeatureDeliveredMax": 2,
+      "valeurEffectsDivisorIfAbsent": 2
+    },
+    "ops": {
+      "label": "Ops",
+      "icon": "🛠️",
+      "capacityPerEmployee": { "junior": 0, "senior": 0 },
+      "dettePerOps": -1,
+      "detteReliefMax": -2,
+      "dettePerSprintIfAbsent": 2
+    }
+  },
+
+  "firing": {
+    "severancePieces": 2,
+    "moral": -4,
+    "cynismePerExtraFiring": 3
+  },
+
+  "trialPeriodSprints": 2,
+
+  "pieces": {
+    "boardAllocationPerSprint": 2,
+    "boardAllocationIfReviewFailed": 1,
+    "revenuePerformanceDivider": 4
+  },
+
+  "shopDraw": {
+    "candidatesPerSprint": 2,
+    "practicesPerSprint": 2,
+    "practiceCynisme": 2
+  },
+
+  "pressure": {
+    "valeurPercueDecayPerSprint": 2,
+    "revenueCutoffValeurPercue": 5,
+    "boardReview": {
+      "successPieces": 5,
+      "successCapitalPolitique": 8,
+      "failCapitalPolitique": -12
+    }
+  },
+
   "roadmap": {
     "overCapacityPenalty": { "dette-organisationnelle": 10, "cynisme": 6, "moral": -4 },
+    "featureCostPoints": {
+      "export-multi-comptes": 4,
+      "onboarding-refonte": 3,
+      "dark-mode": 1,
+      "audit-rgpd": 3
+    },
+    "quickWinPieces": {
+      "dark-mode": 2
+    },
     "featureEffects": {
       "export-multi-comptes": { "capital-politique": 6, "valeur-percue": 4, "tresorerie": -3 },
       "onboarding-refonte": { "valeur-percue": 6, "moral": 3, "dette-organisationnelle": 2 },
       "dark-mode": { "moral": 5, "valeur-percue": 1 },
       "audit-rgpd": { "capital-politique": 8, "dette-organisationnelle": -4, "tresorerie": -5 }
-    }
-  },
-
-  "recruitment": {
-    "itemEffects": {
-      "sofia-pm-senior": { "hireCost": { "tresorerie": -8 }, "capacityBonus": 2, "immediate": { "valeur-percue": 3 } },
-      "contractuel-dev-backend": { "hireCost": { "tresorerie": -12 }, "capacityBonus": 1, "immediate": { "dette-organisationnelle": -3 } },
-      "kevin-ops-junior": { "hireCost": { "tresorerie": -3 }, "capacityBonus": 1, "immediate": { "moral": 2 } },
-      "codeur-motive": { "hireCost": { "tresorerie": -1 }, "capacityBonus": 1, "immediate": { "moral": 4, "cynisme": 2 } },
-      "consultant-disponible": { "hireCost": { "tresorerie": -9 }, "capacityBonus": 1, "immediate": { "capital-politique": 4, "cynisme": 5 } },
-      "stagiaire-experience": { "hireCost": { "tresorerie": -1 }, "capacityBonus": 1, "immediate": { "dette-organisationnelle": 3, "moral": 3 } }
     }
   }
 }
