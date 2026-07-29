@@ -25,6 +25,9 @@ var hud_demo: Dictionary = {}
 var structure: Dictionary = {}
 var balance: Dictionary = {}
 var companies: Array = []
+var candidates: Array = []
+var practices: Array = []
+var hidden_traits: Dictionary = {}
 
 var is_loaded: bool = false
 
@@ -113,6 +116,18 @@ func _load_all() -> void:
 	var companies_data = _load_json("companies.json")
 	if companies_data:
 		companies = companies_data.get("companies", [])
+
+	var candidates_data = _load_json("candidates.json")
+	if candidates_data:
+		candidates = candidates_data.get("candidates", [])
+
+	var practices_data = _load_json("practices.json")
+	if practices_data:
+		practices = practices_data.get("practices", [])
+
+	var hidden_traits_data = _load_json("hidden-traits.json")
+	if hidden_traits_data:
+		hidden_traits = hidden_traits_data
 
 	is_loaded = resources.size() > 0 and not cards.is_empty() and not balance.is_empty()
 
