@@ -11,7 +11,7 @@
   },
 
   "startingResourceOverrides": {
-    "karavel-scaleup": { "tresorerie": 25 }
+    "karavel-scaleup": { "tresorerie": 20 }
   },
 
   "resourceBounds": { "min": 0, "max": 100 },
@@ -69,8 +69,8 @@
     "saas-mrr": {
       "label": "SaaS — revenu récurrent (MRR)",
       "description": "Un revenu tombe chaque sprint, proportionnel à la Valeur perçue au-dessus du seuil de notoriété, érodé par un Moral bas (churn). Sous le seuil de décrochage, plus aucun revenu.",
-      "revenuePerValeurPercuePoint": 0.6,
-      "revenueValeurPercueOffset": 30,
+      "revenuePerValeurPercuePoint": 0.75,
+      "revenueValeurPercueOffset": 38,
       "moralChurnFloor": 0.3,
       "moralChurnCeiling": 1.1
     },
