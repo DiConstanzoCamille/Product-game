@@ -30,6 +30,31 @@ func _build_cards() -> void:
 		cards_row.add_child(_build_company_card(company))
 
 
+## Résumé du roster de départ par rôle, ex. "1 📋 PM · 2 💻 Devs · 1 🛠️ Ops".
+func _roster_summary(roster: Array) -> String:
+	var roles: Dictionary = GameData.balance.get("roles", {})
+	var counts: Dictionary = {}
+	for member in roster:
+		var role_id: String = member.get("role", "")
+		counts[role_id] = int(counts.get(role_id, 0)) + 1
+	var parts: Array = []
+	for role_id in ["pm", "dev", "designer", "ops"]:
+		var count := int(counts.get(role_id, 0))
+		if count == 0:
+			continue
+		var role_conf: Dictionary = roles.get(role_id, {})
+		parts.append("%d %s %s" % [count, role_conf.get("icon", ""), role_conf.get("label", role_id)])
+	var missing: Array = []
+	for role_id in ["pm", "dev", "designer", "ops"]:
+		if int(counts.get(role_id, 0)) == 0:
+			var role_conf: Dictionary = roles.get(role_id, {})
+			missing.append("%s %s" % [role_conf.get("icon", ""), role_conf.get("label", role_id)])
+	var text := " · ".join(parts)
+	if not missing.is_empty():
+		text += " · aucun %s !" % " ni ".join(missing)
+	return text
+
+
 func _team_profile_label(team_profile: String) -> String:
 	for profile in GameData.cards.get("teamProfiles", []):
 		if profile.get("id", "") == team_profile:
@@ -70,11 +95,36 @@ func _build_company_card(company: Dictionary) -> Control:
 	vbox.add_child(description_label)
 
 	var team_label := Label.new()
-	team_label.text = "Équipe héritée : %s" % _team_profile_label(company.get("teamProfile", ""))
+	var roster: Array = company.get("startingRoster", [])
+	team_label.text = "Équipe héritée : %s — %d personne%s (cap %d) · %s" % [
+		_team_profile_label(company.get("teamProfile", "")),
+		roster.size(), "s" if roster.size() > 1 else "",
+		int(company.get("teamCap", 0)),
+		_roster_summary(roster),
+	]
 	team_label.add_theme_font_size_override("font_size", 12)
 	team_label.add_theme_color_override("font_color", UIHelpers.COLOR_SOFT_TEXT)
 	team_label.autowrap_mode = TextServer.AUTOWRAP_WORD
 	vbox.add_child(team_label)
+
+	var pieces_label := Label.new()
+	pieces_label.text = "Budget d'action de départ : %d 🪙" % int(company.get("startingPieces", 0))
+	pieces_label.add_theme_font_size_override("font_size", 12)
+	pieces_label.add_theme_color_override("font_color", UIHelpers.COLOR_AMBER)
+	vbox.add_child(pieces_label)
+
+	var objectives: Dictionary = company.get("boardObjectives", {})
+	if not objectives.is_empty():
+		var objectives_label := Label.new()
+		var lines: Array = ["🏛️ Revue de board (sprint %d) : %s" % [
+			int(GameData.balance.get("trimesterLengthSprints", 6)), objectives.get("title", "")
+		]]
+		for condition in objectives.get("conditions", []):
+			lines.append("   • %s" % condition.get("label", ""))
+		objectives_label.text = "\n".join(lines)
+		objectives_label.add_theme_font_size_override("font_size", 12)
+		objectives_label.autowrap_mode = TextServer.AUTOWRAP_WORD
+		vbox.add_child(objectives_label)
 
 	var action_btn := Button.new()
 	action_btn.text = "Accepter le poste"
