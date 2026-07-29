@@ -12,6 +12,7 @@ const START_SCREEN_SCENE := "res://scenes/screens/start_screen.tscn"
 @onready var senior_button: Button = $Margin/VBox/TeamToggle/SeniorButton
 @onready var cards_grid: GridContainer = $Margin/VBox/Scroll/CardsGrid
 @onready var next_button: Button = $Margin/VBox/BottomBar/NextButton
+@onready var activation_counter: Label = $Margin/VBox/ActivationCounter
 
 var team_group := ButtonGroup.new()
 # card_id -> {"axis_rows": {axis_id -> {"value": Label, "note": Label}}, "tagline": Label, "axes_box": VBoxContainer, "toggle_btn": Button}
@@ -43,8 +44,11 @@ func _ready() -> void:
 	UIHelpers.add_hover_bounce(junior_button, 1.02)
 	UIHelpers.add_hover_bounce(senior_button, 1.02)
 
+	UIHelpers.apply_mono(activation_counter, 12)
+
 	_build_cards()
 	_refresh_cards()
+	_update_activation_counter()
 
 
 func _build_cards() -> void:
@@ -106,8 +110,12 @@ func _build_cards() -> void:
 		toggle_btn.text = "Voir l'effet →"
 		vbox.add_child(toggle_btn)
 		toggle_btn.pressed.connect(_on_card_toggle.bind(card.get("id", "")))
-
 		UIHelpers.add_hover_bounce(toggle_btn, 1.02)
+
+		var activate_btn := Button.new()
+		vbox.add_child(activate_btn)
+		activate_btn.pressed.connect(_on_card_activate.bind(card.get("id", "")))
+		UIHelpers.add_hover_bounce(activate_btn, 1.02)
 
 		card_refs[card.get("id", "")] = {
 			"panel": panel,
@@ -115,6 +123,7 @@ func _build_cards() -> void:
 			"tagline": tagline_label,
 			"axes_box": axes_box,
 			"toggle_btn": toggle_btn,
+			"activate_btn": activate_btn,
 			"flipping": false,
 		}
 
@@ -163,3 +172,51 @@ func _refresh_cards() -> void:
 				"font_color", UIHelpers.COLOR_GOOD if is_positive else UIHelpers.COLOR_DANGER
 			)
 			refs.axis_rows[axis_id].note.text = d.get("note", "")
+
+		_refresh_activate_button(card_id)
+
+
+func _max_activations() -> int:
+	return int(GameData.balance.get("structuralDecisionMaxActivations", 4))
+
+
+func _refresh_activate_button(card_id: String) -> void:
+	var activate_btn: Button = card_refs[card_id].activate_btn
+	var already_active: bool = SprintState.activated_cards.has(card_id)
+	var limit_reached: bool = SprintState.activated_cards.size() >= _max_activations()
+
+	if already_active:
+		activate_btn.text = "Activée ✓"
+		activate_btn.disabled = true
+	elif limit_reached:
+		activate_btn.text = "Limite de grandes décisions atteinte"
+		activate_btn.disabled = true
+	else:
+		activate_btn.text = "Activer cette grande décision"
+		activate_btn.disabled = false
+
+
+func _update_activation_counter() -> void:
+	activation_counter.text = "%d/%d grandes décisions activées ce mandat" % [
+		SprintState.activated_cards.size(), _max_activations()
+	]
+
+
+func _on_card_activate(card_id: String) -> void:
+	if SprintState.activated_cards.has(card_id) or SprintState.activated_cards.size() >= _max_activations():
+		return
+
+	var card := {}
+	for c in GameData.cards.get("cards", []):
+		if c.get("id", "") == card_id:
+			card = c
+			break
+
+	var deltas := EffectResolver.resolve_card_activation(card_id, SprintState.team_profile, SprintState.era_id)
+	SprintState.add_pending(deltas, "Grande décision : %s activée (%s)" % [card.get("name", card_id), SprintState.team_profile])
+	SprintState.activated_cards.append(card_id)
+	SprintState.activated_card_sprints[card_id] = SprintState.sprint_number
+
+	for known_card_id in card_refs.keys():
+		_refresh_activate_button(known_card_id)
+	_update_activation_counter()

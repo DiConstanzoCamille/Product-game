@@ -16,6 +16,8 @@ const START_SCREEN_SCENE := "res://scenes/screens/start_screen.tscn"
 @onready var next_button: Button = $Margin/VBox/BottomBar/NextButton
 
 var event: Dictionary
+var choice_buttons: Array[Button] = []
+var choice_made: bool = false
 
 
 func _ready() -> void:
@@ -56,12 +58,23 @@ func _load_event() -> void:
 		var btn := Button.new()
 		btn.text = choice.get("label", "")
 		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		btn.pressed.connect(_on_choice_pressed.bind(choice.get("reveal", "")))
+		btn.pressed.connect(_on_choice_pressed.bind(choice))
 		choices_container.add_child(btn)
+		choice_buttons.append(btn)
 		UIHelpers.add_hover_bounce(btn, 1.015)
 
 
-func _on_choice_pressed(reveal: String) -> void:
-	reveal_label.text = reveal
+func _on_choice_pressed(choice: Dictionary) -> void:
+	if choice_made:
+		return
+	choice_made = true
+
+	reveal_label.text = choice.get("reveal", "")
 	reveal_label.visible = true
 	next_button.disabled = false
+
+	for btn in choice_buttons:
+		btn.disabled = true
+
+	var note := "%s → %s" % [event.get("subject", ""), choice.get("label", "")]
+	SprintState.add_pending(choice.get("effects", {}), note)

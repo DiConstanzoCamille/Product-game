@@ -3,14 +3,13 @@ extends Node
 ## avec la landing page (../data/*.json à la racine du dépôt).
 ## Source de vérité et schéma détaillé : docs/data-schema.md.
 ##
-## NOTE export : ce chemin relatif ("res://../data/") ne fonctionne que
-## lorsque le projet tourne depuis l'éditeur ou en build debug non empaqueté.
-## Pour un export packagé (PCK), il faudra soit copier data/ dans
-## res://data/ au moment du build, soit charger depuis un chemin externe
-## au binaire (ex: à côté de l'exécutable). Non résolu — voir
-## docs/tech-stack.md, section "Questions ouvertes".
+## Résolution du dossier de données : en éditeur ou en lancement debug,
+## "res://../data/" pointe vers le dossier data/ du dépôt. Dans un export
+## packagé, res:// est un .pck et ne permet pas de remonter au-dessus —
+## on retombe alors sur un dossier data/ placé à côté de l'exécutable
+## (voir game/README.md, section "Exporter le jeu").
 
-const DATA_DIR := "res://../data/"
+const DATA_DIR_DEV := "res://../data/"
 
 var resources: Array = []
 var tensions: Array = []
@@ -24,16 +23,26 @@ var recruitment_archetypes: Dictionary = {}
 var recruitment_demo: Dictionary = {}
 var hud_demo: Dictionary = {}
 var structure: Dictionary = {}
+var balance: Dictionary = {}
 
 var is_loaded: bool = false
 
+var _data_dir: String = ""
+
 
 func _ready() -> void:
+	_data_dir = _resolve_data_dir()
 	_load_all()
 
 
+func _resolve_data_dir() -> String:
+	if FileAccess.file_exists(DATA_DIR_DEV + "resources.json"):
+		return DATA_DIR_DEV
+	return OS.get_executable_path().get_base_dir() + "/data/"
+
+
 func _load_json(file_name: String) -> Variant:
-	var path := DATA_DIR + file_name
+	var path := _data_dir + file_name
 	if not FileAccess.file_exists(path):
 		push_error("Fichier de données introuvable : %s" % path)
 		return null
@@ -96,11 +105,15 @@ func _load_all() -> void:
 	if structure_data:
 		structure = structure_data
 
-	is_loaded = resources.size() > 0 and not cards.is_empty()
+	var balance_data = _load_json("balance.json")
+	if balance_data:
+		balance = balance_data
+
+	is_loaded = resources.size() > 0 and not cards.is_empty() and not balance.is_empty()
 
 	if is_loaded:
 		print("GameData: données chargées — %d ressources, %d cartes, %d époques, %d fins de mandat." % [
 			resources.size(), cards.get("cards", []).size(), eras.size(), endings.size()
 		])
 	else:
-		push_error("GameData: échec du chargement des données. Vérifiez que data/ existe à la racine du dépôt.")
+		push_error("GameData: échec du chargement des données. Vérifiez que data/ existe à la racine du dépôt (ou à côté de l'exécutable en export).")

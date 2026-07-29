@@ -52,7 +52,7 @@ Product-game/
 - [`docs/data-schema.md`](docs/data-schema.md) — le détail du schéma de chaque fichier JSON.
 - [`docs/tech-stack.md`](docs/tech-stack.md) — le choix du moteur de jeu (Godot 4) et les alternatives écartées (Three.js, Unity, Unreal, stack web).
 - [`landing/index.html`](landing/index.html) — une page de présentation interactive du concept : cartes retournables, jauges de ressources, aperçu d'écrans de jeu (inbox, roadmap, recrutement), présentation des époques et des fins de mandat. Toutes ses données viennent de `data/`, pas de contenu codé en dur.
-- [`game/`](game/README.md) — le projet Godot 4 : la boucle complète d'un sprint est jouable (Accueil → Inbox → Roadmap → Grandes décisions → Recrutement → Résolution → sprint suivant), avec les mêmes `data/*.json` que la landing page, une identité visuelle propre (polices de marque, icônes, portraits, fond quadrillé, animations légères — toutes licences libres, détail dans `game/assets/THIRD_PARTY_NOTICES.md`). Pas encore une simulation équilibrée — voir `game/README.md` pour le détail et les limites connues.
+- [`game/`](game/README.md) — le projet Godot 4 : un mandat complet est jouable de bout en bout (Accueil → Inbox → Roadmap → Grandes décisions → Recrutement → Résolution → sprint suivant → fin de mandat), avec une vraie simulation persistante des 6 ressources et les mêmes `data/*.json` que la landing page (plus `data/balance.json`, propre au jeu), une identité visuelle propre (polices de marque, icônes, portraits, fond quadrillé, animations légères — toutes licences libres, détail dans `game/assets/THIRD_PARTY_NOTICES.md`). Pas encore équilibré (tous les nombres sont dans `data/balance.json`, ajustables sans toucher au code) — voir `game/README.md` pour le détail et les limites connues.
 
 ## Voir la landing page
 
@@ -86,4 +86,4 @@ Aucune ne s'optimise seule — voir le détail des tensions entre ressources dan
 
 ## Statut du projet
 
-Phase de conception. Les valeurs numériques (coûts, gains, seuils de déclenchement des fins de mandat) sont indicatives et seront ajustées en playtest. Plusieurs questions restent ouvertes (voir la [section 13 du carnet de règles](docs/carnet-de-regles.md#13-hypothèses-et-questions-ouvertes)).
+MVP jouable dans `game/` : un mandat complet se joue de bout en bout jusqu'à une vraie fin. Les valeurs numériques (coûts, gains, seuils de déclenchement des fins de mandat) sont indicatives et seront ajustées en playtest — voir [`data/balance.json`](data/balance.json) et la [section 14 du carnet de règles](docs/carnet-de-regles.md#14-décisions-de-conception-du-mvp-jouable) pour le détail des décisions prises. Plusieurs questions restent ouvertes au-delà du MVP (voir la [section 13](docs/carnet-de-regles.md#13-hypothèses-et-questions-ouvertes)).

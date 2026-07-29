@@ -1,0 +1,85 @@
+{
+  "_comment": "Données de simulation MVP — consommées uniquement par game/ (pas par landing/). Toutes les valeurs sont indicatives, à ajuster en playtest. Décisions documentées dans docs/carnet-de-regles.md §14.",
+
+  "startingResources": {
+    "tresorerie": 60,
+    "moral": 60,
+    "dette-organisationnelle": 15,
+    "capital-politique": 55,
+    "valeur-percue": 50,
+    "cynisme": 10
+  },
+
+  "resourceBounds": { "min": 0, "max": 100 },
+
+  "resourceDirection": {
+    "tresorerie": "high-good",
+    "moral": "high-good",
+    "capital-politique": "high-good",
+    "valeur-percue": "high-good",
+    "dette-organisationnelle": "low-good",
+    "cynisme": "low-good"
+  },
+
+  "stateThresholds": { "goodMin": 60, "dangerMax": 25 },
+
+  "mandateLengthSprints": 12,
+  "trimesterLengthSprints": 6,
+
+  "endingThresholds": [
+    { "resource": "tresorerie", "comparison": "lte", "value": 0, "ending": "faillite" },
+    { "resource": "moral", "comparison": "lte", "value": 0, "ending": "exode-equipe" },
+    { "resource": "dette-organisationnelle", "comparison": "gte", "value": 100, "ending": "entreprise-zombie" },
+    { "resource": "capital-politique", "comparison": "lte", "value": 0, "ending": "rachat-hostile" },
+    { "resource": "valeur-percue", "comparison": "lte", "value": 0, "ending": "burnout-fondateur" },
+    { "resource": "cynisme", "comparison": "gte", "value": 100, "ending": "remplace-par-ia" }
+  ],
+
+  "endingThresholdOverrides": {
+    "garage": { "cynisme": 130 },
+    "ai-era": { "capital-politique": 12 }
+  },
+
+  "goodEnding": {
+    "scoreResources": ["valeur-percue", "capital-politique"],
+    "ipoThreshold": 60,
+    "highEnding": "ipo",
+    "lowEnding": "rachat"
+  },
+
+  "cardAxisResourceMap": {
+    "humain": { "resource": "moral", "invert": false },
+    "financier": { "resource": "tresorerie", "invert": false },
+    "ttm": { "resource": "valeur-percue", "invert": false },
+    "productivite": { "resource": "dette-organisationnelle", "invert": true }
+  },
+
+  "structuralDecisionMaxActivations": 4,
+
+  "eraCardEffectMultipliers": {
+    "garage": {},
+    "agile-transformation": { "cynisme": 1.5 },
+    "ai-era": { "dette-organisationnelle": 1.15, "moral": 1.2, "tresorerie": 0.85 }
+  },
+
+  "roadmap": {
+    "overCapacityPenalty": { "dette-organisationnelle": 10, "cynisme": 6, "moral": -4 },
+    "featureEffects": {
+      "export-multi-comptes": { "capital-politique": 6, "valeur-percue": 4, "tresorerie": -3 },
+      "onboarding-refonte": { "valeur-percue": 6, "moral": 3, "dette-organisationnelle": 2 },
+      "dark-mode": { "moral": 5, "valeur-percue": 1 },
+      "audit-rgpd": { "capital-politique": 8, "dette-organisationnelle": -4, "tresorerie": -5 }
+    }
+  },
+
+  "recruitment": {
+    "itemEffects": {
+      "sofia-pm-senior": { "hireCost": { "tresorerie": -8 }, "capacityBonus": 2, "immediate": { "valeur-percue": 3 } },
+      "contractuel-dev-backend": { "hireCost": { "tresorerie": -12 }, "capacityBonus": 1, "immediate": { "dette-organisationnelle": -3 } },
+      "kevin-ops-junior": { "hireCost": { "tresorerie": -3 }, "capacityBonus": 1, "immediate": { "moral": 2 } },
+      "codeur-motive": { "hireCost": { "tresorerie": -1 }, "capacityBonus": 1, "immediate": { "moral": 4, "cynisme": 2 } },
+      "consultant-disponible": { "hireCost": { "tresorerie": -9 }, "capacityBonus": 1, "immediate": { "capital-politique": 4, "cynisme": 5 } },
+      "stagiaire-experience": { "hireCost": { "tresorerie": -1 }, "capacityBonus": 1, "immediate": { "dette-organisationnelle": 3, "moral": 3 } }
+    }
+  }
+}

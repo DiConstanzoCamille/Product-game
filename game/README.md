@@ -2,7 +2,7 @@
 
 Projet [Godot 4.3+](https://godotengine.org/) (GDScript). Voir [`docs/tech-stack.md`](../docs/tech-stack.md) pour le choix du moteur et [`docs/data-schema.md`](../docs/data-schema.md) pour le contenu des données consommées ici.
 
-La boucle complète d'un sprint est jouable de bout en bout (Accueil → Inbox → Roadmap → Grandes décisions → Recrutement → Résolution → sprint suivant), avec des données réelles issues de `data/*.json`. Ce n'est pas encore un jeu équilibré : aucune ressource ne s'accumule réellement d'un sprint à l'autre (voir "Limites connues" plus bas) — c'est un squelette d'écrans navigable, pas la simulation finale.
+La boucle complète d'un sprint est jouable de bout en bout (Accueil → Inbox → Roadmap → Grandes décisions → Recrutement → Résolution → sprint suivant), avec des données réelles issues de `data/*.json`. Un mandat complet (12 sprints) se joue jusqu'à une vraie fin — faillite, exode d'équipe, IPO, etc. — les 6 ressources persistent et évoluent réellement d'un sprint à l'autre. Ce n'est pas encore un jeu *équilibré* (voir `docs/carnet-de-regles.md` §14 pour les décisions de conception du MVP, et `data/balance.json` pour tous les nombres ajustables), mais la boucle cœur fonctionne de bout en bout.
 
 ## Ouvrir le projet
 
@@ -32,27 +32,33 @@ game/
 │   ├── roadmap_screen.tscn               # phase 2 — features & capacité
 │   ├── decisions_screen.tscn             # phase 3 — cartes structurelles (RICE, Notion, Jira)
 │   ├── recruitment_screen.tscn           # phase 4 — shop (habillage par époque)
-│   ├── resolution_screen.tscn            # phase 5 — HUD (jauges, journal, alerte)
-│   └── foundations_screen.tscn           # plateau des Fondations, accessible depuis la Résolution
-└── scripts/
-    ├── autoload/
-    │   ├── game_data.gd                  # singleton : charge tous les data/*.json au démarrage
-    │   └── sprint_state.gd               # singleton léger : n° de sprint, profil d'équipe courant
-    ├── ui_helpers.gd                     # polices, icônes, avatars, barres, fade-in, hover (voir plus bas)
-    └── screens/                          # un script par écran ci-dessus
+│   ├── resolution_screen.tscn            # phase 5 — HUD (jauges, journal, alerte), applique les effets du sprint
+│   ├── foundations_screen.tscn           # plateau des Fondations, accessible depuis la Résolution
+│   └── mandate_end_screen.tscn           # fin de mandat (bonne ou mauvaise), retour à l'accueil ou nouveau mandat
+├── scripts/
+│   ├── autoload/
+│   │   ├── game_data.gd                  # singleton : charge tous les data/*.json (+ balance.json) au démarrage
+│   │   └── sprint_state.gd               # singleton : état du mandat en cours (ressources, panier d'effets, journal, fins)
+│   ├── effect_resolver.gd                # classe statique : convertit les données brutes en deltas de ressources
+│   ├── ui_helpers.gd                     # polices, icônes, avatars, barres, fade-in, hover (voir plus bas)
+│   └── screens/                          # un script par écran ci-dessus
+└── tests/
+    ├── smoke_test_logic.gd/.tscn         # simule des mandats complets (stress/greedy/careful) sans UI
+    └── smoke_test_ui.gd/.tscn            # instancie chaque écran, vérifie l'absence d'erreur au chargement
 ```
 
 ## Les écrans
 
 Chaque écran a un bouton **← Accueil** (retour au menu à tout moment) et un bouton d'avancée en bas à droite qui enchaîne vers la phase suivante. Tout le contenu (textes, valeurs, cartes) est généré au runtime depuis `GameData`, rien n'est codé en dur dans les scènes.
 
-- **Accueil** (`start_screen`) — titre, tagline, panneau de règles scrollable, Nouvelle partie / Quitter.
-- **Inbox** (`inbox_screen`) — un événement de `inbox_events.json` (actuellement un seul, tiré par index de sprint), 3 choix ; cliquer un choix révèle son effet et débloque "Suivant".
-- **Roadmap** (`roadmap_screen`) — features de `roadmap-features.json` en boutons à bascule ; une barre de capacité passe au rouge et affiche un avertissement au-delà de `capacityMax`.
-- **Grandes décisions** (`decisions_screen`) — les 3 cartes de `cards.json`, toggle Junior/Senior (radio via `ButtonGroup`) qui recalibre les 4 axes de chaque carte en direct ; "Voir l'effet" bascule tagline ↔ détail des axes.
-- **Recrutement** (`recruitment_screen`) — habillages de `recruitment-demo.json` (candidats vs petites annonces), bouton d'action qui se désactive après clic.
-- **Résolution** (`resolution_screen`) — jauges colorées par état (bon/attention/danger), journal du sprint, alerte, depuis `hud-demo.json`. "Sprint suivant" incrémente `SprintState.sprint_number` et boucle vers l'Inbox. Un bouton dédié ouvre le plateau des Fondations.
-- **Fondations** (`foundations_screen`) — le plateau de `foundations.json` (statut en attente / actif), pas un compte à rebours.
+- **Accueil** (`start_screen`) — titre, tagline, panneau de règles scrollable, Nouvelle partie (appelle `SprintState.reset_run()` : tire une époque, réinitialise les 6 ressources) / Quitter.
+- **Inbox** (`inbox_screen`) — un événement de `inbox_events.json` (5 disponibles, tiré par index de sprint), 3 choix ; cliquer un choix révèle son effet, l'ajoute au panier du sprint (`SprintState.add_pending`) et débloque "Suivant".
+- **Roadmap** (`roadmap_screen`) — features de `roadmap-features.json` en boutons à bascule ; une barre de capacité (base + bonus de recrutement) passe au rouge et affiche un avertissement au-delà de la capacité effective. Au clic sur "Suivant", les effets des features sélectionnées (+ pénalité de surchauffe éventuelle) rejoignent le panier du sprint.
+- **Grandes décisions** (`decisions_screen`) — les 3 cartes de `cards.json`, toggle Junior/Senior qui recalibre les 4 axes en direct ; "Voir l'effet" bascule tagline ↔ détail des axes ; "Activer cette grande décision" convertit la carte en deltas réels (via `EffectResolver`, avec les multiplicateurs d'époque) et la marque comme Fondation active, jusqu'à la limite du mandat.
+- **Recrutement** (`recruitment_screen`) — habillages de `recruitment-demo.json` (candidats vs petites annonces) ; embaucher coûte de la trésorerie, produit un effet immédiat et augmente durablement la capacité de roadmap (`SprintState.capacity_bonus`).
+- **Résolution** (`resolution_screen`) — applique tout le panier d'effets accumulé pendant le sprint (`SprintState.apply_pending_and_check()`), affiche les 6 jauges réelles (état bon/attention/danger, delta du sprint), le journal cumulatif, une alerte sur la ressource la plus critique. Détecte les fins de mandat et route vers `mandate_end_screen` le cas échéant ; sinon "Sprint suivant" incrémente `SprintState.sprint_number` et boucle vers l'Inbox. Un bouton dédié ouvre le plateau des Fondations.
+- **Fondations** (`foundations_screen`) — affiche les grandes décisions réellement activées ce mandat (état réel, pas une démo) ; message dédié si aucune n'est encore active.
+- **Fin de mandat** (`mandate_end_screen`) — la fin atteinte (`endings.json`), le bilan des 6 ressources, l'époque et le profil d'équipe ; "Nouveau mandat" relance directement (`reset_run()` + Inbox), "Accueil" retourne au menu.
 
 Le thème visuel (`resources/theme/main_theme.tres`) est appliqué par défaut à tout le projet (`[gui] theme/custom`) — un nouvel écran hérite des couleurs de marque sans re-stylisation manuelle.
 
@@ -76,14 +82,28 @@ Pas de dépendance/plugin externe : tout est construit avec les nœuds et l'API 
 
 ## Limites connues
 
-- **Pas de simulation persistante** : les choix faits sur un écran (feature sélectionnée, carte activée, employé recruté) ne modifient pas encore les ressources ni ne persistent au sprint suivant — chaque écran affiche les mêmes données d'exemple à chaque passage. Calculer et faire persister les 6 ressources (§4 du carnet de règles) à travers la boucle est la prochaine étape naturelle côté logique de jeu.
-- **Export packagé** : le chemin de chargement des données (`res://../data/`) fonctionne depuis l'éditeur et en lancement debug, mais pas depuis un export `.pck` — à résoudre avant de distribuer une build (copier `data/` dans `res://data/` au moment du build, ou charger depuis un chemin à côté de l'exécutable).
-- **Un seul événement Inbox** dans `data/inbox-events.json` — le code gère déjà un nombre arbitraire d'événements (tirage par index de sprint), il suffira d'en ajouter dans le JSON.
+- **Employés non persistants** : le recrutement a un effet immédiat + un bonus de capacité durable, mais il n'y a pas encore d'employé "vivant" dont le trait s'applique en continu sprint après sprint (voir §14 du carnet de règles). Les traits de `recruitment-archetypes.json` restent illustratifs.
+- **Fondations sans prérequis** : le plateau affiche les grandes décisions activées, pas encore de Fondation "en attente" débloquée par une condition (le cas Shape Up de `foundations.json` reste un exemple de direction).
+- **Pas de sauvegarde** : fermer le jeu perd la progression du mandat en cours — aucune persistance sur disque pour l'instant.
 - **Portraits** : seuls 5 personnages ont un avatar dédié (voir `assets/THIRD_PARTY_NOTICES.md`) — les autres candidats retombent sur une icône générique, ce qui est voulu pour les profils anonymes des petites annonces mais mériterait des portraits dédiés si de nouveaux personnages nommés sont ajoutés aux données.
+- **Export packagé** : `GameData` sait retomber sur un dossier `data/` placé à côté de l'exécutable quand `res://../data/` n'est pas accessible (cas d'un export `.pck`) — mais ce dossier doit être copié là manuellement au moment de la distribution, ce n'est pas encore automatisé dans le pipeline d'export.
+
+## Tests
+
+`game/tests/` contient deux scripts headless (aucune fenêtre requise) :
+
+```bash
+godot --headless --path game res://tests/smoke_test_logic.tscn  # simule des mandats complets, 3 profils de joueur
+godot --headless --path game res://tests/smoke_test_ui.tscn     # instancie chaque écran, détecte les erreurs de chargement
+```
+
+`smoke_test_logic` fait rejouer des mandats entiers avec trois stratégies (`stress`, `greedy`, `careful`) et vérifie que les ressources restent dans les bornes et qu'une fin est toujours atteinte. C'est le filet de sécurité à relancer après tout changement dans `EffectResolver`, `SprintState` ou `data/balance.json`.
 
 ## Prochaines étapes possibles
 
-- Faire persister et évoluer les 6 ressources à travers la boucle de sprint (le vrai cœur du jeu, cf. §4 et §11 du carnet de règles — modèle d'effet unifié).
-- Ajouter des événements Inbox et des features Roadmap supplémentaires dans `data/`.
-- Résoudre le chargement des données pour un export packagé (voir ci-dessus).
+- Employés persistants avec effet continu (traits actifs sprint après sprint), au lieu du seul effet immédiat + bonus de capacité actuel.
+- Fondations avec prérequis réels (méthodologie d'orga débloquée par une condition sur le plateau).
+- Sauvegarde/reprise d'un mandat en cours.
+- Automatiser la copie de `data/` à côté de l'exécutable dans le pipeline d'export.
+- Rééquilibrage par playtest — tous les nombres sont dans `data/balance.json`, aucun n'est figé dans le code.
 - Décider de la stratégie d'export (desktop prioritaire, ou aussi HTML5/Web).

@@ -54,6 +54,9 @@ text="Équipe junior — startup, 18 mois"
 [node name="SeniorButton" type="Button" parent="Margin/VBox/TeamToggle"]
 text="Équipe senior — grand groupe, 12 ans"
 
+[node name="ActivationCounter" type="Label" parent="Margin/VBox"]
+text="0/4 grandes décisions activées ce mandat"
+
 [node name="Scroll" type="ScrollContainer" parent="Margin/VBox"]
 size_flags_vertical=3
 

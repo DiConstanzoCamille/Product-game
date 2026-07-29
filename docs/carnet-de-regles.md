@@ -229,3 +229,56 @@ Ordre d'application à figer tôt : carte → employé → époque, puis arrondi
 ### Non validé
 - Archétypes de CPO de départ (piste proposée, jamais tranchée) : fondateur·rice visionnaire, PM parachuté·e en legacy org, growth hacker, coach agile évangéliste, responsable conformité — chacun avec un deck/une capacité de départ différents
 - Valeurs finales de tous les effets — tout ce qui est chiffré dans ce document reste indicatif
+
+---
+
+## 14. Décisions de conception du MVP jouable
+
+Pour rendre le jeu réellement jouable (simulation persistante, vraies fins de
+mandat), certaines questions ouvertes du §13 ont dû recevoir une réponse
+provisoire — pas une réponse définitive, une réponse suffisante pour avancer.
+Tous les nombres cités ici vivent dans `data/balance.json`, pas dans le code :
+les rééquilibrer ne demande aucune modification de script.
+
+- **Mapping axes de carte → ressources.** Les 4 axes de `cards.json`
+  (humain, financier, ttm, productivité) alimentent les 6 ressources ainsi :
+  humain → Moral, financier → Trésorerie, time-to-market → Valeur perçue,
+  productivité → Dette organisationnelle (relation inversée : plus de
+  productivité réduit la dette). Voir `balance.json` → `cardAxisResourceMap`.
+- **Seuils de fin de mandat.** Chaque ressource a un extrême qui déclenche une
+  fin (repris de son champ `extreme` dans `resources.json`) : Trésorerie à 0
+  → Faillite, Moral à 0 → Exode d'équipe, Dette à 100 → Entreprise zombie,
+  Capital politique à 0 → Rachat hostile, Valeur perçue à 0 → Burn-out
+  fondateur·rice, Cynisme à 100 → Remplacé·e par l'IA. Les seuils sont
+  découverts par le joueur en jouant (pas annoncés à l'avance) — répond à la
+  question de lisibilité du §13, dans le sens le plus proche du thème du jeu.
+- **Longueur de mandat et fins positives.** Un mandat dure 12 sprints
+  (`mandateLengthSprints`). S'il se termine sans fin négative, le score final
+  est la moyenne de Valeur perçue et Capital politique : ≥ 60 → IPO, sinon →
+  Rachat. Valeur arbitraire de calibrage MVP, à ajuster en playtest.
+- **Époques : portée des effets systémiques.** Pour le MVP, chaque époque ne
+  modifie que ce qui est mesurable simplement : les années garage relèvent le
+  seuil de fin par Cynisme (plus tolérant), la Transformation agile
+  multiplie par 1.5 l'effet Cynisme des grandes décisions activées, l'Ère IA
+  abaisse le seuil de fin par Capital politique et modifie légèrement les
+  effets Dette/Moral/Trésorerie des grandes décisions. Les autres effets
+  narratifs des époques (cartes indisponibles avant un jalon, etc.) restent
+  à implémenter — non couverts par le MVP.
+- **Grandes décisions : une activation par carte.** Chaque carte structurelle
+  (RICE, Notion, Jira) peut être activée une seule fois par mandat, jusqu'à
+  la limite globale (`structuralDecisionMaxActivations`, 4 par défaut). Pas
+  de réactivation ni de coût de bascule différencié pour le MVP — la nuance
+  "coût de bascule" du §7 reste à implémenter.
+- **Recrutement : effet immédiat, pas de simulation d'employé actif.** Une
+  embauche coûte de la trésorerie, produit un effet immédiat sur les
+  ressources, et augmente durablement la capacité de roadmap
+  (`capacityBonus`). Il n'y a pas encore d'employé "vivant" avec un trait qui
+  s'applique en continu sprint après sprint — les traits de
+  `recruitment-archetypes.json` restent illustratifs pour le MVP.
+- **Fondations = grandes décisions activées.** Le plateau des Fondations
+  affiche l'état réel du mandat en cours (les cartes activées), pas encore de
+  Fondation "en attente" avec prérequis (le cas Shape Up du fichier de démo
+  reste un exemple de direction, pas une mécanique implémentée).
+- **Valeurs de départ.** Les 6 ressources démarrent autour de 50-60 (hautes
+  pour les jauges "plus haut = mieux", basses pour Dette et Cynisme). Voir
+  `balance.json` → `startingResources`.

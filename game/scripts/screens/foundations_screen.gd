@@ -2,6 +2,11 @@ extends Control
 ## Plateau des Fondations (docs/carnet-de-regles.md §7) : effets persistants,
 ## pas un compte à rebours — soit une décision est déjà active, soit elle
 ## attend une condition précise. Accessible depuis l'écran de Résolution.
+##
+## Affiche l'état réel du mandat en cours (SprintState.activated_cards),
+## pas les données de démo — une grande décision activée en phase 3 devient
+## une Fondation active ici. MVP : pas encore de Fondation "en attente"
+## avec prérequis (voir docs/carnet-de-regles.md §14, limites connues).
 
 const RESOLUTION_SCENE := "res://scenes/screens/resolution_screen.tscn"
 const START_SCREEN_SCENE := "res://scenes/screens/start_screen.tscn"
@@ -23,11 +28,36 @@ func _ready() -> void:
 
 
 func _load_board() -> void:
-	var data: Dictionary = GameData.foundations
-	var families: Array = data.get("families", [])
+	var families: Array = GameData.foundations.get("families", [])
 
-	for foundation in data.get("demoBoard", []):
+	if SprintState.activated_cards.is_empty():
+		var empty_label := Label.new()
+		empty_label.text = "Aucune fondation active pour l'instant — activez une grande décision en phase 3 pour qu'elle apparaisse ici."
+		empty_label.autowrap_mode = TextServer.AUTOWRAP_WORD
+		empty_label.custom_minimum_size = Vector2(520, 0)
+		empty_label.add_theme_color_override("font_color", UIHelpers.COLOR_SOFT_TEXT)
+		board_grid.add_child(empty_label)
+		return
+
+	for card_id in SprintState.activated_cards:
+		var card := _find_card(card_id)
+		if card.is_empty():
+			continue
+		var foundation := {
+			"status": "active",
+			"activeSinceSprint": SprintState.activated_card_sprints.get(card_id, 0),
+			"family": card.get("family", ""),
+			"name": card.get("name", ""),
+			"detail": card.get("tagline", ""),
+		}
 		board_grid.add_child(_build_foundation_card(foundation, families))
+
+
+func _find_card(card_id: String) -> Dictionary:
+	for card in GameData.cards.get("cards", []):
+		if card.get("id", "") == card_id:
+			return card
+	return {}
 
 
 func _family_label(family_id: String, families: Array) -> String:

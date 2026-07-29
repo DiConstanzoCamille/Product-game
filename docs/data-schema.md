@@ -40,7 +40,7 @@ Les features proposables en phase Roadmap (§8), exemple d'un sprint : `capacity
 
 ## `inbox-events.json`
 
-Les événements aléatoires de la phase Inbox (§3, phase 1) : `events[].id/from/sprint/status/subject/text`, et `choices[]` (`id`, `label`, `reveal` — l'effet réel montré après le choix).
+Les événements aléatoires de la phase Inbox (§3, phase 1) : `events[].id/from/sprint/status/subject/text`, et `choices[]` (`id`, `label`, `reveal` — le texte montré après le choix, `effects` — deltas structurés sur les 6 ressources, consommés par `game/` ; `reveal` et `effects` doivent rester cohérents mais ne sont pas générés l'un depuis l'autre).
 
 ## `recruitment-archetypes.json`
 
@@ -63,6 +63,20 @@ La mécanique de fond, hors contenu chiffré (§2, §3, §6.1/6.2, §7, §11) :
 - `cardSystem` — la distinction cartes tactiques (pioche) vs grandes décisions structurelles (menu + familles).
 - `persistentEffectsRules` — les 4 règles régissant les effets persistants (délai par défaut, friction contextuelle, prérequis, stacks transverses).
 - `unifiedEffectModel` — le modèle d'effet unifié (ressource + magnitude + condition + durée) avec l'exemple chiffré du carnet (RICE × Transformation Agile × Ex-consultant McKinsey × senior).
+
+## `balance.json`
+
+Toutes les valeurs numériques nécessaires à la simulation persistante du MVP jouable (§14 du carnet de règles) — consommé uniquement par `game/`, jamais par `landing/`, pour garder la maquette de présentation indépendante de l'équilibrage :
+
+- `startingResources` — valeur de départ des 6 ressources ; `resourceBounds` (min/max, 0-100) ; `resourceDirection` (`high-good` / `low-good`, pour savoir quel sens est "bon") ; `stateThresholds` (`goodMin`/`dangerMax`, pour l'affichage bon/attention/danger).
+- `mandateLengthSprints`, `trimesterLengthSprints` — durée du mandat et du point de contrôle trimestriel.
+- `endingThresholds[]` — seuil par ressource déclenchant une fin négative (`resource`, `comparison`: `lte`/`gte`, `value`, `ending`) ; `endingThresholdOverrides` — ajustement de ces seuils par époque.
+- `goodEnding` — comment calculer la fin positive (IPO vs Rachat) quand le mandat va à son terme sans fin négative.
+- `cardAxisResourceMap` — comment les 4 axes de `cards.json` se convertissent en deltas sur les 6 ressources (`resource`, `invert`).
+- `structuralDecisionMaxActivations` — limite de grandes décisions activées par mandat.
+- `eraCardEffectMultipliers` — multiplicateurs par époque sur les deltas produits par l'activation d'une grande décision.
+- `roadmap` — `featureEffects` (deltas par feature de `roadmap-features.json`) et `overCapacityPenalty` (pénalité de surchauffe).
+- `recruitment.itemEffects` — coût d'embauche, effet immédiat et bonus de capacité par entrée de `recruitment-demo.json`.
 
 ## Ce qui reste hors JSON
 

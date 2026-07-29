@@ -96,7 +96,7 @@ func _build_candidate_card(candidate: Dictionary) -> Control:
 
 	var action_btn := Button.new()
 	action_btn.text = candidate.get("action", "")
-	action_btn.pressed.connect(_on_hire_pressed.bind(action_btn))
+	action_btn.pressed.connect(_on_hire_pressed.bind(action_btn, candidate.get("id", ""), candidate_name))
 	UIHelpers.add_hover_bounce(action_btn, 1.03)
 	vbox.add_child(action_btn)
 
@@ -124,13 +124,17 @@ func _build_ad_card(ad: Dictionary) -> Control:
 
 	var action_btn := Button.new()
 	action_btn.text = ad.get("action", "")
-	action_btn.pressed.connect(_on_hire_pressed.bind(action_btn))
+	action_btn.pressed.connect(_on_hire_pressed.bind(action_btn, ad.get("id", ""), ad.get("title", "")))
 	UIHelpers.add_hover_bounce(action_btn, 1.03)
 	vbox.add_child(action_btn)
 
 	return panel
 
 
-func _on_hire_pressed(btn: Button) -> void:
+func _on_hire_pressed(btn: Button, item_id: String, display_name: String) -> void:
 	btn.text = btn.text + " ✓"
 	btn.disabled = true
+
+	var result := EffectResolver.resolve_recruitment(item_id)
+	SprintState.add_pending(result.get("deltas", {}), "Recrutement : %s" % display_name)
+	SprintState.capacity_bonus += int(result.get("capacity_bonus", 0))
