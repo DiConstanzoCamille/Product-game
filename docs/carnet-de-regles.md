@@ -393,3 +393,51 @@ fois, au début du mandat.
   répartition grands comptes / petits comptes...") : l'intention est actée,
   la donnée sous-jacente (quels comptes, quel burn down) n'existe pas encore
   dans la simulation et reste à concevoir avant de débloquer l'écran.
+
+---
+
+## 17. Phase A — fondations économiques et pression
+
+Implémentation du premier lot de la
+[spec de profondeur de gameplay](spec-profondeur-gameplay.md) (§13-A). Tout
+le chiffrage vit dans `data/balance.json` ; les pools de contenu dans
+`data/candidates.json`, `data/practices.json` et `data/hidden-traits.json`.
+
+- **Le roster produit la capacité.** `SprintState.roster` remplace le
+  `capacity_bonus` plat : chaque entreprise définit son équipe héritée, son
+  cap d'effectif et son budget d'action initial (`companies.json`). Devs et
+  PM produisent des points de capacité (rendements décroissants au-delà du
+  cap de cumul du rôle), les Designers bonifient la Valeur perçue des
+  features livrées (÷2 en leur absence), les Ops contiennent la dette
+  (+2 Dette/sprint sans eux — le défaut affiché de Karavel). Les salaires
+  (junior 1, senior 2) sont prélevés à chaque Résolution, ligne « masse
+  salariale ».
+- **Les Pièces 🪙.** Monnaie d'action de l'entreprise : allocation du board
+  (+2/sprint, réduite à +1 après une revue ratée), prime de performance
+  (`floor(revenu/4)`), quick wins, événements Inbox (pseudo-ressource
+  `pieces` dans `effects`). Se dépense au Marché et en indemnités. À 0 on ne
+  perd pas — on est paralysé.
+- **Le Marché.** L'écran Recrutement devient un shop unifié : 2 candidats +
+  2 pratiques tirés par sprint et stockés dans `SprintState` (pas de
+  re-tirage). Chaque pratique achetée inflige +2 Cynisme ; Entretiens
+  structurés révèle les traits cachés des candidats dès le Marché, les
+  pratiques de révélation roadmap posent leurs flags pour la Phase C.
+- **Traits cachés.** Tirés à l'apparition du candidat (~50 % aucun, 30 %
+  négatif, 20 % positif), révélés en fin de période d'essai (embauche +
+  2 sprints) — leurs effets ne s'appliquent qu'une fois révélés. Négociateur
+  s'augmente tout seul, Démission silencieuse part au sprint d'embauche +4,
+  Réseau offre −2 🪙 sur l'embauche suivante.
+- **Licenciement.** Indemnités 2 🪙, Moral −4, +3 Cynisme par licenciement
+  supplémentaire dans le mandat (`fired_count`).
+- **La pression.** Valeur perçue −2/sprint (le marché avance) ; le revenu
+  SaaS ne compte que les points de Valeur perçue au-dessus d'un seuil de
+  notoriété (`revenueValeurPercueOffset`) et tombe à zéro sous le seuil de
+  décrochage (≤ 5) — le couperet « Valeur perçue ≤ 0 = fin » disparaît, la
+  mort passe par la spirale économique. La **revue de board** tombe à la fin
+  du sprint 6 : objectifs par entreprise (visibles dès l'offre d'emploi),
+  overlay de verdict en Résolution, +5 🪙/+8 Capital politique en cas de
+  succès, −12 Capital politique et allocation réduite sinon.
+- **Recette.** Les smoke tests pilotent ces systèmes ; critère impératif :
+  la stratégie `careful` (ne rien livrer, ne rien acheter, ne rien recruter)
+  perd avant la fin du mandat — vérifié en faillite vers les sprints 7-11
+  sur les deux entreprises.
