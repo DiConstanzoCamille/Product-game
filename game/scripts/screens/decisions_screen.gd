@@ -1,7 +1,8 @@
 extends Control
-## Phase 3 — Grandes décisions (docs/carnet-de-regles.md §6.2). Menu permanent
-## de cartes structurelles (RICE, Notion, Jira). L'effet réel dépend du
-## profil d'équipe — bascule Junior/Senior pour recalibrer.
+## Phase 3 — Grandes décisions (docs/carnet-de-regles.md §6.2, §16). Menu
+## permanent de cartes structurelles. L'effet réel dépend du profil
+## d'équipe — fixé pour tout le mandat par l'entreprise choisie au départ
+## (plus un bouton à bascule libre, voir company_select_screen).
 
 const NEXT_SCENE := "res://scenes/screens/recruitment_screen.tscn"
 const START_SCREEN_SCENE := "res://scenes/screens/start_screen.tscn"
@@ -14,9 +15,9 @@ const START_SCREEN_SCENE := "res://scenes/screens/start_screen.tscn"
 @onready var next_button: Button = $Margin/VBox/BottomBar/NextButton
 @onready var activation_counter: Label = $Margin/VBox/ActivationCounter
 
-var team_group := ButtonGroup.new()
 # card_id -> {"axis_rows": {axis_id -> {"value": Label, "note": Label}}, "tagline": Label, "axes_box": VBoxContainer, "toggle_btn": Button}
 var card_refs: Dictionary = {}
+var available_cards: Array = []  # cartes de GameData.cards filtrées par scénario en cours
 
 
 func _ready() -> void:
@@ -29,20 +30,26 @@ func _ready() -> void:
 
 	sprint_label.text = "Sprint %d — Phase 3 : Grandes décisions" % SprintState.sprint_number
 
-	junior_button.toggle_mode = true
-	senior_button.toggle_mode = true
-	junior_button.button_group = team_group
-	senior_button.button_group = team_group
-	junior_button.button_pressed = SprintState.team_profile == "junior"
-	senior_button.button_pressed = SprintState.team_profile == "senior"
-	junior_button.pressed.connect(_on_team_selected.bind("junior"))
-	senior_button.pressed.connect(_on_team_selected.bind("senior"))
+	var bar := UIHelpers.build_resource_bar()
+	$Margin/VBox.add_child(bar)
+	$Margin/VBox.move_child(bar, 1)
+	UIHelpers.attach_company_menu(self)
+
+	for card in GameData.cards.get("cards", []):
+		var eras: Array = card.get("eras", [])
+		if eras.is_empty() or eras.has(SprintState.era_id):
+			available_cards.append(card)
+
+	# Le profil d'équipe est fixé par l'entreprise choisie au lancement du
+	# mandat (§16) — affiché ici comme un badge, plus comme un bouton à bascule.
+	junior_button.visible = SprintState.team_profile == "junior"
+	senior_button.visible = SprintState.team_profile == "senior"
+	junior_button.disabled = true
+	senior_button.disabled = true
 	junior_button.icon = UIHelpers.icon_texture("sprout")
 	senior_button.icon = UIHelpers.icon_texture("landmark")
 	junior_button.add_theme_constant_override("icon_max_width", 18)
 	senior_button.add_theme_constant_override("icon_max_width", 18)
-	UIHelpers.add_hover_bounce(junior_button, 1.02)
-	UIHelpers.add_hover_bounce(senior_button, 1.02)
 
 	UIHelpers.apply_mono(activation_counter, 12)
 
@@ -54,7 +61,7 @@ func _ready() -> void:
 func _build_cards() -> void:
 	var axes: Array = GameData.cards.get("axes", [])
 
-	for card in GameData.cards.get("cards", []):
+	for card in available_cards:
 		var panel := PanelContainer.new()
 		panel.custom_minimum_size = Vector2(280, 0)
 		cards_grid.add_child(panel)
@@ -151,13 +158,8 @@ func _on_card_toggle(card_id: String) -> void:
 	tween.tween_callback(func(): refs.flipping = false)
 
 
-func _on_team_selected(team: String) -> void:
-	SprintState.team_profile = team
-	_refresh_cards()
-
-
 func _refresh_cards() -> void:
-	for card in GameData.cards.get("cards", []):
+	for card in available_cards:
 		var card_id: String = card.get("id", "")
 		var effects: Dictionary = card.get("effects", {}).get(SprintState.team_profile, {})
 		var refs: Dictionary = card_refs[card_id]

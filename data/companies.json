@@ -1,0 +1,24 @@
+{
+  "_comment": "Offres d'emploi — le cadre RP de chaque run (§16 du carnet de règles). Chaque entrée est liée à un scénario (era) et fixe le profil d'équipe hérité ; consommé uniquement par game/.",
+
+  "companies": [
+    {
+      "id": "meridia-corp",
+      "era": "agile-transformation",
+      "icon": "🏛️",
+      "name": "Meridia — grand groupe en pleine transformation",
+      "tagline": "CPO — Direction Produit, poste à pourvoir immédiatement",
+      "description": "Meridia emploie 4000 personnes et vend le même logiciel de gestion depuis 2003. Le comité de direction a lu un livre blanc sur l'agilité l'an dernier. Un cabinet de conseil a été mandaté. Vous héritez d'une équipe senior, compétente, méfiante, et fatiguée des grandes annonces.",
+      "teamProfile": "senior"
+    },
+    {
+      "id": "karavel-scaleup",
+      "era": "agile-transformation",
+      "icon": "🚀",
+      "name": "Karavel — scale-up qui structure sa croissance",
+      "tagline": "CPO — premier poste produit dédié de l'entreprise",
+      "description": "Karavel a triplé ses effectifs en 18 mois sans jamais poser de process. Le board veut « structurer avant que ça casse ». Vous héritez d'une équipe jeune, enthousiaste, et qui n'a jamais eu de cadre — chaque nouvelle méthode est encore une découverte.",
+      "teamProfile": "junior"
+    }
+  ]
+}

@@ -56,6 +56,33 @@
 
   "structuralDecisionMaxActivations": 4,
 
+  "playableEras": ["agile-transformation"],
+
+  "eraBusinessModel": {
+    "agile-transformation": "saas-mrr"
+  },
+
+  "eraRecruitmentSkin": {
+    "agile-transformation": "moderne"
+  },
+
+  "businessModels": {
+    "saas-mrr": {
+      "label": "SaaS — revenu récurrent (MRR)",
+      "description": "Un revenu tombe chaque sprint, proportionnel à la Valeur perçue, érodé par un Moral bas (churn).",
+      "revenuePerValeurPercuePoint": 0.2,
+      "moralChurnFloor": 0.3,
+      "moralChurnCeiling": 1.1
+    },
+    "waterfall-release": {
+      "label": "Vente à la version (waterfall)",
+      "description": "Pas de revenu récurrent — de gros paliers de revenu tombent à la sortie d'une version. Pas encore implémenté (scénario Garage, à venir).",
+      "revenuePerValeurPercuePoint": 0,
+      "moralChurnFloor": 1.0,
+      "moralChurnCeiling": 1.0
+    }
+  },
+
   "eraCardEffectMultipliers": {
     "garage": {},
     "agile-transformation": { "cynisme": 1.5 },

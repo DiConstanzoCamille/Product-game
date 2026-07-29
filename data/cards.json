@@ -75,6 +75,52 @@
           "productivite": { "value": 35, "note": "Traçabilité qui rassure l'audit et la direction." }
         }
       }
+    },
+    {
+      "id": "daily-standup",
+      "refId": "RIT-001",
+      "family": "methodologie-orga",
+      "category": "Rituel quotidien",
+      "name": "Daily Standup",
+      "tagline": "Quinze minutes debout, en théorie. La réalité dépend beaucoup de qui parle en premier.",
+      "eras": ["agile-transformation"],
+      "effects": {
+        "junior": {
+          "humain": { "value": 20, "note": "Un repère quotidien qui rassure une équipe qui manque encore de rythme." },
+          "financier": { "value": -2, "note": "Quasi nul." },
+          "ttm": { "value": -5, "note": "Petit coût d'installation du rituel." },
+          "productivite": { "value": 15, "note": "Meilleure synchro, moins de blocages découverts trop tard." }
+        },
+        "senior": {
+          "humain": { "value": -15, "note": "Perçu comme du micromanagement sur une équipe qui se coordonnait déjà." },
+          "financier": { "value": -2, "note": "Quasi nul." },
+          "ttm": { "value": 0, "note": "Ni gain ni perte notable." },
+          "productivite": { "value": 5, "note": "Léger gain, l'équipe se parlait déjà informellement." }
+        }
+      }
+    },
+    {
+      "id": "sprint-retro",
+      "refId": "RIT-002",
+      "family": "methodologie-orga",
+      "category": "Rituel de fin de sprint",
+      "name": "Sprint Rétro",
+      "tagline": "Le seul moment où on a le droit de dire que ça ne va pas — encore faut-il que quelqu'un ose.",
+      "eras": ["agile-transformation"],
+      "effects": {
+        "junior": {
+          "humain": { "value": 15, "note": "Premier espace où la parole circule sans hiérarchie." },
+          "financier": { "value": -2, "note": "Quasi nul." },
+          "ttm": { "value": -8, "note": "Un sprint qui semble « perdu » à discuter plutôt que livrer." },
+          "productivite": { "value": 10, "note": "Premiers ajustements, encore timides." }
+        },
+        "senior": {
+          "humain": { "value": 10, "note": "Bien reçu, si les retours sont pris au sérieux au sprint suivant." },
+          "financier": { "value": -2, "note": "Quasi nul." },
+          "ttm": { "value": -5, "note": "Coût récurrent mais prévisible." },
+          "productivite": { "value": 20, "note": "Vraie amélioration continue chez une équipe déjà mature." }
+        }
+      }
     }
   ]
 }

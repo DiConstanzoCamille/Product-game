@@ -23,6 +23,7 @@ func _ready() -> void:
 	UIHelpers.add_hover_bounce(back_button)
 	UIHelpers.add_hover_bounce(home_button)
 	UIHelpers.apply_heading(title_label, 22, 600.0)
+	UIHelpers.attach_company_menu(self)
 	UIHelpers.fade_in(self)
 	_load_board()
 

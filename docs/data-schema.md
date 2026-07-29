@@ -17,7 +17,7 @@ Le système de cartes structurelles calibrées (§6.2) : RICE, Notion, Jira.
 
 - `axes[]` — les 4 axes affichés sur le dos d'une carte (`id`, `label`) : coût humain, coût financier, time-to-market, productivité.
 - `teamProfiles[]` — les 2 profils d'équipe possibles (`id`, `label`, `shortLabel`) utilisés pour recalibrer les cartes.
-- `cards[]` — `id`, `refId` (identifiant façon ticket), `family` (`outil-process` / `stack-technique` / `methodologie-orga`, voir §6.2), `category`, `name`, `tagline`, `effects.junior` / `effects.senior` (un objet par axe avec `value` signé et `note` explicative).
+- `cards[]` — `id`, `refId` (identifiant façon ticket), `family` (`outil-process` / `stack-technique` / `methodologie-orga`, voir §6.2), `category`, `name`, `tagline`, `effects.junior` / `effects.senior` (un objet par axe avec `value` signé et `note` explicative), `eras[]` optionnel (§15 — réserve la carte aux scénarios listés ; absent = disponible partout).
 
 ## `eras.json`
 
@@ -40,7 +40,7 @@ Les features proposables en phase Roadmap (§8), exemple d'un sprint : `capacity
 
 ## `inbox-events.json`
 
-Les événements aléatoires de la phase Inbox (§3, phase 1) : `events[].id/from/sprint/status/subject/text`, et `choices[]` (`id`, `label`, `reveal` — le texte montré après le choix, `effects` — deltas structurés sur les 6 ressources, consommés par `game/` ; `reveal` et `effects` doivent rester cohérents mais ne sont pas générés l'un depuis l'autre).
+Les événements aléatoires de la phase Inbox (§3, phase 1 ; §15 pour la pioche) : `events[].id/from/sprint/status/subject/text`, `eras[]` optionnel (réserve l'événement aux scénarios listés ; absent = disponible partout), et `choices[]` (`id`, `label`, `reveal` — le texte montré après le choix, `effects` — deltas structurés sur les 6 ressources, consommés par `game/` ; `reveal` et `effects` doivent rester cohérents mais ne sont pas générés l'un depuis l'autre). `sprint` est un vestige de la démo landing (premier événement affiché) — `game/` tire désormais par pioche "sac", indépendante de ce champ.
 
 ## `recruitment-archetypes.json`
 
@@ -77,6 +77,16 @@ Toutes les valeurs numériques nécessaires à la simulation persistante du MVP 
 - `eraCardEffectMultipliers` — multiplicateurs par époque sur les deltas produits par l'activation d'une grande décision.
 - `roadmap` — `featureEffects` (deltas par feature de `roadmap-features.json`) et `overCapacityPenalty` (pénalité de surchauffe).
 - `recruitment.itemEffects` — coût d'embauche, effet immédiat et bonus de capacité par entrée de `recruitment-demo.json`.
+- `playableEras[]` — sous-ensemble de `eras.json` réellement jouable depuis `scenario_screen` (§15) ; les autres s'affichent verrouillés.
+- `eraBusinessModel` — scénario → id de modèle économique (`businessModels`).
+- `businessModels` — un modèle par id : `label`, `description`, `revenuePerValeurPercuePoint`, `moralChurnFloor`/`moralChurnCeiling` (bornes du facteur de churn appliqué au revenu selon le Moral). Voir §15 pour la formule complète (`SprintState.compute_revenue()`).
+- `eraRecruitmentSkin` — scénario → id de skin de `recruitment-demo.json` (§16) ; remplace le choix libre du joueur.
+
+## `companies.json`
+
+Les "offres d'emploi" (§16) — le cadre RP d'une run, choisi sur `company_select_screen` après le scénario :
+
+- `companies[]` — `id`, `era` (scénario auquel l'entreprise est rattachée), `icon`, `name`, `tagline` (accroche façon offre d'emploi), `description` (contexte de la boîte), `teamProfile` (`junior`/`senior` — fixe `SprintState.team_profile` pour tout le mandat, ce n'est plus un réglage modifiable en jeu).
 
 ## Ce qui reste hors JSON
 

@@ -8,6 +8,8 @@ extends Node
 
 const SCREENS := [
 	"res://scenes/screens/start_screen.tscn",
+	"res://scenes/screens/scenario_screen.tscn",
+	"res://scenes/screens/company_select_screen.tscn",
 	"res://scenes/screens/inbox_screen.tscn",
 	"res://scenes/screens/roadmap_screen.tscn",
 	"res://scenes/screens/decisions_screen.tscn",
@@ -37,6 +39,9 @@ func _instantiate_and_free(path: String) -> void:
 	if path == "res://scenes/screens/mandate_end_screen.tscn":
 		SprintState.is_mandate_over = true
 		SprintState.ending_id = "ipo"
+
+	if path == "res://scenes/screens/company_select_screen.tscn":
+		SprintState.pending_era_id = SprintState.era_id
 
 	var packed: PackedScene = load(path)
 	if packed == null:

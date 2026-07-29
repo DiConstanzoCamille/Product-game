@@ -4,7 +4,7 @@ extends Control
 ## mandat a atteint sa longueur (data/balance.json → mandateLengthSprints).
 
 const START_SCREEN_SCENE := "res://scenes/screens/start_screen.tscn"
-const INBOX_SCENE := "res://scenes/screens/inbox_screen.tscn"
+const SCENARIO_SCENE := "res://scenes/screens/scenario_screen.tscn"
 
 const GOOD_ENDINGS := ["ipo", "rachat"]
 
@@ -79,5 +79,4 @@ func _find_ending(ending_id: String) -> Dictionary:
 
 
 func _on_replay_pressed() -> void:
-	SprintState.reset_run()
-	get_tree().change_scene_to_file(INBOX_SCENE)
+	get_tree().change_scene_to_file(SCENARIO_SCENE)

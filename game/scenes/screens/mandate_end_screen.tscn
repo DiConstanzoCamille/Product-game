@@ -80,7 +80,7 @@ theme_override_constants/separation=12
 
 [node name="ReplayButton" type="Button" parent="CenterContainer/VBox/Buttons"]
 custom_minimum_size=Vector2(220, 0)
-text="Nouveau mandat"
+text="Choisir un nouveau scénario"
 
 [node name="HomeButton" type="Button" parent="CenterContainer/VBox/Buttons"]
 custom_minimum_size=Vector2(160, 0)

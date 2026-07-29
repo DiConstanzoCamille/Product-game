@@ -24,6 +24,7 @@ var recruitment_demo: Dictionary = {}
 var hud_demo: Dictionary = {}
 var structure: Dictionary = {}
 var balance: Dictionary = {}
+var companies: Array = []
 
 var is_loaded: bool = false
 
@@ -108,6 +109,10 @@ func _load_all() -> void:
 	var balance_data = _load_json("balance.json")
 	if balance_data:
 		balance = balance_data
+
+	var companies_data = _load_json("companies.json")
+	if companies_data:
+		companies = companies_data.get("companies", [])
 
 	is_loaded = resources.size() > 0 and not cards.is_empty() and not balance.is_empty()
 

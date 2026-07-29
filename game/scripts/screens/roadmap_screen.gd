@@ -28,6 +28,12 @@ func _ready() -> void:
 	UIHelpers.fade_in(self)
 
 	sprint_label.text = "Sprint %d — Phase 2 : Roadmap" % SprintState.sprint_number
+
+	var bar := UIHelpers.build_resource_bar()
+	$Margin/VBox.add_child(bar)
+	$Margin/VBox.move_child(bar, 1)
+	UIHelpers.attach_company_menu(self)
+
 	capacity_bar.add_theme_stylebox_override("fill", UIHelpers.make_bar_fill_style(UIHelpers.COLOR_GOOD))
 	capacity_bar.add_theme_stylebox_override("background", UIHelpers.make_bar_background_style())
 

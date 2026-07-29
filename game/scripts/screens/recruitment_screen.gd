@@ -1,6 +1,7 @@
 extends Control
-## Phase 4 — Recrutement (docs/carnet-de-regles.md §9). Shop dont
-## l'habillage change avec l'époque (garage / moderne / IA).
+## Phase 4 — Recrutement (docs/carnet-de-regles.md §9, §16). Shop dont
+## l'habillage est fixé par le scénario en cours (data/balance.json →
+## eraRecruitmentSkin) — plus un choix libre du joueur à chaque sprint.
 
 const NEXT_SCENE := "res://scenes/screens/resolution_screen.tscn"
 const START_SCREEN_SCENE := "res://scenes/screens/start_screen.tscn"
@@ -12,7 +13,6 @@ const START_SCREEN_SCENE := "res://scenes/screens/start_screen.tscn"
 @onready var next_button: Button = $Margin/VBox/BottomBar/NextButton
 
 var skins: Array = []
-var skin_group := ButtonGroup.new()
 
 
 func _ready() -> void:
@@ -25,23 +25,17 @@ func _ready() -> void:
 
 	sprint_label.text = "Sprint %d — Phase 4 : Recrutement" % SprintState.sprint_number
 
+	var bar := UIHelpers.build_resource_bar()
+	$Margin/VBox.add_child(bar)
+	$Margin/VBox.move_child(bar, 1)
+	UIHelpers.attach_company_menu(self)
+
+	skin_toggle.visible = false
 	skins = GameData.recruitment_demo.get("skins", [])
-	_build_skin_buttons()
-	if not skins.is_empty():
-		_show_skin(skins[0].get("id", ""))
-
-
-func _build_skin_buttons() -> void:
-	for skin in skins:
-		var btn := Button.new()
-		btn.text = skin.get("label", "")
-		btn.toggle_mode = true
-		btn.button_group = skin_group
-		btn.pressed.connect(_show_skin.bind(skin.get("id", "")))
-		skin_toggle.add_child(btn)
-
-	if skin_toggle.get_child_count() > 0:
-		(skin_toggle.get_child(0) as Button).button_pressed = true
+	var skin_id: String = GameData.balance.get("eraRecruitmentSkin", {}).get(SprintState.era_id, "")
+	if skin_id == "" and not skins.is_empty():
+		skin_id = skins[0].get("id", "")
+	_show_skin(skin_id)
 
 
 func _show_skin(skin_id: String) -> void:

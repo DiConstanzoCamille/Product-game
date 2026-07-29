@@ -139,6 +139,204 @@
           "effects": { "valeur-percue": -3, "capital-politique": -2 }
         }
       ]
+    },
+    {
+      "id": "rgpd-audit-surprise",
+      "from": "Direction juridique",
+      "sprint": 1,
+      "status": "urgent",
+      "subject": "Audit RGPD surprise avant signature",
+      "text": "Une clause contractuelle importante impose un audit RGPD avant la fin du trimestre. Personne ne l'avait vu venir.",
+      "choices": [
+        {
+          "id": "mobiliser-urgence",
+          "label": "Mobiliser l'équipe en urgence",
+          "reveal": "🧱 Dette −8 · 🫶 Moral −4 · 🎯 Capital politique +3 — propre, mais ça a coûté un sprint de travail au chausse-pied.",
+          "effects": { "dette-organisationnelle": -8, "moral": -4, "capital-politique": 3 }
+        },
+        {
+          "id": "sous-traiter-cabinet",
+          "label": "Sous-traiter à un cabinet externe",
+          "reveal": "💰 Trésorerie −10 · 🎯 Capital politique +5 — cher, mais l'équipe n'a rien vu passer.",
+          "effects": { "tresorerie": -10, "capital-politique": 5 }
+        },
+        {
+          "id": "repondre-minima",
+          "label": "Répondre a minima, parier que ça passe",
+          "reveal": "🎯 Capital politique −6 · 🎭 Cynisme +4 — ça passe, cette fois.",
+          "effects": { "capital-politique": -6, "cynisme": 4 }
+        }
+      ]
+    },
+    {
+      "id": "investisseur-visite",
+      "from": "Un investisseur historique",
+      "sprint": 3,
+      "status": "urgent",
+      "subject": "Visite surprise avant le comité",
+      "text": "Un investisseur historique demande à visiter les locaux et rencontrer l'équipe avant le prochain comité — sans prévenir.",
+      "choices": [
+        {
+          "id": "demo-soignee",
+          "label": "Improviser une démo soignée",
+          "reveal": "🎯 Capital politique +4 · 🫶 Moral −3 — l'équipe a tout lâché pour préparer ça en urgence.",
+          "effects": { "capital-politique": 4, "moral": -3 }
+        },
+        {
+          "id": "montrer-envers-decor",
+          "label": "Montrer l'envers du décor, sans filtre",
+          "reveal": "🎯 Capital politique −2 · 🎭 Cynisme −3 — moins impressionnant, mais l'équipe respire.",
+          "effects": { "capital-politique": -2, "cynisme": -3 }
+        },
+        {
+          "id": "reporter-visite",
+          "label": "Reporter la visite",
+          "reveal": "🎯 Capital politique −5 — l'investisseur note le refus.",
+          "effects": { "capital-politique": -5 }
+        }
+      ]
+    },
+    {
+      "id": "bug-securite",
+      "from": "Équipe technique",
+      "sprint": 5,
+      "status": "non lu",
+      "subject": "Faille de sécurité mineure repérée",
+      "text": "Une faille de sécurité mineure apparaît dans les logs. Aucune exploitation connue pour l'instant, mais le risque est réel.",
+      "choices": [
+        {
+          "id": "corriger-immediatement",
+          "label": "Corriger immédiatement, quitte à retarder la roadmap",
+          "reveal": "🧱 Dette −6 · 📈 Valeur perçue −2 — la roadmap attendra un sprint.",
+          "effects": { "dette-organisationnelle": -6, "valeur-percue": -2 }
+        },
+        {
+          "id": "planifier-correctif",
+          "label": "Planifier un correctif au prochain sprint",
+          "reveal": "🧱 Dette +3 · 🎯 Capital politique −2 — un pari raisonnable, si rien ne se passe d'ici là.",
+          "effects": { "dette-organisationnelle": 3, "capital-politique": -2 }
+        },
+        {
+          "id": "minimiser-corriger-douce",
+          "label": "Minimiser, corriger en douce plus tard",
+          "reveal": "🎭 Cynisme +6 · 🧱 Dette +2 — l'équipe sait, et le sait qu'on sait.",
+          "effects": { "cynisme": 6, "dette-organisationnelle": 2 }
+        }
+      ]
+    },
+    {
+      "id": "churn-client-cle",
+      "from": "Équipe commerciale",
+      "sprint": 7,
+      "status": "urgent",
+      "subject": "Un client historique menace de partir",
+      "text": "Un client présent depuis le début envisage sérieusement de passer chez un concurrent au prochain renouvellement.",
+      "choices": [
+        {
+          "id": "remise-personnalisee",
+          "label": "Négocier une remise personnalisée",
+          "reveal": "💰 Trésorerie −6 · 📈 Valeur perçue +3 — il reste, à un prix qui fera précédent.",
+          "effects": { "tresorerie": -6, "valeur-percue": 3 }
+        },
+        {
+          "id": "feature-sur-mesure",
+          "label": "Proposer une feature sur-mesure",
+          "reveal": "🧱 Dette +5 · 📈 Valeur perçue +5 — un développement spécifique de plus à maintenir.",
+          "effects": { "dette-organisationnelle": 5, "valeur-percue": 5 }
+        },
+        {
+          "id": "laisser-partir",
+          "label": "Le laisser partir",
+          "reveal": "📈 Valeur perçue −4 · 🫶 Moral +2 — un client de moins à satisfaire, l'équipe respire un peu.",
+          "effects": { "valeur-percue": -4, "moral": 2 }
+        }
+      ]
+    },
+    {
+      "id": "recrutement-difficile",
+      "from": "Équipe RH",
+      "sprint": 9,
+      "status": "non lu",
+      "subject": "Le poste ouvert ne trouve pas preneur",
+      "text": "Le poste ouvert depuis deux sprints n'a toujours pas de candidat sérieux. L'équipe commence à sentir le manque.",
+      "choices": [
+        {
+          "id": "augmenter-offre",
+          "label": "Augmenter l'offre salariale",
+          "reveal": "💰 Trésorerie −7 · 🫶 Moral +3 — les candidatures affluent enfin.",
+          "effects": { "tresorerie": -7, "moral": 3 }
+        },
+        {
+          "id": "elargir-criteres",
+          "label": "Élargir les critères de recrutement",
+          "reveal": "🧱 Dette +3 · 🫶 Moral +1 — un profil moins évident, à former.",
+          "effects": { "dette-organisationnelle": 3, "moral": 1 }
+        },
+        {
+          "id": "redistribuer-charge",
+          "label": "Redistribuer la charge en interne",
+          "reveal": "🫶 Moral −6 — le poste reste vacant, l'équipe absorbe.",
+          "effects": { "moral": -6 }
+        }
+      ]
+    },
+    {
+      "id": "daily-qui-derape",
+      "from": "L'équipe",
+      "sprint": 3,
+      "status": "non lu",
+      "subject": "Le daily dure 45 minutes depuis une semaine",
+      "text": "Le daily standup, censé durer quinze minutes, s'étire en réunion complète tous les jours depuis une semaine.",
+      "eras": ["agile-transformation"],
+      "choices": [
+        {
+          "id": "recadrer-format",
+          "label": "Recadrer fermement le format",
+          "reveal": "🫶 Moral −3 · 🎭 Cynisme −4 — grincheux sur le coup, soulagés le lendemain.",
+          "effects": { "moral": -3, "cynisme": -4 }
+        },
+        {
+          "id": "laisser-filer",
+          "label": "Laisser filer, l'équipe a besoin de parler",
+          "reveal": "🫶 Moral +3 · 🧱 Dette +2 — le rythme de livraison en prend un coup.",
+          "effects": { "moral": 3, "dette-organisationnelle": 2 }
+        },
+        {
+          "id": "supprimer-daily",
+          "label": "Supprimer le daily temporairement",
+          "reveal": "🎭 Cynisme +5 · 🫶 Moral +2 — un rituel de moins, et une question sans réponse.",
+          "effects": { "cynisme": 5, "moral": 2 }
+        }
+      ]
+    },
+    {
+      "id": "coach-agile-burnout",
+      "from": "Coach agile externe",
+      "sprint": 8,
+      "status": "urgent",
+      "subject": "Je pars plus tôt que prévu",
+      "text": "Le coach agile externe annonce qu'il quitte la mission avant terme, épuisé par les résistances internes qu'il n'a jamais réussi à désamorcer.",
+      "eras": ["agile-transformation"],
+      "choices": [
+        {
+          "id": "remplacer-urgence",
+          "label": "Le remplacer en urgence",
+          "reveal": "💰 Trésorerie −9 · 🎭 Cynisme −3 — la transformation continue, à prix fort.",
+          "effects": { "tresorerie": -9, "cynisme": -3 }
+        },
+        {
+          "id": "internaliser-role",
+          "label": "Internaliser le rôle sur un lead existant",
+          "reveal": "🧱 Dette −3 · 🫶 Moral −4 — moins cher, mais un lead de plus qui porte trop de casquettes.",
+          "effects": { "dette-organisationnelle": -3, "moral": -4 }
+        },
+        {
+          "id": "auto-organisation",
+          "label": "Ne pas remplacer, laisser l'équipe s'auto-organiser",
+          "reveal": "🎭 Cynisme +7 · 🫶 Moral +4 — un vrai soulagement, et une transformation qui perd son cap.",
+          "effects": { "cynisme": 7, "moral": 4 }
+        }
+      ]
     }
   ]
 }

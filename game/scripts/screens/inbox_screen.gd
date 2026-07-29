@@ -33,16 +33,20 @@ func _ready() -> void:
 	UIHelpers.fade_in(self)
 
 	sprint_label.text = "Sprint %d — Phase 1 : Inbox" % SprintState.sprint_number
+
+	var bar := UIHelpers.build_resource_bar()
+	$Margin/VBox.add_child(bar)
+	$Margin/VBox.move_child(bar, 1)
+	UIHelpers.attach_company_menu(self)
+
 	_load_event()
 
 
 func _load_event() -> void:
-	var events: Array = GameData.inbox_events
-	if events.is_empty():
+	event = SprintState.draw_inbox_event()
+	if event.is_empty():
 		subject_label.text = "Aucun événement disponible."
 		return
-
-	event = events[(SprintState.sprint_number - 1) % events.size()]
 
 	var sender: String = event.get("from", "")
 	var first_name := sender.split(",")[0].strip_edges()

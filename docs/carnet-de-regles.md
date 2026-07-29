@@ -282,3 +282,114 @@ les rééquilibrer ne demande aucune modification de script.
 - **Valeurs de départ.** Les 6 ressources démarrent autour de 50-60 (hautes
   pour les jauges "plus haut = mieux", basses pour Dette et Cynisme). Voir
   `balance.json` → `startingResources`.
+
+---
+
+## 15. Scénarios, aléatoire et modèle économique
+
+Deuxième vague de décisions, prise après un premier retour de jeu sur le MVP :
+le tirage d'époque était déterministe (cyclique), il n'y avait pas de vrai
+choix de scénario, et la trésorerie ne faisait que descendre — aucune
+mécanique ne rendait visible le retour sur les décisions prises. Là encore,
+tout ce qui est chiffré vit dans `data/balance.json`.
+
+- **Écran de choix de scénario.** `scenario_screen` s'intercale entre
+  l'Accueil et l'Inbox (et entre la fin d'un mandat et le suivant). Les 3
+  scénarios de `eras.json` sont affichés, mais seuls ceux listés dans
+  `balance.json` → `playableEras` sont sélectionnables — les autres
+  s'affichent grisés, "Bientôt disponible". Pour l'instant, seule la
+  **Transformation agile** est jouable ; Garage (Silicon Valley) et Ère IA
+  attendent leur propre contenu (cartes, événements, modèle économique)
+  avant d'être activés.
+- **Le scénario conditionne le contenu, pas juste le décor.** Les cartes de
+  `cards.json` et les événements de `inbox-events.json` peuvent porter un
+  champ optionnel `eras: [...]` — absent, la carte/l'événement est
+  disponible dans tous les scénarios ; présent, réservé aux scénarios listés.
+  Deux cartes (Daily Standup, Sprint Rétro) sont réservées à la
+  Transformation agile pour lui donner une identité propre au-delà des 3
+  cartes génériques (RICE, Notion, Jira).
+- **Aléatoire réel sur l'Inbox — pioche "sac".** Au lieu d'un tirage cyclique
+  par index de sprint, `SprintState.draw_inbox_event()` mélange tous les
+  événements éligibles au scénario en cours, les consomme un par un, et
+  remélange un nouveau sac une fois épuisé (avec une garde anti-répétition
+  immédiate entre deux sacs). Douze événements au total désormais, dont deux
+  propres à la Transformation agile.
+- **Modèle économique du scénario — le "ROI" rendu visible.** Chaque scénario
+  jouable est associé à un `business_model_id` (`balance.json` →
+  `eraBusinessModel`), qui détermine comment la Trésorerie *rentre*, pas
+  seulement comment elle sort. La Transformation agile utilise le modèle
+  **SaaS — revenu récurrent (MRR)** : chaque sprint, un revenu tombe
+  automatiquement, proportionnel à la Valeur perçue et modulé par le Moral
+  (un moral bas simule du churn et rogne le revenu, un moral haut le
+  bonifie légèrement). Calculé dans `SprintState.compute_revenue()`, affiché
+  séparément des coûts de décisions en Résolution (voir plus bas) — c'est la
+  boucle qui manquait : investir dans la Valeur perçue et le Moral compose
+  en revenu récurrent au lieu de rester un pur centre de coût.
+- **Vente à la version (waterfall) — scénario Garage, à venir.** Le modèle
+  `waterfall-release` est déclaré dans `balance.json` mais désactivé (pas de
+  revenu par point de Valeur perçue) : il accompagnera le scénario Garage
+  quand celui-ci sera ouvert — gros paliers de revenu à la sortie d'une
+  version plutôt qu'un flux continu, cohérent avec un produit vendu à la
+  version plutôt qu'en abonnement.
+- **Pivot de business model en cours de run — non implémenté.** L'idée qu'un
+  événement Inbox rare puisse faire basculer le modèle économique en cours
+  de mandat (ex. un pivot SaaS → vente one-shot) est notée pour plus tard,
+  une fois au moins deux modèles réellement jouables.
+- **Résolution animée.** Les jauges passent de l'ancienne à la nouvelle
+  valeur par un tween (au lieu d'un affichage figé), avec un léger décalage
+  entre chaque jauge. Le revenu du sprint défile de 0 jusqu'à sa valeur
+  réelle dans un bloc dédié, à côté du coût net des décisions et du solde —
+  pour que le joueur voie distinctement ce qui rentre et ce qui sort.
+- **Barre de ressources permanente.** Les 4 écrans de phase (Inbox, Roadmap,
+  Grandes décisions, Recrutement) affichent désormais un mini-HUD des 6
+  ressources en haut de l'écran (`UIHelpers.build_resource_bar()`) — l'état
+  *après la dernière Résolution*, pas un aperçu des effets en cours, pour ne
+  pas déflorer la Résolution.
+
+---
+
+## 16. L'entreprise : contexte RP et fin des réglages libres
+
+Troisième vague de retours : le profil d'équipe (Junior/Senior) et l'habillage
+du shop de recrutement (Époque moderne/Petites annonces) étaient des boutons à
+bascule que le joueur pouvait changer librement à tout moment — alors que ce
+sont des traits du contexte de la run, pas des réglages. Cette section
+documente comment ils sont devenus des conséquences d'un choix fait une seule
+fois, au début du mandat.
+
+- **L'entreprise — une "offre d'emploi" par run.** Nouveau fichier
+  `data/companies.json` : chaque entrée est une entreprise liée à un scénario
+  (`era`), avec un nom, une accroche façon offre d'emploi, une description qui
+  pose le contexte, et surtout un `teamProfile` (junior ou senior) qui **fixe**
+  le profil d'équipe pour tout le mandat. Deux entreprises sont disponibles
+  pour la Transformation agile : Meridia (grand groupe, équipe senior) et
+  Karavel (scale-up, équipe junior) — un vrai choix avec un vrai impact sur le
+  calibrage des cartes, pas deux variantes cosmétiques.
+- **Nouvel écran `company_select_screen`.** S'intercale entre le choix du
+  scénario et l'Inbox : le joueur voit les entreprises du scénario choisi et
+  en sélectionne une. `SprintState.reset_run(era_id, company_id)` fixe alors
+  `team_profile` depuis `company.teamProfile` — ce n'est plus une valeur par
+  défaut modifiable en jeu.
+- **Grandes décisions : le toggle devient un badge.** L'écran affiche
+  toujours l'icône + le libellé du profil d'équipe (repris de `cards.json` →
+  `teamProfiles`), mais en lecture seule — impossible de re-basculer entre
+  Junior et Senior en cours de mandat pour voir "ce que ça aurait donné".
+- **Recrutement : l'habillage suit le scénario.** `data/balance.json` →
+  `eraRecruitmentSkin` associe un scénario à un skin de `recruitment-demo.json`
+  (Transformation agile → "Époque moderne"). Le bouton de bascule a disparu ;
+  le skin "Petites annonces — garage days" attend le scénario Garage pour
+  redevenir pertinent thématiquement.
+- **Tooltips sur la barre de ressources.** Chaque item de
+  `UIHelpers.build_resource_bar()` porte un `tooltip_text` (nom + définition +
+  ce qui la fait monter/descendre, tiré de `resources.json`) — affiché au
+  survol par le tooltip natif de Godot, sans UI custom à maintenir.
+- **Panneau "Entreprise".** `scenes/components/company_panel.tscn` est un
+  overlay non-modal (même logique que le panneau Règles de l'Accueil) branché
+  sur chaque écran de phase via `UIHelpers.attach_company_menu()` — jamais un
+  changement de scène, pour ne pas perturber un état déjà consommé (un
+  événement Inbox déjà tiré, par exemple). Il résume le contexte de la run
+  (entreprise, scénario, profil, modèle économique, ressources) et réserve une
+  section **Pilotage verrouillée** ("🔒 Bientôt disponible — burn down,
+  répartition grands comptes / petits comptes...") : l'intention est actée,
+  la donnée sous-jacente (quels comptes, quel burn down) n'existe pas encore
+  dans la simulation et reste à concevoir avant de débloquer l'écran.
