@@ -5,6 +5,8 @@ extends Control
 ## nouvelle valeur de chaque jauge, affiche le revenu séparément des coûts,
 ## le journal cumulatif, une alerte contextuelle, et route vers l'écran de
 ## fin de mandat si une fin est atteinte ou si le mandat arrive à son terme.
+## Depuis la Phase B : ligne de delta d'Énergie ⚡ (régénération modulée par
+## le Moral, dépenses d'actions personnelles) et option 🧘 Souffler.
 
 const INBOX_SCENE := "res://scenes/screens/inbox_screen.tscn"
 const FOUNDATIONS_SCENE := "res://scenes/screens/foundations_screen.tscn"
@@ -43,6 +45,7 @@ func _ready() -> void:
 
 	_load_hud(old_values)
 	_setup_next_button()
+	_setup_breather_button()
 
 	if int(SprintState.board_review_result.get("sprint", -1)) == SprintState.sprint_number:
 		_show_board_review_overlay()
@@ -55,6 +58,7 @@ func _load_hud(old_values: Dictionary) -> void:
 	cpo_label.text = "CPO : Vous · profil %s" % SprintState.team_profile.capitalize()
 
 	_animate_revenue_callout()
+	_add_energy_line()
 
 	var index := 0
 	for resource in GameData.resources:
@@ -108,6 +112,65 @@ func _animate_revenue_callout() -> void:
 			],
 		0.0, float(revenue), 0.7
 	).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+
+
+## Ligne de delta d'Énergie ⚡ (spec profondeur §6.5, §7.1) : régénération
+## avec la modulation par le Moral rendue visible, bonus de Souffler,
+## événements Inbox, dépenses d'actions personnelles du sprint — le pont
+## entre l'économie de l'entreprise et la vôtre, chiffré sous vos yeux.
+func _add_energy_line() -> void:
+	var report: Dictionary = SprintState.last_energy_report
+	if report.is_empty():
+		return
+
+	var parts: Array = ["régén +%d (%d %s Moral)" % [
+		int(report.get("regen", 0)), int(report.get("regenBase", 12)),
+		SprintState.energy_factor_label(float(report.get("factor", 1.0)))
+	]]
+	if int(report.get("breatherBonus", 0)) > 0:
+		parts.append("🧘 Souffler +%d" % int(report.get("breatherBonus", 0)))
+	var events := int(report.get("events", 0))
+	if events != 0:
+		parts.append("événements %s%d" % ["+" if events > 0 else "−", abs(events)])
+	var spent := int(report.get("spent", 0))
+	if spent > 0:
+		parts.append("actions personnelles −%d" % spent)
+
+	var energy_label := Label.new()
+	var sprint_delta := int(report.get("sprintDelta", 0))
+	energy_label.text = "⚡ Énergie : %s  →  %d/%d (%s%d ce sprint)" % [
+		" · ".join(parts), int(report.get("value", 0)), SprintState.get_energy_max(),
+		"+" if sprint_delta >= 0 else "−", abs(sprint_delta)
+	]
+	energy_label.add_theme_font_size_override("font_size", 15)
+	energy_label.autowrap_mode = TextServer.AUTOWRAP_WORD
+	energy_label.add_theme_color_override(
+		"font_color", UIHelpers.COLOR_GOOD if sprint_delta >= 0 else UIHelpers.COLOR_DANGER)
+	energy_label.tooltip_text = UIHelpers.energy_tooltip()
+
+	var content: Node = $Margin/VBox/Scroll/Content
+	content.add_child(energy_label)
+	content.move_child(energy_label, revenue_label.get_index() + 1)
+
+
+## 🧘 Souffler (spec §7.2) — proposé à la Résolution : renoncer aux actions
+## personnelles du prochain sprint contre un bonus de régénération.
+func _setup_breather_button() -> void:
+	if mandate_ending != "":
+		return
+	var bonus := int(GameData.balance.get("energy", {}).get("breatherRegenBonus", 10))
+	var breather_btn := Button.new()
+	breather_btn.text = "🧘 Souffler — sprint suivant sans action personnelle (+%d régén)" % bonus
+	breather_btn.tooltip_text = "Le luxe ultime : un sprint où vous ne faites que votre travail."
+	UIHelpers.add_hover_bounce(breather_btn)
+	breather_btn.pressed.connect(func():
+		if SprintState.plan_breather() == "":
+			breather_btn.text = "🧘 Vous soufflerez au prochain sprint ✓"
+			breather_btn.disabled = true
+	)
+	var bottom_bar: Node = $Margin/VBox/BottomBar
+	bottom_bar.add_child(breather_btn)
+	bottom_bar.move_child(breather_btn, 1)
 
 
 ## Overlay de verdict de la revue de board (spec profondeur §8.2) — affiché

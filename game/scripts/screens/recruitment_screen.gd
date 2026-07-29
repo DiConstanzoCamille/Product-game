@@ -3,7 +3,9 @@ extends Control
 ## 2 candidats (trait caché tiré à l'apparition, révélé si Entretiens
 ## structurés) + 2 pratiques non possédées. L'offre est tirée une fois par
 ## sprint et stockée dans SprintState — revenir sur l'écran ne retire pas.
-## Tout se paie en pièces 🪙, le cap d'effectif est indiqué.
+## Tout se paie en pièces 🪙, le cap d'effectif est indiqué. Le 1:1 (§7.2)
+## permet de payer en Énergie ⚡ la révélation du trait caché d'un candidat
+## avant de signer quoi que ce soit.
 
 const NEXT_SCENE := "res://scenes/screens/resolution_screen.tscn"
 const START_SCREEN_SCENE := "res://scenes/screens/start_screen.tscn"
@@ -17,6 +19,7 @@ const START_SCREEN_SCENE := "res://scenes/screens/start_screen.tscn"
 
 var offer: Dictionary = {}
 var refresh_callbacks: Array = []  # boutons/labels à rafraîchir après un achat
+var resource_bar: Control = null
 
 
 func _ready() -> void:
@@ -29,9 +32,9 @@ func _ready() -> void:
 
 	sprint_label.text = "Sprint %d — Phase 4 : Marché" % SprintState.sprint_number
 
-	var bar := UIHelpers.build_resource_bar()
-	$Margin/VBox.add_child(bar)
-	$Margin/VBox.move_child(bar, 1)
+	resource_bar = UIHelpers.build_resource_bar()
+	$Margin/VBox.add_child(resource_bar)
+	$Margin/VBox.move_child(resource_bar, 1)
 	UIHelpers.attach_company_menu(self)
 
 	offer = SprintState.get_shop_offer()
@@ -50,12 +53,28 @@ func _ready() -> void:
 
 
 func _refresh_all() -> void:
-	pieces_label.text = "🪙 %d pièce%s" % [SprintState.pieces, "s" if SprintState.pieces > 1 else ""]
+	pieces_label.text = "🪙 %d pièce%s · ⚡ %d" % [
+		SprintState.pieces, "s" if SprintState.pieces > 1 else "", SprintState.energy
+	]
 	if SprintState.next_hire_discount > 0:
 		pieces_label.text += "  (réseau : −%d 🪙 sur la prochaine embauche)" % SprintState.next_hire_discount
 	cap_label.text = "👥 Effectif : %d/%d" % [SprintState.roster.size(), SprintState.get_team_cap()]
 	for callback in refresh_callbacks:
 		callback.call()
+	_rebuild_resource_bar()
+
+
+## L'Énergie et les pièces bougent en direct sur cet écran (1:1, embauches) —
+## on reconstruit la barre compacte plutôt que de suivre chaque label.
+func _rebuild_resource_bar() -> void:
+	if resource_bar == null:
+		return
+	var parent := resource_bar.get_parent()
+	var index := resource_bar.get_index()
+	resource_bar.queue_free()
+	resource_bar = UIHelpers.build_resource_bar()
+	parent.add_child(resource_bar)
+	parent.move_child(resource_bar, index)
 
 
 func _seniority_label(seniority: String) -> String:
@@ -114,6 +133,12 @@ func _build_candidate_card(candidate: Dictionary) -> Control:
 	cost_label.add_theme_color_override("font_color", UIHelpers.COLOR_AMBER)
 	vbox.add_child(cost_label)
 
+	var one_on_one_btn := Button.new()
+	one_on_one_btn.pressed.connect(_on_one_on_one_pressed.bind(candidate))
+	one_on_one_btn.tooltip_text = "Action personnelle (⚡) : un vrai entretien, pas un pitch — révèle le trait caché avant embauche."
+	UIHelpers.add_hover_bounce(one_on_one_btn, 1.03)
+	vbox.add_child(one_on_one_btn)
+
 	var action_btn := Button.new()
 	action_btn.pressed.connect(_on_hire_pressed.bind(candidate))
 	UIHelpers.add_hover_bounce(action_btn, 1.03)
@@ -134,6 +159,22 @@ func _build_candidate_card(candidate: Dictionary) -> Control:
 
 		var cost: int = max(0, int(candidate.get("costPieces", 0)) - SprintState.next_hire_discount)
 		cost_label.text = "%d 🪙 · salaire %d 💰/sprint" % [cost, int(candidate.get("salary", 1))]
+
+		var one_on_one_cost := SprintState.get_personal_action_cost("oneOnOne")
+		if candidate.get("hiddenRevealed", false) or candidate.get("hired", false):
+			one_on_one_btn.visible = false
+		else:
+			one_on_one_btn.visible = true
+			match SprintState.personal_action_refusal():
+				"souffler":
+					one_on_one_btn.text = "🤝 1:1 — 🧘 vous soufflez ce sprint"
+					one_on_one_btn.disabled = true
+				"epuise":
+					one_on_one_btn.text = "🤝 1:1 (%d ⚡ — épuisé·e)" % one_on_one_cost
+					one_on_one_btn.disabled = true
+				_:
+					one_on_one_btn.text = "🤝 1:1 (%d ⚡)" % one_on_one_cost
+					one_on_one_btn.disabled = false
 
 		if candidate.get("hired", false):
 			action_btn.text = "Embauché·e ✓"
@@ -213,6 +254,11 @@ func _build_practice_card(practice: Dictionary) -> Control:
 
 func _on_hire_pressed(candidate: Dictionary) -> void:
 	SprintState.hire_candidate(candidate)
+	_refresh_all()
+
+
+func _on_one_on_one_pressed(candidate: Dictionary) -> void:
+	SprintState.do_one_on_one(candidate)
 	_refresh_all()
 
 

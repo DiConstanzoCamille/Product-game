@@ -114,8 +114,8 @@ static func fade_in(control: Control, duration: float = 0.3) -> void:
 ## Barre compacte des ressources, état courant (celui d'après la dernière
 ## Résolution — pas de preview des effets en attente), en deux groupes
 ## (spec profondeur §10) : [Entreprise : 5 jauges + 🪙 pièces + 👥 effectif
-## + icônes de pratiques] et [Vous : 🎯 Capital politique]. Insérée en haut
-## des écrans de phase (Inbox, Roadmap, Grandes décisions, Marché).
+## + icônes de pratiques] et [Vous : 🎯 Capital politique + ⚡ Énergie].
+## Insérée en haut des écrans de phase (Inbox, Roadmap, Décisions, Marché).
 static func build_resource_bar() -> Control:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 10)
@@ -140,6 +140,7 @@ static func build_resource_bar() -> Control:
 	for resource in GameData.resources:
 		if resource.get("id", "") == "capital-politique":
 			player_row.add_child(_build_gauge_item(resource))
+	player_row.add_child(_build_energy_item())
 	row.add_child(_wrap_bar_panel(player_row))
 
 	return row
@@ -219,6 +220,42 @@ static func _build_headcount_item() -> Control:
 	apply_mono(label, 12, true)
 	item.add_child(label)
 	return item
+
+
+## Item ⚡ Énergie du groupe "Vous" (spec profondeur §7.1) — la jauge
+## personnelle du CPO, colorée selon les mêmes seuils bon/attention/danger
+## que les ressources (à 0 c'est le burn-out).
+static func _build_energy_item() -> Control:
+	var value := SprintState.energy
+	var state := EffectResolver.gauge_state("", float(value))
+
+	var item := HBoxContainer.new()
+	item.add_theme_constant_override("separation", 5)
+	item.mouse_filter = Control.MOUSE_FILTER_STOP
+	item.tooltip_text = energy_tooltip()
+
+	var label := Label.new()
+	label.text = "⚡ %d" % value
+	label.add_theme_color_override("font_color", state_color(state))
+	apply_mono(label, 12, true)
+	item.add_child(label)
+	return item
+
+
+## Tooltip de la jauge d'Énergie — chiffres tirés de balance.json → energy.
+static func energy_tooltip() -> String:
+	var conf: Dictionary = GameData.balance.get("energy", {})
+	var actions: Dictionary = conf.get("actions", {})
+	return "\n".join([
+		"⚡ Énergie — votre jauge personnelle. L'entreprise a ses ressources, vous n'avez que celle-là.",
+		"Régénère +%d par sprint à la Résolution, modulée par le Moral de l'équipe (×1 si ≥ 60, ×0.5 entre 30 et 60, ×0 sous 30)." % int(conf.get("regenPerSprint", 12)),
+		"Se dépense en actions personnelles : 🤝 1:1 (%d ⚡), 🔧 Faire le taf soi-même (%d ⚡), 🏛️ Rallonge (%d ⚡)." % [
+			int(actions.get("oneOnOne", {}).get("cost", 10)),
+			int(actions.get("selfWork", {}).get("cost", 25)),
+			int(actions.get("extension", {}).get("cost", 10)),
+		],
+		"À 0 à la Résolution : burn-out fondateur·rice — fin de mandat.",
+	])
 
 
 static func _build_practice_item(practice_id: String) -> Control:

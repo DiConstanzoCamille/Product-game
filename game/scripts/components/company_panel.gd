@@ -1,8 +1,9 @@
 extends PanelContainer
 ## Panneau "Entreprise" (docs/carnet-de-regles.md §16, spec profondeur §10) —
 ## contexte complet de la run en cours : entreprise, scénario, ressources,
-## roster détaillé (avec licenciement), pratiques adoptées, objectifs de la
-## revue de board, sections Pilotage déverrouillables par les pratiques.
+## roster détaillé (avec licenciement et 1:1), pratiques adoptées, objectifs
+## de la revue de board, action personnelle Rallonge, sections Pilotage
+## déverrouillables par les pratiques.
 ## Overlay non-modal, jamais un changement de scène (branché par
 ## UIHelpers.attach_company_menu() sur chaque écran de phase).
 
@@ -41,6 +42,7 @@ func _populate() -> void:
 	])
 	_add_row("🪙 Pièces (budget d'action)", "%d" % SprintState.pieces, UIHelpers.COLOR_AMBER)
 	_add_row("👥 Effectif", "%d / %d" % [SprintState.roster.size(), SprintState.get_team_cap()])
+	_add_row("⚡ Énergie (vous)", "%d / %d" % [SprintState.energy, SprintState.get_energy_max()], UIHelpers.COLOR_AMBER)
 
 	_add_section_title("Ressources")
 	for resource in GameData.resources:
@@ -82,9 +84,50 @@ func _populate() -> void:
 			_:
 				_add_text("⏳ À venir — l'état de la boîte sera comparé à ces objectifs.", 12, UIHelpers.COLOR_SOFT_TEXT)
 
+	_add_section_title("Actions personnelles — ⚡ %d / %d" % [SprintState.energy, SprintState.get_energy_max()])
+	content.add_child(_build_extension_row())
+
 	_add_section_title("Pilotage")
 	_add_pilotage_row("📊 Burn down & métriques post-livraison", "product-analytics")
 	_add_pilotage_row("💼 Grands comptes / petits comptes", "segmentation-clients")
+
+
+## 🏛️ Négocier une rallonge (spec §7.2) : votre Capital politique contre
+## des pièces immédiates pour l'entreprise.
+func _build_extension_row() -> Control:
+	var conf: Dictionary = SprintState.get_personal_action_conf("extension")
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 10)
+
+	var label := Label.new()
+	label.text = "🏛️ Négocier une rallonge — 🎯 %d contre +%d 🪙 immédiats." % [
+		int(conf.get("capitalPolitique", -8)), int(conf.get("pieces", 4))
+	]
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD
+	label.add_theme_font_size_override("font_size", 12)
+	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(label)
+
+	var btn := Button.new()
+	btn.tooltip_text = "Action personnelle (⚡) : retourner voir le board, la casquette à la main. Ça marche, et ça se paie."
+	match SprintState.personal_action_refusal():
+		"souffler":
+			btn.text = "🧘 Vous soufflez ce sprint"
+			btn.disabled = true
+		"epuise":
+			btn.text = "Négocier (%d ⚡ — épuisé·e)" % int(conf.get("cost", 10))
+			btn.disabled = true
+		_:
+			btn.text = "Négocier (%d ⚡)" % int(conf.get("cost", 10))
+			btn.disabled = false
+	btn.pressed.connect(_on_extension_pressed)
+	row.add_child(btn)
+	return row
+
+
+func _on_extension_pressed() -> void:
+	if SprintState.do_negotiate_extension() == "":
+		_populate()
 
 
 func _build_employee_row(employee: Dictionary) -> Control:
@@ -113,6 +156,23 @@ func _build_employee_row(employee: Dictionary) -> Control:
 	label.tooltip_text = employee.get("trait", "")
 	row.add_child(label)
 
+	if not employee.get("hiddenRevealed", false):
+		var one_on_one_btn := Button.new()
+		var one_on_one_cost := SprintState.get_personal_action_cost("oneOnOne")
+		one_on_one_btn.tooltip_text = "Action personnelle (⚡) : une vraie conversation — révèle le trait caché sans attendre la fin de la période d'essai."
+		match SprintState.personal_action_refusal():
+			"souffler":
+				one_on_one_btn.text = "🤝 1:1 — 🧘 vous soufflez"
+				one_on_one_btn.disabled = true
+			"epuise":
+				one_on_one_btn.text = "🤝 1:1 (%d ⚡ — épuisé·e)" % one_on_one_cost
+				one_on_one_btn.disabled = true
+			_:
+				one_on_one_btn.text = "🤝 1:1 (%d ⚡)" % one_on_one_cost
+				one_on_one_btn.disabled = false
+		one_on_one_btn.pressed.connect(_on_one_on_one_pressed.bind(employee.get("id", "")))
+		row.add_child(one_on_one_btn)
+
 	var severance := int(GameData.balance.get("firing", {}).get("severancePieces", 2))
 	var fire_btn := Button.new()
 	fire_btn.text = "Licencier (%d 🪙)" % severance
@@ -130,6 +190,14 @@ func _build_employee_row(employee: Dictionary) -> Control:
 
 func _on_fire_pressed(employee_id: String) -> void:
 	if SprintState.fire_employee(employee_id) == "":
+		_populate()
+
+
+func _on_one_on_one_pressed(employee_id: String) -> void:
+	var employee := SprintState.find_employee(employee_id)
+	if employee.is_empty():
+		return
+	if SprintState.do_one_on_one(employee) == "":
 		_populate()
 
 
