@@ -38,6 +38,13 @@ Les Fondations — effets persistants sur le plateau (§7).
 
 Les features proposables en phase Roadmap (§8), exemple d'un sprint : `capacityMax` (capacité de l'équipe), `features[]` (`id`, `name`, `promise` — la promesse affichée au joueur, `icons[]`, `selectedByDefault`).
 
+## `backlog.json`
+
+Le backlog de la Roadmap profonde (§6 de la [spec profondeur de gameplay](spec-profondeur-gameplay.md)) — le successeur de `roadmap-features.json` côté `game/`, qui reste la démo landing. Contenu préparé pour la Phase C, non encore consommé par le jeu.
+
+- `features[]` — `id`, `name`, `icon` (emoji), `description` (le pitch satirique affiché au joueur), `costPoints` (1-5, **toujours visible**, se paie en capacité produite par le roster), `roi` (0-3, bonus permanent de revenu/sprint une fois livrée), `clientImpact` (−2 à +6, delta de Valeur perçue à la livraison), `risk` (−3 à +8, delta de Dette à la livraison), `quickWin` (booléen — rapporte des Pièces à la livraison, §3 de la spec), `eras[]` (mêmes ids que `eras.json`, filtre du tirage par sac). `roi`, `clientImpact` et `risk` sont **cachés par défaut** ("🔒 ?") et révélés par les pratiques ou l'action Plonger dans une feature (§6.3) — d'où les features pièges dont la description flatteuse cache un `clientImpact` négatif.
+- `epics[]` — mêmes champs que `features[]`, plus `epic: true`, `costPoints` (8-12, investissement libre étalé sur plusieurs sprints) et `completionEffects` (deltas structurés par ressource, même format que `effects` dans `inbox-events.json`, `pieces` inclus — appliqués **uniquement à la complétion**, en plus des `roi`/`clientImpact`/`risk` de l'epic ; abandonner ne rembourse rien, §6.4).
+
 ## `inbox-events.json`
 
 Les événements aléatoires de la phase Inbox (§3, phase 1 ; §15 pour la pioche) : `events[].id/from/sprint/status/subject/text`, `eras[]` optionnel (réserve l'événement aux scénarios listés ; absent = disponible partout), et `choices[]` (`id`, `label`, `reveal` — le texte montré après le choix, `effects` — deltas structurés sur les 6 ressources, consommés par `game/` ; `reveal` et `effects` doivent rester cohérents mais ne sont pas générés l'un depuis l'autre). `sprint` est un vestige de la démo landing (premier événement affiché) — `game/` tire désormais par pioche "sac", indépendante de ce champ.
