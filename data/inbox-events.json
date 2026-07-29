@@ -51,8 +51,8 @@
         {
           "id": "improviser",
           "label": "Improviser une explication au client",
-          "reveal": "🎯 Capital politique +2 · 🎭 Cynisme +4 — le client achète l'histoire, l'équipe moins.",
-          "effects": { "capital-politique": 2, "cynisme": 4 }
+          "reveal": "🎯 Capital politique +2 · 🎭 Cynisme +4 · ⚡ Énergie −5 — le client achète l'histoire, l'équipe moins. C'est vous qui la portez, maintenant.",
+          "effects": { "capital-politique": 2, "cynisme": 4, "energie": -5 }
         }
       ]
     },
@@ -107,8 +107,8 @@
         {
           "id": "tenir-encore",
           "label": "Lui demander de tenir encore un sprint",
-          "reveal": "🫶 Moral −7 · 🧱 Dette +3 — il tient, mais le compteur tourne.",
-          "effects": { "moral": -7, "dette-organisationnelle": 3 }
+          "reveal": "🫶 Moral −7 · 🧱 Dette +3 · ⚡ Énergie −4 — il tient, mais le compteur tourne. Vous vérifiez les alertes à sa place, la nuit.",
+          "effects": { "moral": -7, "dette-organisationnelle": 3, "energie": -4 }
         }
       ]
     },
@@ -151,8 +151,8 @@
         {
           "id": "mobiliser-urgence",
           "label": "Mobiliser l'équipe en urgence",
-          "reveal": "🧱 Dette −8 · 🫶 Moral −4 · 🎯 Capital politique +3 — propre, mais ça a coûté un sprint de travail au chausse-pied.",
-          "effects": { "dette-organisationnelle": -8, "moral": -4, "capital-politique": 3 }
+          "reveal": "🧱 Dette −8 · 🫶 Moral −4 · 🎯 Capital politique +3 · ⚡ Énergie −6 — propre, mais ça a coûté un sprint de travail au chausse-pied, war room pilotée par vos soins.",
+          "effects": { "dette-organisationnelle": -8, "moral": -4, "capital-politique": 3, "energie": -6 }
         },
         {
           "id": "sous-traiter-cabinet",

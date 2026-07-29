@@ -1,5 +1,5 @@
 {
-  "_comment": "Données de simulation — consommées uniquement par game/ (pas par landing/). Toutes les valeurs sont indicatives, à ajuster en playtest. Décisions documentées dans docs/carnet-de-regles.md §14-17. Phase A (spec profondeur §12) : roster, salaires, pièces, shop, pression.",
+  "_comment": "Données de simulation — consommées uniquement par game/ (pas par landing/). Toutes les valeurs sont indicatives, à ajuster en playtest. Décisions documentées dans docs/carnet-de-regles.md §14-18. Phase A (spec profondeur §12) : roster, salaires, pièces, shop, pression. Phase B (spec §7) : energy — l'économie du joueur.",
 
   "startingResources": {
     "tresorerie": 50,
@@ -35,7 +35,8 @@
     { "resource": "moral", "comparison": "lte", "value": 0, "ending": "exode-equipe" },
     { "resource": "dette-organisationnelle", "comparison": "gte", "value": 100, "ending": "entreprise-zombie" },
     { "resource": "capital-politique", "comparison": "lte", "value": 0, "ending": "rachat-hostile" },
-    { "resource": "cynisme", "comparison": "gte", "value": 100, "ending": "remplace-par-ia" }
+    { "resource": "cynisme", "comparison": "gte", "value": 100, "ending": "remplace-par-ia" },
+    { "resource": "energie", "comparison": "lte", "value": 0, "ending": "burnout-fondateur" }
   ],
 
   "endingThresholdOverrides": {
@@ -145,6 +146,24 @@
     "candidatesPerSprint": 2,
     "practicesPerSprint": 2,
     "practiceCynisme": 2
+  },
+
+  "energy": {
+    "start": 70,
+    "max": 100,
+    "regenPerSprint": 12,
+    "moralRegenTiers": [
+      { "moralMin": 60, "factor": 1.0 },
+      { "moralMin": 30, "factor": 0.5 },
+      { "moralMin": 0, "factor": 0.0 }
+    ],
+    "breatherRegenBonus": 10,
+    "actions": {
+      "oneOnOne": { "cost": 10 },
+      "selfWork": { "cost": 25, "capacityBonus": 2 },
+      "extension": { "cost": 10, "capitalPolitique": -8, "pieces": 4 },
+      "breather": { "cost": 0 }
+    }
   },
 
   "pressure": {
