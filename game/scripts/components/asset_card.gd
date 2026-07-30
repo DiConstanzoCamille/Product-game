@@ -255,22 +255,24 @@ func _zone_cost(vbox: VBoxContainer) -> void:
 
 
 # ── ⑥ Actions ────────────────────────────────────────────────────────────
+## Les boutons sont **empilés**, chacun sur toute la largeur de la carte, dans
+## l'ordre de la décision : d'abord se renseigner (🤝 1:1), ensuite signer.
+## Côte à côte, l'action secondaire n'avait pas la place d'écrire son libellé —
+## une carte fait 236 px, deux boutons en demandaient plus du double.
 func _zone_actions(vbox: VBoxContainer) -> void:
 	var primary: Dictionary = _descriptor.get("primary", {})
 	var secondary: Dictionary = _descriptor.get("secondary", {})
 	if primary.is_empty() and secondary.is_empty():
 		return
 
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 7)
-	vbox.add_child(row)
+	var column := VBoxContainer.new()
+	column.add_theme_constant_override("separation", 6)
+	vbox.add_child(column)
 
 	if not secondary.is_empty():
-		row.add_child(_action_button(secondary, false, secondary_pressed))
+		column.add_child(_action_button(secondary, false, secondary_pressed))
 	if not primary.is_empty():
-		var button := _action_button(primary, true, primary_pressed)
-		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		row.add_child(button)
+		column.add_child(_action_button(primary, true, primary_pressed))
 
 
 func _action_button(action: Dictionary, primary: bool, pressed_signal: Signal) -> Button:
@@ -279,7 +281,13 @@ func _action_button(action: Dictionary, primary: bool, pressed_signal: Signal) -
 	button.disabled = action.get("disabled", false)
 	button.tooltip_text = action.get("tooltip", "")
 	button.add_theme_font_size_override("font_size", 12)
+	# `autowrap_mode` ramène la largeur minimale d'un Button à ses seules marges :
+	# le libellé disparaît si le conteneur ne lui donne pas de largeur. C'est sans
+	# danger ici — un VBoxContainer étire ses enfants sur toute sa largeur — et ça
+	# garde les libellés longs (« Cap d'effectif atteint (6/7) ») lisibles sur
+	# deux lignes au lieu d'élargir la carte.
 	button.autowrap_mode = TextServer.AUTOWRAP_WORD
+	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	if primary and not button.disabled:
 		UIHelpers.style_primary_button(button)
 	if not button.disabled:
