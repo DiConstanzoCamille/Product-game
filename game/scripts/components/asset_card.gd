@@ -59,8 +59,8 @@ func _ready() -> void:
 	size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	mouse_filter = Control.MOUSE_FILTER_PASS
 	resized.connect(_apply_tilt)
-	mouse_entered.connect(_on_hover.bind(true))
-	mouse_exited.connect(_on_hover.bind(false))
+	mouse_entered.connect(_on_mouse_entered)
+	set_process(false)
 
 	# **Un Container remet à zéro la rotation et l'échelle de ses enfants à chaque
 	# passe de layout** : sans se rebrancher sur `sort_children`, le tilt des
@@ -81,7 +81,28 @@ func _apply_tilt() -> void:
 	rotation_degrees = 0.0 if _hovered else _tilt_degrees
 
 
-func _on_hover(entered: bool) -> void:
+## `mouse_exited` se déclenche aussi quand le curseur passe sur un **bouton de
+## la carte** : s'y fier ferait retomber la fiche au moment précis où on vise
+## « Embaucher ». On surveille donc la sortie réelle nous-mêmes, en testant la
+## position du curseur contre le rectangle de la carte — et seulement tant
+## qu'elle est soulevée, donc au plus une carte à la fois.
+func _on_mouse_entered() -> void:
+	if _hovered:
+		return
+	_set_hovered(true)
+	set_process(true)
+
+
+func _process(_delta: float) -> void:
+	if not _hovered:
+		set_process(false)
+		return
+	if not get_global_rect().has_point(get_global_mouse_position()):
+		_set_hovered(false)
+		set_process(false)
+
+
+func _set_hovered(entered: bool) -> void:
 	_hovered = entered
 	z_index = 1 if entered else 0  # la carte soulevée passe devant ses voisines
 
