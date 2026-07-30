@@ -39,6 +39,7 @@ game/
 │   └── mandate_end_screen.tscn           # fin de mandat (bonne ou mauvaise), retour à l'accueil ou nouveau mandat
 ├── scenes/components/
 │   ├── asset_card.tscn                   # la carte d'Actif : décision, candidat ou pratique, six zones identiques
+│   ├── device_frame.tscn                 # cadre d'ordinateur portable autour des écrans de choix (décoratif)
 │   ├── side_panel.tscn                   # le Panneau de bord permanent (colonne droite des 4 écrans de phase)
 │   └── company_panel.tscn                # overlay "Dossier entreprise" (lecture longue du contexte de la run)
 ├── scripts/
@@ -49,6 +50,7 @@ game/
 │   ├── asset_view.gd                     # classe statique : données (cartes/candidats/pratiques) → descripteur de carte d'Actif
 │   ├── ui_helpers.gd                     # polices, icônes, avatars, barres, tooltips, fade-in, hover (voir plus bas)
 │   ├── components/asset_card.gd          # script de la carte d'Actif
+│   ├── components/device_frame.gd        # script du cadre d'écran
 │   ├── components/side_panel.gd          # script du Panneau de bord
 │   ├── components/company_panel.gd       # script du "Dossier entreprise"
 │   └── screens/                          # un script par écran ci-dessus

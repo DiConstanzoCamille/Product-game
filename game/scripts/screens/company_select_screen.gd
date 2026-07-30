@@ -19,6 +19,7 @@ func _ready() -> void:
 	UIHelpers.apply_mono(eyebrow_label, 13, true)
 	UIHelpers.apply_heading(title_label, 32, 700.0)
 	UIHelpers.fade_in(self)
+	UIHelpers.attach_device_frame(self)
 
 	_build_cards()
 

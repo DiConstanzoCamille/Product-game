@@ -414,6 +414,26 @@ static func attach_company_menu(screen: Control) -> void:
 	top_bar.move_child(button, 1)
 
 
+## Habille un écran de choix (accueil, scénario, entreprise, fin de mandat) du
+## cadre de l'ordinateur portable — l'immersion sans changer une ligne de
+## contenu : le cadre se pose par-dessus et les marges de l'écran sont repoussées
+## pour tenir dans la dalle. Réservé aux écrans qui parlent *à travers un outil* ;
+## les écrans de phase sont le monde physique de l'openspace.
+static func attach_device_frame(screen: Control) -> Control:
+	var frame_scene: PackedScene = load("res://scenes/components/device_frame.tscn")
+	var frame: Control = frame_scene.instantiate()
+	screen.add_child(frame)
+
+	var margin: Node = screen.get_node_or_null("Margin")
+	if margin is MarginContainer:
+		for side in ["left", "top", "right"]:
+			margin.add_theme_constant_override("margin_" + side,
+				margin.get_theme_constant("margin_" + side) + frame.BEZEL)
+		margin.add_theme_constant_override("margin_bottom",
+			margin.get_theme_constant("margin_bottom") + frame.CHIN)
+	return frame
+
+
 static func instantiate_company_dossier(screen: Control) -> Control:
 	var panel_scene: PackedScene = load("res://scenes/components/company_panel.tscn")
 	var panel: Control = panel_scene.instantiate()
