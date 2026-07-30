@@ -16,10 +16,10 @@ const SCENARIO_SCENE := "res://scenes/screens/scenario_screen.tscn"
 
 func _ready() -> void:
 	back_button.pressed.connect(func(): get_tree().change_scene_to_file(SCENARIO_SCENE))
-	UIHelpers.add_hover_bounce(back_button)
 	UIHelpers.apply_mono(eyebrow_label, 13, true)
 	UIHelpers.apply_heading(title_label, 32, 700.0)
 	UIHelpers.fade_in(self)
+	UIHelpers.attach_device_frame(self)
 
 	_build_cards()
 
@@ -129,7 +129,6 @@ func _build_company_card(company: Dictionary) -> Control:
 	var action_btn := Button.new()
 	action_btn.text = "Accepter le poste"
 	action_btn.pressed.connect(_on_company_selected.bind(company.get("id", "")))
-	UIHelpers.add_hover_bounce(action_btn, 1.03)
 	vbox.add_child(action_btn)
 
 	return panel

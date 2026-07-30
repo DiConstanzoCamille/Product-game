@@ -20,11 +20,10 @@ const GOOD_ENDINGS := ["ipo", "rachat"]
 func _ready() -> void:
 	replay_button.pressed.connect(_on_replay_pressed)
 	home_button.pressed.connect(func(): get_tree().change_scene_to_file(START_SCREEN_SCENE))
-	UIHelpers.add_hover_bounce(replay_button)
-	UIHelpers.add_hover_bounce(home_button)
 	UIHelpers.apply_mono(eyebrow_label, 13, true)
 	UIHelpers.apply_heading(ending_label, 40, 700.0)
 	UIHelpers.fade_in(self)
+	UIHelpers.attach_device_frame(self)
 
 	_load_ending()
 

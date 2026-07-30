@@ -25,7 +25,7 @@ game/
 │   └── avatars/                          # portraits DiceBear générés localement (CC0)
 ├── resources/
 │   ├── theme/main_theme.tres             # thème partagé (couleurs de marque : navy-deep, ambre...)
-│   └── shaders/grid_background*          # fond quadrillé façon landing page
+│   └── shaders/grid_background*          # fond de papier réglé (lignes horizontales), clair
 ├── scenes/screens/
 │   ├── start_screen.tscn                 # écran d'accueil — run/main_scene
 │   ├── scenario_screen.tscn              # choix du scénario (1 jouable, 2 "Bientôt disponible")
@@ -38,14 +38,21 @@ game/
 │   ├── foundations_screen.tscn           # plateau des Fondations, accessible depuis la Résolution
 │   └── mandate_end_screen.tscn           # fin de mandat (bonne ou mauvaise), retour à l'accueil ou nouveau mandat
 ├── scenes/components/
-│   └── company_panel.tscn                # overlay "Entreprise" (contexte de la run), branché sur chaque écran de phase
+│   ├── asset_card.tscn                   # la carte d'Actif : décision, candidat ou pratique, six zones identiques
+│   ├── device_frame.tscn                 # cadre d'ordinateur portable autour des écrans de choix (décoratif)
+│   ├── side_panel.tscn                   # le Panneau de bord permanent (colonne droite des 4 écrans de phase)
+│   └── company_panel.tscn                # overlay "Dossier entreprise" (lecture longue du contexte de la run)
 ├── scripts/
 │   ├── autoload/
 │   │   ├── game_data.gd                  # singleton : charge tous les data/*.json (+ balance.json) au démarrage
 │   │   └── sprint_state.gd               # singleton : état du mandat en cours (ressources, panier d'effets, journal, fins)
 │   ├── effect_resolver.gd                # classe statique : convertit les données brutes en deltas de ressources
+│   ├── asset_view.gd                     # classe statique : données (cartes/candidats/pratiques) → descripteur de carte d'Actif
 │   ├── ui_helpers.gd                     # polices, icônes, avatars, barres, tooltips, fade-in, hover (voir plus bas)
-│   ├── components/company_panel.gd       # script du panneau "Entreprise"
+│   ├── components/asset_card.gd          # script de la carte d'Actif
+│   ├── components/device_frame.gd        # script du cadre d'écran
+│   ├── components/side_panel.gd          # script du Panneau de bord
+│   ├── components/company_panel.gd       # script du "Dossier entreprise"
 │   └── screens/                          # un script par écran ci-dessus
 └── tests/
     ├── smoke_test_logic.gd/.tscn         # simule des mandats complets (stress/greedy/careful) sans UI
@@ -61,15 +68,17 @@ Chaque écran a un bouton **← Accueil** (retour au menu à tout moment) et un 
 - **Entreprise** (`company_select_screen`) — les entreprises de `companies.json` rattachées au scénario choisi (deux pour la Transformation agile), chacune avec sa propre accroche/description façon offre d'emploi et un profil d'équipe (junior/senior) qui sera fixé pour tout le mandat. Le choix appelle `SprintState.reset_run(era_id, company_id)` (réinitialise les 6 ressources, fixe l'entreprise, l'équipe et le modèle économique) puis ouvre l'Inbox.
 - **Inbox** (`inbox_screen`) — un événement tiré par pioche "sac" (`SprintState.draw_inbox_event()`, 12 événements dont 2 propres à la Transformation agile), 3 choix ; cliquer un choix révèle son effet, l'ajoute au panier du sprint (`SprintState.add_pending`) et débloque "Suivant".
 - **Roadmap** (`roadmap_screen`) — features de `roadmap-features.json` en boutons à bascule ; une barre de capacité (base + bonus de recrutement) passe au rouge et affiche un avertissement au-delà de la capacité effective. Au clic sur "Suivant", les effets des features sélectionnées (+ pénalité de surchauffe éventuelle) rejoignent le panier du sprint.
-- **Grandes décisions** (`decisions_screen`) — les cartes de `cards.json` disponibles pour le scénario en cours (3 génériques + celles taguées `eras`) ; le profil d'équipe (junior/senior) s'affiche en badge fixe, hérité de l'entreprise choisie — plus un bouton à bascule. "Voir l'effet" bascule tagline ↔ détail des axes ; "Activer cette grande décision" convertit la carte en deltas réels (via `EffectResolver`, avec les multiplicateurs d'époque) et la marque comme Fondation active, jusqu'à la limite du mandat.
-- **Recrutement** (`recruitment_screen`) — l'habillage de `recruitment-demo.json` est fixé par le scénario (`balance.json` → `eraRecruitmentSkin`, plus de bouton de bascule) ; embaucher coûte de la trésorerie, produit un effet immédiat et augmente durablement la capacité de roadmap (`SprintState.capacity_bonus`).
+- **Grandes décisions** (`decisions_screen`) — les cartes de `cards.json` disponibles pour le scénario en cours (3 génériques + celles taguées `eras`), servies par la **carte d'Actif** ; l'impact est affiché en ressources (🫶 −35, 🧱 −10…) avec la note d'axe comme texte de ligne, et non plus en axes abstraits. "Activer (1 slot)" convertit la carte en deltas réels (via `EffectResolver`, avec les multiplicateurs d'époque) et la marque comme Fondation active, jusqu'à la limite du mandat. Le compteur de slots vit dans le titre du rayon ; le profil d'équipe est passé dans l'en-tête du Panneau de bord.
+- **Marché** (`recruitment_screen`) — l'étal du sprint : 2 candidats + 2 pratiques tirés une fois par sprint (`SprintState.get_shop_offer()`), servis par la même carte d'Actif que les grandes décisions. Embaucher coûte des pièces et ajoute une masse salariale récurrente ; 🤝 1:1 paie en Énergie la révélation d'un trait caché avant de signer.
 - **Résolution** (`resolution_screen`) — applique tout le panier d'effets accumulé pendant le sprint plus le revenu du modèle économique (`SprintState.apply_pending_and_check()`), anime chaque jauge de l'ancienne à la nouvelle valeur, affiche le revenu du sprint dans un bloc dédié (compteur animé) séparé du coût net des décisions, le journal cumulatif, une alerte sur la ressource la plus critique. Détecte les fins de mandat et route vers `mandate_end_screen` le cas échéant ; sinon "Sprint suivant" incrémente `SprintState.sprint_number` et boucle vers l'Inbox. Un bouton dédié ouvre le plateau des Fondations.
 - **Fondations** (`foundations_screen`) — affiche les grandes décisions réellement activées ce mandat (état réel, pas une démo) ; message dédié si aucune n'est encore active.
 - **Fin de mandat** (`mandate_end_screen`) — la fin atteinte (`endings.json`), le bilan des 6 ressources, l'époque et le profil d'équipe ; "Choisir un nouveau scénario" retourne à `scenario_screen`, "Accueil" retourne au menu.
 
-Les 4 écrans de phase (Inbox, Roadmap, Grandes décisions, Recrutement) affichent en plus une barre compacte des 6 ressources en haut de l'écran (`UIHelpers.build_resource_bar()`) — l'état d'après la dernière Résolution, sans preview des effets en attente ; chaque ressource porte un tooltip (définition, ce qui la fait monter/descendre) au survol. Ces 4 écrans, plus Résolution et Fondations, portent aussi un bouton "{icône} {nom de l'entreprise}" qui ouvre le panneau **Entreprise** (`scenes/components/company_panel.tscn`, branché par `UIHelpers.attach_company_menu()`) — un overlay non-modal résumant le contexte de la run (entreprise, scénario, profil, modèle économique, ressources), avec une section Pilotage verrouillée pour l'instant.
+Les 4 écrans de phase (Inbox, Roadmap, Grandes décisions, Marché) portent le **Panneau de bord** (`scenes/components/side_panel.tscn`, branché par `UIHelpers.attach_side_panel()`) : une colonne fixe à droite qui remplace l'ancienne barre de ressources horizontale. Elle affiche en continu les 6 jauges en barres (état d'après la dernière Résolution, sans preview des effets en attente ; tooltip par ressource), les pièces, le bloc « Vous » (Capital politique, Énergie), le roster condensé — un clic sur une ligne ouvre 🤝 1:1 / 🚪 Licencier —, les actifs possédés, et les conditions de la revue de board **évaluées en direct** (`SprintState.evaluate_board_objectives()`).
 
-Le thème visuel (`resources/theme/main_theme.tres`) est appliqué par défaut à tout le projet (`[gui] theme/custom`) — un nouvel écran hérite des couleurs de marque sans re-stylisation manuelle.
+Son bouton du bas ouvre le **Dossier entreprise** (`scenes/components/company_panel.tscn`) — overlay non-modal de lecture longue : contexte RP, modèle économique détaillé, objectifs commentés, roster détaillé, rallonge, Pilotage. Règle de partage : le panneau répond à « où j'en suis », le dossier à « dans quoi je joue ». La Résolution et les Fondations, qui n'ont pas de panneau, ouvrent le dossier depuis un bouton de leur barre du haut (`UIHelpers.attach_company_menu()`).
+
+Le thème visuel (`resources/theme/main_theme.tres`) est appliqué par défaut à tout le projet (`[gui] theme/custom`) — un nouvel écran hérite des couleurs sans re-stylisation manuelle. Il est **clair** depuis le lot 1 de la refonte UI (fond `#f4f6f3`, encre `#2a2f38`, boutons « papier » à filet d'encre) : voir [`docs/proposition-ui-interface.md`](../docs/proposition-ui-interface.md) pour la direction artistique et [`docs/carnet-de-regles.md`](../docs/carnet-de-regles.md) §19 pour ce que le lot a livré.
 
 ## Habillage visuel
 
@@ -77,9 +86,10 @@ Tout ce qui n'est pas généré par shader vit dans `assets/`, avec les licences
 
 - **Polices** — Space Grotesk (titres) et IBM Plex Sans/Mono (corps, labels mono), les mêmes familles que `landing/`. Le poids des titres est piloté par code via `UIHelpers.apply_heading()` / `apply_mono()` (variation de police à la volée), pas par un thème pré-figé — un nouvel écran les récupère avec un seul appel.
 - **Icônes** — set [Lucide](https://lucide.dev/) (trait, teintable via `modulate`) à la place des emoji pour les ressources, les profils d'équipe et le statut des Fondations. `UIHelpers.make_icon(nom, taille, couleur)`.
-- **Avatars** — portraits [DiceBear](https://www.dicebear.com/) (style Notionists) générés une fois hors-ligne pour les personnages nommés (Priya, Sofia, Kevin...), affichés sur l'Inbox et le Recrutement. `UIHelpers.make_avatar(seed, taille)` retombe sur une icône générique si aucun portrait ne correspond au nom (ex. les candidats des petites annonces, anonymes par nature).
-- **Fond quadrillé** — `resources/shaders/grid_background.gdshader` reproduit en shader le fond à grille de `landing/css/style.css`, appliqué à tous les écrans.
-- **Animations** — `UIHelpers.fade_in()` (arrivée en fondu sur chaque écran), `UIHelpers.add_hover_bounce()` (léger zoom au survol des boutons), et un flip `scale.x` sur les cartes de Grandes décisions qui fait écho au retournement de carte de la landing page.
+- **Avatars** — portraits [DiceBear](https://www.dicebear.com/) (style Notionists) générés une fois hors-ligne pour les personnages nommés (Priya, Sofia, Kevin...). `UIHelpers.make_person_badge(nom, taille)` affiche le portrait s'il existe, sinon une pastille d'initiale — le cas courant, et le badge d'accès de la carte candidat.
+- **Icônes d'objets** — [Generic Items](https://kenney.nl/assets/generic-items) de Kenney (CC0) : une icône d'objet par Actif (calculatrice pour RICE, dossier suspendu pour Jira, presse-papiers pour Discovery…), le mapping vit dans `AssetView`. `UIHelpers.make_item_icon(index, taille)`.
+- **Fond de papier réglé** — `resources/shaders/grid_background.gdshader` dessine le blanc cassé et les lignes réglées à peine visibles du tableau blanc, appliqué à tous les écrans (`vertical_rules = true` retrouve l'ancien quadrillage).
+- **Animations** — `UIHelpers.fade_in()` (arrivée en fondu sur chaque écran). Le survol d'un **bouton** ne touche pas à sa géométrie : son ombre portée grossit (StyleBox `hover` du thème et de `style_primary_button()`), parce qu'un bouton large fait exactement la largeur de son conteneur et que tous les `ScrollContainer` ont `clip_contents = true` — un zoom se ferait couper sur les côtés. Le mouvement est réservé aux **objets** : une carte d'Actif est posée de travers (`UIHelpers.apply_card_placement()`) et se **redresse en se soulevant** au survol. Attention, un `Container` remet à zéro la rotation et l'échelle de ses enfants à chaque passe de layout : `asset_card.gd` se rebranche sur le signal `sort_children` du parent pour réappliquer son angle. La preview d'impact et l'impulsion animée à l'achat arrivent au lot 3 de la refonte.
 
 Pas de dépendance/plugin externe : tout est construit avec les nœuds et l'API standard de Godot (`FontVariation`, `Tween`, `ShaderMaterial`, `TextureRect`).
 

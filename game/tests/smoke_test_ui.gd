@@ -49,6 +49,13 @@ func _instantiate_and_free(path: String) -> void:
 		return
 
 	var instance := packed.instantiate()
+
+	# Un script qui ne compile pas n'empêche pas la scène de s'instancier : Godot
+	# la charge sans lui. Sans cette vérification, une erreur de parse passait le
+	# test au vert — et l'écran arrivait muet en jeu.
+	if instance.get_script() == null:
+		push_error("%s s'instancie sans son script — erreur de compilation ?" % path)
+
 	get_tree().root.add_child.call_deferred(instance)
 	await get_tree().process_frame
 	await get_tree().process_frame

@@ -18,7 +18,7 @@ anchor_right=1.0
 anchor_bottom=1.0
 grow_horizontal=2
 grow_vertical=2
-color=Color(0.0705882, 0.12549, 0.25098, 1)
+color=Color(0.956863, 0.964706, 0.952941, 1)
 
 [node name="Margin" type="MarginContainer" parent="."]
 anchors_preset=15
@@ -45,19 +45,19 @@ size_flags_horizontal=3
 [node name="SprintLabel" type="Label" parent="Margin/VBox/TopBar"]
 text="Sprint 1 — Phase 4 : Marché"
 
-[node name="InfoRow" type="HBoxContainer" parent="Margin/VBox"]
-theme_override_constants/separation=24
-
-[node name="PiecesLabel" type="Label" parent="Margin/VBox/InfoRow"]
-text="🪙 0 pièce"
-
-[node name="CapLabel" type="Label" parent="Margin/VBox/InfoRow"]
-text="👥 Effectif : 0/0"
+[node name="ShelfHead" type="VBoxContainer" parent="Margin/VBox"]
 
 [node name="Scroll" type="ScrollContainer" parent="Margin/VBox"]
 size_flags_vertical=3
 
-[node name="ShopGrid" type="GridContainer" parent="Margin/VBox/Scroll"]
+[node name="Pad" type="MarginContainer" parent="Margin/VBox/Scroll"]
+size_flags_horizontal=3
+theme_override_constants/margin_left=16
+theme_override_constants/margin_top=16
+theme_override_constants/margin_right=16
+theme_override_constants/margin_bottom=16
+
+[node name="ShopGrid" type="GridContainer" parent="Margin/VBox/Scroll/Pad"]
 size_flags_horizontal=3
 columns=4
 theme_override_constants/h_separation=14

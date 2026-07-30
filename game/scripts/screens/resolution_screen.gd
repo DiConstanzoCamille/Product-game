@@ -31,9 +31,6 @@ var mandate_ending: String = ""
 func _ready() -> void:
 	back_button.pressed.connect(func(): get_tree().change_scene_to_file(START_SCREEN_SCENE))
 	foundations_button.pressed.connect(func(): get_tree().change_scene_to_file(FOUNDATIONS_SCENE))
-	UIHelpers.add_hover_bounce(back_button)
-	UIHelpers.add_hover_bounce(foundations_button)
-	UIHelpers.add_hover_bounce(next_sprint_button)
 	UIHelpers.apply_mono(sprint_label, 12)
 	UIHelpers.fade_in(self)
 
@@ -162,7 +159,6 @@ func _setup_breather_button() -> void:
 	var breather_btn := Button.new()
 	breather_btn.text = "🧘 Souffler — sprint suivant sans action personnelle (+%d régén)" % bonus
 	breather_btn.tooltip_text = "Le luxe ultime : un sprint où vous ne faites que votre travail."
-	UIHelpers.add_hover_bounce(breather_btn)
 	breather_btn.pressed.connect(func():
 		if SprintState.plan_breather() == "":
 			breather_btn.text = "🧘 Vous soufflerez au prochain sprint ✓"
@@ -233,7 +229,6 @@ func _show_board_review_overlay() -> void:
 	var close_btn := Button.new()
 	close_btn.text = "Reprendre le sprint →"
 	close_btn.pressed.connect(func(): dim.queue_free())
-	UIHelpers.add_hover_bounce(close_btn)
 	vbox.add_child(close_btn)
 
 

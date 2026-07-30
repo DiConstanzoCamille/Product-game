@@ -486,3 +486,76 @@ Implémentation du deuxième lot de la
   permanente) ; critères impératifs vérifiés en sortie non nulle : la
   spirale burn-out reste atteignable (`stress` la déclenche sur Meridia
   vers le sprint 2-4) et `careful` perd toujours.
+
+---
+
+## 19. Refonte UI — Lot 1 : le socle visuel
+
+Premier lot de la [proposition UI](proposition-ui-interface.md), en réponse aux
+cinq retours post-Phase B. **Aucune règle ni aucun flux ne change** : les
+mêmes données, les mêmes effets, les mêmes phases — seule la façon de les
+présenter change. Le lot suivant fusionnera les écrans Grandes décisions et
+Marché en « Investissements » ; celui d'après ajoutera la preview d'impact.
+
+- **Le thème passe en clair.** `resources/theme/main_theme.tres` inverse la
+  palette (fond `#f4f6f3`, encre `#2a2f38`) et le fond quadrillé sombre devient
+  du papier réglé. La direction retenue (« Post-it & Feutre ») est claire : tant
+  que le thème restait sombre, chaque écran refait jurait avec les autres. Les
+  boutons deviennent des boutons « papier » — fond blanc, filet d'encre épais,
+  encre inversée à l'appui, ce qui rend enfin lisible l'état d'un bouton à
+  bascule (une feature retenue sur la Roadmap est remplie d'encre).
+  `UIHelpers.style_primary_button()` réserve le remplissage plein au geste
+  principal d'un écran ou d'une carte.
+- **Un seul objet : l'Actif.** `scenes/components/asset_card.tscn` sert les
+  trois types (grande décision, candidat, pratique) avec six zones toujours à
+  la même place — le joueur apprend la carte une fois. La traduction des trois
+  pools de données vers un descripteur commun vit dans `scripts/asset_view.gd` ;
+  `cards.json`, `candidates.json` et `practices.json` ne sont **pas** fusionnés,
+  seulement présentés par le même composant.
+- **L'impact se dit en ressources, plus en axes.** Les cartes de décision
+  affichaient les 4 axes abstraits (`humain`, `financier`, `ttm`,
+  `productivite`) quand tout le reste du jeu parle en 6 jauges.
+  `EffectResolver.card_impact_lines()` applique le même calcul que
+  `resolve_card_activation()` (mapping `cardAxisResourceMap`, multiplicateur
+  d'époque, arrondi) mais conserve la note d'axe comme texte de ligne : on lit
+  « 🫶 Perçu comme un contrôle sur un instinct qui marchait déjà bien −35 ».
+  C'est le prérequis pour que la preview du lot 3 soit honnête — elle projettera
+  sur les jauges exactement ce qui est écrit sur la carte. Le sens de la
+  ressource est respecté (`delta_is_good()` : une dette qui baisse est verte).
+- **L'inconnu est une ligne d'impact comme les autres.** « 🔒 Trait caché —
+  révélé en fin de période d'essai · ❓ » occupe une ligne de la zone Impact, au
+  même endroit que les deltas connus : le pari est affiché, et payer de
+  l'information (1:1, Entretiens structurés) transforme la ligne sur place.
+- **Le Panneau de bord remplace la barre de ressources.**
+  `scenes/components/side_panel.tscn` est une colonne fixe à droite des 4
+  écrans de phase : jauges en **barres** (et non en pourcentages — il faut une
+  géométrie sur laquelle projeter la preview du lot 3), pièces, bloc « Vous »,
+  roster condensé, actifs possédés, revue de board. Il est sombre dans un monde
+  clair : diégétiquement l'écran TV du standup, et pratiquement la garantie que
+  les chiffres restent lisibles là où le post-it échouerait.
+- **Le roster est actionnable en un clic.** Un clic sur une ligne du panneau
+  ouvre le menu 🤝 1:1 / 🚪 Licencier — plus besoin d'ouvrir un overlay puis de
+  scroller. Le licenciement gagne une vraie confirmation (il est irréversible et
+  coûte du Moral).
+- **La revue de board est évaluée en direct.** `SprintState.evaluate_board_objectives()`
+  confronte les conditions de `companies.json` à l'état courant sans rien
+  modifier ; le panneau les affiche cochées avec la valeur lue (« ✗ (47) »), et
+  `_run_board_review()` s'en sert au sprint 6 pour son verdict — une seule
+  implémentation des conditions, deux usages.
+- **Le panneau Entreprise devient le « Dossier entreprise ».** Il garde ce
+  qu'on lit une fois par mandat (contexte RP, modèle économique détaillé,
+  objectifs commentés, roster détaillé, Pilotage, rallonge) et cède au panneau
+  tout ce qui répond à « où j'en suis ». Règle de partage : le panneau répond à
+  *où j'en suis*, le dossier à *dans quoi je joue*.
+- **Icônes d'objets.** Les cartes portent une icône Kenney (CC0) par Actif — la
+  « fausse 3D d'objets posés sur le tableau » de la direction retenue : une
+  calculatrice pour RICE, un dossier suspendu pour Jira, un presse-papiers pour
+  Discovery, une boussole pour le Tech radar. Le mapping est de la présentation,
+  il vit dans `AssetView`, pas dans les données.
+- **Ce que le lot ne fait pas.** Le rail replié du panneau, la preview d'impact
+  au survol, l'animation d'achat et la fusion des écrans restent devant nous. Le
+  flip « tagline ↔ détail » des cartes de décision disparaît : la nouvelle carte
+  affiche l'accroche **et** les impacts commentés en même temps, comme le spike
+  validé — il n'y a plus deux faces à retourner.
+- **Recette.** Les deux smoke tests headless passent sans modification, plus un
+  run visuel des 11 écrans (thème clair, cartes, panneau, dossier).

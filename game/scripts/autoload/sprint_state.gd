@@ -935,27 +935,47 @@ func _resolve_silent_quits() -> void:
 		})
 
 
+## Confronte les conditions de la revue de board (companies.json →
+## boardObjectives) à l'état courant, sans rien modifier. Appelée deux fois :
+## par _run_board_review() au sprint de mi-mandat, qui en tire le verdict, et
+## par le Panneau de bord, qui les affiche cochées **en direct** — comprendre
+## ce qu'il faut prioriser ne devrait pas demander d'attendre le sprint 6
+## (docs/proposition-ui-interface.md §4.2).
+## Retourne [{label, ok, current}] ; `current` est la valeur lue, pour
+## l'affichage « ✗ (47) ».
+func evaluate_board_objectives() -> Array:
+	var conditions: Array = []
+	for condition in get_company().get("boardObjectives", {}).get("conditions", []):
+		var ok := false
+		var current := ""
+		match condition.get("type", ""):
+			"resource-max":
+				var max_value: float = resource_values.get(condition.get("resource", ""), 0.0)
+				ok = max_value <= float(condition.get("value", 0))
+				current = "%d" % int(round(max_value))
+			"resource-min":
+				var min_value: float = resource_values.get(condition.get("resource", ""), 0.0)
+				ok = min_value >= float(condition.get("value", 0))
+				current = "%d" % int(round(min_value))
+			"decisions-min":
+				ok = activated_cards.size() >= int(condition.get("value", 1))
+				current = "%d" % activated_cards.size()
+			"revenue-min":
+				ok = last_revenue >= int(condition.get("value", 0))
+				current = "%d" % last_revenue
+		conditions.append({"label": condition.get("label", ""), "ok": ok, "current": current})
+	return conditions
+
+
 ## La revue de board (§8.2) — le "boss" de mi-mandat : l'état de la boîte
 ## est comparé aux objectifs fixés par l'entreprise à l'embauche.
 func _run_board_review() -> void:
 	var objectives: Dictionary = get_company().get("boardObjectives", {})
 	var review_conf: Dictionary = GameData.balance.get("pressure", {}).get("boardReview", {})
-	var conditions: Array = []
+	var conditions: Array = evaluate_board_objectives()
 	var all_ok := true
-
-	for condition in objectives.get("conditions", []):
-		var ok := false
-		match condition.get("type", ""):
-			"resource-max":
-				ok = resource_values.get(condition.get("resource", ""), 0.0) <= float(condition.get("value", 0))
-			"resource-min":
-				ok = resource_values.get(condition.get("resource", ""), 0.0) >= float(condition.get("value", 0))
-			"decisions-min":
-				ok = activated_cards.size() >= int(condition.get("value", 1))
-			"revenue-min":
-				ok = last_revenue >= int(condition.get("value", 0))
-		conditions.append({"label": condition.get("label", ""), "ok": ok})
-		if not ok:
+	for condition in conditions:
+		if not condition.get("ok", false):
 			all_ok = false
 
 	var bounds: Dictionary = GameData.balance.get("resourceBounds", {"min": 0, "max": 100})

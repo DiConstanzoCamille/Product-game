@@ -20,24 +20,23 @@ const START_SCREEN_SCENE := "res://scenes/screens/start_screen.tscn"
 
 var effective_capacity: int = 0
 var feature_buttons: Array[Button] = []
-var resource_bar: Control = null
+var side_panel: Control = null
 var self_work_button: Button = null
 
 
 func _ready() -> void:
 	back_button.pressed.connect(func(): get_tree().change_scene_to_file(START_SCREEN_SCENE))
 	next_button.pressed.connect(_on_next_pressed)
-	UIHelpers.add_hover_bounce(back_button)
-	UIHelpers.add_hover_bounce(next_button)
+	UIHelpers.style_primary_button(next_button)
 	UIHelpers.apply_mono(sprint_label, 12)
 	UIHelpers.fade_in(self)
 
 	sprint_label.text = "Sprint %d — Phase 2 : Roadmap" % SprintState.sprint_number
 
-	resource_bar = UIHelpers.build_resource_bar()
-	$Margin/VBox.add_child(resource_bar)
-	$Margin/VBox.move_child(resource_bar, 1)
-	UIHelpers.attach_company_menu(self)
+	side_panel = UIHelpers.attach_side_panel(self)
+	# Un licenciement ou un 1:1 fait depuis le panneau change la capacité
+	# produite par l'équipe : le panier doit être réévalué.
+	side_panel.state_changed.connect(_on_roster_changed)
 
 	capacity_bar.add_theme_stylebox_override("fill", UIHelpers.make_bar_fill_style(UIHelpers.COLOR_GOOD))
 	capacity_bar.add_theme_stylebox_override("background", UIHelpers.make_bar_background_style())
@@ -76,7 +75,6 @@ func _load_features() -> void:
 			" ".join(feature.get("icons", [])),
 		]
 		btn.pressed.connect(_update_capacity)
-		UIHelpers.add_hover_bounce(btn, 1.02)
 		feature_grid.add_child(btn)
 		feature_buttons.append(btn)
 
@@ -87,7 +85,6 @@ func _setup_self_work_button() -> void:
 	self_work_button = Button.new()
 	self_work_button.tooltip_text = "Action personnelle (⚡) : vous prenez des tickets vous-même. Le sprint est sauvé, pas vous."
 	self_work_button.pressed.connect(_on_self_work_pressed)
-	UIHelpers.add_hover_bounce(self_work_button, 1.03)
 	$Margin/VBox/CapacityRow.add_child(self_work_button)
 	_refresh_self_work_button()
 
@@ -111,22 +108,19 @@ func _refresh_self_work_button() -> void:
 func _on_self_work_pressed() -> void:
 	if SprintState.do_self_work() != "":
 		return
+	_on_roster_changed()
+	if side_panel != null:
+		side_panel.refresh()
+
+
+## Recalcule la capacité produite et l'état du bouton d'action personnelle —
+## après un 🔧 Faire le taf soi-même, ou après un mouvement de roster décidé
+## depuis le Panneau de bord.
+func _on_roster_changed() -> void:
 	effective_capacity = SprintState.get_effective_capacity()
 	capacity_bar.max_value = max(effective_capacity, 1)
 	_update_capacity()
 	_refresh_self_work_button()
-	_rebuild_resource_bar()
-
-
-func _rebuild_resource_bar() -> void:
-	if resource_bar == null:
-		return
-	var parent := resource_bar.get_parent()
-	var index := resource_bar.get_index()
-	resource_bar.queue_free()
-	resource_bar = UIHelpers.build_resource_bar()
-	parent.add_child(resource_bar)
-	parent.move_child(resource_bar, index)
 
 
 func _selected_points() -> int:
