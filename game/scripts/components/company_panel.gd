@@ -1,11 +1,18 @@
 extends PanelContainer
-## Panneau "Entreprise" (docs/carnet-de-regles.md §16, spec profondeur §10) —
-## contexte complet de la run en cours : entreprise, scénario, ressources,
-## roster détaillé (avec licenciement et 1:1), pratiques adoptées, objectifs
-## de la revue de board, action personnelle Rallonge, sections Pilotage
-## déverrouillables par les pratiques.
-## Overlay non-modal, jamais un changement de scène (branché par
-## UIHelpers.attach_company_menu() sur chaque écran de phase).
+## Le **Dossier entreprise** (docs/carnet-de-regles.md §16 ; refonte UI §4.4) —
+## la lecture longue et les actions rares : dans quoi je joue.
+##
+## Depuis la refonte UI, tout ce qui répond à « où j'en suis » a migré dans le
+## Panneau de bord permanent (scenes/components/side_panel.tscn) : ressources,
+## pièces, effectif, roster condensé avec 1:1 et licenciement, actifs possédés,
+## rappel des conditions de board. Le Dossier garde ce qu'on lit une fois par
+## mandat — contexte RP, modèle économique détaillé, objectifs commentés,
+## roster détaillé, Pilotage — et la seule action rare qui y reste : la
+## rallonge négociée au board.
+##
+## Overlay non-modal, jamais un changement de scène : ouvert depuis le bouton
+## du Panneau de bord sur les écrans de phase, depuis la TopBar à la Résolution
+## (UIHelpers.attach_company_menu).
 
 @onready var title_label: Label = $VBox/TopRow/TitleLabel
 @onready var close_button: Button = $VBox/TopRow/CloseButton
@@ -19,72 +26,73 @@ func _ready() -> void:
 	_populate()
 
 
+## Reconstruit le dossier — appelé par le Panneau de bord quand l'état a bougé.
+func refresh() -> void:
+	_populate()
+
+
 func _populate() -> void:
 	for child in content.get_children():
-		child.queue_free()
+		child.free()
 
 	var company: Dictionary = SprintState.get_company()
 	var era: Dictionary = SprintState.get_era()
 	var model: Dictionary = SprintState.get_business_model()
 
-	title_label.text = "%s %s" % [company.get("icon", "🏢"), company.get("name", "Entreprise")]
+	title_label.text = "🏢 Dossier — %s %s" % [company.get("icon", ""), company.get("name", "Entreprise")]
 
 	_add_text(company.get("tagline", ""), 14, UIHelpers.COLOR_AMBER)
-	_add_text(company.get("description", ""), 13, Color.WHITE)
+	_add_text(company.get("description", ""), 13, UIHelpers.COLOR_INK)
 
-	_add_section_title("Contexte de la run")
+	_add_section_title("Le mandat")
 	_add_row("Scénario", "%s %s" % [era.get("icon", ""), era.get("name", "")])
-	_add_row("Profil d'équipe", SprintState.team_profile.capitalize())
-	_add_row("Modèle économique", model.get("label", "—"))
-	_add_row("Sprint en cours", "%d / %d" % [SprintState.sprint_number, int(GameData.balance.get("mandateLengthSprints", 12))])
-	_add_row("Grandes décisions activées", "%d / %d" % [
-		SprintState.activated_cards.size(), int(GameData.balance.get("structuralDecisionMaxActivations", 4))
+	_add_row("Profil d'équipe", _team_profile_label())
+	_add_row("Sprint en cours", "%d / %d" % [
+		SprintState.sprint_number, int(GameData.balance.get("mandateLengthSprints", 12))
 	])
-	_add_row("🪙 Pièces (budget d'action)", "%d" % SprintState.pieces, UIHelpers.COLOR_AMBER)
-	_add_row("👥 Effectif", "%d / %d" % [SprintState.roster.size(), SprintState.get_team_cap()])
-	_add_row("⚡ Énergie (vous)", "%d / %d" % [SprintState.energy, SprintState.get_energy_max()], UIHelpers.COLOR_AMBER)
+	_add_text(era.get("description", ""), 12, UIHelpers.COLOR_SOFT_TEXT)
 
-	_add_section_title("Ressources")
-	for resource in GameData.resources:
-		var resource_id: String = resource.get("id", "")
-		var value: float = SprintState.resource_values.get(resource_id, 0.0)
-		var state := EffectResolver.gauge_state(resource_id, value)
-		_add_row(
-			"%s %s" % [resource.get("icon", ""), resource.get("name", "")],
-			"%d%%" % int(round(value)),
-			UIHelpers.state_color(state)
-		)
-
-	_add_section_title("Équipe — capacité produite : %d pts · masse salariale : %d 💰/sprint" % [
-		SprintState.get_effective_capacity(), SprintState.get_payroll()
-	])
-	if SprintState.roster.is_empty():
-		_add_text("Plus personne. Une organisation parfaitement silencieuse.", 12, UIHelpers.COLOR_SOFT_TEXT)
-	for employee in SprintState.roster:
-		content.add_child(_build_employee_row(employee))
-
-	_add_section_title("Pratiques adoptées")
-	if SprintState.owned_practices.is_empty():
-		_add_text("Aucune pour l'instant — le Marché en propose deux par sprint.", 12, UIHelpers.COLOR_SOFT_TEXT)
-	for practice_id in SprintState.owned_practices:
-		var practice: Dictionary = SprintState.find_practice(practice_id)
-		_add_text("%s %s — %s" % [practice.get("icon", ""), practice.get("name", ""), practice.get("description", "")], 12, Color.WHITE)
+	_add_section_title("Modèle économique — %s" % model.get("label", "—"))
+	_add_text(model.get("description", ""), 12, UIHelpers.COLOR_SOFT_TEXT)
+	if SprintState.last_revenue > 0 or SprintState.last_payroll > 0:
+		_add_row("Dernier sprint résolu", "revenu +%d 💰 · masse salariale −%d 💰" % [
+			SprintState.last_revenue, SprintState.last_payroll
+		])
 
 	var objectives: Dictionary = company.get("boardObjectives", {})
 	if not objectives.is_empty():
-		_add_section_title("Revue de board — sprint %d" % int(GameData.balance.get("trimesterLengthSprints", 6)))
+		_add_section_title("Objectifs de board — verdict au sprint %d" % int(GameData.balance.get("trimesterLengthSprints", 6)))
 		_add_text(objectives.get("title", ""), 13, UIHelpers.COLOR_AMBER)
 		for condition in objectives.get("conditions", []):
-			_add_text("• %s" % condition.get("label", ""), 12, Color.WHITE)
+			_add_text("• %s" % condition.get("label", ""), 12, UIHelpers.COLOR_INK)
 		match SprintState.board_review_state:
 			"passed":
 				_add_text("✅ Revue réussie — le board a débloqué du budget d'action.", 12, UIHelpers.COLOR_GOOD)
 			"failed":
 				_add_text("❌ Revue ratée — allocation de pièces réduite pour le reste du mandat.", 12, UIHelpers.COLOR_DANGER)
 			_:
-				_add_text("⏳ À venir — l'état de la boîte sera comparé à ces objectifs.", 12, UIHelpers.COLOR_SOFT_TEXT)
+				_add_text("⏳ À venir — le Panneau de bord suit ces conditions en direct.", 12, UIHelpers.COLOR_SOFT_TEXT)
 
-	_add_section_title("Actions personnelles — ⚡ %d / %d" % [SprintState.energy, SprintState.get_energy_max()])
+	_add_section_title("L'équipe en détail — %d pts produits · %d 💰/sprint" % [
+		SprintState.get_effective_capacity(), SprintState.get_payroll()
+	])
+	if SprintState.roster.is_empty():
+		_add_text("Plus personne. Une organisation parfaitement silencieuse.", 12, UIHelpers.COLOR_SOFT_TEXT)
+	_add_text("Les actions (🤝 1:1 · licencier) sont dans le Panneau de bord, sur la ligne de la personne.",
+		11, UIHelpers.COLOR_SOFT_TEXT)
+	for employee in SprintState.roster:
+		_add_employee(employee)
+
+	_add_section_title("Pratiques adoptées")
+	if SprintState.owned_practices.is_empty():
+		_add_text("Aucune pour l'instant — l'étal en propose deux par sprint.", 12, UIHelpers.COLOR_SOFT_TEXT)
+	for practice_id in SprintState.owned_practices:
+		var practice: Dictionary = SprintState.find_practice(practice_id)
+		_add_text("%s %s — %s" % [
+			practice.get("icon", ""), practice.get("name", ""), practice.get("description", "")
+		], 12, UIHelpers.COLOR_INK)
+
+	_add_section_title("Action rare — ⚡ %d / %d" % [SprintState.energy, SprintState.get_energy_max()])
 	content.add_child(_build_extension_row())
 
 	_add_section_title("Pilotage")
@@ -93,7 +101,9 @@ func _populate() -> void:
 
 
 ## 🏛️ Négocier une rallonge (spec §7.2) : votre Capital politique contre
-## des pièces immédiates pour l'entreprise.
+## des pièces immédiates pour l'entreprise. Reste ici, et pas dans le Panneau
+## de bord : plus elle est visible, plus elle est tentante — arbitrage laissé
+## ouvert dans la proposition UI §7.
 func _build_extension_row() -> Control:
 	var conf: Dictionary = SprintState.get_personal_action_conf("extension")
 	var row := HBoxContainer.new()
@@ -130,75 +140,34 @@ func _on_extension_pressed() -> void:
 		_populate()
 
 
-func _build_employee_row(employee: Dictionary) -> Control:
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 10)
-
+## Fiche détaillée d'une personne : tout ce que la ligne condensée du Panneau
+## de bord ne peut pas montrer — trait visible complet, trait caché, sprint
+## d'embauche.
+func _add_employee(employee: Dictionary) -> void:
 	var roles: Dictionary = GameData.balance.get("roles", {})
 	var role_conf: Dictionary = roles.get(employee.get("role", ""), {})
 
-	var label := Label.new()
-	var hidden_text := ""
-	if employee.get("hiddenRevealed", false):
-		var hidden_trait: Dictionary = SprintState.get_hidden_trait(employee.get("hidden_trait", ""))
-		if not hidden_trait.is_empty():
-			hidden_text = " · %s %s" % [hidden_trait.get("icon", ""), hidden_trait.get("name", "")]
-	else:
-		hidden_text = " · 🔒 période d'essai en cours"
-	label.text = "%s %s — %s %s · salaire %d 💰%s" % [
+	_add_text("%s %s — %s %s · salaire %d 💰/sprint · arrivé·e au sprint %d" % [
 		role_conf.get("icon", "👤"), employee.get("name", ""),
 		role_conf.get("label", employee.get("role", "")), employee.get("seniority", ""),
-		int(employee.get("salary", 0)), hidden_text
-	]
-	label.autowrap_mode = TextServer.AUTOWRAP_WORD
-	label.add_theme_font_size_override("font_size", 12)
-	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	label.tooltip_text = employee.get("trait", "")
-	row.add_child(label)
+		int(employee.get("salary", 0)), int(employee.get("hiredSprint", 0)),
+	], 12, UIHelpers.COLOR_INK)
 
-	if not employee.get("hiddenRevealed", false):
-		var one_on_one_btn := Button.new()
-		var one_on_one_cost := SprintState.get_personal_action_cost("oneOnOne")
-		one_on_one_btn.tooltip_text = "Action personnelle (⚡) : une vraie conversation — révèle le trait caché sans attendre la fin de la période d'essai."
-		match SprintState.personal_action_refusal():
-			"souffler":
-				one_on_one_btn.text = "🤝 1:1 — 🧘 vous soufflez"
-				one_on_one_btn.disabled = true
-			"epuise":
-				one_on_one_btn.text = "🤝 1:1 (%d ⚡ — épuisé·e)" % one_on_one_cost
-				one_on_one_btn.disabled = true
-			_:
-				one_on_one_btn.text = "🤝 1:1 (%d ⚡)" % one_on_one_cost
-				one_on_one_btn.disabled = false
-		one_on_one_btn.pressed.connect(_on_one_on_one_pressed.bind(employee.get("id", "")))
-		row.add_child(one_on_one_btn)
+	if employee.get("trait", "") != "":
+		_add_text("   « %s »" % employee.get("trait", ""), 11, UIHelpers.COLOR_FLAVOR)
 
-	var severance := int(GameData.balance.get("firing", {}).get("severancePieces", 2))
-	var fire_btn := Button.new()
-	fire_btn.text = "Licencier (%d 🪙)" % severance
-	fire_btn.disabled = SprintState.pieces < severance
-	fire_btn.tooltip_text = "Indemnités %d 🪙 · 🫶 Moral %d · 🎭 Cynisme +%d à partir du 2e licenciement du mandat" % [
-		severance,
-		int(GameData.balance.get("firing", {}).get("moral", -4)),
-		int(GameData.balance.get("firing", {}).get("cynismePerExtraFiring", 3)),
-	]
-	fire_btn.pressed.connect(_on_fire_pressed.bind(employee.get("id", "")))
-	row.add_child(fire_btn)
-
-	return row
-
-
-func _on_fire_pressed(employee_id: String) -> void:
-	if SprintState.fire_employee(employee_id) == "":
-		_populate()
-
-
-func _on_one_on_one_pressed(employee_id: String) -> void:
-	var employee := SprintState.find_employee(employee_id)
-	if employee.is_empty():
-		return
-	if SprintState.do_one_on_one(employee) == "":
-		_populate()
+	if employee.get("hiddenRevealed", false):
+		var hidden_trait: Dictionary = SprintState.get_hidden_trait(employee.get("hidden_trait", ""))
+		if hidden_trait.is_empty():
+			_add_text("   🔓 Rien à signaler. Vraiment.", 11, UIHelpers.COLOR_SOFT_TEXT)
+		else:
+			_add_text("   %s %s — %s" % [
+				hidden_trait.get("icon", ""), hidden_trait.get("name", ""), hidden_trait.get("description", "")
+			], 11, UIHelpers.COLOR_GOOD if hidden_trait.get("polarity", "") == "positive" else UIHelpers.COLOR_DANGER)
+	else:
+		_add_text("   🔒 Période d'essai en cours — le trait caché tombera au sprint %d." % (
+			int(employee.get("hiredSprint", 0)) + int(GameData.balance.get("trialPeriodSprints", 2))
+		), 11, UIHelpers.COLOR_SOFT_TEXT)
 
 
 func _add_pilotage_row(label_text: String, practice_id: String) -> void:
@@ -207,15 +176,23 @@ func _add_pilotage_row(label_text: String, practice_id: String) -> void:
 			label_text, SprintState.find_practice(practice_id).get("name", practice_id)
 		], 12, UIHelpers.COLOR_GOOD)
 	else:
-		_add_text("%s — 🔒 s'achète au Marché (%s)." % [
+		_add_text("%s — 🔒 s'adopte à l'étal du sprint (%s)." % [
 			label_text, SprintState.find_practice(practice_id).get("name", practice_id)
 		], 12, UIHelpers.COLOR_SOFT_TEXT)
+
+
+func _team_profile_label() -> String:
+	for profile in GameData.cards.get("teamProfiles", []):
+		if profile.get("id", "") == SprintState.team_profile:
+			return profile.get("label", SprintState.team_profile)
+	return SprintState.team_profile.capitalize()
 
 
 func _add_section_title(text: String) -> void:
 	var label := Label.new()
 	label.text = text
 	UIHelpers.apply_mono(label, 12, true)
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD
 	label.add_theme_color_override("font_color", UIHelpers.COLOR_AMBER)
 	content.add_child(label)
 
@@ -231,7 +208,7 @@ func _add_text(text: String, size: int, color: Color) -> void:
 	content.add_child(label)
 
 
-func _add_row(label_text: String, value_text: String, value_color: Color = Color.WHITE) -> void:
+func _add_row(label_text: String, value_text: String, value_color: Color = UIHelpers.COLOR_INK) -> void:
 	var row := HBoxContainer.new()
 	var label := Label.new()
 	label.text = label_text

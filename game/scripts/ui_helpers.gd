@@ -2,12 +2,48 @@ class_name UIHelpers
 extends RefCounted
 ## Petits utilitaires de style partagés entre les écrans de sprint.
 ## Licences des assets référencés : game/assets/THIRD_PARTY_NOTICES.md
+##
+## Palette CLAIRE depuis la refonte UI (docs/proposition-ui-interface.md §6,
+## piste « Post-it & Feutre ») : le monde de jeu est du papier — blanc cassé,
+## encre foncée, fiches et post-it. Le seul îlot sombre est le panneau de bord
+## (scenes/components/side_panel.tscn), l'écran TV du standup : ses couleurs
+## sont préfixées PANEL_ ci-dessous. Les hex de référence viennent du spike
+## validé scenes/prototype_2d/market_screen_proto.tscn.
 
-const COLOR_GOOD := Color(0.498039, 0.890196, 0.647059)   # #7FE3A5
-const COLOR_WARN := Color(0.941176, 0.705882, 0.290196)   # #F0B44A
-const COLOR_DANGER := Color(0.952941, 0.537255, 0.498039) # #F3897F
-const COLOR_SOFT_TEXT := Color(0.666667, 0.713725, 0.8)   # #AAB6CC
-const COLOR_AMBER := Color(0.988235, 0.917647, 0.796078)  # #FCEACB
+# ── Le monde clair ────────────────────────────────────────────────────────
+const COLOR_SCREEN_BG := Color("#f4f6f3")
+const COLOR_INK := Color("#2a2f38")        # texte courant, filets épais
+const COLOR_FLAVOR := Color("#40485a")     # accroches, texte « à la main »
+const COLOR_SOFT_TEXT := Color("#79808d")  # sous-textes, mentions secondaires
+const COLOR_RULE := Color("#d4d9df")       # filets pointillés des cartes
+const COLOR_AMBER := Color("#8a6d00")      # eyebrows, catégories, coûts
+const COLOR_SHELF := Color("#23408e")      # titres de rayon
+
+const COLOR_GOOD := Color("#2f9e63")
+const COLOR_WARN := Color("#b3801a")
+const COLOR_DANGER := Color("#d3543f")
+const COLOR_UNKNOWN := Color("#c78a1b")    # les lignes d'impact 🔒 / ❓
+
+# Fonds des trois types d'Actif : badge d'accès, post-it, fiche cartonnée.
+const COLOR_CARD_CANDIDATE := Color("#ffffff")
+const COLOR_CARD_PRACTICE := Color("#ffef8d")
+const COLOR_CARD_DECISION := Color("#fbf7e9")
+
+const PILL_CANDIDATE := Color("#23408e")
+const PILL_PRACTICE := Color("#8a6d00")
+const PILL_DECISION := Color("#a33b3b")
+
+# ── Le panneau de bord (écran de standup : données claires sur fond sombre) ─
+const PANEL_BG := Color("#10151f")
+const PANEL_FG := Color("#e8ecf5")
+const PANEL_MUTED := Color("#8b97b0")
+const PANEL_RULE := Color("#262f42")
+const PANEL_ACCENT := Color("#7fd3ff")
+const PANEL_GOOD := Color("#7fe3a5")
+const PANEL_WARN := Color("#f0b44a")
+const PANEL_DANGER := Color("#f3897f")
+
+const SIDE_PANEL_WIDTH := 320
 
 const FONT_SPACE_GROTESK := preload("res://assets/fonts/SpaceGrotesk-Variable.ttf")
 const FONT_MONO_MEDIUM := preload("res://assets/fonts/IBMPlexMono-Medium.ttf")
@@ -15,6 +51,7 @@ const FONT_MONO_SEMIBOLD := preload("res://assets/fonts/IBMPlexMono-SemiBold.ttf
 
 const ICON_DIR := "res://assets/icons/"
 const AVATAR_DIR := "res://assets/avatars/"
+const ITEM_ICON_PATH := "res://assets/items-kenney/PNG/Colored/genericItem_color_%03d.png"
 
 const GAUGE_ICONS := {
 	"tresorerie": "wallet",
@@ -24,6 +61,90 @@ const GAUGE_ICONS := {
 	"valeur-percue": "trending-up",
 	"cynisme": "drama",
 }
+
+
+## Filet pointillé horizontal (l'équivalent d'un `border-top: 1px dashed`) —
+## StyleBoxFlat ne sait pas dessiner de pointillés. Sépare les zones de la
+## carte d'Actif.
+class DashedRule extends Control:
+	var rule_color: Color = Color("#d4d9df")
+	var dash: float = 3.0
+	var gap: float = 3.0
+
+	func _init() -> void:
+		custom_minimum_size = Vector2(0, 9)
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	func _draw() -> void:
+		var y := size.y - 5.0
+		var x := 0.0
+		while x < size.x:
+			draw_line(Vector2(x, y), Vector2(minf(x + dash, size.x), y), rule_color, 1.0)
+			x += dash + gap
+
+
+## Soulignement ondulé des titres de rayon (l'équivalent d'un
+## `text-decoration: underline wavy`) — le trait de feutre sous le titre écrit
+## à la main sur le tableau blanc.
+class WavyRule extends Control:
+	var rule_color: Color = Color("#23408e")
+
+	func _init() -> void:
+		custom_minimum_size = Vector2(0, 7)
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	func _draw() -> void:
+		var points := PackedVector2Array()
+		var x := 0.0
+		while x <= size.x:
+			points.append(Vector2(x, 3.0 + sin(x * 0.55) * 1.9))
+			x += 1.5
+		if points.size() > 1:
+			draw_polyline(points, rule_color, 2.0)
+
+
+## En-tête de rayon : titre souligné au feutre + mention de la règle du rayon
+## (« tiré une fois par sprint », « 2 slots sur 4 »…). Commun aux deux rayons
+## des écrans d'acquisition.
+static func make_shelf_head(title: String, subtitle: String) -> Control:
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 2)
+
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	vbox.add_child(row)
+
+	var title_box := VBoxContainer.new()
+	title_box.add_theme_constant_override("separation", 0)
+	row.add_child(title_box)
+
+	var title_label := Label.new()
+	title_label.text = title
+	apply_heading(title_label, 19, 600.0)
+	title_label.add_theme_color_override("font_color", COLOR_SHELF)
+	title_box.add_child(title_label)
+
+	var wavy := WavyRule.new()
+	wavy.rule_color = COLOR_SHELF
+	title_box.add_child(wavy)
+
+	if subtitle != "":
+		var subtitle_label := Label.new()
+		subtitle_label.text = subtitle
+		subtitle_label.add_theme_font_size_override("font_size", 12)
+		subtitle_label.add_theme_color_override("font_color", COLOR_SOFT_TEXT)
+		subtitle_label.autowrap_mode = TextServer.AUTOWRAP_WORD
+		subtitle_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		subtitle_label.size_flags_vertical = Control.SIZE_SHRINK_END
+		row.add_child(subtitle_label)
+
+	return vbox
+
+
+## Le léger tilt des cartes posées sur le tableau : une carte sur deux penche
+## dans l'autre sens. À passer dans le descripteur d'AssetCard.
+static func card_tilt(index: int) -> float:
+	return -1.1 if index % 2 == 0 else 0.9
 
 
 static func state_color(state: String) -> Color:
@@ -36,23 +157,28 @@ static func state_color(state: String) -> Color:
 			return COLOR_WARN
 
 
+## Même code d'état, mais dans les tons du panneau de bord sombre.
+static func panel_state_color(state: String) -> Color:
+	match state:
+		"good":
+			return PANEL_GOOD
+		"danger":
+			return PANEL_DANGER
+		_:
+			return PANEL_WARN
+
+
 static func make_bar_fill_style(color: Color) -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
 	style.bg_color = color
-	style.corner_radius_top_left = 4
-	style.corner_radius_top_right = 4
-	style.corner_radius_bottom_right = 4
-	style.corner_radius_bottom_left = 4
+	style.set_corner_radius_all(4)
 	return style
 
 
 static func make_bar_background_style() -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
-	style.bg_color = Color(1, 1, 1, 0.12)
-	style.corner_radius_top_left = 4
-	style.corner_radius_top_right = 4
-	style.corner_radius_bottom_right = 4
-	style.corner_radius_bottom_left = 4
+	style.bg_color = Color(0, 0, 0, 0.1)
+	style.set_corner_radius_all(4)
 	return style
 
 
@@ -80,13 +206,28 @@ static func icon_texture(icon_name: String) -> Texture2D:
 
 
 ## Icône Lucide (trait blanc) teintée via modulate — voir assets/THIRD_PARTY_NOTICES.md.
-static func make_icon(icon_name: String, size: int = 20, color: Color = Color.WHITE) -> TextureRect:
+static func make_icon(icon_name: String, size: int = 20, color: Color = COLOR_INK) -> TextureRect:
 	var rect := TextureRect.new()
 	rect.texture = icon_texture(icon_name)
 	rect.custom_minimum_size = Vector2(size, size)
 	rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	rect.modulate = color
+	return rect
+
+
+## Icône d'objet Kenney (les « objets physiques » de la direction Post-it) —
+## `index` est le numéro de genericItem_color_NNN.png. EXPAND_IGNORE_SIZE est
+## obligatoire : sans lui, la taille native du PNG (~100 px) devient la taille
+## minimale et l'icône écrase la carte (piège rencontré dans le spike).
+static func make_item_icon(index: int, size: int = 34) -> TextureRect:
+	var rect := TextureRect.new()
+	rect.texture = load(ITEM_ICON_PATH % index)
+	rect.custom_minimum_size = Vector2(size, size)
+	rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	rect.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	rect.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	return rect
 
 
@@ -98,11 +239,40 @@ static func make_avatar(seed_name: String, size: int = 48) -> TextureRect:
 		rect.texture = load(path)
 	else:
 		rect.texture = icon_texture("user-round")
-		rect.modulate = Color(1, 1, 1, 0.55)
+		rect.modulate = Color(COLOR_INK.r, COLOR_INK.g, COLOR_INK.b, 0.45)
 	rect.custom_minimum_size = Vector2(size, size)
 	rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	return rect
+
+
+## Identité d'une personne : le portrait DiceBear s'il existe, sinon une
+## pastille d'initiale (le badge d'accès du spike). Seuls cinq personnages ont
+## un portrait dédié — la pastille est donc le cas courant, et elle reste
+## lisible à 22 px dans le roster du panneau.
+static func make_person_badge(person_name: String, size: int = 36, bg: Color = PILL_CANDIDATE) -> Control:
+	var path := AVATAR_DIR + person_name.to_lower() + ".svg"
+	if ResourceLoader.exists(path):
+		var avatar := make_avatar(person_name, size)
+		avatar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		return avatar
+
+	var badge := PanelContainer.new()
+	badge.custom_minimum_size = Vector2(size, size)
+	badge.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	var style := StyleBoxFlat.new()
+	style.bg_color = bg
+	style.set_corner_radius_all(int(size / 2.0))
+	badge.add_theme_stylebox_override("panel", style)
+
+	var initial := Label.new()
+	initial.text = person_name.substr(0, 1).to_upper() if person_name != "" else "?"
+	initial.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	initial.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	initial.add_theme_font_size_override("font_size", int(size * 0.42))
+	initial.add_theme_color_override("font_color", Color.WHITE)
+	badge.add_child(initial)
+	return badge
 
 
 static func fade_in(control: Control, duration: float = 0.3) -> void:
@@ -111,135 +281,31 @@ static func fade_in(control: Control, duration: float = 0.3) -> void:
 	tween.tween_property(control, "modulate:a", 1.0, duration)
 
 
-## Barre compacte des ressources, état courant (celui d'après la dernière
-## Résolution — pas de preview des effets en attente), en deux groupes
-## (spec profondeur §10) : [Entreprise : 5 jauges + 🪙 pièces + 👥 effectif
-## + icônes de pratiques] et [Vous : 🎯 Capital politique + ⚡ Énergie].
-## Insérée en haut des écrans de phase (Inbox, Roadmap, Décisions, Marché).
-static func build_resource_bar() -> Control:
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 10)
-
-	var company_row := HBoxContainer.new()
-	company_row.add_theme_constant_override("separation", 18)
-	_add_bar_group_label(company_row, "ENTREPRISE")
-	for resource in GameData.resources:
-		var resource_id: String = resource.get("id", "")
-		if resource_id == "capital-politique":
-			continue
-		company_row.add_child(_build_gauge_item(resource))
-	company_row.add_child(_build_pieces_item())
-	company_row.add_child(_build_headcount_item())
-	for practice_id in SprintState.owned_practices:
-		company_row.add_child(_build_practice_item(practice_id))
-	row.add_child(_wrap_bar_panel(company_row))
-
-	var player_row := HBoxContainer.new()
-	player_row.add_theme_constant_override("separation", 18)
-	_add_bar_group_label(player_row, "VOUS")
-	for resource in GameData.resources:
-		if resource.get("id", "") == "capital-politique":
-			player_row.add_child(_build_gauge_item(resource))
-	player_row.add_child(_build_energy_item())
-	row.add_child(_wrap_bar_panel(player_row))
-
-	return row
-
-
-static func _wrap_bar_panel(content: Control) -> PanelContainer:
-	var panel := PanelContainer.new()
+## Bouton d'appel à l'action : l'encre remplit le bouton au lieu de le cerner.
+## Le thème global (resources/theme/main_theme.tres) donne le bouton « papier »
+## par défaut ; celui-ci est réservé au geste principal d'un écran ou d'une
+## carte (Activer / Embaucher / Adopter, Suivant).
+static func style_primary_button(button: Button) -> void:
 	var style := StyleBoxFlat.new()
-	style.bg_color = Color(1, 1, 1, 0.05)
-	style.corner_radius_top_left = 8
-	style.corner_radius_top_right = 8
-	style.corner_radius_bottom_right = 8
-	style.corner_radius_bottom_left = 8
-	style.content_margin_left = 14
-	style.content_margin_right = 14
-	style.content_margin_top = 8
-	style.content_margin_bottom = 8
-	panel.add_theme_stylebox_override("panel", style)
-	panel.add_child(content)
-	return panel
+	style.bg_color = COLOR_INK
+	style.border_color = COLOR_INK
+	style.set_border_width_all(2)
+	style.set_corner_radius_all(8)
+	style.content_margin_left = 16
+	style.content_margin_right = 16
+	style.content_margin_top = 9
+	style.content_margin_bottom = 9
 
+	var hover := style.duplicate() as StyleBoxFlat
+	hover.bg_color = COLOR_FLAVOR
+	hover.border_color = COLOR_FLAVOR
 
-static func _add_bar_group_label(row: HBoxContainer, text: String) -> void:
-	var label := Label.new()
-	label.text = text
-	label.add_theme_color_override("font_color", COLOR_SOFT_TEXT)
-	apply_mono(label, 9, true)
-	row.add_child(label)
-
-
-static func _build_gauge_item(resource: Dictionary) -> Control:
-	var resource_id: String = resource.get("id", "")
-	var value: float = SprintState.resource_values.get(resource_id, 0.0)
-	var state := EffectResolver.gauge_state(resource_id, value)
-
-	var item := HBoxContainer.new()
-	item.add_theme_constant_override("separation", 5)
-	item.mouse_filter = Control.MOUSE_FILTER_STOP
-	item.tooltip_text = resource_tooltip(resource)
-	item.add_child(make_icon(GAUGE_ICONS.get(resource_id, "target"), 14, state_color(state)))
-
-	var label := Label.new()
-	label.text = "%d%%" % int(round(value))
-	label.add_theme_color_override("font_color", state_color(state))
-	apply_mono(label, 12, true)
-	item.add_child(label)
-	return item
-
-
-static func _build_pieces_item() -> Control:
-	var item := HBoxContainer.new()
-	item.add_theme_constant_override("separation", 5)
-	item.mouse_filter = Control.MOUSE_FILTER_STOP
-	item.tooltip_text = "🪙 Pièces — le budget d'action que le board vous accorde.\nSe gagne : allocation par sprint, performance (revenu), quick wins.\nSe dépense : Marché (candidats, pratiques), indemnités de licenciement."
-
-	var label := Label.new()
-	label.text = "🪙 %d" % SprintState.pieces
-	label.add_theme_color_override("font_color", COLOR_AMBER)
-	apply_mono(label, 12, true)
-	item.add_child(label)
-	return item
-
-
-static func _build_headcount_item() -> Control:
-	var item := HBoxContainer.new()
-	item.add_theme_constant_override("separation", 5)
-	item.mouse_filter = Control.MOUSE_FILTER_STOP
-	var names: Array = []
-	for employee in SprintState.roster:
-		names.append(employee.get("name", ""))
-	item.tooltip_text = "👥 Effectif — %d personne(s) sur un cap de %d.\n%s" % [
-		SprintState.roster.size(), SprintState.get_team_cap(), ", ".join(names)
-	]
-
-	var label := Label.new()
-	label.text = "👥 %d/%d" % [SprintState.roster.size(), SprintState.get_team_cap()]
-	apply_mono(label, 12, true)
-	item.add_child(label)
-	return item
-
-
-## Item ⚡ Énergie du groupe "Vous" (spec profondeur §7.1) — la jauge
-## personnelle du CPO, colorée selon les mêmes seuils bon/attention/danger
-## que les ressources (à 0 c'est le burn-out).
-static func _build_energy_item() -> Control:
-	var value := SprintState.energy
-	var state := EffectResolver.gauge_state("", float(value))
-
-	var item := HBoxContainer.new()
-	item.add_theme_constant_override("separation", 5)
-	item.mouse_filter = Control.MOUSE_FILTER_STOP
-	item.tooltip_text = energy_tooltip()
-
-	var label := Label.new()
-	label.text = "⚡ %d" % value
-	label.add_theme_color_override("font_color", state_color(state))
-	apply_mono(label, 12, true)
-	item.add_child(label)
-	return item
+	button.add_theme_stylebox_override("normal", style)
+	button.add_theme_stylebox_override("pressed", style)
+	button.add_theme_stylebox_override("hover", hover)
+	button.add_theme_stylebox_override("focus", hover)
+	for state in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
+		button.add_theme_color_override(state, Color.WHITE)
 
 
 ## Tooltip de la jauge d'Énergie — chiffres tirés de balance.json → energy.
@@ -258,17 +324,8 @@ static func energy_tooltip() -> String:
 	])
 
 
-static func _build_practice_item(practice_id: String) -> Control:
-	var practice: Dictionary = SprintState.find_practice(practice_id)
-	var item := Label.new()
-	item.text = practice.get("icon", "✨")
-	item.mouse_filter = Control.MOUSE_FILTER_STOP
-	item.tooltip_text = "%s %s\n%s" % [practice.get("icon", ""), practice.get("name", ""), practice.get("description", "")]
-	return item
-
-
 ## Texte de tooltip pour une ressource : définition + ce qui la fait
-## monter/descendre (resources.json), affiché au survol de la barre.
+## monter/descendre (resources.json), affiché au survol d'une jauge.
 static func resource_tooltip(resource: Dictionary) -> String:
 	var lines: Array = ["%s %s" % [resource.get("icon", ""), resource.get("name", "")]]
 	if resource.get("definition", "") != "":
@@ -282,26 +339,53 @@ static func resource_tooltip(resource: Dictionary) -> String:
 	return "\n".join(lines)
 
 
-## Branche le bouton + panneau "Entreprise" (§16) sur un écran de phase :
-## instancie company_panel.tscn en enfant de `screen` (overlay caché par
-## défaut, jamais un changement de scène — évite de perturber un état déjà
-## consommé, ex. un tirage Inbox), et ajoute un bouton dans sa TopBar pour
-## l'ouvrir/fermer. `screen` doit avoir un nœud "Margin/VBox/TopBar".
-static func attach_company_menu(screen: Control) -> void:
-	var panel_scene: PackedScene = load("res://scenes/components/company_panel.tscn")
+## Branche le Panneau de bord (§4 de la proposition UI) sur un écran de phase :
+## une colonne fixe à droite, présente en continu, qui remplace la barre de
+## ressources horizontale. Instancié par chaque écran — il n'a aucun état à
+## préserver, tout vit dans SprintState. `screen` doit avoir un nœud "Margin"
+## (MarginContainer) : sa marge droite est repoussée pour laisser la place.
+static func attach_side_panel(screen: Control) -> Control:
+	var panel_scene: PackedScene = load("res://scenes/components/side_panel.tscn")
 	var panel: Control = panel_scene.instantiate()
 	screen.add_child(panel)
 
-	var top_bar: Node = screen.get_node("Margin/VBox/TopBar")
-	var company: Dictionary = SprintState.get_company()
+	var margin: Node = screen.get_node_or_null("Margin")
+	if margin is MarginContainer:
+		# La marge suit la largeur *réelle* du panneau : un contenu qui impose sa
+		# taille minimale (nom d'entreprise long, roster large) ne doit jamais
+		# finir par recouvrir le contenu de la phase.
+		var keep_clear := func():
+			margin.add_theme_constant_override("margin_right", int(max(panel.size.x, SIDE_PANEL_WIDTH)) + 28)
+		keep_clear.call()
+		panel.resized.connect(keep_clear)
+	return panel
 
+
+## Branche le bouton + overlay "Dossier entreprise" (§16) sur un écran qui n'a
+## pas de Panneau de bord (la Résolution) : instancie company_panel.tscn en
+## enfant de `screen` (overlay caché par défaut, jamais un changement de scène
+## — évite de perturber un état déjà consommé, ex. un tirage Inbox), et ajoute
+## un bouton dans sa TopBar pour l'ouvrir/fermer. Sur les écrans de phase,
+## c'est le Panneau de bord qui porte ce bouton.
+## `screen` doit avoir un nœud "Margin/VBox/TopBar".
+static func attach_company_menu(screen: Control) -> void:
+	var panel := instantiate_company_dossier(screen)
+
+	var top_bar: Node = screen.get_node("Margin/VBox/TopBar")
 	var button := Button.new()
-	button.text = "%s %s" % [company.get("icon", "🏢"), company.get("name", "Entreprise")]
+	button.text = "🏢 Dossier entreprise"
 	button.pressed.connect(func(): panel.visible = not panel.visible)
 	add_hover_bounce(button, 1.02)
 
 	top_bar.add_child(button)
 	top_bar.move_child(button, 1)
+
+
+static func instantiate_company_dossier(screen: Control) -> Control:
+	var panel_scene: PackedScene = load("res://scenes/components/company_panel.tscn")
+	var panel: Control = panel_scene.instantiate()
+	screen.add_child(panel)
+	return panel
 
 
 ## Léger effet de survol (zoom) sur un bouton — purement cosmétique.

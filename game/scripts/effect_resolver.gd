@@ -37,6 +37,73 @@ static func resolve_card_activation(card_id: String, team_profile: String, era_i
 	return round_deltas(deltas)
 
 
+## Lignes d'impact d'une grande décision pour la carte d'Actif, exprimées **en
+## ressources et non en axes** (docs/proposition-ui-interface.md §2.2) : même
+## calcul que resolve_card_activation() — axe → ressource via
+## balance.json → cardAxisResourceMap, puis multiplicateur d'époque et arrondi
+## — mais les notes d'axe sont conservées comme texte de la ligne. C'est la
+## condition pour que la preview d'impact du Lot 3 soit honnête : on projettera
+## sur les jauges exactement ce qui est écrit sur la carte.
+## Retourne [{resource_id, icon, name, note, value, good}], dans l'ordre de
+## resources.json ; les deltas nuls sont omis, comme à l'application.
+static func card_impact_lines(card_id: String, team_profile: String, era_id: String) -> Array:
+	var card := _find_card(card_id)
+	if card.is_empty():
+		return []
+
+	var effects: Dictionary = card.get("effects", {}).get(team_profile, {})
+	var axis_map: Dictionary = GameData.balance.get("cardAxisResourceMap", {})
+	var era_multipliers: Dictionary = GameData.balance.get("eraCardEffectMultipliers", {}).get(era_id, {})
+
+	var totals: Dictionary = {}
+	var notes: Dictionary = {}
+	for axis_id in effects.keys():
+		var mapping: Dictionary = axis_map.get(axis_id, {})
+		var resource_id: String = mapping.get("resource", "")
+		if resource_id == "":
+			continue
+		var raw_value: float = float(effects[axis_id].get("value", 0))
+		if mapping.get("invert", false):
+			raw_value = -raw_value
+		totals[resource_id] = totals.get(resource_id, 0.0) + raw_value
+		var note: String = effects[axis_id].get("note", "")
+		if note != "":
+			var collected: Array = notes.get(resource_id, [])
+			collected.append(note)
+			notes[resource_id] = collected
+
+	var lines: Array = []
+	for resource in GameData.resources:
+		var resource_id: String = resource.get("id", "")
+		if not totals.has(resource_id):
+			continue
+		var value: float = float(totals[resource_id])
+		if era_multipliers.has(resource_id):
+			value *= float(era_multipliers[resource_id])
+		var rounded := int(round(value))
+		if rounded == 0:
+			continue
+		lines.append({
+			"resource_id": resource_id,
+			"icon": resource.get("icon", ""),
+			"name": resource.get("name", ""),
+			"note": " · ".join(notes.get(resource_id, [])),
+			"value": rounded,
+			"good": delta_is_good(resource_id, float(rounded)),
+		})
+	return lines
+
+
+## Un delta va-t-il dans le bon sens pour cette ressource ? La dette et le
+## cynisme sont "low-good" (balance.json → resourceDirection) : y descendre est
+## une bonne nouvelle. Sert à colorer les lignes d'impact des cartes d'Actif.
+static func delta_is_good(resource_id: String, value: float) -> bool:
+	var direction: String = GameData.balance.get("resourceDirection", {}).get(resource_id, "high-good")
+	if direction == "high-good":
+		return value >= 0.0
+	return value <= 0.0
+
+
 ## Coût total en points d'une sélection de features (balance.json →
 ## roadmap.featureCostPoints ; 1 point par défaut).
 static func roadmap_points_cost(selected_feature_ids: Array) -> int:

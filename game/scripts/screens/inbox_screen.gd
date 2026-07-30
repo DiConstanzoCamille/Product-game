@@ -18,6 +18,7 @@ const START_SCREEN_SCENE := "res://scenes/screens/start_screen.tscn"
 var event: Dictionary
 var choice_buttons: Array[Button] = []
 var choice_made: bool = false
+var side_panel: Control = null
 
 
 func _ready() -> void:
@@ -30,14 +31,14 @@ func _ready() -> void:
 	UIHelpers.apply_heading(subject_label, 26, 600.0)
 	UIHelpers.add_hover_bounce(back_button)
 	UIHelpers.add_hover_bounce(next_button)
+	UIHelpers.style_primary_button(next_button)
 	UIHelpers.fade_in(self)
 
 	sprint_label.text = "Sprint %d — Phase 1 : Inbox" % SprintState.sprint_number
 
-	var bar := UIHelpers.build_resource_bar()
-	$Margin/VBox.add_child(bar)
-	$Margin/VBox.move_child(bar, 1)
-	UIHelpers.attach_company_menu(self)
+	# Rien de l'écran Inbox ne dépend du roster ni des pièces : le panneau se
+	# tient à jour tout seul, l'écran n'a pas à écouter ses changements.
+	side_panel = UIHelpers.attach_side_panel(self)
 
 	_load_event()
 

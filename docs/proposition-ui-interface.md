@@ -1,10 +1,18 @@
 # Proposition UI — Objet unifié, panneau permanent, feedback live, direction artistique
 
 > Document de proposition (30/07/2026), en réponse aux retours de Camille sur
-> l'état post-Phase B. Rien ici n'est implémenté : c'est une cible d'interface
-> et de direction artistique, à trancher avant la Phase C — la roadmap
-> profonde ajoutera un troisième « rayon » d'objets (features/epics) et il
-> vaut mieux poser la grammaire commune avant de la remplir.
+> l'état post-Phase B. C'est une cible d'interface et de direction artistique,
+> à trancher avant la Phase C — la roadmap profonde ajoutera un troisième
+> « rayon » d'objets (features/epics) et il vaut mieux poser la grammaire
+> commune avant de la remplir.
+>
+> **État d'avancement.** Le **Lot 1 — le socle visuel** est livré : thème clair
+> (§6, piste 1), carte d'Actif à six zones branchée sur les trois types (§2),
+> impact exprimé en ressources (§2.2), Panneau de bord permanent avec jauges en
+> barres, roster actionnable et revue de board live (§4), Dossier entreprise
+> allégé (§4.4). Détail dans `docs/carnet-de-regles.md` §19. Restent devant
+> nous : la fusion des écrans en « Investissements » (§3), la preview d'impact
+> et l'impulsion d'achat (§5), le rail replié (§4.3).
 >
 > Maquette interactive associée : **[Product Tycoon — Maquette UI comparée](https://claude.ai/code/artifact/84d5088d-9d6f-41a0-a108-7adec6fc502f)**
 > (4 pistes de direction artistique commutables sur le même écran, avec la

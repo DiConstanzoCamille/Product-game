@@ -18,7 +18,7 @@ anchor_right=1.0
 anchor_bottom=1.0
 grow_horizontal=2
 grow_vertical=2
-color=Color(0.0705882, 0.12549, 0.25098, 1)
+color=Color(0.956863, 0.964706, 0.952941, 1)
 
 [node name="Margin" type="MarginContainer" parent="."]
 anchors_preset=15
@@ -44,7 +44,7 @@ size_flags_horizontal=3
 
 [node name="Eyebrow" type="Label" parent="Margin/VBox"]
 theme_override_font_sizes/font_size=13
-theme_override_colors/font_color=Color(0.988235, 0.917647, 0.796078, 1)
+theme_override_colors/font_color=Color(0.541176, 0.427451, 0, 1)
 text="OFFRES D'EMPLOI"
 
 [node name="Title" type="Label" parent="Margin/VBox"]
@@ -52,7 +52,7 @@ theme_override_font_sizes/font_size=32
 text="Quel poste acceptez-vous ?"
 
 [node name="Subtitle" type="Label" parent="Margin/VBox"]
-theme_override_colors/font_color=Color(0.666667, 0.713725, 0.8, 1)
+theme_override_colors/font_color=Color(0.47451, 0.501961, 0.552941, 1)
 text="Chaque entreprise vous confie une équipe différente — son profil (junior ou senior) change radicalement l'effet de vos décisions."
 autowrap_mode=2
 

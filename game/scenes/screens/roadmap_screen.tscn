@@ -18,7 +18,7 @@ anchor_right=1.0
 anchor_bottom=1.0
 grow_horizontal=2
 grow_vertical=2
-color=Color(0.0705882, 0.12549, 0.25098, 1)
+color=Color(0.956863, 0.964706, 0.952941, 1)
 
 [node name="Margin" type="MarginContainer" parent="."]
 anchors_preset=15
@@ -56,7 +56,7 @@ show_percentage=false
 
 [node name="WarningLabel" type="Label" parent="Margin/VBox"]
 visible=false
-theme_override_colors/font_color=Color(0.952941, 0.537255, 0.498039, 1)
+theme_override_colors/font_color=Color(0.827451, 0.329412, 0.247059, 1)
 text="⚠️ Surchauffe — capacité dépassée : 🧱 Dette et 🎭 Cynisme vont grimper ce sprint."
 autowrap_mode=2
 

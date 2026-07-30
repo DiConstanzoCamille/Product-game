@@ -18,7 +18,7 @@ anchor_right=1.0
 anchor_bottom=1.0
 grow_horizontal=2
 grow_vertical=2
-color=Color(0.0705882, 0.12549, 0.25098, 1)
+color=Color(0.956863, 0.964706, 0.952941, 1)
 
 [node name="CenterContainer" type="CenterContainer" parent="."]
 anchors_preset=15
@@ -33,7 +33,7 @@ alignment=1
 theme_override_constants/separation=18
 
 [node name="Eyebrow" type="Label" parent="CenterContainer/VBoxContainer"]
-theme_override_colors/font_color=Color(0.988235, 0.917647, 0.796078, 1)
+theme_override_colors/font_color=Color(0.541176, 0.427451, 0, 1)
 theme_override_font_sizes/font_size=13
 text="MODULE 00 — ONBOARDING"
 horizontal_alignment=1
@@ -45,7 +45,7 @@ horizontal_alignment=1
 
 [node name="Tagline" type="Label" parent="CenterContainer/VBoxContainer"]
 custom_minimum_size=Vector2(520, 0)
-theme_override_colors/font_color=Color(0.666667, 0.713725, 0.8, 1)
+theme_override_colors/font_color=Color(0.47451, 0.501961, 0.552941, 1)
 text="Chaque bonne pratique a un prix. Vous allez le découvrir en le payant."
 horizontal_alignment=1
 autowrap_mode=2
@@ -73,7 +73,7 @@ size_flags_horizontal=4
 text="Quitter"
 
 [node name="Footer" type="Label" parent="CenterContainer/VBoxContainer"]
-theme_override_colors/font_color=Color(0.666667, 0.713725, 0.8, 1)
+theme_override_colors/font_color=Color(0.47451, 0.501961, 0.552941, 1)
 theme_override_font_sizes/font_size=11
 text="Document de travail — v0.1"
 horizontal_alignment=1

@@ -1,23 +1,29 @@
 extends Control
-## Phase 3 — Grandes décisions (docs/carnet-de-regles.md §6.2, §16). Menu
-## permanent de cartes structurelles. L'effet réel dépend du profil
-## d'équipe — fixé pour tout le mandat par l'entreprise choisie au départ
-## (plus un bouton à bascule libre, voir company_select_screen).
+## Phase 3 — Grandes décisions (docs/carnet-de-regles.md §6.2, §16). Rayon
+## permanent de cartes structurelles. L'effet réel dépend du profil d'équipe —
+## fixé pour tout le mandat par l'entreprise choisie au départ.
+##
+## Depuis la refonte UI (docs/proposition-ui-interface.md), l'écran ne dessine
+## plus ses cartes lui-même : il produit un descripteur par AssetView et laisse
+## la carte d'Actif (scenes/components/asset_card.tscn) l'afficher — même
+## anatomie que les candidats et les pratiques, et **impact exprimé en
+## ressources** (🫶 −35, 🧱 +10…) et non plus en axes abstraits. Le badge de
+## profil d'équipe a migré dans l'en-tête du Panneau de bord : c'est un trait de
+## la run, pas de la phase.
 
 const NEXT_SCENE := "res://scenes/screens/recruitment_screen.tscn"
 const START_SCREEN_SCENE := "res://scenes/screens/start_screen.tscn"
 
 @onready var sprint_label: Label = $Margin/VBox/TopBar/SprintLabel
 @onready var back_button: Button = $Margin/VBox/TopBar/BackButton
-@onready var junior_button: Button = $Margin/VBox/TeamToggle/JuniorButton
-@onready var senior_button: Button = $Margin/VBox/TeamToggle/SeniorButton
+@onready var shelf_head: VBoxContainer = $Margin/VBox/ShelfHead
 @onready var cards_grid: GridContainer = $Margin/VBox/Scroll/CardsGrid
 @onready var next_button: Button = $Margin/VBox/BottomBar/NextButton
-@onready var activation_counter: Label = $Margin/VBox/ActivationCounter
 
-# card_id -> {"axis_rows": {axis_id -> {"value": Label, "note": Label}}, "tagline": Label, "axes_box": VBoxContainer, "toggle_btn": Button}
-var card_refs: Dictionary = {}
 var available_cards: Array = []  # cartes de GameData.cards filtrées par scénario en cours
+var side_panel: Control = null
+
+var _cards: Array = []  # [{node: AssetCard, data: Dictionary}]
 
 
 func _ready() -> void:
@@ -25,200 +31,89 @@ func _ready() -> void:
 	next_button.pressed.connect(func(): get_tree().change_scene_to_file(NEXT_SCENE))
 	UIHelpers.add_hover_bounce(back_button)
 	UIHelpers.add_hover_bounce(next_button)
+	UIHelpers.style_primary_button(next_button)
 	UIHelpers.apply_mono(sprint_label, 12)
 	UIHelpers.fade_in(self)
 
 	sprint_label.text = "Sprint %d — Phase 3 : Grandes décisions" % SprintState.sprint_number
 
-	var bar := UIHelpers.build_resource_bar()
-	$Margin/VBox.add_child(bar)
-	$Margin/VBox.move_child(bar, 1)
-	UIHelpers.attach_company_menu(self)
+	side_panel = UIHelpers.attach_side_panel(self)
+	# Un licenciement depuis le panneau change le profil d'effet des cartes :
+	# elles se relisent, mais c'est le panneau qui s'est déjà rafraîchi.
+	side_panel.state_changed.connect(_refresh_cards)
 
 	for card in GameData.cards.get("cards", []):
 		var eras: Array = card.get("eras", [])
 		if eras.is_empty() or eras.has(SprintState.era_id):
 			available_cards.append(card)
 
-	# Le profil d'équipe est fixé par l'entreprise choisie au lancement du
-	# mandat (§16) — affiché ici comme un badge, plus comme un bouton à bascule.
-	junior_button.visible = SprintState.team_profile == "junior"
-	senior_button.visible = SprintState.team_profile == "senior"
-	junior_button.disabled = true
-	senior_button.disabled = true
-	junior_button.icon = UIHelpers.icon_texture("sprout")
-	senior_button.icon = UIHelpers.icon_texture("landmark")
-	junior_button.add_theme_constant_override("icon_max_width", 18)
-	senior_button.add_theme_constant_override("icon_max_width", 18)
-
-	UIHelpers.apply_mono(activation_counter, 12)
-
 	_build_cards()
-	_refresh_cards()
-	_update_activation_counter()
+	_refresh_shelf_head()
 
 
 func _build_cards() -> void:
-	var axes: Array = GameData.cards.get("axes", [])
-
+	var index := 0
 	for card in available_cards:
-		var panel := PanelContainer.new()
-		panel.custom_minimum_size = Vector2(280, 0)
-		cards_grid.add_child(panel)
-
-		var vbox := VBoxContainer.new()
-		vbox.add_theme_constant_override("separation", 8)
-		panel.add_child(vbox)
-
-		var category_label := Label.new()
-		category_label.text = card.get("category", "")
-		category_label.add_theme_color_override("font_color", UIHelpers.COLOR_AMBER)
-		UIHelpers.apply_mono(category_label, 11, true)
-		vbox.add_child(category_label)
-
-		var name_label := Label.new()
-		name_label.text = card.get("name", "")
-		UIHelpers.apply_heading(name_label, 21, 600.0)
-		vbox.add_child(name_label)
-
-		var tagline_label := Label.new()
-		tagline_label.text = card.get("tagline", "")
-		tagline_label.autowrap_mode = TextServer.AUTOWRAP_WORD
-		vbox.add_child(tagline_label)
-
-		var axes_box := VBoxContainer.new()
-		axes_box.visible = false
-		axes_box.add_theme_constant_override("separation", 10)
-		vbox.add_child(axes_box)
-
-		var axis_rows: Dictionary = {}
-		for axis in axes:
-			var axis_id: String = axis.get("id", "")
-			var row := HBoxContainer.new()
-			axes_box.add_child(row)
-
-			var axis_label := Label.new()
-			axis_label.text = axis.get("label", "")
-			axis_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			row.add_child(axis_label)
-
-			var value_label := Label.new()
-			row.add_child(value_label)
-
-			var note_label := Label.new()
-			note_label.add_theme_font_size_override("font_size", 11)
-			note_label.add_theme_color_override("font_color", UIHelpers.COLOR_SOFT_TEXT)
-			note_label.autowrap_mode = TextServer.AUTOWRAP_WORD
-			axes_box.add_child(note_label)
-
-			axis_rows[axis_id] = {"value": value_label, "note": note_label}
-
-		var toggle_btn := Button.new()
-		toggle_btn.text = "Voir l'effet →"
-		vbox.add_child(toggle_btn)
-		toggle_btn.pressed.connect(_on_card_toggle.bind(card.get("id", "")))
-		UIHelpers.add_hover_bounce(toggle_btn, 1.02)
-
-		var activate_btn := Button.new()
-		vbox.add_child(activate_btn)
-		activate_btn.pressed.connect(_on_card_activate.bind(card.get("id", "")))
-		UIHelpers.add_hover_bounce(activate_btn, 1.02)
-
-		card_refs[card.get("id", "")] = {
-			"panel": panel,
-			"axis_rows": axis_rows,
-			"tagline": tagline_label,
-			"axes_box": axes_box,
-			"toggle_btn": toggle_btn,
-			"activate_btn": activate_btn,
-			"flipping": false,
-		}
-
-
-## Petit effet de "retournement" (scale.x 1 → 0 → 1) au moment où le contenu
-## bascule tagline ↔ détail des axes — écho au flip 3D de la landing page.
-func _on_card_toggle(card_id: String) -> void:
-	var refs: Dictionary = card_refs[card_id]
-	if refs.flipping:
-		return
-	refs.flipping = true
-
-	var panel: PanelContainer = refs.panel
-	panel.pivot_offset = panel.size / 2.0
-
-	var tween := panel.create_tween()
-	tween.tween_property(panel, "scale:x", 0.0, 0.12).set_trans(Tween.TRANS_SINE)
-	tween.tween_callback(func():
-		var showing_axes: bool = refs.axes_box.visible
-		refs.axes_box.visible = not showing_axes
-		refs.tagline.visible = showing_axes
-		refs.toggle_btn.text = "← Voir la carte" if not showing_axes else "Voir l'effet →"
-	)
-	tween.tween_property(panel, "scale:x", 1.0, 0.12).set_trans(Tween.TRANS_SINE)
-	tween.tween_callback(func(): refs.flipping = false)
+		var descriptor := AssetView.for_decision(card)
+		descriptor["tilt"] = UIHelpers.card_tilt(index)
+		var asset_card := AssetCard.create(descriptor)
+		asset_card.primary_pressed.connect(_on_card_activate.bind(card))
+		cards_grid.add_child(asset_card)
+		_cards.append({"node": asset_card, "data": card})
+		index += 1
 
 
 func _refresh_cards() -> void:
-	for card in available_cards:
-		var card_id: String = card.get("id", "")
-		var effects: Dictionary = card.get("effects", {}).get(SprintState.team_profile, {})
-		var refs: Dictionary = card_refs[card_id]
-
-		for axis_id in refs.axis_rows.keys():
-			var d: Dictionary = effects.get(axis_id, {})
-			var value: int = d.get("value", 0)
-			var is_positive := value >= 0
-			var value_label: Label = refs.axis_rows[axis_id].value
-			value_label.text = "%s%d" % ["+" if is_positive else "−", abs(value)]
-			value_label.add_theme_color_override(
-				"font_color", UIHelpers.COLOR_GOOD if is_positive else UIHelpers.COLOR_DANGER
-			)
-			refs.axis_rows[axis_id].note.text = d.get("note", "")
-
-		_refresh_activate_button(card_id)
+	var index := 0
+	for entry in _cards:
+		var descriptor := AssetView.for_decision(entry["data"])
+		descriptor["tilt"] = UIHelpers.card_tilt(index)
+		entry["node"].set_descriptor(descriptor)
+		index += 1
+	_refresh_shelf_head()
 
 
-func _max_activations() -> int:
-	return int(GameData.balance.get("structuralDecisionMaxActivations", 4))
+func _refresh_all() -> void:
+	_refresh_cards()
+	if side_panel != null:
+		side_panel.refresh()
 
 
-func _refresh_activate_button(card_id: String) -> void:
-	var activate_btn: Button = card_refs[card_id].activate_btn
-	var already_active: bool = SprintState.activated_cards.has(card_id)
-	var limit_reached: bool = SprintState.activated_cards.size() >= _max_activations()
+## Le compteur de slots vit dans le titre du rayon (et une seconde fois dans la
+## section Actifs du Panneau de bord — proposition UI §3.3).
+func _refresh_shelf_head() -> void:
+	for child in shelf_head.get_children():
+		child.free()
 
-	if already_active:
-		activate_btn.text = "Activée ✓"
-		activate_btn.disabled = true
-	elif limit_reached:
-		activate_btn.text = "Limite de grandes décisions atteinte"
-		activate_btn.disabled = true
-	else:
-		activate_btn.text = "Activer cette grande décision"
-		activate_btn.disabled = false
-
-
-func _update_activation_counter() -> void:
-	activation_counter.text = "%d/%d grandes décisions activées ce mandat" % [
-		SprintState.activated_cards.size(), _max_activations()
+	var used: int = SprintState.activated_cards.size()
+	var maximum := int(GameData.balance.get("structuralDecisionMaxActivations", 4))
+	var subtitle := "%d activée%s · %d slot%s restant%s sur %d — effets calibrés pour votre %s" % [
+		used, "s" if used > 1 else "",
+		maximum - used, "s" if maximum - used > 1 else "", "s" if maximum - used > 1 else "",
+		maximum, _team_profile_label(),
 	]
+	shelf_head.add_child(UIHelpers.make_shelf_head("🃏 Les grandes décisions", subtitle))
 
 
-func _on_card_activate(card_id: String) -> void:
-	if SprintState.activated_cards.has(card_id) or SprintState.activated_cards.size() >= _max_activations():
+func _team_profile_label() -> String:
+	for profile in GameData.cards.get("teamProfiles", []):
+		if profile.get("id", "") == SprintState.team_profile:
+			return profile.get("shortLabel", SprintState.team_profile)
+	return SprintState.team_profile
+
+
+func _on_card_activate(card: Dictionary) -> void:
+	var card_id: String = card.get("id", "")
+	if SprintState.activated_cards.has(card_id):
+		return
+	if SprintState.activated_cards.size() >= int(GameData.balance.get("structuralDecisionMaxActivations", 4)):
 		return
 
-	var card := {}
-	for c in GameData.cards.get("cards", []):
-		if c.get("id", "") == card_id:
-			card = c
-			break
-
 	var deltas := EffectResolver.resolve_card_activation(card_id, SprintState.team_profile, SprintState.era_id)
-	SprintState.add_pending(deltas, "Grande décision : %s activée (%s)" % [card.get("name", card_id), SprintState.team_profile])
+	SprintState.add_pending(deltas, "Grande décision : %s activée (%s)" % [
+		card.get("name", card_id), SprintState.team_profile
+	])
 	SprintState.activated_cards.append(card_id)
 	SprintState.activated_card_sprints[card_id] = SprintState.sprint_number
 
-	for known_card_id in card_refs.keys():
-		_refresh_activate_button(known_card_id)
-	_update_activation_counter()
+	_refresh_all()
