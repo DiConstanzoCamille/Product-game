@@ -111,10 +111,41 @@ static func fade_in(control: Control, duration: float = 0.3) -> void:
 	tween.tween_property(control, "modulate:a", 1.0, duration)
 
 
-## Barre compacte des 6 ressources (icône + %), état courant (celui d'après
-## la dernière Résolution — pas de preview des effets en attente). Insérée
-## en haut des écrans de phase (Inbox, Roadmap, Grandes décisions, Recrutement).
+## Barre compacte des ressources, état courant (celui d'après la dernière
+## Résolution — pas de preview des effets en attente), en deux groupes
+## (spec profondeur §10) : [Entreprise : 5 jauges + 🪙 pièces + 👥 effectif
+## + icônes de pratiques] et [Vous : 🎯 Capital politique]. Insérée en haut
+## des écrans de phase (Inbox, Roadmap, Grandes décisions, Marché).
 static func build_resource_bar() -> Control:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 10)
+
+	var company_row := HBoxContainer.new()
+	company_row.add_theme_constant_override("separation", 18)
+	_add_bar_group_label(company_row, "ENTREPRISE")
+	for resource in GameData.resources:
+		var resource_id: String = resource.get("id", "")
+		if resource_id == "capital-politique":
+			continue
+		company_row.add_child(_build_gauge_item(resource))
+	company_row.add_child(_build_pieces_item())
+	company_row.add_child(_build_headcount_item())
+	for practice_id in SprintState.owned_practices:
+		company_row.add_child(_build_practice_item(practice_id))
+	row.add_child(_wrap_bar_panel(company_row))
+
+	var player_row := HBoxContainer.new()
+	player_row.add_theme_constant_override("separation", 18)
+	_add_bar_group_label(player_row, "VOUS")
+	for resource in GameData.resources:
+		if resource.get("id", "") == "capital-politique":
+			player_row.add_child(_build_gauge_item(resource))
+	row.add_child(_wrap_bar_panel(player_row))
+
+	return row
+
+
+static func _wrap_bar_panel(content: Control) -> PanelContainer:
 	var panel := PanelContainer.new()
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(1, 1, 1, 0.05)
@@ -127,31 +158,76 @@ static func build_resource_bar() -> Control:
 	style.content_margin_top = 8
 	style.content_margin_bottom = 8
 	panel.add_theme_stylebox_override("panel", style)
-
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 22)
-	panel.add_child(row)
-
-	for resource in GameData.resources:
-		var resource_id: String = resource.get("id", "")
-		var value: float = SprintState.resource_values.get(resource_id, 0.0)
-		var state := EffectResolver.gauge_state(resource_id, value)
-
-		var item := HBoxContainer.new()
-		item.add_theme_constant_override("separation", 5)
-		item.mouse_filter = Control.MOUSE_FILTER_STOP
-		item.tooltip_text = resource_tooltip(resource)
-		item.add_child(make_icon(GAUGE_ICONS.get(resource_id, "target"), 14, state_color(state)))
-
-		var label := Label.new()
-		label.text = "%d%%" % int(round(value))
-		label.add_theme_color_override("font_color", state_color(state))
-		apply_mono(label, 12, true)
-		item.add_child(label)
-
-		row.add_child(item)
-
+	panel.add_child(content)
 	return panel
+
+
+static func _add_bar_group_label(row: HBoxContainer, text: String) -> void:
+	var label := Label.new()
+	label.text = text
+	label.add_theme_color_override("font_color", COLOR_SOFT_TEXT)
+	apply_mono(label, 9, true)
+	row.add_child(label)
+
+
+static func _build_gauge_item(resource: Dictionary) -> Control:
+	var resource_id: String = resource.get("id", "")
+	var value: float = SprintState.resource_values.get(resource_id, 0.0)
+	var state := EffectResolver.gauge_state(resource_id, value)
+
+	var item := HBoxContainer.new()
+	item.add_theme_constant_override("separation", 5)
+	item.mouse_filter = Control.MOUSE_FILTER_STOP
+	item.tooltip_text = resource_tooltip(resource)
+	item.add_child(make_icon(GAUGE_ICONS.get(resource_id, "target"), 14, state_color(state)))
+
+	var label := Label.new()
+	label.text = "%d%%" % int(round(value))
+	label.add_theme_color_override("font_color", state_color(state))
+	apply_mono(label, 12, true)
+	item.add_child(label)
+	return item
+
+
+static func _build_pieces_item() -> Control:
+	var item := HBoxContainer.new()
+	item.add_theme_constant_override("separation", 5)
+	item.mouse_filter = Control.MOUSE_FILTER_STOP
+	item.tooltip_text = "🪙 Pièces — le budget d'action que le board vous accorde.\nSe gagne : allocation par sprint, performance (revenu), quick wins.\nSe dépense : Marché (candidats, pratiques), indemnités de licenciement."
+
+	var label := Label.new()
+	label.text = "🪙 %d" % SprintState.pieces
+	label.add_theme_color_override("font_color", COLOR_AMBER)
+	apply_mono(label, 12, true)
+	item.add_child(label)
+	return item
+
+
+static func _build_headcount_item() -> Control:
+	var item := HBoxContainer.new()
+	item.add_theme_constant_override("separation", 5)
+	item.mouse_filter = Control.MOUSE_FILTER_STOP
+	var names: Array = []
+	for employee in SprintState.roster:
+		names.append(employee.get("name", ""))
+	item.tooltip_text = "👥 Effectif — %d personne(s) sur un cap de %d.\n%s" % [
+		SprintState.roster.size(), SprintState.get_team_cap(), ", ".join(names)
+	]
+
+	var label := Label.new()
+	label.text = "👥 %d/%d" % [SprintState.roster.size(), SprintState.get_team_cap()]
+	apply_mono(label, 12, true)
+	item.add_child(label)
+	return item
+
+
+static func _build_practice_item(practice_id: String) -> Control:
+	var practice: Dictionary = SprintState.find_practice(practice_id)
+	var item := Label.new()
+	item.text = practice.get("icon", "✨")
+	item.mouse_filter = Control.MOUSE_FILTER_STOP
+	item.tooltip_text = "%s %s\n%s" % [practice.get("icon", ""), practice.get("name", ""), practice.get("description", "")]
+	return item
 
 
 ## Texte de tooltip pour une ressource : définition + ce qui la fait

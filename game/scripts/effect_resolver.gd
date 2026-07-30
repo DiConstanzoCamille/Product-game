@@ -37,45 +37,63 @@ static func resolve_card_activation(card_id: String, team_profile: String, era_i
 	return round_deltas(deltas)
 
 
-## Deltas de la Roadmap : somme des effets des features sélectionnées, plus
-## la pénalité de surchauffe si la sélection dépasse la capacité effective.
-static func resolve_roadmap(selected_feature_ids: Array, effective_capacity: int) -> Dictionary:
-	var feature_effects: Dictionary = GameData.balance.get("roadmap", {}).get("featureEffects", {})
-	var deltas: Dictionary = {}
+## Coût total en points d'une sélection de features (balance.json →
+## roadmap.featureCostPoints ; 1 point par défaut).
+static func roadmap_points_cost(selected_feature_ids: Array) -> int:
+	var cost_points: Dictionary = GameData.balance.get("roadmap", {}).get("featureCostPoints", {})
+	var total := 0
+	for feature_id in selected_feature_ids:
+		total += int(cost_points.get(feature_id, 1))
+	return total
 
+
+## Deltas de la Roadmap (Phase A) : somme des effets des features
+## sélectionnées — effets Valeur perçue divisés si aucun Designer au roster,
+## bonus Designer par feature livrée (plafonné), pièces des quick wins — plus
+## la pénalité de surchauffe si le panier dépasse la capacité en points,
+## modulée par les PM présents (spec profondeur §4.2, §6.2). Le contexte de
+## roster vient de SprintState.get_roster_context().
+static func resolve_roadmap(selected_feature_ids: Array, capacity_points: int, roster_context: Dictionary = {}) -> Dictionary:
+	var roadmap_conf: Dictionary = GameData.balance.get("roadmap", {})
+	var feature_effects: Dictionary = roadmap_conf.get("featureEffects", {})
+	var quick_win_pieces: Dictionary = roadmap_conf.get("quickWinPieces", {})
+	var roles: Dictionary = GameData.balance.get("roles", {})
+	var designer_conf: Dictionary = roles.get("designer", {})
+	var pm_conf: Dictionary = roles.get("pm", {})
+	var designer_weight: float = roster_context.get("designer_weight", 0.0)
+	var pm_weight: float = roster_context.get("pm_weight", 0.0)
+
+	var valeur_divisor := 1.0
+	if designer_weight <= 0.0:
+		valeur_divisor = float(designer_conf.get("valeurEffectsDivisorIfAbsent", 2))
+
+	var deltas: Dictionary = {}
 	for feature_id in selected_feature_ids:
 		var effect: Dictionary = feature_effects.get(feature_id, {})
 		for resource_id in effect.keys():
-			deltas[resource_id] = deltas.get(resource_id, 0.0) + float(effect[resource_id])
+			var value := float(effect[resource_id])
+			if resource_id == "valeur-percue":
+				value /= valeur_divisor
+			deltas[resource_id] = deltas.get(resource_id, 0.0) + value
+		deltas["pieces"] = deltas.get("pieces", 0.0) + float(quick_win_pieces.get(feature_id, 0))
 
-	if selected_feature_ids.size() > effective_capacity:
-		var penalty: Dictionary = GameData.balance.get("roadmap", {}).get("overCapacityPenalty", {})
+	if designer_weight > 0.0 and not selected_feature_ids.is_empty():
+		var per_feature: float = min(
+			floor(designer_weight) * float(designer_conf.get("valeurPerFeatureDelivered", 1)),
+			float(designer_conf.get("valeurPerFeatureDeliveredMax", 2))
+		)
+		deltas["valeur-percue"] = deltas.get("valeur-percue", 0.0) + per_feature * selected_feature_ids.size()
+
+	if roadmap_points_cost(selected_feature_ids) > capacity_points:
+		var penalty: Dictionary = roadmap_conf.get("overCapacityPenalty", {})
+		var reduction: float = min(
+			pm_weight * float(pm_conf.get("overloadReductionPerPm", 0.25)),
+			float(pm_conf.get("overloadReductionMax", 0.5))
+		)
 		for resource_id in penalty.keys():
-			deltas[resource_id] = deltas.get(resource_id, 0.0) + float(penalty[resource_id])
+			deltas[resource_id] = deltas.get(resource_id, 0.0) + float(penalty[resource_id]) * (1.0 - reduction)
 
 	return round_deltas(deltas)
-
-
-## Effet d'une embauche : coût + effet immédiat (balance.json →
-## recruitment.itemEffects). Le bonus de capacité est retourné à part —
-## il persiste au-delà du sprint, l'appelant l'ajoute directement à
-## SprintState.capacity_bonus plutôt qu'au panier d'un sprint.
-static func resolve_recruitment(item_id: String) -> Dictionary:
-	var item_effects: Dictionary = GameData.balance.get("recruitment", {}).get("itemEffects", {})
-	var config: Dictionary = item_effects.get(item_id, {})
-
-	var deltas: Dictionary = {}
-	var hire_cost: Dictionary = config.get("hireCost", {})
-	var immediate: Dictionary = config.get("immediate", {})
-	for resource_id in hire_cost.keys():
-		deltas[resource_id] = deltas.get(resource_id, 0.0) + float(hire_cost[resource_id])
-	for resource_id in immediate.keys():
-		deltas[resource_id] = deltas.get(resource_id, 0.0) + float(immediate[resource_id])
-
-	return {
-		"deltas": round_deltas(deltas),
-		"capacity_bonus": int(config.get("capacityBonus", 0)),
-	}
 
 
 static func round_deltas(deltas: Dictionary) -> Dictionary:
@@ -103,7 +121,7 @@ static func gauge_state(resource_id: String, value: float) -> String:
 
 ## Formate un dictionnaire de deltas en texte façon journal de sprint, ex.
 ## "💰 Trésorerie −4 · 🫶 Moral +6". Ignore les deltas nuls, ordre stable
-## (celui de resources.json).
+## (celui de resources.json), pseudo-ressource "pieces" (🪙) en dernier.
 static func format_deltas(deltas: Dictionary) -> String:
 	var parts: Array = []
 	for resource in GameData.resources:
@@ -115,6 +133,9 @@ static func format_deltas(deltas: Dictionary) -> String:
 			continue
 		var sign := "+" if value > 0 else "−"
 		parts.append("%s %s %s%d" % [resource.get("icon", ""), resource.get("name", ""), sign, abs(value)])
+	var pieces_value := int(round(deltas.get("pieces", 0.0)))
+	if pieces_value != 0:
+		parts.append("🪙 Pièces %s%d" % ["+" if pieces_value > 0 else "−", abs(pieces_value)])
 	if parts.is_empty():
 		return "Aucun changement mesurable."
 	return " · ".join(parts)

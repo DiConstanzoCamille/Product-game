@@ -43,17 +43,23 @@ text="← Accueil"
 size_flags_horizontal=3
 
 [node name="SprintLabel" type="Label" parent="Margin/VBox/TopBar"]
-text="Sprint 1 — Phase 4 : Recrutement"
+text="Sprint 1 — Phase 4 : Marché"
 
-[node name="SkinToggle" type="HBoxContainer" parent="Margin/VBox"]
-theme_override_constants/separation=10
+[node name="InfoRow" type="HBoxContainer" parent="Margin/VBox"]
+theme_override_constants/separation=24
+
+[node name="PiecesLabel" type="Label" parent="Margin/VBox/InfoRow"]
+text="🪙 0 pièce"
+
+[node name="CapLabel" type="Label" parent="Margin/VBox/InfoRow"]
+text="👥 Effectif : 0/0"
 
 [node name="Scroll" type="ScrollContainer" parent="Margin/VBox"]
 size_flags_vertical=3
 
 [node name="ShopGrid" type="GridContainer" parent="Margin/VBox/Scroll"]
 size_flags_horizontal=3
-columns=3
+columns=4
 theme_override_constants/h_separation=14
 theme_override_constants/v_separation=14
 

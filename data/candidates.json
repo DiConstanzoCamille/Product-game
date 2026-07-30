@@ -1,0 +1,138 @@
+{
+  "_comment": "Pool de candidats du Marché (spec profondeur §5.1) — 2 tirés par sprint (pioche sac, stockée dans SprintState). Le trait visible est illustratif (branché dans EffectResolver en phase C) ; le trait caché est tiré au sort dans data/hidden-traits.json au moment du tirage. Les salaires suivent data/balance.json → salaries (junior 1, senior 2).",
+
+  "candidates": [
+    {
+      "id": "lina-dev-senior",
+      "name": "Lina",
+      "role": "dev",
+      "seniority": "senior",
+      "costPieces": 6,
+      "salary": 2,
+      "trait": "Refuse toute réunion de plus de 25 minutes",
+      "badges": ["10 ans de legacy Java", "a survécu à 3 migrations de framework"],
+      "eras": ["agile-transformation"]
+    },
+    {
+      "id": "marc-dev-senior",
+      "name": "Marc",
+      "role": "dev",
+      "seniority": "senior",
+      "costPieces": 6,
+      "salary": 2,
+      "trait": "Ex-consultant reconverti — documente tout, même trop",
+      "badges": ["certifié sur 4 outils abandonnés depuis", "slides impeccables"],
+      "eras": ["agile-transformation"]
+    },
+    {
+      "id": "priya-dev-rockstar",
+      "name": "Priya",
+      "role": "dev",
+      "seniority": "senior",
+      "costPieces": 7,
+      "salary": 2,
+      "trait": "Rockstar 10x — livre vite, relit rarement",
+      "badges": ["3 side-projects à 2000 étoiles", "démissionne par tradition tous les 18 mois"],
+      "eras": ["agile-transformation"]
+    },
+    {
+      "id": "theo-dev-junior",
+      "name": "Théo",
+      "role": "dev",
+      "seniority": "junior",
+      "costPieces": 3,
+      "salary": 1,
+      "trait": "Adopte chaque nouvel outil avec un enthousiasme non négociable",
+      "badges": ["bootcamp 2023", "a déjà refactoré le README"],
+      "eras": ["agile-transformation"]
+    },
+    {
+      "id": "aicha-dev-junior",
+      "name": "Aïcha",
+      "role": "dev",
+      "seniority": "junior",
+      "costPieces": 3,
+      "salary": 1,
+      "trait": "Pose les questions que tout le monde évitait depuis deux ans",
+      "badges": ["reconversion réussie", "lit vraiment les specs"],
+      "eras": ["agile-transformation"]
+    },
+    {
+      "id": "sofia-pm-senior",
+      "name": "Sofia",
+      "role": "pm",
+      "seniority": "senior",
+      "costPieces": 5,
+      "salary": 2,
+      "trait": "Dit non avec le sourire, et surtout dit non",
+      "badges": ["8 ans de produit B2B", "connaît le vrai coût d'une roadmap"],
+      "eras": ["agile-transformation"]
+    },
+    {
+      "id": "hugo-pm-junior",
+      "name": "Hugo",
+      "role": "pm",
+      "seniority": "junior",
+      "costPieces": 3,
+      "salary": 1,
+      "trait": "Croit encore que les estimations sont des engagements",
+      "badges": ["master en gestion de projet", "premier backlog jamais priorisé"],
+      "eras": ["agile-transformation"]
+    },
+    {
+      "id": "bertrand-pm-veteran",
+      "name": "Bertrand",
+      "role": "pm",
+      "seniority": "senior",
+      "costPieces": 4,
+      "salary": 2,
+      "trait": "Vétéran désabusé — stabilise l'équipe, lève un sourcil par process",
+      "badges": ["a connu le cycle en V", "prédit chaque échec avec 2 sprints d'avance"],
+      "eras": ["agile-transformation"]
+    },
+    {
+      "id": "claire-designer-senior",
+      "name": "Claire",
+      "role": "designer",
+      "seniority": "senior",
+      "costPieces": 5,
+      "salary": 2,
+      "trait": "Défend l'utilisateur même contre le client qui paie",
+      "badges": ["design system complet livré une fois", "tests utilisateurs non simulés"],
+      "eras": ["agile-transformation"]
+    },
+    {
+      "id": "nadia-designer-junior",
+      "name": "Nadia",
+      "role": "designer",
+      "seniority": "junior",
+      "costPieces": 3,
+      "salary": 1,
+      "trait": "Prototype plus vite que l'équipe ne développe",
+      "badges": ["portfolio impeccable", "n'a jamais vu un design survivre au dev"],
+      "eras": ["agile-transformation"]
+    },
+    {
+      "id": "yann-ops-senior",
+      "name": "Yann",
+      "role": "ops",
+      "seniority": "senior",
+      "costPieces": 5,
+      "salary": 2,
+      "trait": "Dort avec son téléphone d'astreinte depuis 2011",
+      "badges": ["a éteint des incendies dont personne ne parle", "automatise par vengeance"],
+      "eras": ["agile-transformation"]
+    },
+    {
+      "id": "kevin-ops-junior",
+      "name": "Kevin",
+      "role": "ops",
+      "seniority": "junior",
+      "costPieces": 3,
+      "salary": 1,
+      "trait": "Dit oui à tout, y compris à l'astreinte du réveillon",
+      "badges": ["certif cloud fraîche", "premier post-mortem rédigé seul"],
+      "eras": ["agile-transformation"]
+    }
+  ]
+}

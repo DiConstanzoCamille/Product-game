@@ -1,5 +1,5 @@
 {
-  "_comment": "Offres d'emploi — le cadre RP de chaque run (§16 du carnet de règles). Chaque entrée est liée à un scénario (era) et fixe le profil d'équipe hérité ; consommé uniquement par game/.",
+  "_comment": "Offres d'emploi — le cadre RP de chaque run (§16 du carnet de règles, spec profondeur §4.1 et §8.2). Chaque entrée est liée à un scénario (era), fixe le profil d'équipe hérité, le roster de départ, le cap d'effectif, le budget d'action initial (pièces) et les objectifs de la revue de board — visibles dès le choix du poste. Consommé uniquement par game/. Les salaires du roster suivent data/balance.json → salaries.",
 
   "companies": [
     {
@@ -9,7 +9,23 @@
       "name": "Meridia — grand groupe en pleine transformation",
       "tagline": "CPO — Direction Produit, poste à pourvoir immédiatement",
       "description": "Meridia emploie 4000 personnes et vend le même logiciel de gestion depuis 2003. Le comité de direction a lu un livre blanc sur l'agilité l'an dernier. Un cabinet de conseil a été mandaté. Vous héritez d'une équipe senior, compétente, méfiante, et fatiguée des grandes annonces.",
-      "teamProfile": "senior"
+      "teamProfile": "senior",
+      "teamCap": 7,
+      "startingPieces": 5,
+      "startingRoster": [
+        { "id": "herve-pm", "name": "Hervé", "role": "pm", "seniority": "senior", "trait": "Connaît tous les raccourcis politiques de la maison" },
+        { "id": "danielle-dev", "name": "Danielle", "role": "dev", "seniority": "senior", "trait": "Maintient seule un module que personne n'ose ouvrir" },
+        { "id": "marek-dev", "name": "Marek", "role": "dev", "seniority": "senior", "trait": "Répond « ça dépend » et a toujours raison" },
+        { "id": "solange-ops", "name": "Solange", "role": "ops", "seniority": "senior", "trait": "La prod tient parce qu'elle la surveille" },
+        { "id": "patrice-designer", "name": "Patrice", "role": "designer", "seniority": "senior", "trait": "Défend la cohérence visuelle depuis trois refontes" }
+      ],
+      "boardObjectives": {
+        "title": "« Prouvez que l'agilité marche »",
+        "conditions": [
+          { "type": "resource-max", "resource": "cynisme", "value": 45, "label": "🎭 Cynisme contenu (≤ 45)" },
+          { "type": "decisions-min", "value": 1, "label": "🃏 Au moins une grande décision active" }
+        ]
+      }
     },
     {
       "id": "karavel-scaleup",
@@ -17,8 +33,24 @@
       "icon": "🚀",
       "name": "Karavel — scale-up qui structure sa croissance",
       "tagline": "CPO — premier poste produit dédié de l'entreprise",
-      "description": "Karavel a triplé ses effectifs en 18 mois sans jamais poser de process. Le board veut « structurer avant que ça casse ». Vous héritez d'une équipe jeune, enthousiaste, et qui n'a jamais eu de cadre — chaque nouvelle méthode est encore une découverte.",
-      "teamProfile": "junior"
+      "description": "Karavel a triplé ses effectifs en 18 mois sans jamais poser de process. Le board veut « structurer avant que ça casse ». Vous héritez d'une équipe jeune, enthousiaste, sans personne aux manettes Ops — la dette monte toute seule tant que vous n'aurez pas recruté. Le défaut de la boîte est dans l'offre d'emploi.",
+      "teamProfile": "junior",
+      "teamCap": 6,
+      "startingPieces": 4,
+      "startingRoster": [
+        { "id": "jade-pm", "name": "Jade", "role": "pm", "seniority": "junior", "trait": "Gère le backlog dans un tableur nommé « FINAL_v7 »" },
+        { "id": "bilal-dev", "name": "Bilal", "role": "dev", "seniority": "junior", "trait": "Déploie le vendredi soir, par optimisme" },
+        { "id": "emma-dev", "name": "Emma", "role": "dev", "seniority": "junior", "trait": "A appris le framework en le réécrivant" },
+        { "id": "nino-dev", "name": "Nino", "role": "dev", "seniority": "junior", "trait": "Commente son code en trois langues" },
+        { "id": "lou-designer", "name": "Lou", "role": "designer", "seniority": "junior", "trait": "Maquette plus vite que le produit ne pivote" }
+      ],
+      "boardObjectives": {
+        "title": "« Structurez sans casser la machine »",
+        "conditions": [
+          { "type": "resource-max", "resource": "dette-organisationnelle", "value": 35, "label": "🧱 Dette maîtrisée (≤ 35)" },
+          { "type": "revenue-min", "value": 12, "label": "💰 Revenu du sprint ≥ 12" }
+        ]
+      }
     }
   ]
 }

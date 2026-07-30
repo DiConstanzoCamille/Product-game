@@ -1,0 +1,64 @@
+{
+  "_comment": "Pool de traits cachés (spec profondeur §4.5) — tirés au sort à l'apparition d'un candidat au Marché, masqués à l'embauche, révélés en fin de période d'essai. Les effets ne s'appliquent qu'une fois le trait révélé. Distribution en poids relatifs : none = aucun trait caché.",
+
+  "distribution": { "none": 50, "negative": 30, "positive": 20 },
+
+  "traits": [
+    {
+      "id": "raleur-openspace",
+      "icon": "😤",
+      "name": "Râleur d'openspace",
+      "polarity": "negative",
+      "description": "Commente chaque décision à voix haute, entre la machine à café et le stand-up. −1 Moral par sprint.",
+      "effects": { "moralPerSprint": -1 }
+    },
+    {
+      "id": "fantome",
+      "icon": "🏝️",
+      "name": "Fantôme",
+      "polarity": "negative",
+      "description": "Présent aux réunions, introuvable entre les réunions. Contributions de rôle divisées par 2.",
+      "effects": { "contributionFactor": 0.5 }
+    },
+    {
+      "id": "negociateur",
+      "icon": "💸",
+      "name": "Négociateur",
+      "polarity": "negative",
+      "description": "Arrive en fin de période d'essai avec une offre concurrente imprimée en couleur. +1 de salaire, sinon il part.",
+      "effects": { "salaryRaiseAtTrialEnd": 1 }
+    },
+    {
+      "id": "demission-silencieuse",
+      "icon": "🧨",
+      "name": "Démission silencieuse",
+      "polarity": "negative",
+      "description": "Avait déjà un pied dehors en signant. Part sans prévenir au sprint d'embauche +4.",
+      "effects": { "quitsAtHiredPlus": 4 }
+    },
+    {
+      "id": "pepite",
+      "icon": "💎",
+      "name": "Pépite",
+      "polarity": "positive",
+      "description": "Fait tranquillement le travail de deux personnes sans jamais le mettre dans un slide. +1 point de capacité.",
+      "effects": { "capacityBonus": 1 }
+    },
+    {
+      "id": "mentor",
+      "icon": "🤝",
+      "name": "Mentor",
+      "polarity": "positive",
+      "description": "Prend les juniors sous son aile sans qu'aucun process ne le lui demande. +1 Moral par sprint.",
+      "effects": { "moralPerSprint": 1 }
+    },
+    {
+      "id": "reseau",
+      "icon": "📣",
+      "name": "Réseau",
+      "polarity": "positive",
+      "description": "Connaît quelqu'un qui connaît quelqu'un. −2 pièces sur le prochain recrutement.",
+      "effects": { "nextHireDiscountPieces": 2 }
+    }
+  ]
+}

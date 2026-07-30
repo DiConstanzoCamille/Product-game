@@ -44,6 +44,9 @@ func _ready() -> void:
 	_load_hud(old_values)
 	_setup_next_button()
 
+	if int(SprintState.board_review_result.get("sprint", -1)) == SprintState.sprint_number:
+		_show_board_review_overlay()
+
 
 func _load_hud(old_values: Dictionary) -> void:
 	var era: Dictionary = SprintState.get_era()
@@ -73,9 +76,10 @@ func _load_hud(old_values: Dictionary) -> void:
 	alert_label.text = _build_alert_text()
 
 
-## Bloc "Revenus" mis en avant, séparé des coûts de décisions — répond au
-## besoin de rendre le ROI visible : un compteur défile de 0 jusqu'au revenu
-## réel du sprint, à côté du coût net des décisions et du solde.
+## Bloc "Revenus" mis en avant, séparé des coûts — répond au besoin de rendre
+## le ROI visible : un compteur défile de 0 jusqu'au revenu réel du sprint,
+## à côté de la masse salariale, du coût net des décisions, du solde
+## trésorerie et du flux de pièces du sprint.
 func _animate_revenue_callout() -> void:
 	var model: Dictionary = SprintState.get_business_model()
 	if model.is_empty():
@@ -84,8 +88,10 @@ func _animate_revenue_callout() -> void:
 
 	revenue_label.visible = true
 	var revenue: int = SprintState.last_revenue
+	var payroll: int = SprintState.last_payroll
 	var cost: int = SprintState.last_tresorerie_cost
-	var net: int = revenue + cost
+	var pieces_delta: int = SprintState.last_pieces_delta
+	var net: int = revenue - payroll + cost
 	var model_label: String = model.get("label", "Revenu")
 
 	revenue_label.add_theme_color_override("font_color", UIHelpers.COLOR_GOOD if net >= 0 else UIHelpers.COLOR_DANGER)
@@ -93,13 +99,79 @@ func _animate_revenue_callout() -> void:
 	var tween := create_tween()
 	tween.tween_method(
 		func(v: float):
-			revenue_label.text = "🪙 %s : +%d  ·  💸 Décisions du sprint : %s%d  ·  Net trésorerie : %s%d" % [
+			revenue_label.text = "💰 %s : +%d  ·  👥 Masse salariale : −%d  ·  💸 Décisions : %s%d  ·  Net trésorerie : %s%d  ·  🪙 Pièces %s%d (solde %d)" % [
 				model_label, int(round(v)),
+				payroll,
 				"+" if cost >= 0 else "−", abs(cost),
 				"+" if net >= 0 else "−", abs(net),
+				"+" if pieces_delta >= 0 else "−", abs(pieces_delta), SprintState.pieces,
 			],
 		0.0, float(revenue), 0.7
 	).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+
+
+## Overlay de verdict de la revue de board (spec profondeur §8.2) — affiché
+## à la Résolution du sprint de mi-mandat, par-dessus le HUD.
+func _show_board_review_overlay() -> void:
+	var result: Dictionary = SprintState.board_review_result
+	var passed: bool = result.get("passed", false)
+
+	var dim := ColorRect.new()
+	dim.color = Color(0, 0, 0, 0.55)
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(dim)
+
+	var center := CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	dim.add_child(center)
+
+	var panel := PanelContainer.new()
+	panel.custom_minimum_size = Vector2(560, 0)
+	center.add_child(panel)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 12)
+	panel.add_child(vbox)
+
+	var eyebrow := Label.new()
+	eyebrow.text = "SPRINT %d — LA REVUE DE BOARD" % int(result.get("sprint", 0))
+	UIHelpers.apply_mono(eyebrow, 12, true)
+	eyebrow.add_theme_color_override("font_color", UIHelpers.COLOR_AMBER)
+	vbox.add_child(eyebrow)
+
+	var title := Label.new()
+	title.text = result.get("title", "")
+	UIHelpers.apply_heading(title, 24, 700.0)
+	title.autowrap_mode = TextServer.AUTOWRAP_WORD
+	vbox.add_child(title)
+
+	for condition in result.get("conditions", []):
+		var line := Label.new()
+		line.text = "%s  %s" % ["✅" if condition.get("ok", false) else "❌", condition.get("label", "")]
+		line.autowrap_mode = TextServer.AUTOWRAP_WORD
+		vbox.add_child(line)
+
+	var verdict := Label.new()
+	var review_conf: Dictionary = GameData.balance.get("pressure", {}).get("boardReview", {})
+	if passed:
+		verdict.text = "Le comité applaudit poliment. +%d 🪙 de budget d'action, 🎯 Capital politique +%d." % [
+			int(review_conf.get("successPieces", 5)), int(review_conf.get("successCapitalPolitique", 8))
+		]
+		verdict.add_theme_color_override("font_color", UIHelpers.COLOR_GOOD)
+	else:
+		verdict.text = "Le comité « prend note ». 🎯 Capital politique %d, et l'allocation tombe à %d 🪙/sprint pour le reste du mandat." % [
+			int(review_conf.get("failCapitalPolitique", -12)),
+			int(GameData.balance.get("pieces", {}).get("boardAllocationIfReviewFailed", 1))
+		]
+		verdict.add_theme_color_override("font_color", UIHelpers.COLOR_DANGER)
+	verdict.autowrap_mode = TextServer.AUTOWRAP_WORD
+	vbox.add_child(verdict)
+
+	var close_btn := Button.new()
+	close_btn.text = "Reprendre le sprint →"
+	close_btn.pressed.connect(func(): dim.queue_free())
+	UIHelpers.add_hover_bounce(close_btn)
+	vbox.add_child(close_btn)
 
 
 func _build_gauge(resource: Dictionary, old_values: Dictionary, index: int) -> Control:
@@ -175,6 +247,12 @@ func _build_alert_text() -> String:
 	var extreme: Dictionary = worst_resource.get("extreme", {})
 	match worst_state:
 		"danger":
+			# Depuis la Phase A, la Valeur perçue ne déclenche plus de fin
+			# directe : sous le seuil de décrochage, c'est le revenu qui meurt.
+			if worst_resource.get("id", "") == "valeur-percue":
+				return "⚠️ 📈 Valeur perçue en zone critique — sous %d, plus aucun revenu ne tombera." % int(
+					GameData.balance.get("pressure", {}).get("revenueCutoffValeurPercue", 5)
+				)
 			return "⚠️ %s %s en zone critique — encore un peu et : %s" % [
 				worst_resource.get("icon", ""), worst_resource.get("name", ""), extreme.get("outcome", "")
 			]
