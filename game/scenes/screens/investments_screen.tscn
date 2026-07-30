@@ -59,17 +59,9 @@ theme_override_constants/margin_bottom=16
 size_flags_horizontal=3
 theme_override_constants/separation=26
 
-[node name="ShopHead" type="VBoxContainer" parent="Margin/VBox/Scroll/Pad/Shelves"]
+[node name="ShelfHead" type="VBoxContainer" parent="Margin/VBox/Scroll/Pad/Shelves"]
 
-[node name="ShopGrid" type="GridContainer" parent="Margin/VBox/Scroll/Pad/Shelves"]
-size_flags_horizontal=3
-columns=4
-theme_override_constants/h_separation=14
-theme_override_constants/v_separation=14
-
-[node name="DecisionsHead" type="VBoxContainer" parent="Margin/VBox/Scroll/Pad/Shelves"]
-
-[node name="DecisionsGrid" type="GridContainer" parent="Margin/VBox/Scroll/Pad/Shelves"]
+[node name="ShelfGrid" type="GridContainer" parent="Margin/VBox/Scroll/Pad/Shelves"]
 size_flags_horizontal=3
 columns=4
 theme_override_constants/h_separation=14

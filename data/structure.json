@@ -7,7 +7,7 @@
   "sprintPhases": [
     { "order": 1, "id": "inbox", "name": "Inbox", "description": "Un événement aléatoire tombe (le « chaos humain ») et force un choix avant toute planification." },
     { "order": 2, "id": "roadmap", "name": "Roadmap", "description": "2 à 4 features proposées, sélection limitée par la capacité de l'équipe. Dépasser sa capacité déclenche une surchauffe (dette + cynisme en hausse)." },
-    { "order": 3, "id": "investissements", "name": "Investissements", "description": "Un seul écran, deux rayons dans le même scroll : l'étal du sprint (2 candidats + 2 pratiques, tirés une fois par sprint) et les grandes décisions (catalogue permanent, activation optionnelle). Tout est optionnel — mettre les acquisitions en concurrence dans le même champ de vision est l'arbitrage du tour." },
+    { "order": 3, "id": "investissements", "name": "Investissements", "description": "Un seul écran, un seul rayon : 6 emplacements tirés une fois par sprint dans un pool commun aux trois types d'Actif (candidats, pratiques, grandes décisions), avec un minimum garanti par type. Tout est optionnel — mettre les acquisitions en concurrence dans le même champ de vision, avec la même pièce et le même tour, est l'arbitrage du tour. On peut payer pour rejouer l'offre (re-tirage) ou pour en garder une carte (punaise)." },
     { "order": 4, "id": "resolution", "name": "Résolution", "description": "Application des effets, delta affiché." }
   ],
   "cardSystem": {

@@ -143,9 +143,17 @@
   },
 
   "shopDraw": {
-    "candidatesPerSprint": 2,
-    "practicesPerSprint": 2,
-    "decisionsPerSprint": 2,
+    "slotsPerSprint": 6,
+    "guaranteedPerSprint": {
+      "candidate": 1,
+      "decision": 1,
+      "practice": 0
+    },
+    "typeWeights": {
+      "candidate": 34,
+      "practice": 33,
+      "decision": 33
+    },
     "practiceCynisme": 2,
     "reroll": {
       "baseCost": 1,

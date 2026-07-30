@@ -400,10 +400,19 @@ func plan_breather() -> String:
 
 # --- Les Investissements : tirage du sprint (spec profondeur §5) ---
 
-## Offre du sprint en cours, pour les deux rayons : 2 candidats (trait caché
-## tiré à l'apparition) + 2 pratiques non possédées + 2 grandes décisions.
+## Offre du sprint en cours — **un seul rayon, trois types mélangés**.
+## `slotsPerSprint` emplacements tirés dans un pool commun (candidats,
+## pratiques, grandes décisions), avec un minimum garanti par type
+## (`guaranteedPerSprint`) pour qu'aucun sprint ne soit totalement inutile, et
+## le reste au hasard entre types (`typeWeights`). Certains sprints proposent
+## donc trois décisions et un seul candidat, d'autres l'inverse.
+##
 ## Tirée une seule fois par sprint puis stockée — revenir sur l'écran ne
 ## re-tire pas ; seul 🎲 Re-tirer l'offre, qui se paie, change la donne.
+##
+## `slots` porte l'ordre d'affichage (mélangé : c'est tout l'intérêt de mettre
+## les trois types en concurrence) ; `candidates`/`practices`/`decisions` sont
+## les mêmes Actifs regroupés par type, pour le reste du code.
 func get_shop_offer() -> Dictionary:
 	if int(current_shop_offer.get("sprint", -1)) == sprint_number:
 		return current_shop_offer
@@ -411,57 +420,135 @@ func get_shop_offer() -> Dictionary:
 	return current_shop_offer
 
 
+const ASSET_KINDS := ["candidate", "practice", "decision"]
+
+
 func _draw_shop_offer(rerolls: int) -> Dictionary:
 	var draw_conf: Dictionary = GameData.balance.get("shopDraw", {})
 	_expire_reservations()
 	_expire_leases()
 
-	# 📌 Ce qui a été réservé occupe sa place dans le rayon avant le tirage — y
-	# compris quand on re-tire : payer pour garder doit résister au hasard qu'on
-	# paie pour rejouer.
-	var drawn_candidates: Array = []
-	for entry in _reservations_for("candidate"):
-		drawn_candidates.append(entry.get("data", {}))
-	var drawn_practices: Array = []
-	for entry in _reservations_for("practice"):
-		drawn_practices.append(entry.get("id", ""))
-	var drawn_decisions: Array = []
-	for entry in _reservations_for("decision"):
-		drawn_decisions.append(entry.get("id", ""))
+	var slots: Array = []  # [{kind, id, data}]
 
-	while drawn_candidates.size() < int(draw_conf.get("candidatesPerSprint", 2)):
-		var candidate := _draw_candidate(drawn_candidates)
-		if candidate.is_empty():
-			break
-		drawn_candidates.append(candidate)
+	# 1. 📌 Ce qui a été réservé prend sa place avant tout tirage — y compris
+	#    quand on re-tire : payer pour garder doit résister au hasard qu'on paie
+	#    pour rejouer. Une réservation compte dans le minimum garanti de son type.
+	for kind in ASSET_KINDS:
+		for entry in _reservations_for(kind):
+			slots.append({"kind": kind, "id": entry.get("id", ""), "data": entry.get("data", {})})
 
-	while drawn_practices.size() < int(draw_conf.get("practicesPerSprint", 2)):
-		var practice_id := _draw_practice(drawn_practices)
-		if practice_id == "":
-			break
-		drawn_practices.append(practice_id)
+	# 2. Les minimums garantis : le garde-fou qui empêche un sprint sans aucune
+	#    décision ni aucun candidat. C'est la seule entorse au hasard pur.
+	var total := int(draw_conf.get("slotsPerSprint", 6))
+	var guaranteed: Dictionary = draw_conf.get("guaranteedPerSprint", {})
+	for kind in ASSET_KINDS:
+		var missing := int(guaranteed.get(kind, 0)) - _count_slots_of_kind(slots, kind)
+		while missing > 0 and slots.size() < total:
+			var slot := _draw_slot(kind, slots)
+			if slot.is_empty():
+				break
+			slots.append(slot)
+			missing -= 1
 
-	while drawn_decisions.size() < int(draw_conf.get("decisionsPerSprint", 2)):
-		var card_id := _draw_decision(drawn_decisions)
-		if card_id == "":
+	# 3. Le reste au hasard entre les trois types.
+	var exhausted: Array = []
+	while slots.size() < total and exhausted.size() < ASSET_KINDS.size():
+		var kind := _pick_asset_kind(exhausted)
+		if kind == "":
 			break
-		drawn_decisions.append(card_id)
+		var slot := _draw_slot(kind, slots)
+		if slot.is_empty():
+			exhausted.append(kind)
+			continue
+		slots.append(slot)
+
+	# 4. L'ordre d'affichage est mélangé : un rayon trié par type redeviendrait
+	#    trois rayons, et la mise en concurrence disparaîtrait.
+	slots.shuffle()
 
 	# Une carte à prérequis prend un **bail** dès qu'elle sort : elle reste
 	# affichée le trimestre entier, en plus du tirage, pour qu'on ait le temps
 	# de réunir sa condition. Sans ça, une carte gatée tirée un sprint où la
 	# condition n'est pas remplie serait une carte perdue.
-	for card_id in drawn_decisions:
-		_open_lease_if_gated(card_id)
+	for slot in slots:
+		if slot.get("kind", "") == "decision":
+			_open_lease_if_gated(slot.get("id", ""))
 
-	return {
+	var offer := {
 		"sprint": sprint_number,
-		"candidates": drawn_candidates,
-		"practices": drawn_practices,
-		"decisions": drawn_decisions,
+		"slots": slots,
+		"candidates": [],
+		"practices": [],
+		"decisions": [],
 		"leased": get_leased_decision_ids(),
 		"rerolls": rerolls,
 	}
+	for slot in slots:
+		match slot.get("kind", ""):
+			"candidate":
+				offer["candidates"].append(slot.get("data", {}))
+			"practice":
+				offer["practices"].append(slot.get("id", ""))
+			"decision":
+				offer["decisions"].append(slot.get("id", ""))
+	return offer
+
+
+func _count_slots_of_kind(slots: Array, kind: String) -> int:
+	var count := 0
+	for slot in slots:
+		if slot.get("kind", "") == kind:
+			count += 1
+	return count
+
+
+## Quel type occupe le prochain emplacement libre. Pondéré par `typeWeights` —
+## et non par la taille des pools : sans ça, les 12 candidats écraseraient les
+## 6 décisions par simple effet de nombre.
+func _pick_asset_kind(exhausted: Array) -> String:
+	var weights: Dictionary = GameData.balance.get("shopDraw", {}).get("typeWeights", {})
+	var total := 0.0
+	for kind in ASSET_KINDS:
+		if not exhausted.has(kind):
+			total += float(weights.get(kind, 1))
+	if total <= 0.0:
+		return ""
+
+	var roll := randf() * total
+	for kind in ASSET_KINDS:
+		if exhausted.has(kind):
+			continue
+		roll -= float(weights.get(kind, 1))
+		if roll <= 0.0:
+			return kind
+	return ""
+
+
+## Tire un Actif du type demandé, en évitant ce qui est déjà dans l'offre.
+## Retourne {} si le pool de ce type est épuisé.
+func _draw_slot(kind: String, slots: Array) -> Dictionary:
+	var taken: Array = []
+	for slot in slots:
+		if slot.get("kind", "") == kind:
+			taken.append(slot.get("id", ""))
+
+	match kind:
+		"candidate":
+			var candidate := _draw_candidate(taken)
+			if candidate.is_empty():
+				return {}
+			return {"kind": kind, "id": candidate.get("id", ""), "data": candidate}
+		"practice":
+			var practice_id := _draw_practice(taken)
+			if practice_id == "":
+				return {}
+			return {"kind": kind, "id": practice_id, "data": {}}
+		"decision":
+			var card_id := _draw_decision(taken)
+			if card_id == "":
+				return {}
+			return {"kind": kind, "id": card_id, "data": {}}
+	return {}
 
 
 # --- Le tirage pondéré : des taux d'apparition, pas un sac ---
@@ -716,16 +803,12 @@ func reroll_shop_offer() -> String:
 ## revient pas ; les autres peuvent réapparaître d'un sprint à l'autre — le
 ## marché du travail ne se vide pas parce qu'on a regardé une annonce.
 func _draw_candidate(already_drawn: Array) -> Dictionary:
-	var drawn_ids: Array = []
-	for entry in already_drawn:
-		drawn_ids.append(entry.get("id", ""))
-
 	var pool: Array = []
 	for candidate in GameData.candidates:
 		var candidate_id: String = candidate.get("id", "")
 		if not _available_for_era(candidate):
 			continue
-		if _hired_candidate_ids.has(candidate_id) or drawn_ids.has(candidate_id):
+		if _hired_candidate_ids.has(candidate_id) or already_drawn.has(candidate_id):
 			continue
 		pool.append(candidate)
 

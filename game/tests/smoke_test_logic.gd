@@ -122,12 +122,57 @@ func _test_investment_draw_rules() -> void:
 			_fail("La décision activée « %s » est ressortie au tirage du sprint %d." % [activated_id, SprintState.sprint_number])
 			break
 
+	_test_mixed_shelf()
 	_test_rarity_weights()
 	_test_reservation()
 	_test_gated_card_lease()
 
-	print("Tirage des Investissements : OK (%d décisions par sprint, re-tirage %d 🪙 +%d)" % [
-		int(draw_conf.get("decisionsPerSprint", 2)), base_cost, increment])
+	print("Tirage des Investissements : OK (%d emplacements par sprint, re-tirage %d 🪙 +%d)" % [
+		int(draw_conf.get("slotsPerSprint", 6)), base_cost, increment])
+
+
+## Le rayon unique : les trois types se partagent `slotsPerSprint`
+## emplacements, avec un minimum garanti par type. C'est le garde-fou qui
+## empêche un sprint entièrement inutile — et la seule entorse au hasard pur.
+func _test_mixed_shelf() -> void:
+	var conf: Dictionary = GameData.balance.get("shopDraw", {})
+	var total := int(conf.get("slotsPerSprint", 6))
+	var guaranteed: Dictionary = conf.get("guaranteedPerSprint", {})
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+
+	var seen_mix := {}
+	for sprint in range(200):
+		SprintState.sprint_number = sprint + 1
+		var offer := SprintState.get_shop_offer()
+		var slots: Array = offer.get("slots", [])
+		if slots.size() != total:
+			_fail("Le rayon propose %d emplacements au lieu de %d au sprint %d." % [
+				slots.size(), total, SprintState.sprint_number])
+			return
+
+		var counts := {"candidate": 0, "practice": 0, "decision": 0}
+		for slot in slots:
+			counts[slot.get("kind", "")] = int(counts.get(slot.get("kind", ""), 0)) + 1
+		for kind in counts.keys():
+			if counts[kind] < int(guaranteed.get(kind, 0)):
+				_fail("Minimum garanti non tenu au sprint %d : %d %s pour %d attendu(s)." % [
+					SprintState.sprint_number, counts[kind], kind, int(guaranteed.get(kind, 0))])
+				return
+
+		# Les trois listes par type doivent rester le reflet exact des slots.
+		if offer.get("candidates", []).size() != counts["candidate"] \
+				or offer.get("practices", []).size() != counts["practice"] \
+				or offer.get("decisions", []).size() != counts["decision"]:
+			_fail("Les listes par type ne correspondent pas aux emplacements au sprint %d." % SprintState.sprint_number)
+			return
+
+		seen_mix["%d-%d-%d" % [counts["candidate"], counts["practice"], counts["decision"]]] = true
+
+	# Le mélange doit vraiment varier : si un seul dosage sort sur 200 sprints,
+	# le "hasard entre types" n'en est pas un.
+	if seen_mix.size() < 4:
+		_fail("Seulement %d dosages de rayon différents sur 200 sprints — le tirage entre types ne varie pas assez." % seen_mix.size())
+	print("  dosages de rayon observés sur 200 sprints (candidats-pratiques-décisions) : %d combinaisons" % seen_mix.size())
 
 
 ## Les taux d'apparition : une carte `rare` doit sortir nettement moins souvent

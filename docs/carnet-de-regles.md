@@ -582,13 +582,14 @@ Après :  Inbox → Roadmap → Investissements ─────────→ R
   deviennent un **rayon permanent** de l'écran d'acquisition. Un rayon qu'on
   longe sans s'arrêter coûte zéro clic ; un écran qu'on traverse en coûte un,
   plus un chargement de scène.
-- **Deux rayons, un seul scroll, pas d'onglets.** 📦 **L'étal du sprint**
-  (périssable, tirage du sprint, règle anti-re-tirage inchangée) puis 🃏 **Les
-  grandes décisions** (catalogue permanent). L'intérêt de la fusion est
-  précisément de mettre les investissements **en concurrence dans le même champ
-  de vision** : « cette pièce, je la garde pour Lina ou je prends Discovery —
-  ou est-ce que ce sprint est celui où j'active Jira ? ». Des onglets auraient
-  reconstruit la cloison qu'on vient d'abattre.
+- **Un seul rayon, pas d'onglets.** L'intérêt de la fusion est précisément de
+  mettre les investissements **en concurrence dans le même champ de vision** :
+  « cette pièce, je la garde pour Lina ou je prends Discovery — ou est-ce que ce
+  sprint est celui où j'active Jira ? ». Des onglets auraient reconstruit la
+  cloison qu'on vient d'abattre. Le premier jet gardait deux rayons empilés
+  (l'étal périssable au-dessus, le catalogue de décisions en dessous) ; l'étape
+  suivante les a fondus en un seul, où les trois types se mélangent dans le même
+  tirage — voir §21.
 - **L'écran s'appelle « Investissements ».** Question ouverte du §7 de la
   proposition, tranchée : « Marché » ne couvrait que la moitié de ce qu'on y
   fait — on n'achète pas une méthodologie d'organisation sur un étal. Le mot
@@ -628,9 +629,23 @@ entre les deux rayons. À gauche du même scroll, une offre périssable qui cré
 de l'envie ; à droite, un catalogue permanent qui n'en crée aucune — une carte
 qu'on peut activer *n'importe quand* ne se décide jamais maintenant.
 
-- **Les décisions sont tirées comme le reste.** 2 par sprint
-  (`balance.json` → `shopDraw.decisionsPerSprint`). Une carte **activée sort du
+- **Les décisions sont tirées comme le reste.** Une carte **activée sort du
   tirage définitivement** (elle ne peut de toute façon plus resservir).
+- **Un seul rayon, trois types mélangés.** Deux rayons séparés garantissaient
+  encore à chaque type sa place, donc supprimaient la question « qu'est-ce que
+  ce sprint m'a proposé ? ». Les trois types se partagent désormais
+  `shopDraw.slotsPerSprint` emplacements (6) tirés dans un pool commun, dans un
+  ordre d'affichage **mélangé** — un rayon trié par type redeviendrait trois
+  rayons. Certains sprints proposent trois décisions et un seul candidat,
+  d'autres l'inverse. C'est là que la concurrence devient réelle : la pièce
+  gardée pour Lina est celle qui paierait Discovery, et le slot dépensé sur Jira
+  est celui qu'on n'aura pas pour Shape Up.
+  - **Garde-fous.** `guaranteedPerSprint` impose un minimum par type (1
+    candidat, 1 décision) : le hasard peut décevoir, il ne doit pas produire un
+    tour vide. C'est la seule entorse au hasard pur.
+  - **`typeWeights`** répartit les emplacements restants entre types — et non la
+    taille des pools : sans ça, les 12 candidats écraseraient les 6 décisions
+    par simple effet de nombre.
 - **Des taux d'apparition, pas un sac.** Le premier jet utilisait une pioche
   « sac » (on vide avant de reconstituer) pour les décisions comme pour les
   candidats. C'était un faux hasard : un sac se compte, et « j'ai vu 4 cartes
@@ -690,10 +705,11 @@ qu'on peut activer *n'importe quand* ne se décide jamais maintenant.
     déjà vraie et la carte n'est qu'un tirage rare de plus ; sur Karavel —
     équipe 100 % junior — c'est un vrai programme de recrutement. La même carte
     ne raconte pas la même chose selon la boîte.
-- **Une carte activée ce sprint reste sur le rayon** jusqu'à la fin du tour,
-  tamponnée et reléguée en fin de rayon — elle disparaît au sprint suivant. Ce
-  qu'on a activé se relit dans le Panneau de bord et sur le plateau des
-  Fondations, pas sur l'étal.
+- **Ce qui est acquis passe en fin de rayon** — embauché, adopté ou activé, la
+  carte reste visible jusqu'à la fin du tour, tamponnée et grisée, mais cesse
+  d'occuper la tête de rayon. Elle disparaît au sprint suivant : ce qu'on
+  possède se relit dans le Panneau de bord et sur le plateau des Fondations, pas
+  sur l'étal.
 - **Le rail replié du Panneau de bord**, resté sur l'établi depuis le Lot 1, est
   fait : un clic replie la colonne en un rail de 62 px qui garde les six jauges
   en vignette (barre + valeur, tooltips complets) et rend 260 px aux cartes. Sur
@@ -707,9 +723,11 @@ qu'on peut activer *n'importe quand* ne se décide jamais maintenant.
   le sprint, prix du re-tirage croissant puis remis à zéro, refus à sec,
   décision activée qui ne ressort jamais sur 30 sprints, **taux d'apparition
   vérifiés sur 600 sprints** (une `rare` doit sortir nettement moins qu'une
-  `commune`, et `eraWeights` doit peser), punaise qui survit à un re-tirage puis
-  tombe au bout d'un sprint, et bail complet d'une carte gatée (verrouillée,
-  activable une fois la condition réunie, expirée à l'échéance).
+  `commune`, et `eraWeights` doit peser), **minimums garantis tenus sur 200
+  sprints** avec au moins 4 dosages de rayon différents (sinon le « hasard entre
+  types » n'en est pas un), punaise qui survit à un re-tirage puis tombe au bout
+  d'un sprint, et bail complet d'une carte gatée (verrouillée, activable une
+  fois la condition réunie, expirée à l'échéance).
   - La stratégie `stress` a dû être réécrite : elle activait « la première carte
     du catalogue » et comptait sur le −35 Moral de RICE pour amorcer la spirale
     du burn-out. Ce n'est plus possible — elle prend maintenant **la pire carte
