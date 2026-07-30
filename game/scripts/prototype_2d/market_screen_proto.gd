@@ -3,7 +3,7 @@ extends Control
 ## ne l'utilise. Sert de cible validée pour la refonte UI décrite dans
 ## docs/proposition-ui-interface.md (piste « Post-it & Feutre »).
 ##
-## Port complet de l'écran "Marché fusionné + Panneau de bord" de la maquette :
+## Port complet de l'écran "Investissements + Panneau de bord" de la maquette :
 ## contrairement aux essais précédents (qui ne portaient que les couleurs),
 ## celui-ci reprend la STRUCTURE — anatomie de carte à 6 zones, deux rayons
 ## titrés, en-tête de phase, panneau de bord permanent façon écran de standup.
@@ -192,14 +192,14 @@ func _build_screen_head() -> Control:
 	panel.add_theme_stylebox_override("panel", _flat(HEAD_BG))
 
 	var row := HBoxContainer.new()
-	var phase := _label("SPRINT 5 · PHASE 3 / 4 — LE MARCHÉ", _display, 14, HEAD_FG)
+	var phase := _label("SPRINT 5 · PHASE 3 / 4 — INVESTISSEMENTS", _display, 14, HEAD_FG)
 	row.add_child(phase)
 
 	var spacer := Control.new()
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(spacer)
 
-	var crumb := _label("Inbox ✓ · Roadmap ✓ · Marché · Résolution", _ui, 12, Color(HEAD_FG.r, HEAD_FG.g, HEAD_FG.b, 0.75))
+	var crumb := _label("Inbox ✓ · Roadmap ✓ · Investissements · Résolution", _ui, 12, Color(HEAD_FG.r, HEAD_FG.g, HEAD_FG.b, 0.75))
 	row.add_child(crumb)
 
 	panel.add_child(_margin(row, 20, 12, 20, 12))

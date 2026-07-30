@@ -15,7 +15,7 @@
 **Sommaire**
 1. Lecture des retours — le problème commun
 2. A — L'Actif : un seul type d'objet, une seule grammaire
-3. A — L'écran fusionné : « Le Marché » absorbe les Grandes décisions
+3. A — L'écran fusionné : « Investissements » absorbe le Marché et les Grandes décisions
 4. B — Le Panneau de bord : l'entreprise toujours à l'écran
 5. C — Ressentir ses achats : preview, impulsion, engagement
 6. D — Direction artistique : 4 pistes comparées
@@ -127,24 +127,32 @@ fusionnés tout de suite.
 
 ---
 
-## 3. A — L'écran fusionné : « Le Marché » absorbe les Grandes décisions
+## 3. A — L'écran fusionné : « Investissements » absorbe le Marché et les Grandes décisions
+
+> **Nom tranché (30/07/2026) : l'écran fusionné s'appelle « Investissements ».**
+> « Marché » ne couvrait que la moitié de ce qu'on y fait — on n'« achète » pas
+> une méthodologie d'organisation sur un étal. « Investissements » couvre les
+> trois types d'Actif (on investit dans une personne, dans une pratique, dans
+> une décision structurelle) et porte la bonne idée : ça coûte maintenant, ça
+> rapporte — ou pas — plus tard. Le mot reste corpo, donc raccord avec le ton.
+> Le rayon périssable garde, lui, le nom d'« étal du sprint ».
 
 ### 3.1 Le flux passe de 5 à 4 phases
 
 ```
 Avant :  Inbox → Roadmap → Grandes décisions → Marché → Résolution
-Après :  Inbox → Roadmap → Marché ──────────────────→ Résolution
+Après :  Inbox → Roadmap → Investissements ─────────→ Résolution
 ```
 
 La phase 3 disparaît en tant qu'écran ; les Grandes décisions deviennent un
-**rayon permanent du Marché**. Justification de gameplay, pas seulement
+**rayon permanent des Investissements**. Justification de gameplay, pas seulement
 d'ergonomie : les grandes décisions ne sont activées que 3-4 fois par mandat
 — leur consacrer un écran plein *à chaque sprint* donne 8 à 9 passages où
 l'écran n'est qu'un péage à cliquer. Un rayon qu'on longe sans s'arrêter
 coûte zéro clic ; un écran qu'on traverse en coûte un, plus un chargement de
 scène.
 
-### 3.2 Structure de l'écran « Marché »
+### 3.2 Structure de l'écran « Investissements »
 
 Pas d'onglets : **deux rayons empilés dans un seul scroll**, parce que tout
 l'intérêt de la fusion est de mettre les investissements en concurrence dans
@@ -154,7 +162,7 @@ j'active Jira ? »).
 
 ```
 ┌────────────────────────────────────────────┬─────────────┐
-│  SPRINT 5 — PHASE 3 : LE MARCHÉ            │             │
+│  SPRINT 5 — PHASE 3 : INVESTISSEMENTS      │             │
 │                                            │   PANNEAU   │
 │  📦 L'ÉTAL DU SPRINT      « tiré ce sprint »│     DE      │
 │  [👤 candidat] [👤 candidat] [✨ prat.] [✨ prat.] │    BORD     │
@@ -264,7 +272,7 @@ Trois choix forts :
 |---|---|
 | Inbox | Visible, preview active sur les choix d'événement (mêmes chips que §5) |
 | Roadmap | Visible, preview sur les features ; la ligne ÉQUIPE affiche le compteur de points du panier en Phase C |
-| Marché | Visible, c'est son écran de gloire (preview + impulsion d'achat) |
+| Investissements | Visible, c'est son écran de gloire (preview + impulsion d'achat) |
 | Résolution | Visible et **c'est lui qui s'anime** : les tweens de jauge de la Résolution jouent dans le panneau, le centre de l'écran garde le journal (revenu, masse salariale, verdicts) |
 
 - **Repliable en rail** (~56 px, icônes + valeurs) pour les petites fenêtres
@@ -358,14 +366,14 @@ Deux options d'implémentation, à trancher :
 - **Option 2 — application immédiate** : les deltas de décision sont
   réellement appliqués à l'achat. Plus simple à lire, mais change la
   sémantique de la Résolution et le calcul des seuils de fin (une jauge
-  peut-elle déclencher une fin en pleine phase Marché ?). Déconseillé sans
+  peut-elle déclencher une fin en pleine phase Investissements ?). Déconseillé sans
   passage par les smoke tests.
 
 ---
 
 ## 6. D — Direction artistique : 4 pistes
 
-Les quatre pistes habillent **le même écran** (Marché fusionné + Panneau de
+Les quatre pistes habillent **le même écran** (Investissements + Panneau de
 bord) — c'est ce que montre la maquette interactive, style commutable. Le
 texte du jeu (taglines, traits, badges) est déjà la moitié de la DA : toutes
 les pistes doivent le laisser respirer.
@@ -466,7 +474,7 @@ piste 4 comme plan B économique, et des emprunts assumés entre les deux.**
 
 Concrètement :
 
-1. Le **monde de jeu** (rayons du Marché, cartes, Roadmap, Inbox) en tableau
+1. Le **monde de jeu** (rayons des Investissements, cartes, Roadmap, Inbox) en tableau
    blanc / post-it / fausse 3D pixel art — c'est l'identité, et c'est là que
    le thème « transformation agile » paie le plus.
 2. Le **Panneau de bord** en écran de standup sombre (langage de la piste 2)
@@ -491,7 +499,7 @@ trancher.
 **Proposé (à valider) :**
 1. Un type d'objet unifié, **l'Actif**, servi par un composant carte unique à
    six zones (§2.2), pensé pour accueillir les features/epics de la Phase C.
-2. Fusion des phases 3 et 4 en un écran **Marché** à deux rayons (étal du
+2. Fusion des phases 3 et 4 en un écran **Investissements** à deux rayons (étal du
    sprint + grandes décisions) ; le flux passe à 4 phases.
 3. Un **Panneau de bord** permanent à droite (jauges en barres, roster
    condensé actionnable, actifs, revue de board live), repliable en rail ;
@@ -507,8 +515,8 @@ trancher.
 **Questions ouvertes pour Camille :**
 - Le nom joueur des choses : « Actif » est-il le bon mot à l'écran (section
   du panneau), ou reste-t-il purement interne ?
-- L'écran fusionné garde-t-il le nom « Marché », ou un nom qui couvre mieux
-  les décisions structurelles (« Investissements » ?) ?
+- ~~L'écran fusionné garde-t-il le nom « Marché » ?~~ **Tranché le 30/07/2026 :
+  « Investissements »** (voir l'encadré du §3).
 - La Rallonge reste-t-elle dans le Dossier, ou mérite-t-elle un bouton dans
   la section VOUS du panneau (plus visible = plus tentante = plus de
   tension) ?
