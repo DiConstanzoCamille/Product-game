@@ -15,7 +15,7 @@ const START_SCREEN_SCENE := "res://scenes/screens/start_screen.tscn"
 @onready var sprint_label: Label = $Margin/VBox/TopBar/SprintLabel
 @onready var back_button: Button = $Margin/VBox/TopBar/BackButton
 @onready var shelf_head: VBoxContainer = $Margin/VBox/ShelfHead
-@onready var shop_grid: GridContainer = $Margin/VBox/Scroll/ShopGrid
+@onready var shop_grid: GridContainer = $Margin/VBox/Scroll/Pad/ShopGrid
 @onready var next_button: Button = $Margin/VBox/BottomBar/NextButton
 
 var offer: Dictionary = {}
@@ -27,8 +27,6 @@ var _cards: Array = []  # [{node: AssetCard, kind: "candidate"|"practice", data:
 func _ready() -> void:
 	back_button.pressed.connect(func(): get_tree().change_scene_to_file(START_SCREEN_SCENE))
 	next_button.pressed.connect(func(): get_tree().change_scene_to_file(NEXT_SCENE))
-	UIHelpers.add_hover_bounce(back_button)
-	UIHelpers.add_hover_bounce(next_button)
 	UIHelpers.style_primary_button(next_button)
 	UIHelpers.apply_mono(sprint_label, 12)
 	UIHelpers.fade_in(self)
@@ -72,8 +70,7 @@ func _add_card(kind: String, data: Dictionary, index: int) -> AssetCard:
 
 func _descriptor_for(kind: String, data: Dictionary, index: int) -> Dictionary:
 	var descriptor: Dictionary = AssetView.for_candidate(data) if kind == "candidate" else AssetView.for_practice(data)
-	descriptor["tilt"] = UIHelpers.card_tilt(index)
-	return descriptor
+	return UIHelpers.apply_card_placement(descriptor, index)
 
 
 ## Une embauche, un 1:1 ou une pratique adoptée changent l'état de toutes les

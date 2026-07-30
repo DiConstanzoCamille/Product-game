@@ -27,8 +27,15 @@ signal secondary_pressed
 
 const MIN_WIDTH := 236
 
+## Le geste de survol : la carte se **redresse et se soulève**, comme une fiche
+## qu'on décolle du tableau pour la lire. Pas de grossissement — voir
+## UIHelpers.SHADOW_* pour pourquoi la géométrie ne bouge pas côté boutons.
+const HOVER_TWEEN := 0.14
+
 var _descriptor: Dictionary = {}
 var _tilt_degrees: float = 0.0
+var _hovered: bool = false
+var _paper: StyleBoxFlat = null
 
 
 ## Fabrique : instancie la scène et lui donne son descripteur. La carte se
@@ -50,14 +57,42 @@ func set_descriptor(descriptor: Dictionary) -> void:
 func _ready() -> void:
 	custom_minimum_size = Vector2(MIN_WIDTH, 0)
 	size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	resized.connect(_on_resized)
+	mouse_filter = Control.MOUSE_FILTER_PASS
+	resized.connect(_apply_tilt)
+	mouse_entered.connect(_on_hover.bind(true))
+	mouse_exited.connect(_on_hover.bind(false))
+
+	# **Un Container remet à zéro la rotation et l'échelle de ses enfants à chaque
+	# passe de layout** : sans se rebrancher sur `sort_children`, le tilt des
+	# cartes est silencieusement effacé et les cartes s'affichent parfaitement
+	# droites (c'était le cas au premier jet du Lot 1).
+	var parent := get_parent()
+	if parent is Container:
+		parent.sort_children.connect(_apply_tilt)
+
 	if not _descriptor.is_empty():
 		_rebuild()
 
 
-func _on_resized() -> void:
+## Le léger désordre des objets posés à la main : chaque carte garde son angle
+## propre, et se redresse quand on la survole.
+func _apply_tilt() -> void:
 	pivot_offset = size / 2.0
-	rotation_degrees = _tilt_degrees
+	rotation_degrees = 0.0 if _hovered else _tilt_degrees
+
+
+func _on_hover(entered: bool) -> void:
+	_hovered = entered
+	z_index = 1 if entered else 0  # la carte soulevée passe devant ses voisines
+
+	var tween := create_tween().set_parallel(true)
+	pivot_offset = size / 2.0
+	tween.tween_property(self, "rotation_degrees", 0.0 if entered else _tilt_degrees, HOVER_TWEEN)
+	if _paper != null:
+		tween.tween_property(_paper, "shadow_size",
+			UIHelpers.SHADOW_SIZE_HOVER if entered else UIHelpers.SHADOW_SIZE_REST + 2, HOVER_TWEEN)
+		tween.tween_property(_paper, "shadow_offset",
+			UIHelpers.SHADOW_OFFSET_HOVER if entered else Vector2(2, 4), HOVER_TWEEN)
 
 
 func _rebuild() -> void:
@@ -66,10 +101,9 @@ func _rebuild() -> void:
 		child.free()
 
 	_tilt_degrees = float(_descriptor.get("tilt", 0.0))
-	pivot_offset = size / 2.0
-	rotation_degrees = _tilt_degrees
 
 	_apply_paper_style()
+	_apply_tilt()
 	_build_decorations()
 
 	_zone_type(vbox)
@@ -89,13 +123,14 @@ func _apply_paper_style() -> void:
 	style.set_corner_radius_all(int(_descriptor.get("corner_radius", 3)))
 	style.border_color = Color(0, 0, 0, 0.08)
 	style.set_border_width_all(1)
-	style.shadow_color = Color(0.156863, 0.196078, 0.27451, 0.22)
-	style.shadow_size = 7
+	style.shadow_color = UIHelpers.SHADOW_COLOR
+	style.shadow_size = UIHelpers.SHADOW_SIZE_REST + 2
 	style.shadow_offset = Vector2(2, 4)
 	if _descriptor.get("dimmed", false):
 		style.bg_color = style.bg_color.lerp(UIHelpers.COLOR_SCREEN_BG, 0.45)
 		style.shadow_size = 3
 	add_theme_stylebox_override("panel", style)
+	_paper = style  # gardé pour animer l'ombre au survol
 
 	var margin: MarginContainer = get_node("Margin")
 	# Le badge d'accès garde de la place pour son trou de lanière.
@@ -134,9 +169,10 @@ func _build_decorations() -> void:
 		piece.rotation_degrees = -2.0
 	layer.add_child(piece)
 
+	var shift := float(_descriptor.get("decoration_shift", 0.0))
 	var place := func():
 		piece.position = Vector2(
-			round(layer.size.x / 2.0 - piece.size.x / 2.0),
+			round(layer.size.x / 2.0 - piece.size.x / 2.0 + shift),
 			7.0 if kind == "lanyard" else -5.0
 		)
 	place.call()
@@ -291,7 +327,6 @@ func _action_button(action: Dictionary, primary: bool, pressed_signal: Signal) -
 	if primary and not button.disabled:
 		UIHelpers.style_primary_button(button)
 	if not button.disabled:
-		UIHelpers.add_hover_bounce(button, 1.03)
 		button.pressed.connect(func(): pressed_signal.emit())
 	return button
 

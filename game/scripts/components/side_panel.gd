@@ -99,7 +99,6 @@ func _build() -> void:
 	dossier_button.tooltip_text = "Le contexte long : scénario, modèle économique, objectifs commentés, roster détaillé, rallonge."
 	dossier_button.add_theme_font_size_override("font_size", 13)
 	dossier_button.pressed.connect(_on_dossier_pressed)
-	UIHelpers.add_hover_bounce(dossier_button, 1.02)
 	vbox.add_child(_spaced(dossier_button, 12, 0))
 
 

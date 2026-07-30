@@ -45,6 +45,24 @@ const PANEL_DANGER := Color("#f3897f")
 
 const SIDE_PANEL_WIDTH := 320
 
+## Ombre portée des objets de papier, au repos et au survol. Le survol d'un
+## **bouton** ne touche pas à sa géométrie : il grossit son ombre, et le bouton
+## se soulève de la page sans grandir. C'est le thème
+## (resources/theme/main_theme.tres) qui porte ces valeurs pour les boutons
+## ordinaires ; style_primary_button() les reprend pour les appels à l'action.
+##
+## Un zoom au survol (l'ancien `add_hover_bounce()`) était un bug d'affichage :
+## un bouton large occupe *exactement* la largeur de son conteneur et tous les
+## ScrollContainer ont `clip_contents = true` — le grossissement se faisait donc
+## couper sur les côtés. Le mouvement est réservé aux objets qui ont de la marge
+## autour d'eux : les cartes d'Actif, qui se redressent et se soulèvent
+## (asset_card.gd).
+const SHADOW_COLOR := Color(0.156863, 0.196078, 0.27451, 0.22)
+const SHADOW_SIZE_REST := 5
+const SHADOW_SIZE_HOVER := 11
+const SHADOW_OFFSET_REST := Vector2(1, 2)
+const SHADOW_OFFSET_HOVER := Vector2(2, 6)
+
 const FONT_SPACE_GROTESK := preload("res://assets/fonts/SpaceGrotesk-Variable.ttf")
 const FONT_MONO_MEDIUM := preload("res://assets/fonts/IBMPlexMono-Medium.ttf")
 const FONT_MONO_SEMIBOLD := preload("res://assets/fonts/IBMPlexMono-SemiBold.ttf")
@@ -141,10 +159,20 @@ static func make_shelf_head(title: String, subtitle: String) -> Control:
 	return vbox
 
 
-## Le léger tilt des cartes posées sur le tableau : une carte sur deux penche
-## dans l'autre sens. À passer dans le descripteur d'AssetCard.
-static func card_tilt(index: int) -> float:
-	return -1.1 if index % 2 == 0 else 0.9
+## Le désordre des objets posés à la main sur le tableau. Une alternance
+## régulière se lirait comme un motif ; ces angles-là n'ont pas de période
+## évidente et le scotch ne tombe jamais tout à fait au même endroit.
+const CARD_TILTS := [-1.3, 0.9, -0.6, 1.4, -1.1, 0.5, -1.6, 1.2]
+const CARD_DECORATION_SHIFTS := [0.0, -9.0, 7.0, -4.0, 11.0, -6.0, 3.0, -11.0]
+
+
+## Pose une carte sur le tableau : son angle et le décalage de sa décoration
+## (scotch, trou de lanière), d'après son rang dans le rayon. À appeler sur le
+## descripteur avant de le donner à AssetCard.
+static func apply_card_placement(descriptor: Dictionary, index: int) -> Dictionary:
+	descriptor["tilt"] = CARD_TILTS[index % CARD_TILTS.size()]
+	descriptor["decoration_shift"] = CARD_DECORATION_SHIFTS[index % CARD_DECORATION_SHIFTS.size()]
+	return descriptor
 
 
 static func state_color(state: String) -> Color:
@@ -295,10 +323,16 @@ static func style_primary_button(button: Button) -> void:
 	style.content_margin_right = 16
 	style.content_margin_top = 9
 	style.content_margin_bottom = 9
+	style.shadow_color = SHADOW_COLOR
+	style.shadow_size = SHADOW_SIZE_REST
+	style.shadow_offset = SHADOW_OFFSET_REST
 
+	# Au survol, l'ombre grandit : le bouton se soulève sans changer de taille.
 	var hover := style.duplicate() as StyleBoxFlat
 	hover.bg_color = COLOR_FLAVOR
 	hover.border_color = COLOR_FLAVOR
+	hover.shadow_size = SHADOW_SIZE_HOVER
+	hover.shadow_offset = SHADOW_OFFSET_HOVER
 
 	button.add_theme_stylebox_override("normal", style)
 	button.add_theme_stylebox_override("pressed", style)
@@ -375,7 +409,6 @@ static func attach_company_menu(screen: Control) -> void:
 	var button := Button.new()
 	button.text = "🏢 Dossier entreprise"
 	button.pressed.connect(func(): panel.visible = not panel.visible)
-	add_hover_bounce(button, 1.02)
 
 	top_bar.add_child(button)
 	top_bar.move_child(button, 1)
@@ -388,15 +421,3 @@ static func instantiate_company_dossier(screen: Control) -> Control:
 	return panel
 
 
-## Léger effet de survol (zoom) sur un bouton — purement cosmétique.
-static func add_hover_bounce(button: Button, scale_amount: float = 1.04) -> void:
-	button.pivot_offset = button.size / 2.0
-	button.resized.connect(func(): button.pivot_offset = button.size / 2.0)
-	button.mouse_entered.connect(func():
-		var tween := button.create_tween()
-		tween.tween_property(button, "scale", Vector2.ONE * scale_amount, 0.12)
-	)
-	button.mouse_exited.connect(func():
-		var tween := button.create_tween()
-		tween.tween_property(button, "scale", Vector2.ONE, 0.12)
-	)

@@ -24,7 +24,6 @@ func _ready() -> void:
 	rules_close_button.pressed.connect(_on_rules_close_pressed)
 
 	for btn in [new_game_button, rules_button, quit_button]:
-		UIHelpers.add_hover_bounce(btn)
 
 	UIHelpers.apply_mono(eyebrow_label, 13, true)
 	UIHelpers.apply_heading(title_label, 52, 700.0)

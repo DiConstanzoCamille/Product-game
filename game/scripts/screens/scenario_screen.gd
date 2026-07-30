@@ -17,7 +17,6 @@ const START_SCREEN_SCENE := "res://scenes/screens/start_screen.tscn"
 
 func _ready() -> void:
 	back_button.pressed.connect(func(): get_tree().change_scene_to_file(START_SCREEN_SCENE))
-	UIHelpers.add_hover_bounce(back_button)
 	UIHelpers.apply_mono(eyebrow_label, 13, true)
 	UIHelpers.apply_heading(title_label, 32, 700.0)
 	UIHelpers.fade_in(self)
@@ -81,7 +80,6 @@ func _build_era_card(era: Dictionary, is_playable: bool) -> Control:
 	if is_playable:
 		action_btn.text = "Choisir ce scénario"
 		action_btn.pressed.connect(_on_era_selected.bind(era.get("id", "")))
-		UIHelpers.add_hover_bounce(action_btn, 1.03)
 	else:
 		action_btn.text = "🔒 Bientôt disponible"
 		action_btn.disabled = true

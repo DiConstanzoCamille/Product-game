@@ -22,7 +22,6 @@ extends PanelContainer
 func _ready() -> void:
 	close_button.pressed.connect(func(): visible = false)
 	UIHelpers.apply_heading(title_label, 22, 600.0)
-	UIHelpers.add_hover_bounce(close_button)
 	_populate()
 
 

@@ -20,8 +20,6 @@ const START_SCREEN_SCENE := "res://scenes/screens/start_screen.tscn"
 func _ready() -> void:
 	back_button.pressed.connect(func(): get_tree().change_scene_to_file(RESOLUTION_SCENE))
 	home_button.pressed.connect(func(): get_tree().change_scene_to_file(START_SCREEN_SCENE))
-	UIHelpers.add_hover_bounce(back_button)
-	UIHelpers.add_hover_bounce(home_button)
 	UIHelpers.apply_heading(title_label, 22, 600.0)
 	UIHelpers.attach_company_menu(self)
 	UIHelpers.fade_in(self)

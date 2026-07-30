@@ -29,8 +29,6 @@ func _ready() -> void:
 
 	UIHelpers.apply_mono(sprint_label, 12)
 	UIHelpers.apply_heading(subject_label, 26, 600.0)
-	UIHelpers.add_hover_bounce(back_button)
-	UIHelpers.add_hover_bounce(next_button)
 	UIHelpers.style_primary_button(next_button)
 	UIHelpers.fade_in(self)
 
@@ -66,7 +64,6 @@ func _load_event() -> void:
 		btn.pressed.connect(_on_choice_pressed.bind(choice))
 		choices_container.add_child(btn)
 		choice_buttons.append(btn)
-		UIHelpers.add_hover_bounce(btn, 1.015)
 
 
 func _on_choice_pressed(choice: Dictionary) -> void:

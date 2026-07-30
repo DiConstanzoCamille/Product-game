@@ -27,8 +27,6 @@ var self_work_button: Button = null
 func _ready() -> void:
 	back_button.pressed.connect(func(): get_tree().change_scene_to_file(START_SCREEN_SCENE))
 	next_button.pressed.connect(_on_next_pressed)
-	UIHelpers.add_hover_bounce(back_button)
-	UIHelpers.add_hover_bounce(next_button)
 	UIHelpers.style_primary_button(next_button)
 	UIHelpers.apply_mono(sprint_label, 12)
 	UIHelpers.fade_in(self)
@@ -77,7 +75,6 @@ func _load_features() -> void:
 			" ".join(feature.get("icons", [])),
 		]
 		btn.pressed.connect(_update_capacity)
-		UIHelpers.add_hover_bounce(btn, 1.02)
 		feature_grid.add_child(btn)
 		feature_buttons.append(btn)
 
@@ -88,7 +85,6 @@ func _setup_self_work_button() -> void:
 	self_work_button = Button.new()
 	self_work_button.tooltip_text = "Action personnelle (⚡) : vous prenez des tickets vous-même. Le sprint est sauvé, pas vous."
 	self_work_button.pressed.connect(_on_self_work_pressed)
-	UIHelpers.add_hover_bounce(self_work_button, 1.03)
 	$Margin/VBox/CapacityRow.add_child(self_work_button)
 	_refresh_self_work_button()
 

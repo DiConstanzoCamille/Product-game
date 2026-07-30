@@ -50,7 +50,14 @@ text="Sprint 1 — Phase 4 : Marché"
 [node name="Scroll" type="ScrollContainer" parent="Margin/VBox"]
 size_flags_vertical=3
 
-[node name="ShopGrid" type="GridContainer" parent="Margin/VBox/Scroll"]
+[node name="Pad" type="MarginContainer" parent="Margin/VBox/Scroll"]
+size_flags_horizontal=3
+theme_override_constants/margin_left=16
+theme_override_constants/margin_top=16
+theme_override_constants/margin_right=16
+theme_override_constants/margin_bottom=16
+
+[node name="ShopGrid" type="GridContainer" parent="Margin/VBox/Scroll/Pad"]
 size_flags_horizontal=3
 columns=4
 theme_override_constants/h_separation=14
