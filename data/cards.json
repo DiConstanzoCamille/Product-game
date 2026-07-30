@@ -12,6 +12,7 @@
   "cards": [
     {
       "id": "rice",
+      "costPieces": 3,
       "refId": "PRD-014",
       "family": "outil-process",
       "category": "Module priorisation",
@@ -35,6 +36,7 @@
     },
     {
       "id": "notion",
+      "costPieces": 4,
       "refId": "DOC-002",
       "family": "outil-process",
       "category": "Module documentation",
@@ -58,6 +60,7 @@
     },
     {
       "id": "jira",
+      "costPieces": 6,
       "refId": "DOC-003",
       "family": "outil-process",
       "category": "Module suivi & doc",
@@ -82,6 +85,7 @@
     },
     {
       "id": "daily-standup",
+      "costPieces": 2,
       "refId": "RIT-001",
       "family": "methodologie-orga",
       "category": "Rituel quotidien",
@@ -106,6 +110,7 @@
     },
     {
       "id": "sprint-retro",
+      "costPieces": 2,
       "refId": "RIT-002",
       "family": "methodologie-orga",
       "category": "Rituel de fin de sprint",
@@ -130,6 +135,7 @@
     },
     {
       "id": "shape-up",
+      "costPieces": 5,
       "refId": "ORG-021",
       "family": "methodologie-orga",
       "category": "Refonte du cycle produit",

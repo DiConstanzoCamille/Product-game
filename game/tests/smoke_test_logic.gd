@@ -111,11 +111,27 @@ func _test_investment_draw_rules() -> void:
 	if SprintState.shop_reroll_cost() != base_cost:
 		_fail("Le prix du re-tirage n'est pas reparti à %d au sprint suivant (%d)." % [base_cost, SprintState.shop_reroll_cost()])
 
+	# Une grande décision se paie comme le reste du rayon.
+	var priced_id: String = SprintState.get_shop_offer().get("decisions", [""])[0]
+	var price := SprintState.decision_cost(priced_id)
+	if price <= 0:
+		_fail("La décision « %s » ne coûte rien — elle est hors du modèle du shop." % priced_id)
+	SprintState.pieces = max(0, price - 1)
+	if SprintState.activate_decision(priced_id) != "pieces":
+		_fail("« %s » s'est activée avec %d 🪙 pour un prix de %d." % [priced_id, SprintState.pieces, price])
+	if SprintState.activated_cards.has(priced_id):
+		_fail("« %s » a été marquée activée malgré le refus pour pièces insuffisantes." % priced_id)
+
 	# Une décision activée sort du tirage : elle ne doit plus jamais reparaître.
 	SprintState.pieces = 20
 	var activated_id: String = SprintState.get_shop_offer().get("decisions", [""])[0]
+	var pieces_at_activation := SprintState.pieces
+	var activation_cost := SprintState.decision_cost(activated_id)
 	if SprintState.activate_decision(activated_id) != "":
 		_fail("Activation refusée pour « %s » alors qu'un slot est libre." % activated_id)
+	if SprintState.pieces != pieces_at_activation - activation_cost:
+		_fail("L'activation de « %s » a coûté %d 🪙 au lieu de %d." % [
+			activated_id, pieces_at_activation - SprintState.pieces, activation_cost])
 	for sprint in range(30):
 		SprintState.sprint_number += 1
 		if SprintState.get_shop_offer().get("decisions", []).has(activated_id):
@@ -288,8 +304,10 @@ func _test_gated_card_lease() -> void:
 			_fail("« shape-up » a quitté le rayon au sprint %d, avant la fin de son bail." % SprintState.sprint_number)
 			break
 
-	# Le prérequis rempli, elle s'active.
+	# Le prérequis rempli — et les pièces en poche, une décision s'achète — elle
+	# s'active.
 	SprintState.sprint_number = drawn_at + 1
+	SprintState.pieces = 20
 	SprintState.roster.append({"id": "t1", "name": "Test", "role": "dev", "seniority": "senior", "salary": 2, "trait": "", "hidden_trait": "", "hiddenRevealed": true, "hiredSprint": 1})
 	SprintState.roster.append({"id": "t2", "name": "Test2", "role": "dev", "seniority": "senior", "salary": 2, "trait": "", "hidden_trait": "", "hiddenRevealed": true, "hiredSprint": 1})
 	if not SprintState.card_requirement_state(gated).get("ok", false):

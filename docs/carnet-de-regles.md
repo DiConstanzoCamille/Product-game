@@ -80,7 +80,7 @@ Six jauges. Aucune ne s'optimise seule.
 Une main piochée chaque sprint dans un deck — arbitrages du quotidien (priorisation ponctuelle, réponse à un incident, micro-ajustement). C'est la couche aléatoire, façon deckbuilder.
 
 ### 6.2 Grandes décisions structurelles
-Limitées à 3-4 activations par mandat, avec un vrai coût de bascule. Reflète le fait qu'une organisation ne change pas d'outil toutes les deux semaines. Elles sont **tirées** au rayon des Investissements, comme les candidats et les pratiques (§21 — c'était un menu permanent jusqu'au Lot 2 de la refonte UI) : ce qui n'est pas activé aujourd'hui n'est pas garanti de revenir. Trois familles, qui ne se comportent pas pareil dans le temps (détail en §7) :
+Limitées à 3-4 activations par mandat, et payées en 🪙 comme le reste du rayon (§21) : un coût court (l'argent) et un coût long (le slot). Reflète le fait qu'une organisation ne change pas d'outil toutes les deux semaines. Elles sont **tirées** au rayon des Investissements, comme les candidats et les pratiques (§21 — c'était un menu permanent jusqu'au Lot 2 de la refonte UI) : ce qui n'est pas activé aujourd'hui n'est pas garanti de revenir. Trois familles, qui ne se comportent pas pareil dans le temps (détail en §7) :
 - **Outils/process** (RICE, Notion, Jira) — effet direct sur les jauges
 - **Stack technique/produit** (ex. React) — effet sur le shop de recrutement, pas sur les jauges
 - **Méthodologie d'orga** (ex. Shape Up) — gatée par prérequis, n'apporte rien tant que les bonnes conditions ne sont pas réunies
@@ -631,6 +631,22 @@ qu'on peut activer *n'importe quand* ne se décide jamais maintenant.
 
 - **Les décisions sont tirées comme le reste.** Une carte **activée sort du
   tirage définitivement** (elle ne peut de toute façon plus resservir).
+- **Et elles se paient comme le reste.** Une grande décision coûte des 🪙
+  (`cards.json` → `costPieces`, de 2 pour un rituel à 6 pour Jira et ses
+  licences), en **plus** du slot de mandat. Sans ça, la mise en concurrence du
+  rayon unique était fausse : « je garde ma pièce pour Lina ou j'active Jira ? »
+  n'était pas une question tant que Jira ne coûtait pas de pièce. C'est aussi ce
+  qui rend les décisions arbitrables quand elles deviendront le moteur de
+  certains builds — un levier de scaling doit avoir un prix.
+  - **Deux coûts, deux raretés.** Les 🪙 sont le budget d'**action** du sprint :
+    ce qu'il faut dépenser maintenant, en concurrence directe avec une embauche.
+    Le slot est la capacité d'encaissement de l'organisation sur tout le mandat
+    (4 bascules, §6.2) : une boîte ne change pas d'outil toutes les deux
+    semaines, même riche. L'argent est la contrainte courte, le slot la longue.
+  - **Ni l'un ni l'autre n'est l'axe `financier` de la carte**, qui frappe la
+    Trésorerie sprint après sprint : le prix d'achat n'est pas le coût
+    d'exploitation. Les prix suivent quand même la fiction de cet axe — Daily
+    Standup à 2 🪙 (« quasi nul »), Jira à 6 (« licences qui pèsent lourd »).
 - **Un seul rayon, trois types mélangés.** Deux rayons séparés garantissaient
   encore à chaque type sa place, donc supprimaient la question « qu'est-ce que
   ce sprint m'a proposé ? ». Les trois types se partagent désormais

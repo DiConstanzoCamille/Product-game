@@ -627,9 +627,21 @@ func find_card(card_id: String) -> Dictionary:
 	return {}
 
 
-## Active une grande décision : ses effets rejoignent le panier du sprint, elle
-## devient une Fondation, et elle quitte définitivement l'offre. Retourne "" si
-## l'activation a eu lieu, sinon la raison du refus.
+## Prix d'activation d'une grande décision, en 🪙. Une décision se paie comme
+## une embauche ou une pratique — c'est la condition pour que les trois types
+## soient vraiment en concurrence sur le même rayon (carnet §21). Les pièces
+## sont le budget d'**action** : ce qu'il faut dépenser pour faire passer la
+## bascule. C'est distinct de l'axe `financier` de la carte, qui frappe la
+## Trésorerie sprint après sprint — le prix d'achat n'est pas le coût
+## d'exploitation.
+func decision_cost(card_id: String) -> int:
+	return int(find_card(card_id).get("costPieces", 0))
+
+
+## Active une grande décision : les pièces tombent immédiatement, ses effets
+## rejoignent le panier du sprint, elle devient une Fondation et quitte
+## définitivement l'offre. Retourne "" si l'activation a eu lieu, sinon la
+## raison du refus.
 func activate_decision(card_id: String) -> String:
 	if activated_cards.has(card_id):
 		return "deja-activee"
@@ -640,9 +652,15 @@ func activate_decision(card_id: String) -> String:
 		return "introuvable"
 	if not card_requirement_state(card).get("ok", true):
 		return "prerequis"
+	var cost := decision_cost(card_id)
+	if pieces < cost:
+		return "pieces"
 
+	pieces -= cost
 	var deltas := EffectResolver.resolve_card_activation(card_id, team_profile, era_id)
-	add_pending(deltas, "Grande décision : %s activée (%s)" % [card.get("name", card_id), team_profile])
+	add_pending(deltas, "Grande décision : %s activée (%d 🪙, %s)" % [
+		card.get("name", card_id), cost, team_profile
+	])
 	activated_cards.append(card_id)
 	activated_card_sprints[card_id] = sprint_number
 	release_reservation("decision", card_id)

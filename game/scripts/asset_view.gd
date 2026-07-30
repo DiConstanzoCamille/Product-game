@@ -103,6 +103,8 @@ static func for_decision(card: Dictionary) -> Dictionary:
 			"tooltip": "Punaisée au rayon jusqu'au sprint %d — vous avez jusque-là pour réunir la condition." % expiry if expiry > 0 else "",
 		})
 
+	var cost := SprintState.decision_cost(card_id)
+
 	var primary: Dictionary = {}
 	if activated:
 		primary = {
@@ -117,11 +119,17 @@ static func for_decision(card: Dictionary) -> Dictionary:
 		}
 	elif used >= max_activations:
 		primary = {"text": "Plus de slot ce mandat", "disabled": true}
+	elif SprintState.pieces < cost:
+		primary = {
+			"text": "Activer (%d 🪙 — insuffisant)" % cost,
+			"disabled": true,
+			"tooltip": "Il vous manque %d 🪙. Une grande décision se paie comme une embauche." % (cost - SprintState.pieces),
+		}
 	else:
 		primary = {
-			"text": "Activer (1 slot)",
+			"text": "Activer (%d 🪙 + 1 slot)" % cost,
 			"disabled": false,
-			"tooltip": "Irréversible pour le mandat. Les effets tombent à la Résolution.",
+			"tooltip": "Deux coûts distincts : %d 🪙 tout de suite (le budget d'action qu'on ne mettra pas dans une embauche) et 1 des %d slots du mandat.\nIrréversible. Les effets tombent à la Résolution." % [cost, max_activations],
 		}
 
 	return _with_shared({
@@ -137,7 +145,7 @@ static func for_decision(card: Dictionary) -> Dictionary:
 		"subtitle": card.get("category", ""),
 		"tagline": card.get("tagline", ""),
 		"impacts": impacts,
-		"cost": "1 slot de grande décision · %d/%d activées" % [used, max_activations],
+		"cost": "%d 🪙 · 1 slot de grande décision · %d/%d activées" % [cost, used, max_activations],
 		"primary": primary,
 		"dimmed": activated,
 	}, "decision", card_id, card, activated)
