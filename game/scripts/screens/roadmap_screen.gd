@@ -3,7 +3,9 @@ extends Control
 ## §6.2). Les features coûtent des points de capacité ; la capacité est
 ## produite par le roster (Devs, PM). Dépasser la capacité = surchauffe
 ## (data/balance.json → roadmap.overCapacityPenalty), modulée par les PM.
-## Les quick wins rapportent des pièces à la livraison.
+## Les quick wins rapportent des pièces à la livraison. "Faire le taf
+## soi-même" (spec §7.2) achète des points de capacité supplémentaires en
+## Énergie ⚡ — le sprint de l'entreprise contre la jauge du joueur.
 
 const NEXT_SCENE := "res://scenes/screens/decisions_screen.tscn"
 const START_SCREEN_SCENE := "res://scenes/screens/start_screen.tscn"
@@ -18,6 +20,8 @@ const START_SCREEN_SCENE := "res://scenes/screens/start_screen.tscn"
 
 var effective_capacity: int = 0
 var feature_buttons: Array[Button] = []
+var resource_bar: Control = null
+var self_work_button: Button = null
 
 
 func _ready() -> void:
@@ -30,14 +34,15 @@ func _ready() -> void:
 
 	sprint_label.text = "Sprint %d — Phase 2 : Roadmap" % SprintState.sprint_number
 
-	var bar := UIHelpers.build_resource_bar()
-	$Margin/VBox.add_child(bar)
-	$Margin/VBox.move_child(bar, 1)
+	resource_bar = UIHelpers.build_resource_bar()
+	$Margin/VBox.add_child(resource_bar)
+	$Margin/VBox.move_child(resource_bar, 1)
 	UIHelpers.attach_company_menu(self)
 
 	capacity_bar.add_theme_stylebox_override("fill", UIHelpers.make_bar_fill_style(UIHelpers.COLOR_GOOD))
 	capacity_bar.add_theme_stylebox_override("background", UIHelpers.make_bar_background_style())
 
+	_setup_self_work_button()
 	_load_features()
 	_update_capacity()
 
@@ -74,6 +79,54 @@ func _load_features() -> void:
 		UIHelpers.add_hover_bounce(btn, 1.02)
 		feature_grid.add_child(btn)
 		feature_buttons.append(btn)
+
+
+## 🔧 Faire le taf soi-même (spec §7.2) — bouton contextuel de la Roadmap :
+## des points de capacité contre de l'Énergie, cumulable tant qu'il en reste.
+func _setup_self_work_button() -> void:
+	self_work_button = Button.new()
+	self_work_button.tooltip_text = "Action personnelle (⚡) : vous prenez des tickets vous-même. Le sprint est sauvé, pas vous."
+	self_work_button.pressed.connect(_on_self_work_pressed)
+	UIHelpers.add_hover_bounce(self_work_button, 1.03)
+	$Margin/VBox/CapacityRow.add_child(self_work_button)
+	_refresh_self_work_button()
+
+
+func _refresh_self_work_button() -> void:
+	var conf: Dictionary = SprintState.get_personal_action_conf("selfWork")
+	var cost := int(conf.get("cost", 25))
+	var bonus := int(conf.get("capacityBonus", 2))
+	match SprintState.personal_action_refusal():
+		"souffler":
+			self_work_button.text = "🔧 Faire le taf soi-même — 🧘 vous soufflez ce sprint"
+			self_work_button.disabled = true
+		"epuise":
+			self_work_button.text = "🔧 Faire le taf soi-même (%d ⚡ — épuisé·e)" % cost
+			self_work_button.disabled = true
+		_:
+			self_work_button.text = "🔧 Faire le taf soi-même (+%d pts · %d ⚡)" % [bonus, cost]
+			self_work_button.disabled = false
+
+
+func _on_self_work_pressed() -> void:
+	if SprintState.do_self_work() != "":
+		return
+	effective_capacity = SprintState.get_effective_capacity()
+	capacity_bar.max_value = max(effective_capacity, 1)
+	_update_capacity()
+	_refresh_self_work_button()
+	_rebuild_resource_bar()
+
+
+func _rebuild_resource_bar() -> void:
+	if resource_bar == null:
+		return
+	var parent := resource_bar.get_parent()
+	var index := resource_bar.get_index()
+	resource_bar.queue_free()
+	resource_bar = UIHelpers.build_resource_bar()
+	parent.add_child(resource_bar)
+	parent.move_child(resource_bar, index)
 
 
 func _selected_points() -> int:

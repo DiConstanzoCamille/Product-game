@@ -441,3 +441,48 @@ le chiffrage vit dans `data/balance.json` ; les pools de contenu dans
   la stratégie `careful` (ne rien livrer, ne rien acheter, ne rien recruter)
   perd avant la fin du mandat — vérifié en faillite vers les sprints 7-11
   sur les deux entreprises.
+
+## 18. Phase B — l'économie du joueur : Énergie et actions personnelles
+
+Implémentation du deuxième lot de la
+[spec de profondeur de gameplay](spec-profondeur-gameplay.md) (§7, §8.3,
+§13-B), construit sur la Phase A. Tout le chiffrage vit dans
+`data/balance.json` → `energy`.
+
+- **La jauge d'Énergie ⚡.** Personnelle au CPO, 0-100, départ 70, côté jeu
+  uniquement (`SprintState.energy` — jamais dans `resources.json`, partagé
+  avec la landing). Affichée dans le groupe « Vous » de la barre de
+  ressources, à côté du Capital politique, avec tooltip.
+- **Régénération modulée par le Moral.** +12/sprint à la Résolution, ×1 si
+  Moral ≥ 60, ×0.5 entre 30 et 60, ×0 sous 30 (`moralRegenTiers`) — les
+  problèmes de la boîte finissent par vous suivre à la maison. Le Moral lu
+  est celui d'après l'application des effets du sprint : l'état dans lequel
+  l'équipe le termine.
+- **Actions personnelles.** Boutons contextuels, limités par l'Énergie
+  seule ; on peut puiser dans la réserve jusqu'à 0 (la dépense plafonne à
+  ce qui reste) : 🤝 **1:1** (Marché ou panneau Entreprise, 10 ⚡) révèle le
+  trait caché d'un candidat avant embauche ou d'un employé — sur un employé,
+  les traits à déclencheur (Négociateur, Réseau) tombent immédiatement ;
+  🔧 **Faire le taf soi-même** (Roadmap, 25 ⚡, cumulable) ajoute +2 points
+  de capacité ce sprint ; 🏛️ **Négocier une rallonge** (panneau Entreprise,
+  10 ⚡) échange −8 Capital politique (réglé à la Résolution) contre +4
+  Pièces immédiates ; 🧘 **Souffler** (Résolution, gratuit) renonce aux
+  actions personnelles du prochain sprint contre +10 de régénération, non
+  modulée — le repos, lui, marche toujours. « Plonger dans une feature »
+  attend la roadmap profonde (Phase C).
+- **Burn-out remappé.** La fin Burn-out fondateur·rice se déclenche sur
+  **Énergie ≤ 0** à la Résolution (pseudo-ressource `energie` dans
+  `endingThresholds`) — l'ancien couperet Valeur perçue avait déjà disparu
+  en Phase A. Pas de mort subite : la spirale (Moral bas → régén nulle →
+  compenser soi-même → 0) se lit sur la barre.
+- **Inbox.** Les `effects` des choix acceptent la pseudo-ressource
+  `energie` — trois crises existantes vous suivent désormais à la maison
+  (incident en démo, surcharge de Kevin, audit RGPD).
+- **Résolution.** Ligne « ⚡ Énergie » détaillée (régén et sa modulation
+  par le Moral, bonus de Souffler, événements, dépenses d'actions
+  personnelles) et bouton Souffler.
+- **Recette.** Les stratégies des smoke tests jouent les actions
+  personnelles (`greedy` avec discernement, `stress` en compensation
+  permanente) ; critères impératifs vérifiés en sortie non nulle : la
+  spirale burn-out reste atteignable (`stress` la déclenche sur Meridia
+  vers le sprint 2-4) et `careful` perd toujours.
