@@ -87,11 +87,33 @@ static func for_decision(card: Dictionary) -> Dictionary:
 			],
 		})
 
+	# 🔒 Une carte à prérequis reste lisible mais inactivable tant que sa
+	# condition n'est pas vraie — et la condition est affichée **comme une ligne
+	# d'impact**, au même endroit que les deltas : le prérequis est une donnée de
+	# la décision, pas un message d'erreur.
+	var requirement := SprintState.card_requirement_state(card)
+	if requirement.get("gated", false):
+		var expiry := SprintState.get_lease_expiry(card_id)
+		impacts.push_front({
+			"label": "🔒 %s" % requirement.get("label", ""),
+			"delta": requirement.get("current", ""),
+			"good": requirement.get("ok", false),
+			"unknown": not requirement.get("ok", false),
+			"locked": not requirement.get("ok", false),
+			"tooltip": "Punaisée au rayon jusqu'au sprint %d — vous avez jusque-là pour réunir la condition." % expiry if expiry > 0 else "",
+		})
+
 	var primary: Dictionary = {}
 	if activated:
 		primary = {
 			"text": "Activée ✓ (sprint %d)" % int(SprintState.activated_card_sprints.get(card_id, 0)),
 			"disabled": true,
+		}
+	elif requirement.get("gated", false) and not requirement.get("ok", false):
+		primary = {
+			"text": "🔒 Verrouillée — %s" % requirement.get("label", ""),
+			"disabled": true,
+			"tooltip": "Elle reste sur le rayon jusqu'au sprint %d." % SprintState.get_lease_expiry(card_id),
 		}
 	elif used >= max_activations:
 		primary = {"text": "Plus de slot ce mandat", "disabled": true}
@@ -102,7 +124,7 @@ static func for_decision(card: Dictionary) -> Dictionary:
 			"tooltip": "Irréversible pour le mandat. Les effets tombent à la Résolution.",
 		}
 
-	return {
+	return _with_shared({
 		"kind": "decision",
 		"pill_text": "Décision",
 		"pill_color": UIHelpers.PILL_DECISION,
@@ -118,7 +140,7 @@ static func for_decision(card: Dictionary) -> Dictionary:
 		"cost": "1 slot de grande décision · %d/%d activées" % [used, max_activations],
 		"primary": primary,
 		"dimmed": activated,
-	}
+	}, "decision", card_id, card, activated)
 
 
 # ── Candidat ──────────────────────────────────────────────────────────────
@@ -159,7 +181,7 @@ static func for_candidate(candidate: Dictionary) -> Dictionary:
 	if SprintState.next_hire_discount > 0:
 		cost_text += " · réseau −%d 🪙" % SprintState.next_hire_discount
 
-	return {
+	return _with_shared({
 		"kind": "candidate",
 		"pill_text": "Candidat",
 		"pill_color": UIHelpers.PILL_CANDIDATE,
@@ -177,7 +199,7 @@ static func for_candidate(candidate: Dictionary) -> Dictionary:
 		"primary": primary,
 		"secondary": secondary,
 		"dimmed": hired,
-	}
+	}, "candidate", candidate.get("id", ""), candidate, hired)
 
 
 # ── Pratique ──────────────────────────────────────────────────────────────
@@ -215,7 +237,7 @@ static func for_practice(practice: Dictionary) -> Dictionary:
 	else:
 		primary = {"text": "Adopter (%d 🪙)" % cost, "disabled": false}
 
-	return {
+	return _with_shared({
 		"kind": "practice",
 		"pill_text": "Pratique",
 		"pill_color": UIHelpers.PILL_PRACTICE,
@@ -231,7 +253,46 @@ static func for_practice(practice: Dictionary) -> Dictionary:
 		"cost": "%d 🪙" % cost,
 		"primary": primary,
 		"dimmed": owned,
+	}, "practice", practice_id, practice, owned)
+
+
+# ── Ce que les trois types partagent : rareté et punaise ──────────────────
+
+## Libellés et couleurs des paliers de rareté. `commune` n'affiche rien : un
+## marquage qui apparaît sur toutes les cartes ne marque plus rien — c'est
+## l'exception qui doit se voir.
+const RARITY_LABELS := {
+	"notable": "◆ NOTABLE",
+	"rare": "◆◆ RARE",
+}
+const RARITY_COLORS := {
+	"notable": Color("#23408e"),
+	"rare": Color("#8a3fbf"),
+}
+
+
+## Ajoute au descripteur ce qui ne dépend pas du type : le liseré de rareté et
+## l'action 📌 Réserver. `acquired` coupe la punaise — on ne réserve pas ce
+## qu'on possède déjà.
+static func _with_shared(descriptor: Dictionary, kind: String, asset_id: String, data: Dictionary, acquired: bool) -> Dictionary:
+	var rarity: String = SprintState.asset_rarity(data)
+	descriptor["rarity"] = rarity
+	descriptor["rarity_label"] = RARITY_LABELS.get(rarity, "")
+	descriptor["rarity_color"] = RARITY_COLORS.get(rarity, UIHelpers.COLOR_SOFT_TEXT)
+
+	if acquired:
+		return descriptor
+
+	var reserved: bool = SprintState.is_reserved(kind, asset_id)
+	descriptor["pin"] = {
+		"active": reserved,
+		"text": "📌" if reserved else "📍",
+		"tooltip": ("Réservé — cet Actif sera encore là au prochain sprint, et un re-tirage ne l'emporte pas. Cliquez pour décoller la punaise et récupérer la pièce."
+			if reserved else
+			"📌 Réserver pour %d 🪙 — il sera encore là au prochain sprint (et un 🎲 re-tirage ne l'emportera pas)." % SprintState.reserve_cost()),
+		"disabled": not reserved and SprintState.pieces < SprintState.reserve_cost(),
 	}
+	return descriptor
 
 
 # ── Fabriques d'impacts partagées ─────────────────────────────────────────

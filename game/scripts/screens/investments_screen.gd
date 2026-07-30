@@ -103,6 +103,7 @@ func _build_shop_shelf() -> void:
 func _add_shop_card(kind: String, data: Dictionary) -> AssetCard:
 	var placement := _shop_cards.size()
 	var card := AssetCard.create(_shop_descriptor(kind, data, placement))
+	card.pin_pressed.connect(_on_pin_pressed.bind(kind, data.get("id", ""), data))
 	shop_grid.add_child(card)
 	_shop_cards.append({"node": card, "kind": kind, "data": data, "placement": placement})
 	return card
@@ -129,8 +130,16 @@ func _refresh_shop_head() -> void:
 func _build_decisions_shelf() -> void:
 	# Le décalage de placement continue celui de l'étal : deux cartes voisines de
 	# part et d'autre de la frontière des rayons ne prennent pas le même angle.
+	# Les cartes à prérequis punaisées par leur bail (🔒) s'ajoutent au tirage
+	# au lieu de lui prendre une place : une carte gatée reste sous les yeux le
+	# temps qu'on réunisse sa condition, sans rogner sur ce qu'on découvre.
+	var card_ids: Array = offer.get("decisions", []).duplicate()
+	for leased_id in SprintState.get_leased_decision_ids():
+		if not card_ids.has(leased_id):
+			card_ids.append(leased_id)
+
 	var placement := _shop_cards.size()
-	for card_id in offer.get("decisions", []):
+	for card_id in card_ids:
 		var card: Dictionary = SprintState.find_card(card_id)
 		if card.is_empty():
 			continue
@@ -138,6 +147,7 @@ func _build_decisions_shelf() -> void:
 			UIHelpers.apply_card_placement(AssetView.for_decision(card), placement)
 		)
 		asset_card.primary_pressed.connect(_on_card_activate.bind(card))
+		asset_card.pin_pressed.connect(_on_pin_pressed.bind("decision", card_id, card))
 		decisions_grid.add_child(asset_card)
 		_decision_cards.append({"node": asset_card, "data": card, "placement": placement})
 		placement += 1
@@ -283,17 +293,13 @@ func _on_buy_practice_pressed(practice: Dictionary) -> void:
 
 
 func _on_card_activate(card: Dictionary) -> void:
-	var card_id: String = card.get("id", "")
-	if SprintState.activated_cards.has(card_id):
+	if SprintState.activate_decision(card.get("id", "")) != "":
 		return
-	if SprintState.activated_cards.size() >= int(GameData.balance.get("structuralDecisionMaxActivations", 4)):
+	_refresh_all()
+
+
+## 📌 Réserver / décoller : l'état vit dans SprintState, la carte se relit.
+func _on_pin_pressed(kind: String, asset_id: String, data: Dictionary) -> void:
+	if SprintState.toggle_reservation(kind, asset_id, data) != "":
 		return
-
-	var deltas := EffectResolver.resolve_card_activation(card_id, SprintState.team_profile, SprintState.era_id)
-	SprintState.add_pending(deltas, "Grande décision : %s activée (%s)" % [
-		card.get("name", card_id), SprintState.team_profile
-	])
-	SprintState.activated_cards.append(card_id)
-	SprintState.activated_card_sprints[card_id] = SprintState.sprint_number
-
 	_refresh_all()

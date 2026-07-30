@@ -5,7 +5,7 @@ extends PanelContainer
 ## (docs/proposition-ui-interface.md §2.2). Six zones fixes, toujours à la même
 ## place, quel que soit le type :
 ##
-##   ① pastille de type + référence de formulaire
+##   ① pastille de type + rareté + référence de formulaire + punaise 📌
 ##   ② identité : portrait/pastille d'initiale (candidat) ou icône d'objet
 ##   ③ accroche (tagline, trait, description) + badges
 ##   ④ IMPACT — lignes « ressource + delta + note », dont les inconnues 🔒/❓
@@ -24,6 +24,7 @@ extends PanelContainer
 
 signal primary_pressed
 signal secondary_pressed
+signal pin_pressed
 
 const MIN_WIDTH := 236
 
@@ -200,9 +201,10 @@ func _build_decorations() -> void:
 	layer.resized.connect(place)
 
 
-# ── ① Type + référence ────────────────────────────────────────────────────
+# ── ① Type + rareté + référence + punaise ─────────────────────────────────
 func _zone_type(vbox: VBoxContainer) -> void:
 	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 6)
 	vbox.add_child(row)
 
 	var pill_color: Color = _descriptor.get("pill_color", UIHelpers.PILL_DECISION)
@@ -220,12 +222,38 @@ func _zone_type(vbox: VBoxContainer) -> void:
 	pill.add_child(_label(_descriptor.get("pill_text", "").to_upper(), 9, pill_color))
 	row.add_child(pill)
 
+	# La rareté ne s'affiche que quand elle sort de l'ordinaire (voir
+	# AssetView.RARITY_LABELS) : un marquage porté par toutes les cartes ne
+	# marquerait plus rien.
+	if _descriptor.get("rarity_label", "") != "":
+		var rarity := _label(_descriptor.get("rarity_label", ""), 9, _descriptor.get("rarity_color", UIHelpers.COLOR_SOFT_TEXT))
+		UIHelpers.apply_mono(rarity, 9, true)
+		rarity.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		row.add_child(rarity)
+
 	row.add_child(_spacer_h())
 
 	var ref_label := _label(_descriptor.get("ref", ""), 10, UIHelpers.COLOR_SOFT_TEXT)
 	UIHelpers.apply_mono(ref_label, 10)
 	ref_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(ref_label)
+
+	# 📌 La punaise est un autocollant sur la carte, pas un troisième bouton :
+	# deux boutons empilés suffisent déjà à la hauteur d'une carte, et « garder
+	# pour plus tard » est un geste de manipulation d'objet, pas une décision.
+	var pin: Dictionary = _descriptor.get("pin", {})
+	if not pin.is_empty():
+		var pin_button := Button.new()
+		pin_button.text = pin.get("text", "📍")
+		pin_button.tooltip_text = pin.get("tooltip", "")
+		pin_button.disabled = pin.get("disabled", false)
+		pin_button.flat = not pin.get("active", false)
+		pin_button.focus_mode = Control.FOCUS_NONE
+		pin_button.add_theme_font_size_override("font_size", 12)
+		pin_button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		if not pin_button.disabled:
+			pin_button.pressed.connect(func(): pin_pressed.emit())
+		row.add_child(pin_button)
 
 
 # ── ② Identité ───────────────────────────────────────────────────────────

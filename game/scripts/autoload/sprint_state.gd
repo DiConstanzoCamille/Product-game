@@ -48,7 +48,9 @@ var next_hire_discount: int = 0        # remise 🪙 sur le prochain recrutement
 var delivered_feature_ids: Array = []  # features livrées ce sprint (posées par l'écran Roadmap)
 var board_review_state: String = "pending"  # "pending" | "passed" | "failed"
 var board_review_result: Dictionary = {}    # {sprint, passed, title, conditions:[{label, ok}]} — pour l'overlay de verdict
-var current_shop_offer: Dictionary = {}     # {sprint, candidates:[...], practices:[ids], decisions:[ids], rerolls} — tirage des Investissements
+var current_shop_offer: Dictionary = {}     # {sprint, candidates:[...], practices:[ids], decisions:[ids], leased:[ids], rerolls} — tirage des Investissements
+var reserved_assets: Array = []             # 📌 [{kind, id, data, sprint, paid}] — punaisés, réinjectés dans l'offre suivante
+var leased_decisions: Dictionary = {}       # 🔒 card_id -> sprint d'expiration du bail d'une carte à prérequis
 
 # --- Phase B : l'économie du joueur (spec profondeur §7) ---
 var energy: int = 70                   # ⚡ jauge personnelle du CPO (0..energy.max), côté jeu uniquement
@@ -59,9 +61,7 @@ var last_energy_report: Dictionary = {}  # détail du delta Énergie de la derni
 
 var _inbox_event_bag: Array = []       # ids restants à tirer dans le "sac" courant
 var _last_inbox_event_id: String = ""  # évite une répétition immédiate entre deux sacs
-var _candidate_bag: Array = []         # ids de candidats restants dans le "sac" des Investissements
 var _hired_candidate_ids: Array = []   # candidats déjà embauchés ce mandat (ne reviennent pas au tirage)
-var _decision_bag: Array = []          # ids de grandes décisions restantes dans le "sac" (activées exclues)
 
 
 ## À appeler au lancement d'un nouveau mandat, une fois le scénario et
@@ -86,9 +86,9 @@ func reset_run(chosen_era_id: String = "", chosen_company_id: String = "") -> vo
 	last_pieces_delta = 0
 	_inbox_event_bag.clear()
 	_last_inbox_event_id = ""
-	_candidate_bag.clear()
 	_hired_candidate_ids.clear()
-	_decision_bag.clear()
+	reserved_assets.clear()
+	leased_decisions.clear()
 	owned_practices.clear()
 	fired_count = 0
 	next_hire_discount = 0
@@ -400,11 +400,10 @@ func plan_breather() -> String:
 
 # --- Les Investissements : tirage du sprint (spec profondeur §5) ---
 
-## Offre du sprint en cours, pour les deux rayons : 2 candidats (pioche sac,
-## trait caché tiré à l'apparition) + 2 pratiques non possédées + 2 grandes
-## décisions (pioche sac elle aussi). Tirée une seule fois par sprint puis
-## stockée — revenir sur l'écran ne re-tire pas ; seul 🎲 Re-tirer l'offre,
-## qui se paie, change la donne.
+## Offre du sprint en cours, pour les deux rayons : 2 candidats (trait caché
+## tiré à l'apparition) + 2 pratiques non possédées + 2 grandes décisions.
+## Tirée une seule fois par sprint puis stockée — revenir sur l'écran ne
+## re-tire pas ; seul 🎲 Re-tirer l'offre, qui se paie, change la donne.
 func get_shop_offer() -> Dictionary:
 	if int(current_shop_offer.get("sprint", -1)) == sprint_number:
 		return current_shop_offer
@@ -414,68 +413,124 @@ func get_shop_offer() -> Dictionary:
 
 func _draw_shop_offer(rerolls: int) -> Dictionary:
 	var draw_conf: Dictionary = GameData.balance.get("shopDraw", {})
-	var candidate_count := int(draw_conf.get("candidatesPerSprint", 2))
-	var practice_count := int(draw_conf.get("practicesPerSprint", 2))
-	var decision_count := int(draw_conf.get("decisionsPerSprint", 2))
+	_expire_reservations()
+	_expire_leases()
 
+	# 📌 Ce qui a été réservé occupe sa place dans le rayon avant le tirage — y
+	# compris quand on re-tire : payer pour garder doit résister au hasard qu'on
+	# paie pour rejouer.
 	var drawn_candidates: Array = []
-	for i in range(candidate_count):
-		var candidate := _draw_candidate()
-		if not candidate.is_empty():
-			drawn_candidates.append(candidate)
-
-	var practice_pool: Array = []
-	for practice in GameData.practices:
-		var eras: Array = practice.get("eras", [])
-		if not eras.is_empty() and not eras.has(era_id):
-			continue
-		if owned_practices.has(practice.get("id", "")):
-			continue
-		practice_pool.append(practice.get("id", ""))
-	practice_pool.shuffle()
-	var drawn_practices: Array = practice_pool.slice(0, min(practice_count, practice_pool.size()))
-
+	for entry in _reservations_for("candidate"):
+		drawn_candidates.append(entry.get("data", {}))
+	var drawn_practices: Array = []
+	for entry in _reservations_for("practice"):
+		drawn_practices.append(entry.get("id", ""))
 	var drawn_decisions: Array = []
-	for i in range(decision_count):
+	for entry in _reservations_for("decision"):
+		drawn_decisions.append(entry.get("id", ""))
+
+	while drawn_candidates.size() < int(draw_conf.get("candidatesPerSprint", 2)):
+		var candidate := _draw_candidate(drawn_candidates)
+		if candidate.is_empty():
+			break
+		drawn_candidates.append(candidate)
+
+	while drawn_practices.size() < int(draw_conf.get("practicesPerSprint", 2)):
+		var practice_id := _draw_practice(drawn_practices)
+		if practice_id == "":
+			break
+		drawn_practices.append(practice_id)
+
+	while drawn_decisions.size() < int(draw_conf.get("decisionsPerSprint", 2)):
 		var card_id := _draw_decision(drawn_decisions)
-		if card_id != "":
-			drawn_decisions.append(card_id)
+		if card_id == "":
+			break
+		drawn_decisions.append(card_id)
+
+	# Une carte à prérequis prend un **bail** dès qu'elle sort : elle reste
+	# affichée le trimestre entier, en plus du tirage, pour qu'on ait le temps
+	# de réunir sa condition. Sans ça, une carte gatée tirée un sprint où la
+	# condition n'est pas remplie serait une carte perdue.
+	for card_id in drawn_decisions:
+		_open_lease_if_gated(card_id)
 
 	return {
 		"sprint": sprint_number,
 		"candidates": drawn_candidates,
 		"practices": drawn_practices,
 		"decisions": drawn_decisions,
+		"leased": get_leased_decision_ids(),
 		"rerolls": rerolls,
 	}
 
 
-## Une grande décision se tire comme un candidat, dans un "sac" qui se
-## reconstitue une fois vide. C'est le changement de la refonte Lot 2 : le
-## catalogue permanent est devenu une offre, pour que passer son tour sur une
-## carte soit un vrai pari ("je la retrouverai quand ?"). Une carte activée
-## quitte le sac pour de bon — elle ne peut de toute façon plus resservir.
+# --- Le tirage pondéré : des taux d'apparition, pas un sac ---
+
+## Rareté d'un Actif (`commune` par défaut) — commune à `cards.json`,
+## `practices.json` et `candidates.json` : un seul vocabulaire pour les trois
+## rayons.
+func asset_rarity(data: Dictionary) -> String:
+	return data.get("rarity", "commune")
+
+
+## Poids de tirage : le poids de sa rareté (balance.json →
+## `shopDraw.rarityWeights`), multiplié par le coefficient d'époque que l'Actif
+## déclare éventuellement (`eraWeights`). C'est là que le scénario colore
+## l'offre — Jira sort deux fois plus souvent en pleine Transformation agile.
+func asset_draw_weight(data: Dictionary) -> float:
+	var weights: Dictionary = GameData.balance.get("shopDraw", {}).get("rarityWeights", {})
+	var weight := float(weights.get(asset_rarity(data), 100))
+	return maxf(0.0, weight * float(data.get("eraWeights", {}).get(era_id, 1.0)))
+
+
+## Tirage pondéré sans remise **dans une même offre** : rien ne mémorise ce qui
+## est déjà sorti d'un sprint à l'autre. Une carte peut donc revenir deux
+## sprints de suite ou manquer six sprints — c'est le prix de l'aléatoire
+## assumé, et le 🎲 re-tirage est là pour ça.
+func _weighted_pick(pool: Array) -> Dictionary:
+	var total := 0.0
+	for data in pool:
+		total += asset_draw_weight(data)
+	if total <= 0.0:
+		return {}
+
+	var roll := randf() * total
+	for data in pool:
+		roll -= asset_draw_weight(data)
+		if roll <= 0.0:
+			return data
+	return pool[-1]
+
+
+func _available_for_era(data: Dictionary) -> bool:
+	var eras: Array = data.get("eras", [])
+	return eras.is_empty() or eras.has(era_id)
+
+
 func _draw_decision(already_drawn: Array) -> String:
-	for attempt in 2:
-		while not _decision_bag.is_empty():
-			var card_id: String = _decision_bag.pop_back()
-			if activated_cards.has(card_id) or already_drawn.has(card_id):
-				continue
-			return card_id
-		_refill_decision_bag(already_drawn)
-	return ""
-
-
-func _refill_decision_bag(exclude: Array) -> void:
+	var pool: Array = []
 	for card in GameData.cards.get("cards", []):
 		var card_id: String = card.get("id", "")
-		var eras: Array = card.get("eras", [])
-		if not eras.is_empty() and not eras.has(era_id):
+		if not _available_for_era(card):
 			continue
-		if activated_cards.has(card_id) or exclude.has(card_id):
+		if activated_cards.has(card_id) or already_drawn.has(card_id):
 			continue
-		_decision_bag.append(card_id)
-	_decision_bag.shuffle()
+		if get_leased_decision_ids().has(card_id):
+			continue  # déjà punaisée sur le rayon, inutile de la retirer
+		pool.append(card)
+	return _weighted_pick(pool).get("id", "")
+
+
+func _draw_practice(already_drawn: Array) -> String:
+	var pool: Array = []
+	for practice in GameData.practices:
+		var practice_id: String = practice.get("id", "")
+		if not _available_for_era(practice):
+			continue
+		if owned_practices.has(practice_id) or already_drawn.has(practice_id):
+			continue
+		pool.append(practice)
+	return _weighted_pick(pool).get("id", "")
 
 
 func find_card(card_id: String) -> Dictionary:
@@ -483,6 +538,151 @@ func find_card(card_id: String) -> Dictionary:
 		if card.get("id", "") == card_id:
 			return card
 	return {}
+
+
+## Active une grande décision : ses effets rejoignent le panier du sprint, elle
+## devient une Fondation, et elle quitte définitivement l'offre. Retourne "" si
+## l'activation a eu lieu, sinon la raison du refus.
+func activate_decision(card_id: String) -> String:
+	if activated_cards.has(card_id):
+		return "deja-activee"
+	if activated_cards.size() >= int(GameData.balance.get("structuralDecisionMaxActivations", 4)):
+		return "plus-de-slot"
+	var card := find_card(card_id)
+	if card.is_empty():
+		return "introuvable"
+	if not card_requirement_state(card).get("ok", true):
+		return "prerequis"
+
+	var deltas := EffectResolver.resolve_card_activation(card_id, team_profile, era_id)
+	add_pending(deltas, "Grande décision : %s activée (%s)" % [card.get("name", card_id), team_profile])
+	activated_cards.append(card_id)
+	activated_card_sprints[card_id] = sprint_number
+	release_reservation("decision", card_id)
+	leased_decisions.erase(card_id)
+	return ""
+
+
+# --- 🔒 Les cartes à prérequis et leur bail ---
+
+## Une carte qui déclare `requires` ne s'active que si sa condition est vraie.
+## Retourne {gated, ok, label, current} — `gated` false pour une carte ordinaire.
+func card_requirement_state(card: Dictionary) -> Dictionary:
+	var requirement: Dictionary = card.get("requires", {})
+	if requirement.is_empty():
+		return {"gated": false, "ok": true, "label": "", "current": ""}
+	var evaluated := evaluate_condition(requirement)
+	return {
+		"gated": true,
+		"ok": evaluated.get("ok", false),
+		"label": requirement.get("label", ""),
+		"current": evaluated.get("current", ""),
+	}
+
+
+func _open_lease_if_gated(card_id: String) -> void:
+	if leased_decisions.has(card_id) or activated_cards.has(card_id):
+		return
+	if find_card(card_id).get("requires", {}).is_empty():
+		return
+	var lease := int(GameData.balance.get("shopDraw", {}).get("lockedLeaseSprints", 6))
+	leased_decisions[card_id] = sprint_number + lease
+
+
+## Les cartes punaisées encore valables : ni activées, ni périmées. Elles
+## s'ajoutent au tirage du rayon au lieu de lui prendre une place.
+func get_leased_decision_ids() -> Array:
+	var ids: Array = []
+	for card_id in leased_decisions.keys():
+		if activated_cards.has(card_id):
+			continue
+		if sprint_number > int(leased_decisions[card_id]):
+			continue
+		ids.append(card_id)
+	return ids
+
+
+func get_lease_expiry(card_id: String) -> int:
+	return int(leased_decisions.get(card_id, 0))
+
+
+## Un bail échu est effacé, pas seulement ignoré : la carte retourne dans le
+## pool et pourra ressortir plus tard — avec un bail tout neuf.
+func _expire_leases() -> void:
+	for card_id in leased_decisions.keys():
+		if activated_cards.has(card_id) or sprint_number > int(leased_decisions[card_id]):
+			leased_decisions.erase(card_id)
+
+
+# --- 📌 Réserver un Actif pour le sprint suivant ---
+
+func reserve_cost() -> int:
+	return int(GameData.balance.get("shopDraw", {}).get("reserveCostPieces", 1))
+
+
+func is_reserved(kind: String, asset_id: String) -> bool:
+	for entry in reserved_assets:
+		if entry.get("kind", "") == kind and entry.get("id", "") == asset_id:
+			return true
+	return false
+
+
+## Punaise un Actif de l'offre : il sera encore là au sprint suivant, et un
+## 🎲 re-tirage ne l'emporte pas. Le bail est **d'un sprint** — le garder plus
+## longtemps se re-paie, sinon une pièce suffirait à annuler toute la rareté.
+## Deuxième appel = on décolle la punaise et la pièce revient (même sprint).
+## Retourne "" si l'état a changé, sinon la raison du refus.
+func toggle_reservation(kind: String, asset_id: String, data: Dictionary) -> String:
+	for entry in reserved_assets:
+		if entry.get("kind", "") == kind and entry.get("id", "") == asset_id:
+			reserved_assets.erase(entry)
+			pieces += int(entry.get("paid", 0))
+			return ""
+
+	var cost := reserve_cost()
+	if pieces < cost:
+		return "pieces"
+	pieces -= cost
+	reserved_assets.append({
+		"kind": kind,
+		"id": asset_id,
+		"data": data.duplicate(true) if kind == "candidate" else {},
+		"sprint": sprint_number,
+		"paid": cost,
+	})
+	return ""
+
+
+func release_reservation(kind: String, asset_id: String) -> void:
+	for entry in reserved_assets:
+		if entry.get("kind", "") == kind and entry.get("id", "") == asset_id:
+			reserved_assets.erase(entry)
+			return
+
+
+## Une réservation vaut pour le sprint où elle est posée et le suivant.
+func _expire_reservations() -> void:
+	var kept: Array = []
+	for entry in reserved_assets:
+		if sprint_number - int(entry.get("sprint", 0)) <= 1:
+			kept.append(entry)
+	reserved_assets = kept
+
+
+func _reservations_for(kind: String) -> Array:
+	var entries: Array = []
+	for entry in reserved_assets:
+		if entry.get("kind", "") != kind:
+			continue
+		var asset_id: String = entry.get("id", "")
+		if kind == "practice" and owned_practices.has(asset_id):
+			continue
+		if kind == "decision" and (activated_cards.has(asset_id) or not _available_for_era(find_card(asset_id))):
+			continue
+		if kind == "candidate" and _hired_candidate_ids.has(asset_id):
+			continue
+		entries.append(entry)
+	return entries
 
 
 ## 🎲 Re-tirer l'offre — le prix monte à chaque usage **dans le sprint** et
@@ -512,31 +712,32 @@ func reroll_shop_offer() -> String:
 	return ""
 
 
-func _draw_candidate() -> Dictionary:
-	if _candidate_bag.is_empty():
-		for candidate in GameData.candidates:
-			var eras: Array = candidate.get("eras", [])
-			if not eras.is_empty() and not eras.has(era_id):
-				continue
-			if _hired_candidate_ids.has(candidate.get("id", "")):
-				continue
-			_candidate_bag.append(candidate.get("id", ""))
-		_candidate_bag.shuffle()
-	if _candidate_bag.is_empty():
+## Même tirage pondéré que les deux autres rayons. Un candidat déjà embauché ne
+## revient pas ; les autres peuvent réapparaître d'un sprint à l'autre — le
+## marché du travail ne se vide pas parce qu'on a regardé une annonce.
+func _draw_candidate(already_drawn: Array) -> Dictionary:
+	var drawn_ids: Array = []
+	for entry in already_drawn:
+		drawn_ids.append(entry.get("id", ""))
+
+	var pool: Array = []
+	for candidate in GameData.candidates:
+		var candidate_id: String = candidate.get("id", "")
+		if not _available_for_era(candidate):
+			continue
+		if _hired_candidate_ids.has(candidate_id) or drawn_ids.has(candidate_id):
+			continue
+		pool.append(candidate)
+
+	var picked := _weighted_pick(pool)
+	if picked.is_empty():
 		return {}
 
-	var candidate_id: String = _candidate_bag.pop_back()
-	if _hired_candidate_ids.has(candidate_id):
-		return _draw_candidate()
-
-	for candidate in GameData.candidates:
-		if candidate.get("id", "") == candidate_id:
-			var instance: Dictionary = candidate.duplicate(true)
-			instance["hidden_trait"] = _roll_hidden_trait()
-			instance["hiddenRevealed"] = has_practice("entretiens-structures")
-			instance["hired"] = false
-			return instance
-	return {}
+	var instance: Dictionary = picked.duplicate(true)
+	instance["hidden_trait"] = _roll_hidden_trait()
+	instance["hiddenRevealed"] = has_practice("entretiens-structures")
+	instance["hired"] = false
+	return instance
 
 
 ## Tirage du trait caché à l'apparition du candidat (spec §4.5) — le même
@@ -592,6 +793,7 @@ func hire_candidate(candidate: Dictionary) -> String:
 		"hiredSprint": sprint_number,
 	})
 	_hired_candidate_ids.append(candidate.get("id", ""))
+	release_reservation("candidate", candidate.get("id", ""))
 	candidate["hired"] = true
 	pending_journal_lines.append("Embauche : %s (%s, %d 🪙)%s" % [
 		candidate.get("name", ""), _role_label(candidate.get("role", "")), cost, discount_note
@@ -637,6 +839,7 @@ func buy_practice(practice_id: String) -> String:
 
 	pieces -= cost
 	owned_practices.append(practice_id)
+	release_reservation("practice", practice_id)
 	var cynisme := float(GameData.balance.get("shopDraw", {}).get("practiceCynisme", 2))
 	add_pending({"cynisme": cynisme}, "Nouvelle pratique : %s %s (%d 🪙) — un process de plus, l'organisation lève les yeux au ciel" % [
 		practice.get("icon", ""), practice.get("name", ""), cost
@@ -1024,25 +1227,48 @@ func _resolve_silent_quits() -> void:
 func evaluate_board_objectives() -> Array:
 	var conditions: Array = []
 	for condition in get_company().get("boardObjectives", {}).get("conditions", []):
-		var ok := false
-		var current := ""
-		match condition.get("type", ""):
-			"resource-max":
-				var max_value: float = resource_values.get(condition.get("resource", ""), 0.0)
-				ok = max_value <= float(condition.get("value", 0))
-				current = "%d" % int(round(max_value))
-			"resource-min":
-				var min_value: float = resource_values.get(condition.get("resource", ""), 0.0)
-				ok = min_value >= float(condition.get("value", 0))
-				current = "%d" % int(round(min_value))
-			"decisions-min":
-				ok = activated_cards.size() >= int(condition.get("value", 1))
-				current = "%d" % activated_cards.size()
-			"revenue-min":
-				ok = last_revenue >= int(condition.get("value", 0))
-				current = "%d" % last_revenue
-		conditions.append({"label": condition.get("label", ""), "ok": ok, "current": current})
+		var evaluated := evaluate_condition(condition)
+		conditions.append({
+			"label": condition.get("label", ""),
+			"ok": evaluated.get("ok", false),
+			"current": evaluated.get("current", ""),
+		})
 	return conditions
+
+
+## Une seule grammaire de condition pour les objectifs de board **et** les
+## prérequis des cartes (`requires`) : `type` + `value` (+ `resource` ou
+## `seniority`). Retourne {ok, current} — `current` est la valeur lue, pour
+## afficher « ✗ (47) » plutôt qu'un simple non.
+func evaluate_condition(condition: Dictionary) -> Dictionary:
+	var ok := false
+	var current := ""
+	match condition.get("type", ""):
+		"resource-max":
+			var max_value: float = resource_values.get(condition.get("resource", ""), 0.0)
+			ok = max_value <= float(condition.get("value", 0))
+			current = "%d" % int(round(max_value))
+		"resource-min":
+			var min_value: float = resource_values.get(condition.get("resource", ""), 0.0)
+			ok = min_value >= float(condition.get("value", 0))
+			current = "%d" % int(round(min_value))
+		"decisions-min":
+			ok = activated_cards.size() >= int(condition.get("value", 1))
+			current = "%d" % activated_cards.size()
+		"revenue-min":
+			ok = last_revenue >= int(condition.get("value", 0))
+			current = "%d" % last_revenue
+		"roster-seniority-min":
+			var count := 0
+			for member in roster:
+				if member.get("seniority", "") == condition.get("seniority", "senior"):
+					count += 1
+			ok = count >= int(condition.get("value", 1))
+			current = "%d/%d" % [count, int(condition.get("value", 1))]
+		"practice-owned":
+			ok = owned_practices.has(condition.get("practice", ""))
+			current = "oui" if ok else "non"
+	return {"ok": ok, "current": current}
 
 
 ## La revue de board (§8.2) — le "boss" de mi-mandat : l'état de la boîte

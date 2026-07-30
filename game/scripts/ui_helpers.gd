@@ -387,9 +387,11 @@ static func attach_side_panel(screen: Control) -> Control:
 	if margin is MarginContainer:
 		# La marge suit la largeur *réelle* du panneau : un contenu qui impose sa
 		# taille minimale (nom d'entreprise long, roster large) ne doit jamais
-		# finir par recouvrir le contenu de la phase.
+		# finir par recouvrir le contenu de la phase — et le rail replié doit
+		# rendre sa place aux cartes, pas la garder pour rien.
 		var keep_clear := func():
-			margin.add_theme_constant_override("margin_right", int(max(panel.size.x, SIDE_PANEL_WIDTH)) + 28)
+			margin.add_theme_constant_override("margin_right",
+				int(max(panel.size.x, panel.get_combined_minimum_size().x)) + 28)
 		keep_clear.call()
 		panel.resized.connect(keep_clear)
 	return panel

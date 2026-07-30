@@ -150,7 +150,14 @@
     "reroll": {
       "baseCost": 1,
       "costIncrement": 1
-    }
+    },
+    "reserveCostPieces": 1,
+    "rarityWeights": {
+      "commune": 100,
+      "notable": 40,
+      "rare": 12
+    },
+    "lockedLeaseSprints": 6
   },
 
   "energy": {

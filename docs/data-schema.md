@@ -17,7 +17,8 @@ Le système de cartes structurelles calibrées (§6.2) : RICE, Notion, Jira.
 
 - `axes[]` — les 4 axes affichés sur le dos d'une carte (`id`, `label`) : coût humain, coût financier, time-to-market, productivité.
 - `teamProfiles[]` — les 2 profils d'équipe possibles (`id`, `label`, `shortLabel`) utilisés pour recalibrer les cartes.
-- `cards[]` — `id`, `refId` (identifiant façon ticket), `family` (`outil-process` / `stack-technique` / `methodologie-orga`, voir §6.2), `category`, `name`, `tagline`, `effects.junior` / `effects.senior` (un objet par axe avec `value` signé et `note` explicative), `eras[]` optionnel (§15 — réserve la carte aux scénarios listés ; absent = disponible partout).
+- `cards[]` — `id`, `refId` (identifiant façon ticket), `family` (`outil-process` / `stack-technique` / `methodologie-orga`, voir §6.2), `category`, `name`, `tagline`, `effects.junior` / `effects.senior` (un objet par axe avec `value` signé et `note` explicative), `eras[]` optionnel (§15 — réserve la carte aux scénarios listés ; absent = disponible partout), `rarity` et `eraWeights` optionnels (voir *Rareté et tirage* plus bas), et `requires` optionnel.
+- `requires` — le prérequis d'activation d'une carte gatée (§21), dans la **même grammaire de conditions** que `boardObjectives` de `companies.json` : `type` (`resource-min` / `resource-max` / `decisions-min` / `revenue-min` / `roster-seniority-min` / `practice-owned`), la clé qui va avec (`resource`, `seniority`, `practice`), `value` et `label` (la phrase montrée sur la carte). Une carte qui déclare `requires` prend automatiquement un bail de `shopDraw.lockedLeaseSprints` sprints quand elle est tirée.
 
 ## `eras.json`
 
@@ -63,7 +64,14 @@ Le pool de candidats du Marché (spec profondeur §5.1, carnet §17) : `candidat
 
 ## `practices.json`
 
-Le pool de pratiques du Marché (spec profondeur §5.2, carnet §17) : `practices[]` — `id`, `icon`, `name`, `costPieces`, `description`, `unlocks` (flag consommé par le système concerné : `hiddenTraits` révèle les traits cachés au Marché dès la Phase A ; `roi`/`clientImpact`/`risk`/`okrBonus` attendent la roadmap profonde de la Phase C ; `burndown`/`accounts` déverrouillent leurs sections du Pilotage), `perSprint` optionnel (deltas de ressources appliqués à chaque Résolution tant que la pratique est possédée), `eras[]` optionnel.
+Le pool de pratiques du Marché (spec profondeur §5.2, carnet §17) : `practices[]` — `id`, `icon`, `name`, `costPieces`, `description`, `unlocks` (flag consommé par le système concerné : `hiddenTraits` révèle les traits cachés au Marché dès la Phase A ; `roi`/`clientImpact`/`risk`/`okrBonus` attendent la roadmap profonde de la Phase C ; `burndown`/`accounts` déverrouillent leurs sections du Pilotage), `perSprint` optionnel (deltas de ressources appliqués à chaque Résolution tant que la pratique est possédée), `rarity` et `eraWeights` optionnels (voir *Rareté et tirage* ci-dessous), `eras[]` optionnel.
+
+### Rareté et tirage — commun à `cards.json`, `practices.json` et `candidates.json`
+
+Depuis le carnet §21, les trois pools sont tirés **au poids**, sans mémoire d'un sprint à l'autre. Deux champs facultatifs, de même sens partout :
+
+- `rarity` — `commune` (défaut), `notable` ou `rare`. Le poids de chaque palier vit dans `balance.json` → `shopDraw.rarityWeights` : la donnée dit *à quel point c'est rare*, l'équilibrage dit *combien ça pèse*.
+- `eraWeights` — coefficient multiplicateur par époque, ex. `{ "agile-transformation": 2.0 }`. C'est là qu'un scénario **colore** l'offre ; `eras[]` reste, lui, un filtre binaire de disponibilité.
 
 ## `hidden-traits.json`
 
@@ -99,7 +107,7 @@ Toutes les valeurs numériques nécessaires à la simulation persistante du MVP 
 - `firing` — licenciement (§4.4) : `severancePieces`, `moral`, `cynismePerExtraFiring` (à partir du 2e licenciement du mandat).
 - `trialPeriodSprints` — durée de la période d'essai avant révélation du trait caché.
 - `pieces` — flux du budget d'action (§3) : `boardAllocationPerSprint`, `boardAllocationIfReviewFailed`, `revenuePerformanceDivider` (prime = `floor(revenu / divider)`).
-- `shopDraw` — taille du tirage des Investissements (`candidatesPerSprint`, `practicesPerSprint`, `decisionsPerSprint` — les grandes décisions sont tirées comme le reste depuis le Lot 2, carnet §21), `practiceCynisme` (+Cynisme par achat de pratique) et `reroll` (`baseCost`, `costIncrement` — prix du 🎲 re-tirage, qui monte de `costIncrement` à chaque usage dans le sprint et repart à `baseCost` au sprint suivant).
+- `shopDraw` — tout le tirage des Investissements (carnet §21) : taille de l'offre (`candidatesPerSprint`, `practicesPerSprint`, `decisionsPerSprint`), `practiceCynisme` (+Cynisme par achat de pratique), `rarityWeights` (poids de tirage par palier de rareté), `reroll` (`baseCost`, `costIncrement` — prix du 🎲 re-tirage, qui monte de `costIncrement` à chaque usage dans le sprint et repart à `baseCost` au sprint suivant), `reserveCostPieces` (prix de la 📌 punaise, qui garantit l'Actif au sprint suivant) et `lockedLeaseSprints` (durée du bail d'une carte à prérequis).
 - `energy` — l'économie du joueur (spec profondeur §7, carnet §18) : `start`/`max` (jauge ⚡, côté jeu uniquement — jamais dans `resources.json`, partagé avec la landing), `regenPerSprint` (régénération à la Résolution), `moralRegenTiers[]` (paliers `moralMin`/`factor` de modulation par le Moral, du plus haut au plus bas : ×1 si Moral ≥ 60, ×0.5 entre 30 et 60, ×0 sous 30), `breatherRegenBonus` (bonus de 🧘 Souffler), `actions` (coûts et effets des actions personnelles : `oneOnOne.cost`, `selfWork.cost`/`capacityBonus`, `extension.cost`/`capitalPolitique`/`pieces`, `breather.cost`).
 - `pressure` — la pression (§8) : `valeurPercueDecayPerSprint` (décroissance naturelle), `revenueCutoffValeurPercue` (seuil de décrochage du revenu), `boardReview` (`successPieces`, `successCapitalPolitique`, `failCapitalPolitique`).
 - `roadmap` — `featureEffects` (deltas par feature de `roadmap-features.json`), `featureCostPoints` (coût en points de capacité par feature), `quickWinPieces` (pièces gagnées à la livraison des quick wins) et `overCapacityPenalty` (pénalité de surchauffe, modulée par les PM).

@@ -620,7 +620,7 @@ Après :  Inbox → Roadmap → Investissements ─────────→ R
 
 ---
 
-## 21. Les grandes décisions passent au tirage (+ le re-tirage payant)
+## 21. Le tirage des Investissements — hasard assumé, punaise et bail
 
 Changement de **règle**, pas de présentation, arrivé avec le Lot 2 : mettre les
 grandes décisions dans le même écran que l'étal a rendu criante l'asymétrie
@@ -629,10 +629,26 @@ de l'envie ; à droite, un catalogue permanent qui n'en crée aucune — une car
 qu'on peut activer *n'importe quand* ne se décide jamais maintenant.
 
 - **Les décisions sont tirées comme le reste.** 2 par sprint
-  (`balance.json` → `shopDraw.decisionsPerSprint`), pioche « sac » identique à
-  celle des candidats : on vide le sac avant qu'il se reconstitue, donc une
-  carte vue aujourd'hui met un moment à revenir. Une carte **activée quitte le
-  sac définitivement** (elle ne peut de toute façon plus resservir).
+  (`balance.json` → `shopDraw.decisionsPerSprint`). Une carte **activée sort du
+  tirage définitivement** (elle ne peut de toute façon plus resservir).
+- **Des taux d'apparition, pas un sac.** Le premier jet utilisait une pioche
+  « sac » (on vide avant de reconstituer) pour les décisions comme pour les
+  candidats. C'était un faux hasard : un sac se compte, et « j'ai vu 4 cartes
+  sur 5, la dernière arrive » n'est plus un pari, c'est de la mémoire. Les
+  trois rayons tirent donc **au poids, sans mémoire d'un sprint à l'autre** —
+  une carte peut revenir deux sprints de suite ou manquer six sprints.
+  - Chaque Actif déclare une **rareté** (`commune` / `notable` / `rare`), dont
+    le poids vit dans `balance.json` → `shopDraw.rarityWeights`. Le même
+    vocabulaire sert aux trois rayons — un seul mot à apprendre.
+  - Un Actif peut **peser plus dans un scénario** via `eraWeights` : Jira sort
+    deux fois plus souvent en pleine Transformation agile. C'est là que
+    l'époque colore l'offre au lieu de seulement filtrer ce qui est disponible
+    (`eras`, qui reste un filtre binaire).
+  - La rareté ne s'affiche **que** quand elle sort de l'ordinaire (`◆ NOTABLE`,
+    `◆◆ RARE`) : un marquage porté par toutes les cartes ne marque plus rien.
+  - Seul un candidat déjà **embauché** et une pratique déjà **possédée**
+    quittent leur pool : le marché du travail ne se vide pas parce qu'on a
+    regardé une annonce.
 - **Ce que ça achète, côté joueur.** La question devient « ça me coûte un slot
   sur quatre, mais est-ce que je la reverrai ? » au lieu de « je verrai plus
   tard ». Le regret est la moitié du sel d'un roguelike ; un menu permanent ne
@@ -647,16 +663,56 @@ qu'on peut activer *n'importe quand* ne se décide jamais maintenant.
   qu'on aurait pu payer. Re-tirer les deux rayons ensemble et non un seul est
   volontaire : renoncer à un bon candidat pour aller chercher une décision fait
   partie du pari.
+- **📌 Réserver**, l'autre réponse au hasard — une punaise dans le coin de la
+  carte, pas un troisième bouton (deux boutons empilés suffisent déjà à la
+  hauteur d'une carte, et « garder pour plus tard » est un geste de
+  manipulation d'objet, pas une décision). Elle coûte 1 🪙, garantit l'Actif
+  dans l'offre du **sprint suivant**, et **résiste au re-tirage** : payer pour
+  garder doit tenir face au hasard qu'on paie pour rejouer. Le bail est d'un
+  sprint — sinon une pièce annulerait toute la rareté qu'on vient de créer.
+  Décoller la punaise dans le même sprint rembourse.
+  - Les deux outils se répondent : 🎲 pour **chercher**, 📌 pour **garder**.
+    Le combo « je punaise Lina, puis je re-tire le reste » est voulu.
+- **🔒 Les cartes à prérequis et leur bail.** Une carte peut déclarer un
+  `requires` (même grammaire de conditions que les objectifs de board, §8.2) :
+  elle s'affiche complète, lisible, mais reste inactivable tant que la
+  condition est fausse. Sa condition occupe une **ligne d'impact**, au même
+  endroit que les deltas : un prérequis est une donnée de la décision, pas un
+  message d'erreur.
+  - Comme les cartes tournent à chaque sprint, une carte gatée tirée au mauvais
+    moment serait une carte perdue. Elle prend donc un **bail** dès qu'elle
+    sort : elle reste punaisée sur le rayon pendant un trimestre
+    (`shopDraw.lockedLeaseSprints`, 6 sprints), **en plus** du tirage — le
+    temps de réunir la condition. Un objectif à moyen terme apparaît au milieu
+    du hasard, ce qui donne au rayon une deuxième vitesse de lecture.
+  - Première carte du genre : **Passage en Shape Up** (`rare`, demande 2
+    profils seniors). Sur Meridia — équipe senior héritée — la condition est
+    déjà vraie et la carte n'est qu'un tirage rare de plus ; sur Karavel —
+    équipe 100 % junior — c'est un vrai programme de recrutement. La même carte
+    ne raconte pas la même chose selon la boîte.
 - **Une carte activée ce sprint reste sur le rayon** jusqu'à la fin du tour,
   tamponnée et reléguée en fin de rayon — elle disparaît au sprint suivant. Ce
   qu'on a activé se relit dans le Panneau de bord et sur le plateau des
   Fondations, pas sur l'étal.
-- **Limite connue.** Le catalogue ne compte que 5 cartes pour la
-  Transformation agile (3 génériques + 2 d'époque) : à 2 tirées par sprint sur
-  12 sprints, le sac tourne vite et la rareté se sent peu. Le système est
-  calibré pour un catalogue de 10-15 cartes — c'est du contenu à écrire, pas
-  une mécanique à revoir.
+- **Le rail replié du Panneau de bord**, resté sur l'établi depuis le Lot 1, est
+  fait : un clic replie la colonne en un rail de 62 px qui garde les six jauges
+  en vignette (barre + valeur, tooltips complets) et rend 260 px aux cartes. Sur
+  un écran qui empile deux rayons, c'est une colonne de cartes entière.
+- **Contenu.** Le catalogue ne compte que 6 cartes de décision : à 2 tirées par
+  sprint, la rareté se sentira surtout quand il en comptera 10-15. C'est du
+  contenu à écrire, pas une mécanique à revoir — les poids sont déjà en place et
+  se règlent dans `balance.json` sans toucher au code.
 - **Recette.** `smoke_test_logic` gagne un bloc déterministe
-  (`_test_investment_draw_rules`) : offre sans doublon, stabilité du tirage
-  dans le sprint, prix du re-tirage croissant puis remis à zéro, refus à sec, et
-  une décision activée qui ne ressort jamais sur 30 sprints.
+  (`_test_investment_draw_rules`) : offre sans doublon, stabilité du tirage dans
+  le sprint, prix du re-tirage croissant puis remis à zéro, refus à sec,
+  décision activée qui ne ressort jamais sur 30 sprints, **taux d'apparition
+  vérifiés sur 600 sprints** (une `rare` doit sortir nettement moins qu'une
+  `commune`, et `eraWeights` doit peser), punaise qui survit à un re-tirage puis
+  tombe au bout d'un sprint, et bail complet d'une carte gatée (verrouillée,
+  activable une fois la condition réunie, expirée à l'échéance).
+  - La stratégie `stress` a dû être réécrite : elle activait « la première carte
+    du catalogue » et comptait sur le −35 Moral de RICE pour amorcer la spirale
+    du burn-out. Ce n'est plus possible — elle prend maintenant **la pire carte
+    pour le Moral parmi celles tirées**, et ré-essaie chaque sprint. Le critère
+    de recette (« la spirale burn-out reste atteignable ») tient toujours, mais
+    il fallait que l'IA de test apprenne à jouer avec l'offre, comme un joueur.

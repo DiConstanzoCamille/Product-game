@@ -17,7 +17,7 @@
     },
     "structural": {
       "id": "grandes-decisions-structurelles",
-      "description": "Tirées au rayon des Investissements comme le reste de l'offre (pioche « sac », 2 par sprint, une carte activée quitte le sac définitivement), et limitées à 3-4 activations par mandat, avec un vrai coût de bascule. Passer son tour sur une carte, c'est parier qu'elle reviendra.",
+      "description": "Tirées au rayon des Investissements comme le reste de l'offre (2 par sprint, tirage pondéré par la rareté et le scénario, sans mémoire d'un sprint à l'autre ; une carte activée sort du tirage définitivement), et limitées à 3-4 activations par mandat, avec un vrai coût de bascule. Passer son tour sur une carte, c'est parier qu'elle reviendra — on peut payer pour la garder (punaise) ou pour rejouer l'offre (re-tirage). Une carte à prérequis reste affichée un trimestre, verrouillée tant que sa condition est fausse.",
       "families": [
         { "id": "outil-process", "label": "Outils / process", "example": "RICE, Notion, Jira", "affects": "Effet direct sur les jauges" },
         { "id": "stack-technique", "label": "Stack technique / produit", "example": "React", "affects": "Effet sur le shop de recrutement, pas sur les jauges" },
