@@ -1,5 +1,5 @@
 extends Control
-## Phase 5 — Résolution (docs/carnet-de-regles.md §3, §14-15). Applique le
+## Phase 4 — Résolution (docs/carnet-de-regles.md §3, §14-15). Applique le
 ## panier d'effets accumulé pendant le sprint (coûts des décisions + revenu
 ## du modèle économique du scénario), anime le passage de l'ancienne à la
 ## nouvelle valeur de chaque jauge, affiche le revenu séparément des coûts,
@@ -34,7 +34,7 @@ func _ready() -> void:
 	UIHelpers.apply_mono(sprint_label, 12)
 	UIHelpers.fade_in(self)
 
-	sprint_label.text = "Sprint %d — Phase 5 : Résolution" % SprintState.sprint_number
+	sprint_label.text = "Sprint %d — Phase 4 : Résolution" % SprintState.sprint_number
 
 	var old_values: Dictionary = SprintState.resource_values.duplicate()
 	mandate_ending = SprintState.apply_pending_and_check()

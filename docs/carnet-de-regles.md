@@ -39,13 +39,14 @@ Trois échelles imbriquées :
 
 ## 3. Anatomie d'un sprint
 
-Cinq phases, dans l'ordre :
+Quatre phases, dans l'ordre :
 
 1. **Inbox** — un événement aléatoire tombe (le "chaos humain") et force un choix avant toute planification.
 2. **Roadmap** — 2 à 4 features proposées, sélection limitée par la **capacité** de l'équipe. Dépasser sa capacité déclenche une surchauffe (dette + cynisme en hausse).
-3. **Grandes décisions** — activation optionnelle d'une décision structurelle (voir §6.2). Pas systématique à chaque sprint.
-4. **Recrutement** — accès optionnel au shop.
-5. **Résolution** — application des effets, delta affiché (voir maquette HUD dans la landing page).
+3. **Investissements** — tout ce que l'organisation acquiert, en deux rayons d'un même écran : l'**étal du sprint** (2 candidats + 2 pratiques tirés pour ce sprint, voir §9) puis les **grandes décisions** (catalogue permanent, activation optionnelle, voir §6.2). Les deux sont facultatifs ; l'arbitrage du tour est de choisir *où* passe la pièce.
+4. **Résolution** — application des effets, delta affiché (voir maquette HUD dans la landing page).
+
+> Les grandes décisions ont eu leur propre phase jusqu'au Lot 2 de la refonte UI (§20) : n'étant activées que 3-4 fois par mandat, elle n'était qu'un péage à cliquer 8 à 9 sprints sur 12.
 
 ---
 
@@ -494,7 +495,7 @@ Implémentation du deuxième lot de la
 Premier lot de la [proposition UI](proposition-ui-interface.md), en réponse aux
 cinq retours post-Phase B. **Aucune règle ni aucun flux ne change** : les
 mêmes données, les mêmes effets, les mêmes phases — seule la façon de les
-présenter change. Le lot suivant fusionnera les écrans Grandes décisions et
+présenter change. Le lot suivant (§20) fusionne les écrans Grandes décisions et
 Marché en « Investissements » ; celui d'après ajoutera la preview d'impact.
 
 - **Le thème passe en clair.** `resources/theme/main_theme.tres` inverse la
@@ -559,3 +560,60 @@ Marché en « Investissements » ; celui d'après ajoutera la preview d'impact.
   validé — il n'y a plus deux faces à retourner.
 - **Recette.** Les deux smoke tests headless passent sans modification, plus un
   run visuel des 11 écrans (thème clair, cartes, panneau, dossier).
+
+---
+
+## 20. Refonte UI — Lot 2 : les Investissements (5 → 4 phases)
+
+Deuxième lot de la [proposition UI](proposition-ui-interface.md) (§3). Le
+premier lot avait donné aux trois types d'Actif la même carte ; celui-ci leur
+donne le même écran. **Aucune règle de simulation ne change** — mêmes tirages,
+mêmes coûts, mêmes effets, même limite d'activations : c'est le découpage du
+tour qui change.
+
+```
+Avant :  Inbox → Roadmap → Grandes décisions → Marché → Résolution
+Après :  Inbox → Roadmap → Investissements ─────────→ Résolution
+```
+
+- **Une phase disparaît, pas un contenu.** Les grandes décisions ne sont
+  activées que 3-4 fois par mandat : leur consacrer un écran plein *à chaque
+  sprint* donnait 8 à 9 passages où l'écran n'était qu'un péage à cliquer. Elles
+  deviennent un **rayon permanent** de l'écran d'acquisition. Un rayon qu'on
+  longe sans s'arrêter coûte zéro clic ; un écran qu'on traverse en coûte un,
+  plus un chargement de scène.
+- **Deux rayons, un seul scroll, pas d'onglets.** 📦 **L'étal du sprint**
+  (périssable, tirage du sprint, règle anti-re-tirage inchangée) puis 🃏 **Les
+  grandes décisions** (catalogue permanent). L'intérêt de la fusion est
+  précisément de mettre les investissements **en concurrence dans le même champ
+  de vision** : « cette pièce, je la garde pour Lina ou je prends Discovery —
+  ou est-ce que ce sprint est celui où j'active Jira ? ». Des onglets auraient
+  reconstruit la cloison qu'on vient d'abattre.
+- **L'écran s'appelle « Investissements ».** Question ouverte du §7 de la
+  proposition, tranchée : « Marché » ne couvrait que la moitié de ce qu'on y
+  fait — on n'achète pas une méthodologie d'organisation sur un étal. Le mot
+  couvre les trois types d'Actif et porte la bonne idée (ça coûte maintenant,
+  ça rapporte — ou pas — plus tard). Le rayon périssable, lui, garde le nom
+  d'« étal du sprint ». `recruitment_screen` et `decisions_screen` deviennent
+  un seul `investments_screen`.
+- **Les activées passent en fin de rayon.** Le catalogue met en avant ce qu'il
+  reste à décider ; une carte activée reste visible (tamponnée, grisée) mais
+  cesse d'occuper la tête de rayon. Elle ne se déplace que le sprint où on
+  l'active, et garde son angle : c'est le même objet, posé ailleurs.
+- **Le compteur de slots vit dans le titre du rayon** (« 1 activée · 3 slots
+  restants sur 4 »), et une seconde fois dans la section Actifs du Panneau de
+  bord. Le badge de profil d'équipe 🌱/🏛️, lui, avait déjà migré dans
+  l'en-tête du panneau au Lot 1 : c'est un trait de la run, pas de la phase.
+- **Les colonnes suivent la fenêtre, et la fenêtre grandit.** Les deux rayons
+  partagent un nombre de colonnes calculé sur la largeur disponible (carte de
+  236 px mini, 4 colonnes au plus) au lieu d'un compte fixe : avec le Panneau
+  de bord qui prend 320 px, une grille à 4 colonnes fixes sortait une barre de
+  défilement horizontale — supportable sur un rayon, absurde sur deux qui se
+  répondent. Et la fenêtre par défaut passe de 1152×648 (la valeur d'usine de
+  Godot) à **1600×900** : à 1152, il ne restait la place que de deux cartes de
+  front, soit quatre écrans de défilement vertical pour lire les deux rayons —
+  exactement ce que la fusion cherchait à éviter.
+- **La Résolution devient la phase 4** ; les libellés de sprint, les
+  enchaînements `NEXT_SCENE` et `data/structure.json` suivent.
+- **Recette.** Les deux smoke tests headless (dont `smoke_test_ui`, qui passe
+  de 10 à 9 écrans) plus un mandat complet joué à la main.

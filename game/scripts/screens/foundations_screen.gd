@@ -4,7 +4,8 @@ extends Control
 ## attend une condition précise. Accessible depuis l'écran de Résolution.
 ##
 ## Affiche l'état réel du mandat en cours (SprintState.activated_cards),
-## pas les données de démo — une grande décision activée en phase 3 devient
+## pas les données de démo — une grande décision activée au rayon des
+## Investissements (phase 3) devient
 ## une Fondation active ici. MVP : pas encore de Fondation "en attente"
 ## avec prérequis (voir docs/carnet-de-regles.md §14, limites connues).
 
@@ -31,7 +32,7 @@ func _load_board() -> void:
 
 	if SprintState.activated_cards.is_empty():
 		var empty_label := Label.new()
-		empty_label.text = "Aucune fondation active pour l'instant — activez une grande décision en phase 3 pour qu'elle apparaisse ici."
+		empty_label.text = "Aucune fondation active pour l'instant — activez une grande décision au rayon 🃏 des Investissements pour qu'elle apparaisse ici."
 		empty_label.autowrap_mode = TextServer.AUTOWRAP_WORD
 		empty_label.custom_minimum_size = Vector2(520, 0)
 		empty_label.add_theme_color_override("font_color", UIHelpers.COLOR_SOFT_TEXT)

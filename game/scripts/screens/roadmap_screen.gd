@@ -7,7 +7,7 @@ extends Control
 ## soi-même" (spec §7.2) achète des points de capacité supplémentaires en
 ## Énergie ⚡ — le sprint de l'entreprise contre la jauge du joueur.
 
-const NEXT_SCENE := "res://scenes/screens/decisions_screen.tscn"
+const NEXT_SCENE := "res://scenes/screens/investments_screen.tscn"
 const START_SCREEN_SCENE := "res://scenes/screens/start_screen.tscn"
 
 @onready var sprint_label: Label = $Margin/VBox/TopBar/SprintLabel

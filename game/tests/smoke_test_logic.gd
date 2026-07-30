@@ -254,7 +254,8 @@ func _play_sprint(strategy: String) -> void:
 		])
 		SprintState.delivered_feature_ids = feature_ids.duplicate()
 
-	# Phase 3 — Grandes décisions. "greedy" en active deux, aux sprints 2 et 4
+	# Phase 3 — Investissements, rayon 🃏 des grandes décisions. "greedy" en
+	# active deux, aux sprints 2 et 4
 	# (un joueur pressé mais pas au point de brûler la trésorerie en cartes) ;
 	# "stress" en active une au sprint 1 puis n'a plus la tête à ça — il faut
 	# que la trésorerie survive assez longtemps pour que le burn-out arrive.
@@ -269,7 +270,8 @@ func _play_sprint(strategy: String) -> void:
 				SprintState.activated_card_sprints[card_id] = SprintState.sprint_number
 				break
 
-	# Phase 4 — Marché : tirage stocké (pas de re-tirage en revisitant).
+	# Phase 3 — Investissements, rayon 📦 de l'étal : tirage stocké (pas de
+	# re-tirage en revisitant).
 	var offer := SprintState.get_shop_offer()
 	var offer_again := SprintState.get_shop_offer()
 	if not _same_offer(offer, offer_again):
@@ -303,7 +305,7 @@ func _play_sprint(strategy: String) -> void:
 		if SprintState.pieces < 2 and SprintState.resource_values.get("capital-politique", 0.0) > 40.0 and SprintState.personal_action_refusal() == "":
 			SprintState.do_negotiate_extension()
 
-	# Phase 5 — Résolution.
+	# Phase 4 — Résolution.
 	var ending := SprintState.apply_pending_and_check()
 	if ending != "":
 		return

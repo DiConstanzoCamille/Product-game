@@ -34,7 +34,7 @@ Product-game/
     ├── resources/
     │   ├── theme/main_theme.tres     # thème partagé (couleurs de marque)
     │   └── shaders/                  # fond quadrillé façon landing page
-    ├── scenes/screens/               # 7 écrans : accueil + les 5 phases de sprint + fondations
+    ├── scenes/screens/               # accueil, choix de scénario/entreprise, les 4 phases de sprint, fondations, fin de mandat
     │   ├── start_screen.tscn
     │   ├── inbox_screen.tscn
     │   ├── roadmap_screen.tscn
@@ -53,7 +53,7 @@ Product-game/
 - [`docs/tech-stack.md`](docs/tech-stack.md) — le choix du moteur de jeu (Godot 4) et les alternatives écartées (Three.js, Unity, Unreal, stack web).
 - [`docs/spec-profondeur-gameplay.md`](docs/spec-profondeur-gameplay.md) — la spécification de la prochaine phase de gameplay (économie de pièces, équipe/roster à rôles, shop à tirage aléatoire, roadmap profonde avec epics et informations cachées) — conception uniquement, pas encore implémentée.
 - [`landing/index.html`](landing/index.html) — une page de présentation interactive du concept : cartes retournables, jauges de ressources, aperçu d'écrans de jeu (inbox, roadmap, recrutement), présentation des époques et des fins de mandat. Toutes ses données viennent de `data/`, pas de contenu codé en dur.
-- [`game/`](game/README.md) — le projet Godot 4 : un mandat complet est jouable de bout en bout (Accueil → Inbox → Roadmap → Grandes décisions → Recrutement → Résolution → sprint suivant → fin de mandat), avec une vraie simulation persistante des 6 ressources et les mêmes `data/*.json` que la landing page (plus `data/balance.json`, propre au jeu), une identité visuelle propre (polices de marque, icônes, portraits, fond quadrillé, animations légères — toutes licences libres, détail dans `game/assets/THIRD_PARTY_NOTICES.md`). Pas encore équilibré (tous les nombres sont dans `data/balance.json`, ajustables sans toucher au code) — voir `game/README.md` pour le détail et les limites connues.
+- [`game/`](game/README.md) — le projet Godot 4 : un mandat complet est jouable de bout en bout (Accueil → Inbox → Roadmap → Investissements → Résolution → sprint suivant → fin de mandat), avec une vraie simulation persistante des 6 ressources et les mêmes `data/*.json` que la landing page (plus `data/balance.json`, propre au jeu), une identité visuelle propre (polices de marque, icônes, portraits, fond quadrillé, animations légères — toutes licences libres, détail dans `game/assets/THIRD_PARTY_NOTICES.md`). Pas encore équilibré (tous les nombres sont dans `data/balance.json`, ajustables sans toucher au code) — voir `game/README.md` pour le détail et les limites connues.
 
 ## Voir la landing page
 
