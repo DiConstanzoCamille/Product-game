@@ -34,6 +34,7 @@ var failures: int = 0
 
 func _ready() -> void:
 	_test_energy_rules()
+	_test_investment_draw_rules()
 
 	for strategy in ["stress", "greedy", "careful"]:
 		print("\n=== SMOKE TEST LOGIQUE — %s ===" % strategy.to_upper())
@@ -63,6 +64,74 @@ func _fail(message: String) -> void:
 	failures += 1
 	push_error(message)
 	print("ASSERTION ÉCHOUÉE : %s" % message)
+
+
+## Vérifications déterministes du tirage des Investissements (carnet §21) :
+## les grandes décisions sont tirées comme le reste de l'offre, une carte
+## activée ne revient jamais, et le re-tirage se paie de plus en plus cher.
+func _test_investment_draw_rules() -> void:
+	print("=== SMOKE TEST LOGIQUE — TIRAGE DES INVESTISSEMENTS ===")
+	var draw_conf: Dictionary = GameData.balance.get("shopDraw", {})
+	var reroll_conf: Dictionary = draw_conf.get("reroll", {})
+	var base_cost := int(reroll_conf.get("baseCost", 1))
+	var increment := int(reroll_conf.get("costIncrement", 1))
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+
+	var offer := SprintState.get_shop_offer()
+	var decisions: Array = offer.get("decisions", [])
+	if decisions.is_empty():
+		_fail("L'offre du sprint 1 ne propose aucune grande décision.")
+	if _has_duplicate(decisions):
+		_fail("L'offre propose deux fois la même grande décision : %s." % [decisions])
+	if SprintState.get_shop_offer().get("decisions", []) != decisions:
+		_fail("Le rayon des décisions a été re-tiré en revisitant l'écran.")
+
+	# Le prix du re-tirage part de sa base et monte à chaque usage du sprint.
+	if SprintState.shop_reroll_cost() != base_cost:
+		_fail("Premier re-tirage à %d 🪙 au lieu de %d." % [SprintState.shop_reroll_cost(), base_cost])
+	SprintState.pieces = 20
+	var pieces_before := SprintState.pieces
+	if SprintState.reroll_shop_offer() != "":
+		_fail("Re-tirage refusé alors que les pièces suffisent.")
+	if SprintState.pieces != pieces_before - base_cost:
+		_fail("Le re-tirage a coûté %d 🪙 au lieu de %d." % [pieces_before - SprintState.pieces, base_cost])
+	if SprintState.shop_reroll_cost() != base_cost + increment:
+		_fail("Deuxième re-tirage à %d 🪙 au lieu de %d." % [SprintState.shop_reroll_cost(), base_cost + increment])
+	SprintState.reroll_shop_offer()
+	if SprintState.shop_reroll_cost() != base_cost + 2 * increment:
+		_fail("Troisième re-tirage à %d 🪙 au lieu de %d." % [SprintState.shop_reroll_cost(), base_cost + 2 * increment])
+
+	# À sec, on ne re-tire pas.
+	SprintState.pieces = 0
+	if SprintState.reroll_shop_offer() != "pieces":
+		_fail("Re-tirage accepté sans pièces.")
+
+	# Le prix repart à sa base au sprint suivant.
+	SprintState.sprint_number += 1
+	if SprintState.shop_reroll_cost() != base_cost:
+		_fail("Le prix du re-tirage n'est pas reparti à %d au sprint suivant (%d)." % [base_cost, SprintState.shop_reroll_cost()])
+
+	# Une décision activée quitte le sac : elle ne doit plus jamais sortir.
+	var activated_id: String = SprintState.get_shop_offer().get("decisions", [""])[0]
+	SprintState.activated_cards.append(activated_id)
+	SprintState.activated_card_sprints[activated_id] = SprintState.sprint_number
+	for sprint in range(30):
+		SprintState.sprint_number += 1
+		if SprintState.get_shop_offer().get("decisions", []).has(activated_id):
+			_fail("La décision activée « %s » est ressortie au tirage du sprint %d." % [activated_id, SprintState.sprint_number])
+			break
+
+	print("Tirage des Investissements : OK (%d décisions par sprint, re-tirage %d 🪙 +%d)" % [
+		int(draw_conf.get("decisionsPerSprint", 2)), base_cost, increment])
+
+
+func _has_duplicate(ids: Array) -> bool:
+	var seen: Array = []
+	for id in ids:
+		if seen.has(id):
+			return true
+		seen.append(id)
+	return false
 
 
 ## Vérifications déterministes des règles d'Énergie (spec profondeur §7) :
@@ -254,28 +323,35 @@ func _play_sprint(strategy: String) -> void:
 		])
 		SprintState.delivered_feature_ids = feature_ids.duplicate()
 
-	# Phase 3 — Investissements, rayon 🃏 des grandes décisions. "greedy" en
-	# active deux, aux sprints 2 et 4
-	# (un joueur pressé mais pas au point de brûler la trésorerie en cartes) ;
-	# "stress" en active une au sprint 1 puis n'a plus la tête à ça — il faut
-	# que la trésorerie survive assez longtemps pour que le burn-out arrive.
+	# Phase 3 — Investissements : une seule offre pour les deux rayons, tirée
+	# une fois par sprint (revisiter l'écran ne re-tire pas).
+	var offer := SprintState.get_shop_offer()
+	var offer_again := SprintState.get_shop_offer()
+	if not _same_offer(offer, offer_again):
+		_fail("L'offre a été re-tirée deux fois au sprint %d — elle doit être stockée." % SprintState.sprint_number)
+
+	# 🎲 Re-tirage : "greedy" retente sa chance au sprint 3 s'il a les moyens —
+	# le chemin payant du re-tirage reste couvert, prix croissant compris.
+	if strategy == "greedy" and SprintState.sprint_number == 3 and SprintState.pieces >= SprintState.shop_reroll_cost() + 3:
+		SprintState.reroll_shop_offer()
+		offer = SprintState.get_shop_offer()
+
+	# Rayon 🃏 : "greedy" active deux décisions, aux sprints 2 et 4 (un joueur
+	# pressé mais pas au point de brûler la trésorerie en cartes) ; "stress" en
+	# active une au sprint 1 puis n'a plus la tête à ça — il faut que la
+	# trésorerie survive assez longtemps pour que le burn-out arrive. On ne peut
+	# activer que ce qui a été **tiré** : passer son tour, c'est peut-être
+	# passer son tour pour longtemps.
 	var wants_card := (strategy == "stress" and SprintState.sprint_number == 1) or (strategy == "greedy" and SprintState.sprint_number in [2, 4])
 	if wants_card and SprintState.activated_cards.size() < int(GameData.balance.get("structuralDecisionMaxActivations", 4)):
-		for card in GameData.cards.get("cards", []):
-			var card_id: String = card.get("id", "")
+		for card_id in offer.get("decisions", []):
 			if not SprintState.activated_cards.has(card_id):
+				var card := SprintState.find_card(card_id)
 				var card_deltas := EffectResolver.resolve_card_activation(card_id, SprintState.team_profile, SprintState.era_id)
 				SprintState.add_pending(card_deltas, "Grande décision : %s" % card.get("name", card_id))
 				SprintState.activated_cards.append(card_id)
 				SprintState.activated_card_sprints[card_id] = SprintState.sprint_number
 				break
-
-	# Phase 3 — Investissements, rayon 📦 de l'étal : tirage stocké (pas de
-	# re-tirage en revisitant).
-	var offer := SprintState.get_shop_offer()
-	var offer_again := SprintState.get_shop_offer()
-	if not _same_offer(offer, offer_again):
-		_fail("Le Marché a été retiré deux fois au sprint %d — l'offre doit être stockée." % SprintState.sprint_number)
 
 	if strategy == "stress":
 		# Plus d'achats compulsifs : ce CPO-là compense tout de sa personne —

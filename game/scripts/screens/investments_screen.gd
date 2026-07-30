@@ -37,6 +37,7 @@ const MAX_COLUMNS := 4
 @onready var shop_grid: GridContainer = $Margin/VBox/Scroll/Pad/Shelves/ShopGrid
 @onready var decisions_head: VBoxContainer = $Margin/VBox/Scroll/Pad/Shelves/DecisionsHead
 @onready var decisions_grid: GridContainer = $Margin/VBox/Scroll/Pad/Shelves/DecisionsGrid
+@onready var reroll_button: Button = $Margin/VBox/BottomBar/RerollButton
 @onready var next_button: Button = $Margin/VBox/BottomBar/NextButton
 
 var offer: Dictionary = {}
@@ -64,10 +65,14 @@ func _ready() -> void:
 	# relit que les rayons.
 	side_panel.state_changed.connect(_refresh_shelves)
 
+	reroll_button.pressed.connect(_on_reroll_pressed)
+
+	offer = SprintState.get_shop_offer()
 	_build_shop_shelf()
 	_build_decisions_shelf()
 	_refresh_shop_head()
 	_refresh_decisions_head()
+	_refresh_reroll_button()
 
 	# Le nombre de colonnes suit la largeur disponible, et il est **commun aux
 	# deux rayons** pour qu'ils s'alignent. Sans ça, une grille à nombre de
@@ -79,8 +84,6 @@ func _ready() -> void:
 
 # ── 📦 L'étal du sprint ───────────────────────────────────────────────────
 func _build_shop_shelf() -> void:
-	offer = SprintState.get_shop_offer()
-
 	for candidate in offer.get("candidates", []):
 		var card := _add_shop_card("candidate", candidate)
 		card.primary_pressed.connect(_on_hire_pressed.bind(candidate))
@@ -115,6 +118,8 @@ func _refresh_shop_head() -> void:
 		child.free()
 
 	var subtitle := "tiré une fois par sprint — revenir sur l'écran ne re-tire pas"
+	if int(offer.get("rerolls", 0)) > 0:
+		subtitle = "re-tiré %d fois ce sprint" % int(offer.get("rerolls", 0))
 	if SprintState.next_hire_discount > 0:
 		subtitle += " · réseau : −%d 🪙 sur la prochaine embauche" % SprintState.next_hire_discount
 	shop_head.add_child(UIHelpers.make_shelf_head("📦 L'étal du sprint", subtitle))
@@ -122,16 +127,13 @@ func _refresh_shop_head() -> void:
 
 # ── 🃏 Les grandes décisions ──────────────────────────────────────────────
 func _build_decisions_shelf() -> void:
-	var available: Array = []
-	for card in GameData.cards.get("cards", []):
-		var eras: Array = card.get("eras", [])
-		if eras.is_empty() or eras.has(SprintState.era_id):
-			available.append(card)
-
 	# Le décalage de placement continue celui de l'étal : deux cartes voisines de
 	# part et d'autre de la frontière des rayons ne prennent pas le même angle.
 	var placement := _shop_cards.size()
-	for card in _sorted_decisions(available):
+	for card_id in offer.get("decisions", []):
+		var card: Dictionary = SprintState.find_card(card_id)
+		if card.is_empty():
+			continue
 		var asset_card := AssetCard.create(
 			UIHelpers.apply_card_placement(AssetView.for_decision(card), placement)
 		)
@@ -140,21 +142,17 @@ func _build_decisions_shelf() -> void:
 		_decision_cards.append({"node": asset_card, "data": card, "placement": placement})
 		placement += 1
 
-
-## Les activées passent en fin de rayon (tamponnées « Activée » par AssetView) :
-## le catalogue met en avant ce qu'il reste à décider. L'ordre relatif du reste
-## ne bouge pas — une carte ne se déplace que le sprint où on l'active.
-func _sorted_decisions(cards: Array) -> Array:
-	var pending: Array = []
-	var activated: Array = []
-	for card in cards:
-		if SprintState.activated_cards.has(card.get("id", "")):
-			activated.append(card)
-		else:
-			pending.append(card)
-	return pending + activated
+	if _decision_cards.is_empty():
+		var empty_label := Label.new()
+		empty_label.text = "Aucune grande décision proposée ce sprint — le catalogue est épuisé pour ce mandat."
+		empty_label.autowrap_mode = TextServer.AUTOWRAP_WORD
+		empty_label.add_theme_color_override("font_color", UIHelpers.COLOR_SOFT_TEXT)
+		decisions_grid.add_child(empty_label)
 
 
+## Une carte activée pendant le sprint reste sur l'étal jusqu'à la fin du tour
+## (elle disparaît du sac, donc des sprints suivants), mais passe en fin de
+## rayon : le rayon met en avant ce qu'il reste à décider.
 func _reorder_decisions() -> void:
 	var pending: Array = []
 	var activated: Array = []
@@ -180,11 +178,15 @@ func _refresh_decisions_head() -> void:
 	var used: int = SprintState.activated_cards.size()
 	var maximum := int(GameData.balance.get("structuralDecisionMaxActivations", 4))
 	var left := maximum - used
-	var subtitle := "%d activée%s · %d slot%s restant%s sur %d — catalogue permanent, effets calibrés pour votre %s" % [
-		used, "s" if used > 1 else "",
-		left, "s" if left > 1 else "", "s" if left > 1 else "", maximum,
-		_team_profile_label(),
-	]
+	var subtitle := ""
+	if left <= 0:
+		subtitle = "%d/%d activées — plus de slot ce mandat, le reste du catalogue est là pour vous narguer" % [used, maximum]
+	else:
+		subtitle = "%d activée%s · %d slot%s restant%s sur %d — tirées pour ce sprint, rien ne garantit de les revoir · effets calibrés pour votre %s" % [
+			used, "s" if used > 1 else "",
+			left, "s" if left > 1 else "", "s" if left > 1 else "", maximum,
+			_team_profile_label(),
+		]
 	decisions_head.add_child(UIHelpers.make_shelf_head("🃏 Les grandes décisions", subtitle))
 
 
@@ -193,6 +195,42 @@ func _team_profile_label() -> String:
 		if profile.get("id", "") == SprintState.team_profile:
 			return profile.get("shortLabel", SprintState.team_profile)
 	return SprintState.team_profile
+
+
+# ── 🎲 Re-tirer l'offre ───────────────────────────────────────────────────
+## Le prix monte à chaque re-tirage du sprint : le premier coup d'œil de plus
+## est presque gratuit, s'acharner ne l'est pas. Il re-tire les **deux** rayons
+## d'un coup — c'est l'offre du sprint qu'on rejoue, pas un rayon qu'on trie,
+## et perdre un bon candidat pour voir une autre décision fait partie du pari.
+func _on_reroll_pressed() -> void:
+	if SprintState.reroll_shop_offer() != "":
+		return
+	offer = SprintState.get_shop_offer()
+	_rebuild_shelves()
+	_refresh_all()
+
+
+func _rebuild_shelves() -> void:
+	for grid in [shop_grid, decisions_grid]:
+		for child in grid.get_children():
+			grid.remove_child(child)
+			child.queue_free()
+	_shop_cards.clear()
+	_decision_cards.clear()
+
+	_build_shop_shelf()
+	_build_decisions_shelf()
+
+
+func _refresh_reroll_button() -> void:
+	var cost := SprintState.shop_reroll_cost()
+	reroll_button.text = "🎲 Re-tirer l'offre — %d 🪙" % cost
+	reroll_button.disabled = SprintState.pieces < cost
+	reroll_button.tooltip_text = "Re-tire les deux rayons. Le prix monte à chaque re-tirage du sprint (le prochain coûtera %d 🪙) et repart à %d au sprint suivant.\nVous avez %d 🪙." % [
+		cost + int(GameData.balance.get("shopDraw", {}).get("reroll", {}).get("costIncrement", 1)),
+		int(GameData.balance.get("shopDraw", {}).get("reroll", {}).get("baseCost", 1)),
+		SprintState.pieces,
+	]
 
 
 # ── Rafraîchissements ─────────────────────────────────────────────────────
@@ -209,6 +247,7 @@ func _refresh_shelves() -> void:
 	_reorder_decisions()
 	_refresh_shop_head()
 	_refresh_decisions_head()
+	_refresh_reroll_button()
 
 
 func _refresh_all() -> void:

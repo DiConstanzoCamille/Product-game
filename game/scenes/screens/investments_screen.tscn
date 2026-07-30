@@ -77,6 +77,9 @@ theme_override_constants/v_separation=14
 
 [node name="BottomBar" type="HBoxContainer" parent="Margin/VBox"]
 
+[node name="RerollButton" type="Button" parent="Margin/VBox/BottomBar"]
+text="🎲 Re-tirer l'offre"
+
 [node name="Spacer2" type="Control" parent="Margin/VBox/BottomBar"]
 size_flags_horizontal=3
 

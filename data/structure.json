@@ -17,7 +17,7 @@
     },
     "structural": {
       "id": "grandes-decisions-structurelles",
-      "description": "Pas de pioche : un menu permanent, activé quand le joueur le décide. Limité à 3-4 activations par mandat, avec un vrai coût de bascule.",
+      "description": "Tirées au rayon des Investissements comme le reste de l'offre (pioche « sac », 2 par sprint, une carte activée quitte le sac définitivement), et limitées à 3-4 activations par mandat, avec un vrai coût de bascule. Passer son tour sur une carte, c'est parier qu'elle reviendra.",
       "families": [
         { "id": "outil-process", "label": "Outils / process", "example": "RICE, Notion, Jira", "affects": "Effet direct sur les jauges" },
         { "id": "stack-technique", "label": "Stack technique / produit", "example": "React", "affects": "Effet sur le shop de recrutement, pas sur les jauges" },

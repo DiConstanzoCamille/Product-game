@@ -80,7 +80,7 @@ Six jauges. Aucune ne s'optimise seule.
 Une main piochée chaque sprint dans un deck — arbitrages du quotidien (priorisation ponctuelle, réponse à un incident, micro-ajustement). C'est la couche aléatoire, façon deckbuilder.
 
 ### 6.2 Grandes décisions structurelles
-Pas de pioche : un menu permanent, activé quand le joueur le décide. Limité à 3-4 activations par mandat, avec un vrai coût de bascule. Reflète le fait qu'une organisation ne change pas d'outil toutes les deux semaines. Trois familles, qui ne se comportent pas pareil dans le temps (détail en §7) :
+Limitées à 3-4 activations par mandat, avec un vrai coût de bascule. Reflète le fait qu'une organisation ne change pas d'outil toutes les deux semaines. Elles sont **tirées** au rayon des Investissements, comme les candidats et les pratiques (§21 — c'était un menu permanent jusqu'au Lot 2 de la refonte UI) : ce qui n'est pas activé aujourd'hui n'est pas garanti de revenir. Trois familles, qui ne se comportent pas pareil dans le temps (détail en §7) :
 - **Outils/process** (RICE, Notion, Jira) — effet direct sur les jauges
 - **Stack technique/produit** (ex. React) — effet sur le shop de recrutement, pas sur les jauges
 - **Méthodologie d'orga** (ex. Shape Up) — gatée par prérequis, n'apporte rien tant que les bonnes conditions ne sont pas réunies
@@ -567,9 +567,9 @@ Marché en « Investissements » ; celui d'après ajoutera la preview d'impact.
 
 Deuxième lot de la [proposition UI](proposition-ui-interface.md) (§3). Le
 premier lot avait donné aux trois types d'Actif la même carte ; celui-ci leur
-donne le même écran. **Aucune règle de simulation ne change** — mêmes tirages,
-mêmes coûts, mêmes effets, même limite d'activations : c'est le découpage du
-tour qui change.
+donne le même écran. Le découpage du tour change, pas les coûts ni les effets —
+la seule règle de simulation touchée est le passage des grandes décisions au
+tirage, qui a sa propre section (§21).
 
 ```
 Avant :  Inbox → Roadmap → Grandes décisions → Marché → Résolution
@@ -617,3 +617,46 @@ Après :  Inbox → Roadmap → Investissements ─────────→ R
   enchaînements `NEXT_SCENE` et `data/structure.json` suivent.
 - **Recette.** Les deux smoke tests headless (dont `smoke_test_ui`, qui passe
   de 10 à 9 écrans) plus un mandat complet joué à la main.
+
+---
+
+## 21. Les grandes décisions passent au tirage (+ le re-tirage payant)
+
+Changement de **règle**, pas de présentation, arrivé avec le Lot 2 : mettre les
+grandes décisions dans le même écran que l'étal a rendu criante l'asymétrie
+entre les deux rayons. À gauche du même scroll, une offre périssable qui crée
+de l'envie ; à droite, un catalogue permanent qui n'en crée aucune — une carte
+qu'on peut activer *n'importe quand* ne se décide jamais maintenant.
+
+- **Les décisions sont tirées comme le reste.** 2 par sprint
+  (`balance.json` → `shopDraw.decisionsPerSprint`), pioche « sac » identique à
+  celle des candidats : on vide le sac avant qu'il se reconstitue, donc une
+  carte vue aujourd'hui met un moment à revenir. Une carte **activée quitte le
+  sac définitivement** (elle ne peut de toute façon plus resservir).
+- **Ce que ça achète, côté joueur.** La question devient « ça me coûte un slot
+  sur quatre, mais est-ce que je la reverrai ? » au lieu de « je verrai plus
+  tard ». Le regret est la moitié du sel d'un roguelike ; un menu permanent ne
+  produit aucun regret.
+- **Ce que ça coûte.** Le hasard peut servir trois sprints sans rien
+  d'intéressant. D'où le contrepoids :
+- **🎲 Re-tirer l'offre**, un bouton qui re-tire les **deux** rayons d'un coup
+  contre des pièces. Le prix part de 1 🪙 et monte de 1 à chaque usage **dans le
+  sprint** (`shopDraw.reroll`), puis repart à sa base au sprint suivant. Deux
+  raisons de le faire monter : la première relance doit être accessible avec
+  une allocation de board (2 🪙/sprint), et s'acharner doit coûter l'embauche
+  qu'on aurait pu payer. Re-tirer les deux rayons ensemble et non un seul est
+  volontaire : renoncer à un bon candidat pour aller chercher une décision fait
+  partie du pari.
+- **Une carte activée ce sprint reste sur le rayon** jusqu'à la fin du tour,
+  tamponnée et reléguée en fin de rayon — elle disparaît au sprint suivant. Ce
+  qu'on a activé se relit dans le Panneau de bord et sur le plateau des
+  Fondations, pas sur l'étal.
+- **Limite connue.** Le catalogue ne compte que 5 cartes pour la
+  Transformation agile (3 génériques + 2 d'époque) : à 2 tirées par sprint sur
+  12 sprints, le sac tourne vite et la rareté se sent peu. Le système est
+  calibré pour un catalogue de 10-15 cartes — c'est du contenu à écrire, pas
+  une mécanique à revoir.
+- **Recette.** `smoke_test_logic` gagne un bloc déterministe
+  (`_test_investment_draw_rules`) : offre sans doublon, stabilité du tirage
+  dans le sprint, prix du re-tirage croissant puis remis à zéro, refus à sec, et
+  une décision activée qui ne ressort jamais sur 30 sprints.

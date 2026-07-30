@@ -48,7 +48,7 @@ var next_hire_discount: int = 0        # remise 🪙 sur le prochain recrutement
 var delivered_feature_ids: Array = []  # features livrées ce sprint (posées par l'écran Roadmap)
 var board_review_state: String = "pending"  # "pending" | "passed" | "failed"
 var board_review_result: Dictionary = {}    # {sprint, passed, title, conditions:[{label, ok}]} — pour l'overlay de verdict
-var current_shop_offer: Dictionary = {}     # {sprint, candidates:[...], practices:[ids]} — tirage du Marché, pas de re-tirage
+var current_shop_offer: Dictionary = {}     # {sprint, candidates:[...], practices:[ids], decisions:[ids], rerolls} — tirage des Investissements
 
 # --- Phase B : l'économie du joueur (spec profondeur §7) ---
 var energy: int = 70                   # ⚡ jauge personnelle du CPO (0..energy.max), côté jeu uniquement
@@ -59,8 +59,9 @@ var last_energy_report: Dictionary = {}  # détail du delta Énergie de la derni
 
 var _inbox_event_bag: Array = []       # ids restants à tirer dans le "sac" courant
 var _last_inbox_event_id: String = ""  # évite une répétition immédiate entre deux sacs
-var _candidate_bag: Array = []         # ids de candidats restants dans le "sac" du Marché
+var _candidate_bag: Array = []         # ids de candidats restants dans le "sac" des Investissements
 var _hired_candidate_ids: Array = []   # candidats déjà embauchés ce mandat (ne reviennent pas au tirage)
+var _decision_bag: Array = []          # ids de grandes décisions restantes dans le "sac" (activées exclues)
 
 
 ## À appeler au lancement d'un nouveau mandat, une fois le scénario et
@@ -87,6 +88,7 @@ func reset_run(chosen_era_id: String = "", chosen_company_id: String = "") -> vo
 	_last_inbox_event_id = ""
 	_candidate_bag.clear()
 	_hired_candidate_ids.clear()
+	_decision_bag.clear()
 	owned_practices.clear()
 	fired_count = 0
 	next_hire_discount = 0
@@ -396,18 +398,25 @@ func plan_breather() -> String:
 	return ""
 
 
-# --- Le Marché : tirage du sprint (spec profondeur §5) ---
+# --- Les Investissements : tirage du sprint (spec profondeur §5) ---
 
-## Offre du Marché pour le sprint en cours : 2 candidats (pioche sac, trait
-## caché tiré à l'apparition) + 2 pratiques non possédées. Tirée une seule
-## fois par sprint puis stockée — revenir sur l'écran ne retire pas.
+## Offre du sprint en cours, pour les deux rayons : 2 candidats (pioche sac,
+## trait caché tiré à l'apparition) + 2 pratiques non possédées + 2 grandes
+## décisions (pioche sac elle aussi). Tirée une seule fois par sprint puis
+## stockée — revenir sur l'écran ne re-tire pas ; seul 🎲 Re-tirer l'offre,
+## qui se paie, change la donne.
 func get_shop_offer() -> Dictionary:
 	if int(current_shop_offer.get("sprint", -1)) == sprint_number:
 		return current_shop_offer
+	current_shop_offer = _draw_shop_offer(0)
+	return current_shop_offer
 
+
+func _draw_shop_offer(rerolls: int) -> Dictionary:
 	var draw_conf: Dictionary = GameData.balance.get("shopDraw", {})
 	var candidate_count := int(draw_conf.get("candidatesPerSprint", 2))
 	var practice_count := int(draw_conf.get("practicesPerSprint", 2))
+	var decision_count := int(draw_conf.get("decisionsPerSprint", 2))
 
 	var drawn_candidates: Array = []
 	for i in range(candidate_count):
@@ -426,12 +435,81 @@ func get_shop_offer() -> Dictionary:
 	practice_pool.shuffle()
 	var drawn_practices: Array = practice_pool.slice(0, min(practice_count, practice_pool.size()))
 
-	current_shop_offer = {
+	var drawn_decisions: Array = []
+	for i in range(decision_count):
+		var card_id := _draw_decision(drawn_decisions)
+		if card_id != "":
+			drawn_decisions.append(card_id)
+
+	return {
 		"sprint": sprint_number,
 		"candidates": drawn_candidates,
 		"practices": drawn_practices,
+		"decisions": drawn_decisions,
+		"rerolls": rerolls,
 	}
-	return current_shop_offer
+
+
+## Une grande décision se tire comme un candidat, dans un "sac" qui se
+## reconstitue une fois vide. C'est le changement de la refonte Lot 2 : le
+## catalogue permanent est devenu une offre, pour que passer son tour sur une
+## carte soit un vrai pari ("je la retrouverai quand ?"). Une carte activée
+## quitte le sac pour de bon — elle ne peut de toute façon plus resservir.
+func _draw_decision(already_drawn: Array) -> String:
+	for attempt in 2:
+		while not _decision_bag.is_empty():
+			var card_id: String = _decision_bag.pop_back()
+			if activated_cards.has(card_id) or already_drawn.has(card_id):
+				continue
+			return card_id
+		_refill_decision_bag(already_drawn)
+	return ""
+
+
+func _refill_decision_bag(exclude: Array) -> void:
+	for card in GameData.cards.get("cards", []):
+		var card_id: String = card.get("id", "")
+		var eras: Array = card.get("eras", [])
+		if not eras.is_empty() and not eras.has(era_id):
+			continue
+		if activated_cards.has(card_id) or exclude.has(card_id):
+			continue
+		_decision_bag.append(card_id)
+	_decision_bag.shuffle()
+
+
+func find_card(card_id: String) -> Dictionary:
+	for card in GameData.cards.get("cards", []):
+		if card.get("id", "") == card_id:
+			return card
+	return {}
+
+
+## 🎲 Re-tirer l'offre — le prix monte à chaque usage **dans le sprint** et
+## repart à sa base au sprint suivant (le compteur vit dans l'offre, qui est
+## elle-même datée). Payer pour revoir le hasard est le contrepoids du tirage :
+## sans lui, un sprint sans rien d'intéressant est subi ; avec lui, c'est un
+## arbitrage de plus contre les pièces qu'on aurait mises dans une embauche.
+func shop_reroll_cost() -> int:
+	var conf: Dictionary = GameData.balance.get("shopDraw", {}).get("reroll", {})
+	var base := int(conf.get("baseCost", 1))
+	var increment := int(conf.get("costIncrement", 1))
+	return base + increment * int(get_shop_offer().get("rerolls", 0))
+
+
+## Retourne "" si le re-tirage a eu lieu, sinon la raison du refus.
+func reroll_shop_offer() -> String:
+	var cost := shop_reroll_cost()
+	if pieces < cost:
+		return "pieces"
+
+	var rerolls := int(get_shop_offer().get("rerolls", 0)) + 1
+	pieces -= cost
+	current_shop_offer = _draw_shop_offer(rerolls)
+	pending_journal_lines.append("🎲 Offre re-tirée (%d 🪙) — %s" % [
+		cost, "le marché a d'autres idées" if rerolls == 1 else "encore une fois (%d ce sprint)" % rerolls
+	])
+	return ""
 
 
 func _draw_candidate() -> Dictionary:

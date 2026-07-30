@@ -145,7 +145,12 @@
   "shopDraw": {
     "candidatesPerSprint": 2,
     "practicesPerSprint": 2,
-    "practiceCynisme": 2
+    "decisionsPerSprint": 2,
+    "practiceCynisme": 2,
+    "reroll": {
+      "baseCost": 1,
+      "costIncrement": 1
+    }
   },
 
   "energy": {
