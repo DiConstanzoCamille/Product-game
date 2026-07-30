@@ -46,3 +46,15 @@ Générés localement avec [DiceBear](https://www.dicebear.com/) (style **Notion
 | `cpo-player.svg` | Le·la joueur·se (CPO), réservé usage futur | `cpo-player` |
 
 Pour ajouter un personnage : `npm install @dicebear/core @dicebear/collection` puis générer avec `createAvatar(notionists, { seed: "nom-du-perso" })` — voir le script utilisé dans l'historique de commit, non conservé dans le repo (pas un outil de build du projet).
+
+## Icônes d'objets — `items-kenney/`
+
+[Generic Items](https://kenney.nl/assets/generic-items) par [Kenney](https://kenney.nl/), licence [CC0](items-kenney/LICENSE-kenney-generic-items.txt) — domaine public, aucune attribution requise. Téléchargé le 30/07/2026 : 160 objets du quotidien de bureau/tech en icônes vectorielles plates (laptop, écrans, mallette, dossier, clé USB, presse-papiers, stéthoscope, appareil photo, livre, café...), utilisés pour incarner le type d'un Actif (candidat / décision / pratique) sur sa carte.
+
+- `PNG/Colored/` et `PNG/White/` — icônes individuelles (330 fichiers PNG au total, deux teintes).
+- `Vector/` — les mêmes en SVG (couleur + blanc).
+- `Spritesheet/` — tout en une planche + fichier `.xml` de découpe, si besoin d'un import groupé.
+
+Utilisé pour l'instant uniquement par le spike `scenes/prototype_2d/market_screen_proto.tscn`.
+
+Le [UI Pack](https://kenney.nl/assets/ui-pack) du même auteur a été évalué le 30/07/2026 puis **écarté** : ses boutons ronds et colorés jurent avec le ton corporate/satirique du jeu. Ne pas le réintroduire comme chrome des écrans sans nouvelle validation.
