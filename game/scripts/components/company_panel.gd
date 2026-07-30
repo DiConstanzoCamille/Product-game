@@ -31,8 +31,9 @@ func refresh() -> void:
 
 
 func _populate() -> void:
-	for child in content.get_children():
-		child.free()
+	# Le dossier se repeuple depuis ses propres boutons (🏛️ Rallonge) : voir
+	# UIHelpers.clear_children() pour pourquoi on ne peut pas les `free()` ici.
+	UIHelpers.clear_children(content)
 
 	var company: Dictionary = SprintState.get_company()
 	var era: Dictionary = SprintState.get_era()

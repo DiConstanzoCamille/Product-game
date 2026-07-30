@@ -121,6 +121,27 @@ class WavyRule extends Control:
 			draw_polyline(points, rule_color, 2.0)
 
 
+## Vide un conteneur qu'on va reconstruire — **détacher d'abord, libérer
+## ensuite**.
+##
+## Tous les composants de l'UI se reconstruisent de zéro à chaque changement
+## d'état, et cette reconstruction est presque toujours déclenchée par le clic
+## d'un bouton… qui vit dans le conteneur qu'on vide. Un `free()` direct détruit
+## donc le bouton **pendant que son signal `pressed` est en cours d'émission** :
+## Godot log « Object was freed or unreferenced while a signal is being emitted
+## from it » et prévient du risque de crash. Symptôme observé à chaque embauche,
+## chaque achat de pratique et chaque rallonge négociée.
+##
+## `queue_free()` seul ne suffit pas : le nœud resterait dans l'arbre jusqu'à la
+## fin de la frame et se ferait mettre en page **à côté** de son remplaçant.
+## D'où les deux temps — `remove_child()` sort le nœud du layout tout de suite,
+## `queue_free()` le détruit quand plus personne ne s'en sert.
+static func clear_children(container: Node) -> void:
+	for child in container.get_children():
+		container.remove_child(child)
+		child.queue_free()
+
+
 ## En-tête de rayon : titre souligné au feutre + mention de la règle du rayon
 ## (« tiré une fois par sprint », « 2 slots sur 4 »…). Commun aux deux rayons
 ## des écrans d'acquisition.

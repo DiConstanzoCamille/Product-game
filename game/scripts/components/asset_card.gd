@@ -119,8 +119,9 @@ func _set_hovered(entered: bool) -> void:
 
 func _rebuild() -> void:
 	var vbox: VBoxContainer = get_node("Margin/VBox")
-	for child in vbox.get_children():
-		child.free()
+	# La carte se reconstruit depuis le clic d'un de ses propres boutons : voir
+	# UIHelpers.clear_children() pour pourquoi on ne peut pas les `free()` ici.
+	UIHelpers.clear_children(vbox)
 
 	_tilt_degrees = float(_descriptor.get("tilt", 0.0))
 
@@ -167,8 +168,7 @@ func _apply_paper_style() -> void:
 ## contrairement au `top_level` du spike.
 func _build_decorations() -> void:
 	var layer: Control = get_node("Decorations")
-	for child in layer.get_children():
-		child.free()
+	UIHelpers.clear_children(layer)
 	# La carte se reconstruit à chaque changement d'état : sans ça, le callable
 	# de placement de la décoration précédente reste branché sur `resized` et
 	# référence un nœud déjà libéré.

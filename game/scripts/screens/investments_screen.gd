@@ -162,8 +162,7 @@ func _is_acquired(entry: Dictionary) -> bool:
 
 
 func _refresh_shelf_head() -> void:
-	for child in shelf_head.get_children():
-		child.free()
+	UIHelpers.clear_children(shelf_head)
 
 	var used: int = SprintState.activated_cards.size()
 	var maximum := int(GameData.balance.get("structuralDecisionMaxActivations", 4))

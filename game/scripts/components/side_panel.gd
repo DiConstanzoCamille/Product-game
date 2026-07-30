@@ -89,8 +89,9 @@ func refresh() -> void:
 
 func _build() -> void:
 	var vbox: VBoxContainer = get_node("Margin/Scroll/VBox")
-	for child in vbox.get_children():
-		child.free()
+	# Le panneau se reconstruit depuis ses propres boutons (roster, repli,
+	# dossier) : voir UIHelpers.clear_children() pour pourquoi pas de `free()`.
+	UIHelpers.clear_children(vbox)
 
 	if collapsed:
 		_build_rail(vbox)

@@ -115,7 +115,7 @@ Pas de dépendance/plugin externe : tout est construit avec les nœuds et l'API 
 - **Pas de pivot de business model en cours de run** : idée notée (§15 du carnet de règles) mais pas implémentée — demande au moins 2 modèles jouables pour avoir du sens.
 - **Employés non persistants** : le recrutement a un effet immédiat + un bonus de capacité durable, mais il n'y a pas encore d'employé "vivant" dont le trait s'applique en continu sprint après sprint (voir §14 du carnet de règles). Les traits de `recruitment-archetypes.json` restent illustratifs.
 - **Fondations sans prérequis** : le plateau affiche les grandes décisions activées, pas encore de Fondation "en attente" débloquée par une condition (le cas Shape Up de `foundations.json` reste un exemple de direction).
-- **Catalogue de décisions trop court pour son tirage** : depuis que les grandes décisions sont tirées (carnet §21), la rareté ne se sent que si le catalogue dépasse largement ce qu'on en voit. Il n'y a que 6 cartes et 2 sont tirées par sprint. Le système vise 10-15 cartes — c'est du contenu à écrire, pas une mécanique à revoir : les poids se règlent dans `balance.json` sans toucher au code.
+- **Catalogue de décisions trop court pour son tirage** : depuis que les grandes décisions sont tirées (carnet §21), la rareté ne se sent que si le catalogue dépasse largement ce qu'on en voit. Il n'y a que 6 cartes, et le rayon en propose ~2 par sprint. Le système vise 10-15 cartes — c'est du contenu à écrire, pas une mécanique à revoir : les poids se règlent dans `balance.json` sans toucher au code.
 - **Une seule carte à prérequis** : `shape-up` est la seule à exercer le mécanisme `requires` + bail. Les autres types de conditions (`practice-owned`, `resource-min`…) sont implémentés et testés côté moteur, mais aucune carte ne s'en sert encore.
 - **Pas de sauvegarde** : fermer le jeu perd la progression du mandat en cours — aucune persistance sur disque pour l'instant.
 - **Portraits** : seuls 5 personnages ont un avatar dédié (voir `assets/THIRD_PARTY_NOTICES.md`) — les autres candidats retombent sur une icône générique, ce qui est voulu pour les profils anonymes des petites annonces mais mériterait des portraits dédiés si de nouveaux personnages nommés sont ajoutés aux données.
@@ -127,7 +127,7 @@ Pas de dépendance/plugin externe : tout est construit avec les nœuds et l'API 
 
 ```bash
 godot --headless --path game res://tests/smoke_test_logic.tscn  # simule des mandats complets, 3 profils de joueur
-godot --headless --path game res://tests/smoke_test_ui.tscn     # instancie les 9 écrans, détecte les erreurs de chargement
+godot --headless --path game res://tests/smoke_test_ui.tscn     # instancie les 9 écrans + joue les gestes des Investissements
 ```
 
 `smoke_test_logic` fait rejouer des mandats entiers avec trois stratégies (`stress`, `greedy`, `careful`) et vérifie que les ressources restent dans les bornes et qu'une fin est toujours atteinte. C'est le filet de sécurité à relancer après tout changement dans `EffectResolver`, `SprintState` ou `data/balance.json`.

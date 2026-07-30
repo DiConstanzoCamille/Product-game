@@ -728,6 +728,19 @@ qu'on peut activer *n'importe quand* ne se décide jamais maintenant.
   types » n'en est pas un), punaise qui survit à un re-tirage puis tombe au bout
   d'un sprint, et bail complet d'une carte gatée (verrouillée, activable une
   fois la condition réunie, expirée à l'échéance).
+  - `smoke_test_ui` ne se contente plus d'instancier les écrans : il **clique
+    les vrais boutons** des Investissements (adopter, embaucher, activer,
+    punaiser, replier). C'est ce qui a fait tomber le bug ci-dessous.
+- **Un bug de fond, trouvé en jouant.** Tous les composants se reconstruisent
+  de zéro à chaque changement d'état, et cette reconstruction est presque
+  toujours déclenchée par le clic d'un bouton… qui vit dans le conteneur qu'on
+  vide. Le `free()` direct détruisait donc le bouton **pendant l'émission de son
+  signal** — « Object was freed or unreferenced while a signal is being emitted
+  from it », à chaque embauche, chaque achat de pratique et chaque rallonge
+  négociée. `UIHelpers.clear_children()` détache d'abord (`remove_child`, pour
+  que l'ancien nœud ne se fasse pas mettre en page à côté de son remplaçant) et
+  libère ensuite (`queue_free`). Le défaut datait du Lot 1 et touchait la carte
+  d'Actif, le Panneau de bord et le Dossier entreprise.
   - La stratégie `stress` a dû être réécrite : elle activait « la première carte
     du catalogue » et comptait sur le −35 Moral de RICE pour amorcer la spirale
     du burn-out. Ce n'est plus possible — elle prend maintenant **la pire carte
