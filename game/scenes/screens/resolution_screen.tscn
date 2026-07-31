@@ -66,6 +66,24 @@ text="CPO : Vous"
 theme_override_font_sizes/font_size=17
 text=""
 
+[node name="ScoreReplay" type="VBoxContainer" parent="Margin/VBox/Scroll/Content"]
+theme_override_constants/separation=6
+
+[node name="ScoreHeader" type="HBoxContainer" parent="Margin/VBox/Scroll/Content/ScoreReplay"]
+theme_override_constants/separation=12
+
+[node name="ScoreTitle" type="Label" parent="Margin/VBox/Scroll/Content/ScoreReplay/ScoreHeader"]
+size_flags_horizontal=3
+theme_override_font_sizes/font_size=18
+text="Traction × Levier = Impact"
+
+[node name="ScoreStatus" type="Label" parent="Margin/VBox/Scroll/Content/ScoreReplay/ScoreHeader"]
+theme_override_colors/font_color=Color(0.47451, 0.501961, 0.552941, 1)
+text=""
+
+[node name="ScoreLines" type="VBoxContainer" parent="Margin/VBox/Scroll/Content/ScoreReplay"]
+theme_override_constants/separation=4
+
 [node name="GaugesGrid" type="GridContainer" parent="Margin/VBox/Scroll/Content"]
 columns=2
 theme_override_constants/h_separation=24
@@ -94,3 +112,5 @@ size_flags_horizontal=3
 
 [node name="NextSprintButton" type="Button" parent="Margin/VBox/BottomBar"]
 text="Sprint suivant →"
+
+[node name="ScoreAudio" type="AudioStreamPlayer" parent="."]

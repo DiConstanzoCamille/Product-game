@@ -34,9 +34,11 @@ var failures: int = 0
 
 func _ready() -> void:
 	_test_energy_rules()
+	_test_multi_squad_roster()
 	_test_inbox_channels()
 	_test_backlog_rules()
 	_test_investment_draw_rules()
+	_test_score_resolution_integration()
 
 	for strategy in ["stress", "greedy", "careful"]:
 		print("\n=== SMOKE TEST LOGIQUE — %s ===" % strategy.to_upper())
@@ -72,6 +74,50 @@ func _test_inbox_channels() -> void:
 	for event in GameData.inbox_events:
 		if String(event.get("channel", "")).strip_edges() == "":
 			_fail("L'événement Inbox '%s' n'a pas de canal." % event.get("id", ""))
+
+
+func _test_multi_squad_roster() -> void:
+	print("=== SMOKE TEST LOGIQUE — ROSTER MULTI-EQUIPE ===")
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+	var primary: Dictionary = SprintState.get_primary_squad()
+	var primary_roster: Array = primary.get("roster", [])
+	var primary_count := primary_roster.size()
+	for employee in primary_roster:
+		if String(employee.get("visible_trait_id", "")) == "":
+			_fail("Le trait visible de %s a ete perdu lors de la creation du roster runtime." % employee.get("name", ""))
+	var secondary_roster: Array = [{
+		"id": "test-squad-secondaire",
+		"name": "Test secondaire",
+		"role": "dev",
+		"seniority": "junior",
+		"salary": 1,
+		"trait": "",
+		"hidden_trait": "",
+		"hiddenRevealed": true,
+		"hiredSprint": 1,
+	}]
+	SprintState.squads.append({
+		"id": "squad-secondaire",
+		"name": "Equipe plateforme",
+		"roster": secondary_roster,
+		"backlog_draw": {},
+		"capacity": 0,
+		"delivered": [],
+		"epic_progress": {},
+	})
+
+	if SprintState.get_roster().size() != primary_count + 1:
+		_fail("get_roster() n'agrège pas le roster de la seconde équipe.")
+	if SprintState.find_employee("test-squad-secondaire").is_empty():
+		_fail("Un employé de la seconde équipe est introuvable.")
+
+	SprintState.pieces = 100
+	if SprintState.fire_employee("test-squad-secondaire") != "":
+		_fail("Le licenciement de la seconde équipe a été refusé.")
+	if primary_roster.size() != primary_count:
+		_fail("Le licenciement de la seconde équipe a modifié le roster principal.")
+	if not secondary_roster.is_empty() or SprintState.get_roster().size() != primary_count:
+		_fail("Le licenciement n'a pas retiré l'employé de son roster propriétaire.")
 
 
 func _test_backlog_rules() -> void:
@@ -131,6 +177,65 @@ func _test_backlog_rules() -> void:
 	report = SprintState.commit_backlog_plan([{"id": epic.get("id", ""), "points": SprintState.get_epic_remaining(epic.get("id", ""))}])
 	if not SprintState.completed_backlog_ids.has(epic.get("id", "")) or report.get("delivered", []).size() != 1:
 		_fail("L'epic n'a pas livré ses effets à la complétion.")
+
+
+## Le rapport de score est la source unique de l'économie : les quick wins
+## n'ajoutent plus leur ancien +1 individuel, et le MRR récurrent n'est jamais
+## versé deux fois dans la trésorerie.
+func _test_score_resolution_integration() -> void:
+	print("=== SMOKE TEST LOGIQUE — INTEGRATION SCORE ===")
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+	var quick_wins: Array = []
+	for feature in GameData.backlog.get("features", []):
+		if bool(feature.get("quickWin", false)):
+			quick_wins.append(feature)
+			if quick_wins.size() == 2:
+				break
+	if quick_wins.size() != 2:
+		_fail("Le test d'integration a besoin de deux quick wins dans le backlog.")
+		return
+
+	SprintState.current_backlog_draw = {"sprint": SprintState.sprint_number, "items": quick_wins}
+	var plan: Array = []
+	for feature in quick_wins:
+		plan.append({"id": feature.get("id", ""), "points": feature.get("costPoints", 0)})
+	SprintState.commit_backlog_plan(plan)
+	SprintState.add_pending({"pieces": 3}, "Inbox test : budget ponctuel")
+	var pieces_before := SprintState.pieces
+	var treasury_before := float(SprintState.resource_values.get("tresorerie", 0.0))
+	var payroll := SprintState.get_payroll()
+	SprintState.apply_pending_and_check()
+
+	var report: Dictionary = SprintState.last_score_report
+	var conversion: Dictionary = report.get("conversion", {})
+	var budget: Dictionary = conversion.get("budget", {})
+	var mrr_report: Dictionary = conversion.get("mrr", {})
+	if report.is_empty() or int(report.get("next_streak", 0)) != 1 or SprintState.streak != 1:
+		_fail("Un sprint avec livraisons doit produire un rapport et commencer la serie.")
+	if int(budget.get("quick_win_bonus", 0)) != 2:
+		_fail("Le rapport doit attribuer exactement +2 de budget aux deux quick wins.")
+	var expected_pieces := pieces_before + 3 + int(budget.get("gain", 0))
+	if SprintState.pieces != expected_pieces or SprintState.last_pieces_delta != expected_pieces - pieces_before:
+		_fail("Les quick wins historiques ont ete comptes deux fois dans les pieces (%d au lieu de %d)." % [SprintState.pieces, expected_pieces])
+	if int(round(SprintState.mrr)) != SprintState.last_revenue or int(round(float(mrr_report.get("after", 0.0)))) != SprintState.last_revenue:
+		_fail("Le revenu applique doit etre exactement le MRR final du rapport.")
+	if int(round(float(mrr_report.get("recurring_roi_gain", 0.0)))) != SprintState.last_roi_revenue_bonus:
+		_fail("Le bonus recurring_roi du rapport n'est pas expose a l'UI.")
+	var expected_treasury: float = clamp(treasury_before - payroll + SprintState.last_revenue, 0.0, 100.0)
+	if not is_equal_approx(float(SprintState.resource_values.get("tresorerie", 0.0)), expected_treasury):
+		_fail("La tresorerie doit recevoir le MRR une seule fois (%s au lieu de %s)." % [SprintState.resource_values.get("tresorerie", 0.0), expected_treasury])
+
+	SprintState.sprint_number += 1
+	SprintState.apply_pending_and_check()
+	if int(SprintState.last_score_report.get("next_streak", -1)) != 0 or SprintState.streak != 0:
+		_fail("Un sprint vide doit remettre la serie a zero.")
+	SprintState.activated_cards = ["sprint-retro"]
+	SprintState.activated_card_sprints = {"sprint-retro": 1}
+	SprintState.sprint_number = 3
+	var snapshot := SprintState._build_score_snapshot()
+	var tools: Array = snapshot.get("active_tools", [])
+	if tools.is_empty() or tools[0].get("id", "") != "sprint-retro" or int(tools[0].get("active_sprints", 0)) != 3:
+		_fail("Le snapshot doit transmettre active_sprints pour les outils cumulatifs.")
 
 
 func _offer_has_item(items: Array, item_id: String) -> bool:
@@ -382,8 +487,8 @@ func _test_gated_card_lease() -> void:
 	# s'active.
 	SprintState.sprint_number = drawn_at + 1
 	SprintState.pieces = 20
-	SprintState.roster.append({"id": "t1", "name": "Test", "role": "dev", "seniority": "senior", "salary": 2, "trait": "", "hidden_trait": "", "hiddenRevealed": true, "hiredSprint": 1})
-	SprintState.roster.append({"id": "t2", "name": "Test2", "role": "dev", "seniority": "senior", "salary": 2, "trait": "", "hidden_trait": "", "hiddenRevealed": true, "hiredSprint": 1})
+	SprintState.get_primary_squad().get("roster", []).append({"id": "t1", "name": "Test", "role": "dev", "seniority": "senior", "salary": 2, "trait": "", "hidden_trait": "", "hiddenRevealed": true, "hiredSprint": 1})
+	SprintState.get_primary_squad().get("roster", []).append({"id": "t2", "name": "Test2", "role": "dev", "seniority": "senior", "salary": 2, "trait": "", "hidden_trait": "", "hiddenRevealed": true, "hiredSprint": 1})
 	if not SprintState.card_requirement_state(gated).get("ok", false):
 		_fail("« shape-up » reste verrouillée avec 2 seniors au roster.")
 	if SprintState.activate_decision("shape-up") != "":
@@ -509,7 +614,7 @@ func _play_one_mandate(run_index: int, strategy: String, company_id: String) -> 
 	SprintState.reset_run("agile-transformation", company_id)
 	print("\n--- Run %d (%s) — %s — 🪙 %d, 👥 %d/%d, capacité %d — Départ : %s ---" % [
 		run_index, strategy, company_id, SprintState.pieces,
-		SprintState.roster.size(), SprintState.get_team_cap(),
+		SprintState.get_roster().size(), SprintState.get_team_cap(),
 		SprintState.get_effective_capacity(), SprintState.resource_values
 	])
 
@@ -523,7 +628,7 @@ func _play_one_mandate(run_index: int, strategy: String, company_id: String) -> 
 
 	print("Run %d (%s, %s) terminé — sprint %d, fin='%s', 🪙 %d, ⚡ %d, 👥 %d, revue de board='%s', ressources finales=%s" % [
 		run_index, strategy, company_id, SprintState.sprint_number, SprintState.ending_id,
-		SprintState.pieces, SprintState.energy, SprintState.roster.size(), SprintState.board_review_state,
+		SprintState.pieces, SprintState.energy, SprintState.get_roster().size(), SprintState.board_review_state,
 		SprintState.resource_values
 	])
 
@@ -535,8 +640,8 @@ func _play_one_mandate(run_index: int, strategy: String, company_id: String) -> 
 		_fail("Pièces négatives : %d" % SprintState.pieces)
 	if SprintState.energy < 0 or SprintState.energy > SprintState.get_energy_max():
 		_fail("Énergie hors bornes : %d" % SprintState.energy)
-	if SprintState.roster.size() > SprintState.get_team_cap():
-		_fail("Roster au-dessus du cap : %d/%d" % [SprintState.roster.size(), SprintState.get_team_cap()])
+	if SprintState.get_roster().size() > SprintState.get_team_cap():
+		_fail("Roster au-dessus du cap : %d/%d" % [SprintState.get_roster().size(), SprintState.get_team_cap()])
 
 	# Critère de recette Phase A : "careful" (ne rien faire) doit perdre
 	# avant la fin du mandat — pas de fin positive, pas de survie.
@@ -628,8 +733,8 @@ func _play_sprint(strategy: String) -> void:
 		# Plus d'achats compulsifs : ce CPO-là compense tout de sa personne —
 		# et licencie quelqu'un chaque sprint à partir du 2e (le chemin de
 		# licenciement reste couvert, et le Moral en prend un coup de plus).
-		if SprintState.sprint_number >= 2 and SprintState.roster.size() > 1:
-			var last_employee: Dictionary = SprintState.roster[-1]
+		if SprintState.sprint_number >= 2 and SprintState.get_roster().size() > 1:
+			var last_employee: Dictionary = SprintState.get_roster()[-1]
 			SprintState.fire_employee(last_employee.get("id", ""))
 	elif strategy == "greedy":
 		# ~1 achat par sprint : une pratique les sprints pairs, sinon une

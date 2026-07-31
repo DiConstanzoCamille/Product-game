@@ -13,11 +13,11 @@
       "teamCap": 7,
       "startingPieces": 5,
       "startingRoster": [
-        { "id": "herve-pm", "name": "Hervé", "role": "pm", "seniority": "senior", "trait": "Connaît tous les raccourcis politiques de la maison" },
-        { "id": "danielle-dev", "name": "Danielle", "role": "dev", "seniority": "senior", "trait": "Maintient seule un module que personne n'ose ouvrir" },
-        { "id": "marek-dev", "name": "Marek", "role": "dev", "seniority": "senior", "trait": "Répond « ça dépend » et a toujours raison" },
-        { "id": "solange-ops", "name": "Solange", "role": "ops", "seniority": "senior", "trait": "La prod tient parce qu'elle la surveille" },
-        { "id": "patrice-designer", "name": "Patrice", "role": "designer", "seniority": "senior", "trait": "Défend la cohérence visuelle depuis trois refontes" }
+        { "id": "herve-pm", "name": "Hervé", "role": "pm", "seniority": "senior", "trait": "Connaît tous les raccourcis politiques de la maison", "visible_trait_id": "political-shortcuts" },
+        { "id": "danielle-dev", "name": "Danielle", "role": "dev", "seniority": "senior", "trait": "Maintient seule un module que personne n'ose ouvrir", "visible_trait_id": "module-fragile" },
+        { "id": "marek-dev", "name": "Marek", "role": "dev", "seniority": "senior", "trait": "Répond « ça dépend » et a toujours raison", "visible_trait_id": "context-dependent" },
+        { "id": "solange-ops", "name": "Solange", "role": "ops", "seniority": "senior", "trait": "La prod tient parce qu'elle la surveille", "visible_trait_id": "production-watch" },
+        { "id": "patrice-designer", "name": "Patrice", "role": "designer", "seniority": "senior", "trait": "Défend la cohérence visuelle depuis trois refontes", "visible_trait_id": "design-consistency" }
       ],
       "boardObjectives": {
         "title": "« Prouvez que l'agilité marche »",
@@ -38,11 +38,11 @@
       "teamCap": 6,
       "startingPieces": 4,
       "startingRoster": [
-        { "id": "jade-pm", "name": "Jade", "role": "pm", "seniority": "junior", "trait": "Gère le backlog dans un tableur nommé « FINAL_v7 »" },
-        { "id": "bilal-dev", "name": "Bilal", "role": "dev", "seniority": "junior", "trait": "Déploie le vendredi soir, par optimisme" },
-        { "id": "emma-dev", "name": "Emma", "role": "dev", "seniority": "junior", "trait": "A appris le framework en le réécrivant" },
-        { "id": "nino-dev", "name": "Nino", "role": "dev", "seniority": "junior", "trait": "Commente son code en trois langues" },
-        { "id": "lou-designer", "name": "Lou", "role": "designer", "seniority": "junior", "trait": "Maquette plus vite que le produit ne pivote" }
+        { "id": "jade-pm", "name": "Jade", "role": "pm", "seniority": "junior", "trait": "Gère le backlog dans un tableur nommé « FINAL_v7 »", "visible_trait_id": "spreadsheet-backlog" },
+        { "id": "bilal-dev", "name": "Bilal", "role": "dev", "seniority": "junior", "trait": "Déploie le vendredi soir, par optimisme", "visible_trait_id": "friday-deployer" },
+        { "id": "emma-dev", "name": "Emma", "role": "dev", "seniority": "junior", "trait": "A appris le framework en le réécrivant", "visible_trait_id": "framework-rewriter" },
+        { "id": "nino-dev", "name": "Nino", "role": "dev", "seniority": "junior", "trait": "Commente son code en trois langues", "visible_trait_id": "multilingual-comments" },
+        { "id": "lou-designer", "name": "Lou", "role": "designer", "seniority": "junior", "trait": "Maquette plus vite que le produit ne pivote", "visible_trait_id": "rapid-prototyper" }
       ],
       "boardObjectives": {
         "title": "« Structurez sans casser la machine »",

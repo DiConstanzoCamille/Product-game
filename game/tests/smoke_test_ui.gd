@@ -44,6 +44,8 @@ func _ready() -> void:
 
 	await _test_roadmap_interactions()
 	await _test_investments_interactions()
+	await _test_resolution_replay()
+	await _test_resolution_multi_team_replay()
 
 	if failures > 0:
 		print("=== SMOKE TEST UI : ÉCHEC — %d assertion(s) en erreur ===" % failures)
@@ -154,6 +156,78 @@ func _test_investments_interactions() -> void:
 		_fail("Le bouton de repli n'a pas replié le Panneau de bord.")
 	if panel.size.x > UIHelpers.SIDE_PANEL_WIDTH / 2:
 		_fail("Le panneau replié fait encore %d px de large." % int(panel.size.x))
+
+	screen.queue_free()
+	viewport.queue_free()
+	await get_tree().process_frame
+
+
+## La Résolution lit le rapport déjà calculé, et ses deux gestes globaux
+## doivent accélérer puis révéler le flux sans attendre la durée réelle.
+func _test_resolution_replay() -> void:
+	print("  → lecture animee de la Resolution")
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+	var feature: Dictionary = GameData.backlog.get("features", [])[0]
+	SprintState.current_backlog_draw = {"sprint": SprintState.sprint_number, "items": [feature]}
+	SprintState.commit_backlog_plan([{"id": feature.get("id", ""), "points": feature.get("costPoints", 0)}])
+
+	var viewport := SubViewport.new()
+	viewport.size = Vector2i(1600, 900)
+	add_child(viewport)
+	var screen: Control = load("res://scenes/screens/resolution_screen.tscn").instantiate()
+	viewport.add_child(screen)
+	for i in 3:
+		await get_tree().process_frame
+	if SprintState.last_score_report.is_empty() or screen._score_events.is_empty():
+		_fail("La Resolution doit afficher le rapport de score deja resolu.")
+	else:
+		screen._accelerate_score_replay()
+		if screen._score_replay_speed != 4.0:
+			_fail("Le premier geste de Resolution n'accelere pas l'animation.")
+		screen._reveal_score_replay()
+		if not screen._score_finished or screen._score_event_index != screen._score_events.size():
+			_fail("Le second geste de Resolution ne revele pas tout le rapport.")
+		for child in screen.score_lines.get_children():
+			if child is Label and child.visible and "squad" in child.text.to_lower():
+				_fail("Le joueur ne doit jamais voir le mot squad en mode une equipe.")
+
+	screen.queue_free()
+	viewport.queue_free()
+	await get_tree().process_frame
+
+
+func _test_resolution_multi_team_replay() -> void:
+	print("  → lecture multi-equipe de la Resolution")
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+	var feature: Dictionary = GameData.backlog.get("features", [])[0]
+	SprintState.squads.append({
+		"id": "equipe-plateforme-test",
+		"name": "Equipe plateforme",
+		"roster": [],
+		"backlog_draw": {},
+		"capacity": int(feature.get("costPoints", 0)),
+		"delivered": [feature],
+		"spent_points": int(feature.get("costPoints", 0)),
+		"epic_progress": {},
+	})
+
+	var viewport := SubViewport.new()
+	viewport.size = Vector2i(1600, 900)
+	add_child(viewport)
+	var screen: Control = load("res://scenes/screens/resolution_screen.tscn").instantiate()
+	viewport.add_child(screen)
+	for i in 3:
+		await get_tree().process_frame
+	var divider_indexes: Array = []
+	for index in screen._score_events.size():
+		if screen._score_events[index].get("kind", "") == "divider":
+			divider_indexes.append(index)
+	if divider_indexes.size() != 2 or divider_indexes[0] != 0 or divider_indexes[1] <= 1:
+		_fail("La lecture multi-equipe doit reveler chaque separateur dans sa propre sequence.")
+	screen._reveal_score_replay()
+	for child in screen.score_lines.get_children():
+		if child is Label and child.visible and "squad" in child.text.to_lower():
+			_fail("Les separateurs multi-equipe ne doivent pas exposer le terme technique squad.")
 
 	screen.queue_free()
 	viewport.queue_free()

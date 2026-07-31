@@ -128,8 +128,6 @@ static func resolve_backlog(delivered_items: Array, spent_points: int, capacity_
 			deltas["valeur-percue"] = deltas.get("valeur-percue", 0.0) + client_impact
 		if risk != 0.0:
 			deltas["dette-organisationnelle"] = deltas.get("dette-organisationnelle", 0.0) + risk
-		if item.get("quickWin", false):
-			deltas["pieces"] = deltas.get("pieces", 0.0) + float(backlog_conf.get("quickWinPieces", 0))
 		for resource_id in item.get("completionEffects", {}).keys():
 			deltas[resource_id] = deltas.get(resource_id, 0.0) + float(item["completionEffects"][resource_id])
 		if has_okr and int(item.get("roi", 0)) >= int(backlog_conf.get("strongRoiThreshold", 0)):

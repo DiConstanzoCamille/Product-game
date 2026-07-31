@@ -319,13 +319,12 @@ tout ce qui est chiffré vit dans `data/balance.json`.
   jouable est associé à un `business_model_id` (`balance.json` →
   `eraBusinessModel`), qui détermine comment la Trésorerie *rentre*, pas
   seulement comment elle sort. La Transformation agile utilise le modèle
-  **SaaS — revenu récurrent (MRR)** : chaque sprint, un revenu tombe
-  automatiquement, proportionnel à la Valeur perçue et modulé par le Moral
-  (un moral bas simule du churn et rogne le revenu, un moral haut le
-  bonifie légèrement). Calculé dans `SprintState.compute_revenue()`, affiché
-  séparément des coûts de décisions en Résolution (voir plus bas) — c'est la
-  boucle qui manquait : investir dans la Valeur perçue et le Moral compose
-  en revenu récurrent au lieu de rester un pur centre de coût.
+  **SaaS — revenu récurrent (MRR)** : le MRR est un stock. À chaque Résolution,
+  `ScoreResolver` applique le churn puis ajoute `Impact × 0,06` et les ROI
+  récurrents déjà acquis. Le Moral et la Dette peuvent porter le churn à 15 %.
+  Le revenu versé à la Trésorerie est le nouveau stock de MRR, affiché
+  séparément des coûts de décisions — investir dans le moteur produit compose
+  désormais d'un sprint à l'autre.
 - **Vente à la version (waterfall) — scénario Garage, à venir.** Le modèle
   `waterfall-release` est déclaré dans `balance.json` mais désactivé (pas de
   revenu par point de Valeur perçue) : il accompagnera le scénario Garage
@@ -336,11 +335,11 @@ tout ce qui est chiffré vit dans `data/balance.json`.
   événement Inbox rare puisse faire basculer le modèle économique en cours
   de mandat (ex. un pivot SaaS → vente one-shot) est notée pour plus tard,
   une fois au moins deux modèles réellement jouables.
-- **Résolution animée.** Les jauges passent de l'ancienne à la nouvelle
-  valeur par un tween (au lieu d'un affichage figé), avec un léger décalage
-  entre chaque jauge. Le revenu du sprint défile de 0 jusqu'à sa valeur
-  réelle dans un bloc dédié, à côté du coût net des décisions et du solde —
-  pour que le joueur voie distinctement ce qui rentre et ce qui sort.
+- **Résolution animée.** La démo rejoue le rapport immuable de `ScoreResolver`
+  événement par événement : livraison, bonus de main, équipe, outils,
+  stratégie, pratiques, freins, Impact puis conversion. Les compteurs suivent
+  les valeurs `before/after`; les jauges persistent ensuite le résultat. Un
+  premier clic accélère la séquence, un second la révèle entièrement.
 - **Barre de ressources permanente.** Les 4 écrans de phase (Inbox, Roadmap,
   Grandes décisions, Recrutement) affichent désormais un mini-HUD des 6
   ressources en haut de l'écran (`UIHelpers.build_resource_bar()`) — l'état
@@ -404,8 +403,9 @@ Implémentation du premier lot de la
 le chiffrage vit dans `data/balance.json` ; les pools de contenu dans
 `data/candidates.json`, `data/practices.json` et `data/hidden-traits.json`.
 
-- **Le roster produit la capacité.** `SprintState.roster` remplace le
-  `capacity_bonus` plat : chaque entreprise définit son équipe héritée, son
+- **Le roster produit la capacité.** `SprintState.squads[0].roster` remplace le
+  `capacity_bonus` plat ; `get_roster()` fournit la vue globale de lecture.
+  Chaque entreprise définit son équipe héritée, son
   cap d'effectif et son budget d'action initial (`companies.json`). Devs et
   PM produisent des points de capacité (rendements décroissants au-delà du
   cap de cumul du rôle), les Designers bonifient la Valeur perçue des
@@ -413,11 +413,11 @@ le chiffrage vit dans `data/balance.json` ; les pools de contenu dans
   (+2 Dette/sprint sans eux — le défaut affiché de Karavel). Les salaires
   (junior 1, senior 2) sont prélevés à chaque Résolution, ligne « masse
   salariale ».
-- **Les Pièces 🪙.** Monnaie d'action de l'entreprise : allocation du board
-  (+2/sprint, réduite à +1 après une revue ratée), prime de performance
-  (`floor(revenu/4)`), quick wins, événements Inbox (pseudo-ressource
-  `pieces` dans `effects`). Se dépense au Marché et en indemnités. À 0 on ne
-  perd pas — on est paralysé.
+- **Le Budget d'investissement 🪙.** `pieces` reste son nom interne. Il gagne
+  `floor(sqrt(Impact))`, une allocation plancher (+2/sprint, réduite à +1
+  après une revue ratée), le combo de deux quick wins (+2) et les effets
+  Inbox (`pieces`). Il se dépense au Marché et en indemnités. À 0 on ne perd
+  pas — on est paralysé.
 - **Le Marché.** L'écran Recrutement devient un shop unifié : 2 candidats +
   2 pratiques tirés par sprint et stockés dans `SprintState` (pas de
   re-tirage). Chaque pratique achetée inflige +2 Cynisme ; Entretiens
@@ -430,11 +430,10 @@ le chiffrage vit dans `data/balance.json` ; les pools de contenu dans
   Réseau offre −2 🪙 sur l'embauche suivante.
 - **Licenciement.** Indemnités 2 🪙, Moral −4, +3 Cynisme par licenciement
   supplémentaire dans le mandat (`fired_count`).
-- **La pression.** Valeur perçue −2/sprint (le marché avance) ; le revenu
-  SaaS ne compte que les points de Valeur perçue au-dessus d'un seuil de
-  notoriété (`revenueValeurPercueOffset`) et tombe à zéro sous le seuil de
-  décrochage (≤ 5) — le couperet « Valeur perçue ≤ 0 = fin » disparaît, la
-  mort passe par la spirale économique. La **revue de board** tombe à la fin
+- **La pression.** Valeur perçue −2/sprint (le marché avance), tandis que le
+  churn rogne séparément le stock de MRR. Le couperet « Valeur perçue ≤ 0 =
+  fin » disparaît, la mort passe par la spirale économique. La **revue de
+  board** tombe à la fin
   du sprint 6 : objectifs par entreprise (visibles dès l'offre d'emploi),
   overlay de verdict en Résolution, +5 🪙/+8 Capital politique en cas de
   succès, −12 Capital politique et allocation réduite sinon.
@@ -797,9 +796,10 @@ La Roadmap consomme maintenant exclusivement `data/backlog.json`; le fichier
   complétion; les attributs et `completionEffects` se résolvent alors une seule
   fois. **Abandonner l'epic** remet sa progression à zéro, sans remboursement;
   il quitte l'offre courante puis peut revenir dans un futur cycle du sac.
-- **Résolution réelle.** Une livraison ajoute son `roi` au MRR récurrent du
-  mandat, applique son impact client et son risque (plus les quick wins et les
-  effets de complétion), puis révèle ces chiffres dans la Résolution. Le bonus
+- **Résolution réelle.** Une livraison ajoute son `roi` au bonus MRR récurrent
+  du mandat, applique son impact client et son risque (plus les effets de
+  complétion), puis alimente le score. Le combo Quick wins est attribué une
+  seule fois par `ScoreResolver`, pas par l'ancien flux de pièces. Le bonus
   Designer, la pénalité de surchauffe modulée par les PM et le bonus OKR restent
   résolus par le moteur, jamais par l'UI.
 - **Recette.** Le smoke test logique vérifie la taille et la persistance du
@@ -813,3 +813,28 @@ deltas. Seule sa forme change : chaque événement porte un `channel`, le messag
 entrant affiche son expéditeur et son horodatage, puis le choix retenu rejoint
 le fil comme réponse du joueur avant la conséquence. Un événement sans canal
 retombe sur `#direction-produit`.
+
+## 26. Traction × Levier = Impact (Lot 1)
+
+`data/scoring.json` est la table d'équilibrage et
+`game/scripts/score_resolver.gd` le moteur pur. Il ne lit ni ne modifie les
+autoloads : un snapshot entre, un rapport ordonné en sort. `SprintState`
+applique ensuite exactement ce rapport; l'écran de Résolution ne recalcule
+rien.
+
+1. Chaque feature rapporte `costPoints × 4 + clientImpact × 3`; une epic ne
+   rapporte rien avant sa complétion, puis `costPoints × 6`.
+2. Sprint parfait ×1,25, Focus ×1,3, livraison groupée +10, epic bouclée
+   ×1,5 et série de livraisons modifient la main dans cet ordre.
+3. Rôles, traits visibles et cachés, puis huit combos d'organisation
+   data-driven construisent le Levier local de chaque entrée de `squads[]`.
+4. Outils, stratégie, pratiques et palier produit construisent le Levier
+   global. À une équipe, la couche multi-équipe reste invisible.
+5. Cynisme, Dette, surchauffe et Moral au plancher rabotent le résultat avant
+   l'Impact final. La conversion alimente MRR, Budget d'investissement, Valeur
+   perçue et Capital politique.
+
+Chaque ligne du rapport conserve son étape, sa portée, son icône, son libellé,
+son type, sa valeur et ses bornes `before/after`. Les cas headless verrouillent
+les scores exacts, le contrat N=2, la série, les freins, le churn, les traits
+et l'absence de double comptage économique.

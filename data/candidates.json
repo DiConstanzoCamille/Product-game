@@ -10,6 +10,7 @@
       "costPieces": 6,
       "salary": 2,
       "trait": "Refuse toute réunion de plus de 25 minutes",
+      "visible_trait_id": "meeting-minimalist",
       "badges": ["10 ans de legacy Java", "a survécu à 3 migrations de framework"],
       "eras": ["agile-transformation"]
     },
@@ -21,6 +22,7 @@
       "costPieces": 6,
       "salary": 2,
       "trait": "Ex-consultant reconverti — documente tout, même trop",
+      "visible_trait_id": "documentation-maximalist",
       "badges": ["certifié sur 4 outils abandonnés depuis", "slides impeccables"],
       "eras": ["agile-transformation"]
     },
@@ -32,6 +34,7 @@
       "costPieces": 7,
       "salary": 2,
       "trait": "Rockstar 10x — livre vite, relit rarement",
+      "visible_trait_id": "fast-and-fragile",
       "badges": ["3 side-projects à 2000 étoiles", "démissionne par tradition tous les 18 mois"],
       "eras": ["agile-transformation"]
     },
@@ -43,6 +46,7 @@
       "costPieces": 3,
       "salary": 1,
       "trait": "Adopte chaque nouvel outil avec un enthousiasme non négociable",
+      "visible_trait_id": "tool-enthusiast",
       "badges": ["bootcamp 2023", "a déjà refactoré le README"],
       "eras": ["agile-transformation"]
     },
@@ -54,6 +58,7 @@
       "costPieces": 3,
       "salary": 1,
       "trait": "Pose les questions que tout le monde évitait depuis deux ans",
+      "visible_trait_id": "hard-questions",
       "badges": ["reconversion réussie", "lit vraiment les specs"],
       "eras": ["agile-transformation"]
     },
@@ -65,6 +70,7 @@
       "costPieces": 5,
       "salary": 2,
       "trait": "Dit non avec le sourire, et surtout dit non",
+      "visible_trait_id": "friendly-no",
       "badges": ["8 ans de produit B2B", "connaît le vrai coût d'une roadmap"],
       "eras": ["agile-transformation"]
     },
@@ -76,6 +82,7 @@
       "costPieces": 3,
       "salary": 1,
       "trait": "Croit encore que les estimations sont des engagements",
+      "visible_trait_id": "estimate-believer",
       "badges": ["master en gestion de projet", "premier backlog jamais priorisé"],
       "eras": ["agile-transformation"]
     },
@@ -87,6 +94,7 @@
       "costPieces": 4,
       "salary": 2,
       "trait": "Vétéran désabusé — stabilise l'équipe, lève un sourcil par process",
+      "visible_trait_id": "process-skeptic",
       "badges": ["a connu le cycle en V", "prédit chaque échec avec 2 sprints d'avance"],
       "eras": ["agile-transformation"]
     },
@@ -98,6 +106,7 @@
       "costPieces": 5,
       "salary": 2,
       "trait": "Défend l'utilisateur même contre le client qui paie",
+      "visible_trait_id": "user-advocate",
       "badges": ["design system complet livré une fois", "tests utilisateurs non simulés"],
       "eras": ["agile-transformation"]
     },
@@ -109,6 +118,7 @@
       "costPieces": 3,
       "salary": 1,
       "trait": "Prototype plus vite que l'équipe ne développe",
+      "visible_trait_id": "rapid-prototyper",
       "badges": ["portfolio impeccable", "n'a jamais vu un design survivre au dev"],
       "eras": ["agile-transformation"]
     },
@@ -120,6 +130,7 @@
       "costPieces": 5,
       "salary": 2,
       "trait": "Dort avec son téléphone d'astreinte depuis 2011",
+      "visible_trait_id": "on-call-veteran",
       "badges": ["a éteint des incendies dont personne ne parle", "automatise par vengeance"],
       "eras": ["agile-transformation"]
     },
@@ -131,6 +142,7 @@
       "costPieces": 3,
       "salary": 1,
       "trait": "Dit oui à tout, y compris à l'astreinte du réveillon",
+      "visible_trait_id": "always-on",
       "badges": ["certif cloud fraîche", "premier post-mortem rédigé seul"],
       "eras": ["agile-transformation"]
     }

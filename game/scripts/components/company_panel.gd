@@ -67,20 +67,21 @@ func _populate() -> void:
 			_add_text("• %s" % condition.get("label", ""), 12, UIHelpers.COLOR_INK)
 		match SprintState.board_review_state:
 			"passed":
-				_add_text("✅ Revue réussie — le board a débloqué du budget d'action.", 12, UIHelpers.COLOR_GOOD)
+				_add_text("✅ Revue réussie — le board a débloqué du budget d'investissement.", 12, UIHelpers.COLOR_GOOD)
 			"failed":
-				_add_text("❌ Revue ratée — allocation de pièces réduite pour le reste du mandat.", 12, UIHelpers.COLOR_DANGER)
+				_add_text("❌ Revue ratée — budget d'investissement réduit pour le reste du mandat.", 12, UIHelpers.COLOR_DANGER)
 			_:
 				_add_text("⏳ À venir — le Panneau de bord suit ces conditions en direct.", 12, UIHelpers.COLOR_SOFT_TEXT)
 
 	_add_section_title("L'équipe en détail — %d pts produits · %d 💰/sprint" % [
 		SprintState.get_effective_capacity(), SprintState.get_payroll()
 	])
-	if SprintState.roster.is_empty():
+	var roster: Array = SprintState.get_roster()
+	if roster.is_empty():
 		_add_text("Plus personne. Une organisation parfaitement silencieuse.", 12, UIHelpers.COLOR_SOFT_TEXT)
 	_add_text("Les actions (🤝 1:1 · licencier) sont dans le Panneau de bord, sur la ligne de la personne.",
 		11, UIHelpers.COLOR_SOFT_TEXT)
-	for employee in SprintState.roster:
+	for employee in roster:
 		_add_employee(employee)
 
 	_add_section_title("Pratiques adoptées")
@@ -101,7 +102,7 @@ func _populate() -> void:
 
 
 ## 🏛️ Négocier une rallonge (spec §7.2) : votre Capital politique contre
-## des pièces immédiates pour l'entreprise. Reste ici, et pas dans le Panneau
+## du budget d'investissement immédiat pour l'entreprise. Reste ici, et pas dans le Panneau
 ## de bord : plus elle est visible, plus elle est tentante — arbitrage laissé
 ## ouvert dans la proposition UI §7.
 func _build_extension_row() -> Control:
@@ -110,7 +111,7 @@ func _build_extension_row() -> Control:
 	row.add_theme_constant_override("separation", 10)
 
 	var label := Label.new()
-	label.text = "🏛️ Négocier une rallonge — 🎯 %d contre +%d 🪙 immédiats." % [
+	label.text = "🏛️ Négocier une rallonge — 🎯 %d contre +%d 🪙 de budget immédiat." % [
 		int(conf.get("capitalPolitique", -8)), int(conf.get("pieces", 4))
 	]
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD
