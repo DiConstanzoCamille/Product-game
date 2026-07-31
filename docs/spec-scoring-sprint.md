@@ -300,8 +300,17 @@ ce sont deux choses qui bornent différemment :
   trimestre rapporte ~24 💶 au T1. On achète 1 à 2 outils par Comité, et
   chaque achat fait mal.
 - **Les slots**, qui gatent la **fin** de partie : l'organisation ne peut
-  porter que `N` outils actifs simultanément. **3 slots de base**, +1
-  achetable au Comité à prix croissant (12, 20, 32, 50 💶), plafond à 7.
+  porter que `N` outils actifs simultanément.
+
+**Le nombre de slots de base vient du kit de départ, donc du niveau de
+carrière** (§13.4) : **3 au niveau PM**, jusqu'à **7 au niveau CEO**. Plus on
+gère de monde, plus l'organisation peut absorber d'outillage — et un des
+slots de départ est déjà occupé par l'**outillage hérité** (§7.1.3). Un run
+de PM commence donc à **2 slots réellement libres**.
+
+En cours de run, on peut en ouvrir **2 de plus au maximum**, au Comité, à
+prix croissant (12 puis 20 💶). Le gros de la capacité d'outillage se gagne
+en carrière, pas en budget.
 
 > **Le basculement est le cœur du late game.** Au T1 on manque d'argent ; au
 > T4 on a 90 💶 par trimestre et **on manque de place**. La question passe de
@@ -309,6 +318,26 @@ ce sont deux choses qui bornent différemment :
 > encore son slot ? ». C'est exactement la courbe des slots de jokers d'un
 > Balatro, et c'est ce qui empêche la fin de partie de devenir un achat
 > automatique de tout le catalogue.
+
+### 7.1.1.b Les outils qui rendent leur place — `slotBonus`
+
+Certains outils portent un **`slotBonus: +1`** : ils ouvrent un slot en
+s'installant, donc leur coût net en place est **zéro**.
+
+C'est la soupape du système, et elle sert d'abord aux **outils cumulatifs**.
+🪞 **Sprint rétro** porte ce bonus : sans lui, l'outil qu'on ne peut jamais
+retirer (§7.1.2) gèlerait un tiers d'un build de PM pour tout le run — la
+carte la plus intéressante du jeu deviendrait la plus étouffante.
+
+Avec le `slotBonus`, la décision se déplace au bon endroit : **installer un
+outil cumulatif tôt n'est plus un sacrifice de place, c'est une course
+contre la montre.** Pris au T1 il vaut +0.5 en fin de mandat, pris au T4 il
+ne vaut rien. La question n'est plus « est-ce que je lui donne un slot ? »
+mais « l'ai-je eu assez tôt ? ».
+
+Deux ou trois outils du catalogue portent ce bonus — jamais les plus
+puissants en Levier direct : un outil qui donne de la place *et* du gros
+Levier n'aurait aucun coût d'opportunité.
 
 ### 7.1.2 Remplacer un outil — le coût de bascule
 
@@ -327,8 +356,13 @@ l'avoir implémenté :
   piège du « je le reprendrai plus tard » est donc réel et visible.
 
 Cette dernière règle donne aux outils cumulatifs un statut à part : ils sont
-les plus forts **et** les plus difficiles à déloger. Poser 🪞 Sprint rétro
-sur un slot au T1, c'est décider qu'on ne récupérera jamais ce slot.
+les plus forts **et** les plus difficiles à déloger. Elle ne les rend pas
+étouffants pour autant, puisqu'ils rendent leur place (§7.1.1.b) — la
+punition porte sur le **compteur**, jamais sur l'espace de build.
+
+Retirer un outil à `slotBonus` retire aussi le slot qu'il donnait : si les
+slots restants sont tous occupés, la bascule est simplement impossible tant
+qu'on n'a pas libéré autre chose. Pas de cas limite à gérer.
 
 ### 7.1.3 L'outillage hérité
 
@@ -347,6 +381,13 @@ choisis par quelqu'un d'autre, qui occupent des slots.
 Le premier vrai arbitrage du run devient donc : *est-ce que je garde ce dont
 j'hérite ?* C'est une bien meilleure première décision que « quelle carte
 j'achète », et ça ne coûte que deux lignes de données.
+
+**Et c'est volontairement exigeant.** Répondre à cette question demande
+d'avoir compris trois mécaniques à la fois — les conditions d'éligibilité de
+l'outil, le coût de bascule, et la rareté des slots. Un joueur qui garde
+Jira chez Meridia par défaut, sans regarder, se prive d'un slot sur deux
+pendant tout son run. **Il faut comprendre pour gagner** : c'est la
+philosophie assumée du jeu, pas un accident de conception.
 
 Les outils internes restent **l'engrenage incrémental du run** : c'est en les
 combinant avec un roster choisi qu'on fait les gros multiplicateurs.
@@ -494,18 +535,46 @@ fenêtre »*.
 - **Karavel** (scale-up) : Sales 2, PMM 4, CSM 1 — on communique très bien,
   on ne retient personne.
 
-**On les influence sans les diriger :**
+**Elles ne sont pas pilotables. Du tout.**
 
-- 🏛️ **Lobbying** au Comité : +1 niveau contre **12 🎯 Capital politique** et
-  du Budget. Le Capital politique cesse d'être une jauge qu'on ne fait que
-  perdre : c'est la monnaie de ce qu'on n'a pas sous son autorité.
-- Certains événements Inbox les font bouger (un VP Sales qui démissionne).
-- Certaines décisions stratégiques les modifient (Open source → PMM +1,
-  Sales −1).
+Pas d'achat, pas de lobbying, pas de niveau à monter au Comité. On ne les
+dirige pas, on **fait avec** — exactement comme dans une vraie boîte, où le
+Sales et le Support ne sont pas dans votre périmètre et où votre travail
+consiste à composer avec ce qu'ils sont.
 
-À grande échelle (§13), elles deviennent le principal levier du **Director**
-et du **CPO** : plus on monte, moins on produit soi-même, plus on négocie
-avec ce qu'on ne contrôle pas.
+Concrètement, elles agissent de deux façons :
+
+**① Leur taux, en permanence.** Le niveau fixé au début du run s'applique à
+chaque Résolution, dans la ligne de conversion (étape ⑨). C'est un
+paramètre du contexte, au même titre que le profil d'équipe.
+
+**② Leurs événements, dans l'Inbox.** Chaque équipe subie alimente le pool
+d'événements avec des situations qui lui sont propres, dont la fréquence et
+la tonalité **dépendent de son niveau** :
+
+| Équipe | Niveau bas → | Niveau haut → |
+|---|---|---|
+| 💼 Sales | *« Un deal à 200 k€ est bloqué sur une feature qui n'existe pas. Le commercial l'a promise. »* | *« Le Sales a vendu trois fois ce que la roadmap prévoyait. Il faut suivre. »* |
+| 📣 PMM | *« Personne dans la boîte ne sait décrire ce que fait le produit. »* | *« La campagne sort dans 2 sprints — la feature n'est pas prête. »* |
+| 🎧 CSM | *« Le support crie au secours : 40 tickets sur le même bug. »* | *« Le support a remonté un pattern client que la Discovery avait raté. »* |
+
+Un niveau bas génère des crises, un niveau haut génère de la pression — les
+deux coûtent, mais pas la même chose. **Une équipe subie forte n'est pas un
+cadeau, c'est une contrainte différente.**
+
+Certaines décisions stratégiques les font bouger comme effet de bord (Open
+source → PMM +1, Sales −1) : on ne les pilote toujours pas, on change le
+monde autour d'elles.
+
+Conséquence à assumer : le 🎯 **Capital politique** ne gagne pas de nouveau
+débouché ici. Il garde ceux qu'il a — la revue de board et l'action
+🏛️ Négocier une rallonge (spec profondeur §7.2). À surveiller en playtest :
+si la jauge reste une jauge qu'on ne fait que perdre, le problème se réglera
+ailleurs, pas en rendant pilotable ce qui ne doit pas l'être.
+
+À grande échelle (§13), les équipes subies deviennent la principale **source
+de variance** entre deux runs de Director ou de CPO : plus on monte, plus la
+part du résultat qui dépend de ce qu'on ne contrôle pas est grande.
 
 ---
 
@@ -628,7 +697,7 @@ Comité est le **gros achat structurel** — et le seul endroit où l'on touche
 | Investissement | Coût 💶 | Effet |
 |---|---|---|
 | 🛠️ **Outil interne** | 8-18 | Autant qu'on veut, tant qu'il reste des **slots** et du budget (§7.1.1) |
-| 🔧 **Ouvrir un slot d'outillage** | 12 / 20 / 32 / 50 | +1 slot, plafond à 7 |
+| 🔧 **Ouvrir un slot d'outillage** | 12 puis 20 | +1 slot, **2 maximum par run** (la base vient du niveau de carrière) |
 | ♻️ **Remplacer un outil** | prix du nouvel outil + **coût de bascule** | Libère un slot (§7.1.2) |
 | 🧭 **Décision stratégique** | 15-30 | **1 seule par trimestre**, parmi 2-3 proposées (§7.2) |
 | 🪑 **Ouvrir un poste** | 6, puis 10, 16… | +1 au cap d'effectif |
@@ -636,7 +705,6 @@ Comité est le **gros achat structurel** — et le seul endroit où l'on touche
 | 🚀 **Palier de produit** | 12 / 25 / 45 | +0.5 Levier permanent, +1 feature proposée par sprint |
 | 🏝️ **Séminaire d'équipe** | 8 | −15 Cynisme |
 | 🧹 **Sprint de remise à plat** | 6 + **un sprint entier** | −20 Dette, 0 Traction ce sprint |
-| 🏛️ **Lobbying** | 10 💶 + **12 🎯** | +1 niveau à une équipe subie (§9.4) |
 | 🤝 **Rachat d'un concurrent** | 30 | +12 MRR, +1 employé aléatoire, +8 Dette |
 | 🔄 **Reroll du Marché** | 3 | Retire l'offre du sprint |
 | 🎯 **Chasseur de têtes** | 8 | Prochain Marché : 4 candidats, traits révélés |
@@ -730,13 +798,13 @@ Le parallèle Balatro est direct et il est déjà à moitié construit :
 | **Deck** (passif de départ) | **L'entreprise** — `companies.json`, son roster hérité, ses équipes subies, son défaut |
 | **Stake / Ante** (difficulté débloquée) | **Le niveau de carrière** — le nombre de squads sous responsabilité |
 
-| Niveau | Squads | Débloqué par | Ce qui apparaît |
-|---|---|---|---|
-| 👤 **PM** | 1 | départ | Le jeu des §3-12 |
-| 👥 **Lead PM** | 2-3 | Tenir 1 an (T4) en PM | Attention limitée, PM locaux, backlogs séparés |
-| 🏢 **Director** | 5-7 | Gagner en Lead PM | Combos inter-squads, équipes subies déterminantes, tribus |
-| 🎩 **CPO** | 10-12 | Gagner en Director | Décisions stratégiques majeures, board hostile |
-| 👑 **CEO** | 3 × 8 (domaines) | Gagner en CPO | On gère des Directors, pas des squads — la formule remonte d'un cran |
+| Niveau | Squads | 🔧 Slots de base | Débloqué par | Ce qui apparaît |
+|---|---|---|---|---|
+| 👤 **PM** | 1 | **3** *(dont 1 hérité)* | départ | Le jeu des §3-12 |
+| 👥 **Lead PM** | 2-3 | **4** | Gagner en PM | Attention limitée, PM locaux, backlogs séparés |
+| 🏢 **Director** | 5-7 | **5** | Gagner en Lead PM | Combos inter-squads, équipes subies déterminantes, tribus |
+| 🎩 **CPO** | 10-12 | **6** | Gagner en Director | Décisions stratégiques majeures, board hostile |
+| 👑 **CEO** | 3 × 8 (domaines) | **7** | Gagner en CPO | On gère des Directors, pas des squads — la formule remonte d'un cran |
 
 Le nombre exact de squads au démarrage d'un niveau dépend des **bonus de
 début de run et des choix** — deux runs de Lead PM ne commencent pas
@@ -745,6 +813,22 @@ forcément à la même taille.
 Les quotas (§11.1) sont **définis par niveau**, pas en absolu : chaque niveau
 a sa propre table T1→T4, calibrée sur le nombre de squads. Un Director ne
 joue pas avec les chiffres d'un PM.
+
+**Le déblocage est strict : il faut gagner un niveau pour ouvrir le
+suivant.** Pas de contournement au bout de N runs joués — un Lead PM se
+mérite. C'est la condition pour que le titre veuille dire quelque chose.
+
+**Mais les niveaux verrouillés doivent être visibles et expliqués.** Un
+joueur qui ne sait pas qu'il existe un après ne joue pas pour y accéder :
+
+- Le menu de démarrage affiche **tous** les niveaux, les verrouillés grisés
+  avec leur condition en clair (*« 🔒 Lead PM — gagnez un mandat complet en
+  PM (4 trimestres franchis) »*).
+- La règle est **identique à celle déjà en place** pour les scénarios non
+  jouables (`playableEras` → « Bientôt disponible » grisé sur
+  `scenario_screen`) : on réutilise le pattern, pas une nouvelle UI.
+- L'écran de fin de mandat annonce le déblocage quand il tombe, et rappelle
+  la condition manquante quand ce n'est pas encore le cas.
 
 ### 13.5 Le contrat de compatibilité — à honorer dès le lot 1
 
@@ -853,7 +937,7 @@ Règles d'animation :
 | Traits visibles décoratifs | Modificateurs de Levier (§6.2) |
 | Roadmap sur 4 features de démo | `backlog.json` branché, points/ROI/impact/risque réels |
 | Cap d'effectif figé | Achetable au Comité (§12) |
-| 🎯 Capital politique — jauge qu'on ne fait que perdre | Monnaie du **lobbying** sur les équipes subies (§9.4) |
+| 🎯 Capital politique | **Inchangé** — la piste du lobbying est écartée (§9.4), à surveiller en playtest |
 | `roster[]` | `squads[]` de longueur 1 (§13.5) |
 | Fins par jauge à l'extrême | **Conservées** + nouvelle fin `remercie` sur quota manqué |
 
@@ -868,13 +952,14 @@ pas une réécriture.
 | Fichier | Statut | Contenu |
 |---|---|---|
 | `data/scoring.json` | **nouveau** | Combos de main, combos d'organisation locaux et globaux, formules de freins |
-| `data/tools.json` | **nouveau** | Outils internes (§7.1) : `perEmployee`, `eligibility`, `refractory`, `adoptionCondition`, `costBudget` |
+| `data/tools.json` | **nouveau** | Outils internes (§7.1) : `perEmployee`, `eligibility`, `refractory`, `adoptionCondition`, `costBudget`, `slotBonus`, `cumulative` |
 | `data/strategy.json` | **nouveau** | Décisions stratégiques (§7.2) et stack (§7.3) |
 | `data/quotas.json` | **nouveau** | Quotas **par niveau de carrière** × trimestre, courbe du mode long, pool des exigences |
 | `data/investments.json` | **nouveau** | Catalogue du Comité (§12) |
-| `data/careers.json` | **nouveau** *(lot 5)* | Niveaux de carrière, nombre de squads, conditions de déblocage |
+| `data/careers.json` | **nouveau** *(lot 5)* | Niveaux de carrière, nombre de squads, **slots de base**, conditions de déblocage et leur libellé affiché |
 | `data/backlog.json` | modifié | + `tags[]` (combo Focus), + les epics |
-| `data/companies.json` | modifié | + `supportTeams` (niveaux Sales/PMM/CSM) |
+| `data/companies.json` | modifié | + `supportTeams` (niveaux Sales/PMM/CSM), + `inheritedTools[]` (§7.1.3) |
+| `data/inbox-events.json` | modifié | + `supportTeam` et `levelRange` : les événements des équipes subies, filtrés par leur niveau (§9.4) |
 | `data/balance.json` | modifié | + `scoring`, `impactToMrr`, churn, `budgetFromImpact`, `toolSlots` (base, coûts d'ouverture, plafond, coût de bascule), `trimesterLengthSprints: 3` |
 | `data/endings.json` | modifié | + `remercie` |
 | `data/cards.json` | **remplacé** | éclaté vers `tools.json` et `strategy.json` |
@@ -914,13 +999,16 @@ headless : le smoke test vérifie des scores, pas des pixels.
   Meridia sans qu'aucune valeur ne soit écrite en dur pour ça ; (2) au T1 on
   manque d'argent, au T4 on manque de slots.*
 - **Lot 4 — La croissance et les équipes subies** : Comité d'investissement,
-  cap achetable, promotions, paliers de produit, Sales/PMM/CSM, lobbying,
-  Compendium des synergies.
+  cap achetable, promotions, paliers de produit, Sales/PMM/CSM et **leurs
+  événements Inbox dédiés**, Compendium des synergies.
   → *Critère : deux runs sur la même entreprise produisent deux
   organisations différentes.*
 - **Lot 5 — L'échelle** : multi-squad, attention limitée, combos
-  inter-squads, niveaux de carrière et déblocages, quotas par niveau.
-  → *Critère : le même `ScoreResolver` sert à 1 squad et à 10.*
+  inter-squads, niveaux de carrière, slots de base par niveau, déblocages
+  stricts **affichés et expliqués dans les menus**, quotas par niveau.
+  → *Critères : (1) le même `ScoreResolver` sert à 1 squad et à 10 ; (2) un
+  joueur qui n'a jamais gagné sait quand même que Lead PM existe et ce qu'il
+  faut faire pour l'ouvrir.*
 
 Chaque lot se conclut comme d'habitude : les deux smoke tests headless, un
 run visuel, et la mise à jour du carnet de règles.
@@ -937,23 +1025,24 @@ run visuel, et la mise à jour du carnet de règles.
 | Fréquence des outils internes | **Au Comité, achats illimités.** Ce sont le **prix** et les **slots** qui bornent, pas un compteur d'achats (§7.1.1) |
 | Décisions stratégiques | **1 par trimestre**, irréversible (§7.2) |
 | Formule du Budget | Racine carrée retenue **comme point de départ**, à recalibrer en playtest — pas un choix de conception, un réglage |
+| Nombre de slots de base | **Vient du kit de départ, donc du niveau de carrière** : 3 au PM (dont 1 hérité) → 7 au CEO. +2 achetables en cours de run (§7.1.1) |
+| Le slot gelé par un outil cumulatif | Réglé par le **`slotBonus`** : les outils cumulatifs rendent leur place (§7.1.1.b). La punition porte sur le compteur, jamais sur l'espace de build |
+| L'outillage hérité | **Retenu.** Il oblige à comprendre trois mécaniques pour bien ouvrir un run — c'est l'intention, pas un effet de bord (§7.1.3) |
+| Pilotage des équipes subies | **Aucun.** Pas de lobbying, pas d'achat. Elles appliquent leur taux et déclenchent leurs événements ; on s'adapte (§9.4) |
+| Déblocage de carrière | **Strict** — il faut gagner pour évoluer. Et les niveaux verrouillés sont **visibles avec leur condition** (§13.4) |
 
 ### 18.2 Encore ouvert
 
-1. **Combien de slots de base ?** Proposé : 3, plafond 7. En dessous de 3 il
-   n'y a pas de build ; au-delà de 7 le late game redevient un achat
-   automatique de tout le catalogue.
-2. **Le coût de bascule remet-il vraiment les compteurs cumulatifs à zéro ?**
-   C'est la règle la plus punitive du document. Elle rend 🪞 Sprint rétro
-   sacré — ce qui est l'effet voulu — mais elle peut aussi geler un slot pour
-   tout le run et rendre la décision *moins* intéressante qu'elle en a l'air.
-   Alternative : le compteur repart à la moitié.
-3. **L'outillage hérité** (§7.1.3) — bonne idée d'ouverture de run, ou
-   frustration inutile en tout début de partie, avant que le joueur ait
-   compris le système des slots ?
-4. **Les équipes subies sont-elles pilotables au-delà du lobbying ?** Par
-   exemple « emprunter » un PMM pendant un trimestre contre du Capital
-   politique. Risque de diluer le principe « ce que je ne contrôle pas ».
-5. **Le déblocage de carrière est-il strict ?** Proposé : il faut gagner un
-   niveau pour ouvrir le suivant. Alternative : ouvrir Lead PM après une
-   victoire *ou* trois runs joués, pour ne pas bloquer un joueur qui coince.
+Plus de question de conception bloquante. Restent trois réglages, qui se
+trancheront mieux en jouant qu'en discutant :
+
+1. **Combien d'outils portent un `slotBonus`** — 2 ou 3 sur le catalogue ?
+   Trop peu et les outils cumulatifs restent rares au point d'être
+   anecdotiques ; trop et les slots cessent d'être une contrainte.
+2. **La courbe de prix des outils** (8-18 💶) face au Budget d'un T1 (~24 💶) —
+   le rythme visé est 1 à 2 achats au premier Comité, à vérifier au smoke
+   test.
+3. **Le Capital politique** (§9.4) : sans le lobbying, il garde ses deux
+   seuls usages actuels. Si la jauge reste purement défensive après
+   playtest, lui trouver un débouché — mais pas en rendant pilotable ce qui
+   ne doit pas l'être.
