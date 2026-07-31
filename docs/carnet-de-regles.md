@@ -721,11 +721,23 @@ qu'on peut activer *n'importe quand* ne se décide jamais maintenant.
     déjà vraie et la carte n'est qu'un tirage rare de plus ; sur Karavel —
     équipe 100 % junior — c'est un vrai programme de recrutement. La même carte
     ne raconte pas la même chose selon la boîte.
-- **Ce qui est acquis passe en fin de rayon** — embauché, adopté ou activé, la
-  carte reste visible jusqu'à la fin du tour, tamponnée et grisée, mais cesse
-  d'occuper la tête de rayon. Elle disparaît au sprint suivant : ce qu'on
-  possède se relit dans le Panneau de bord et sur le plateau des Fondations, pas
-  sur l'étal.
+- **Le tampon, et rien qui bouge.** À l'achat, la carte est **tamponnée sur
+  place** — « ADOPTÉE », « EMBAUCHÉ·E », « ACTIVÉE » en travers, à l'encre rouge
+  d'un tampon administratif : le tampon tombe de haut, s'écrase net et se
+  redresse d'un rien (proposition UI §5.2, où il est le feedback d'acquisition
+  commun aux quatre pistes de DA).
+  - Un premier jet reléguait en fin de rayon ce qui venait d'être acquis, pour
+    mettre en avant ce qu'il restait à décider. Mauvais échange : la carte qu'on
+    vient d'acheter est précisément celle qu'on regarde, et la voir sauter
+    ailleurs au moment du clic casse le lien entre le geste et son effet — on
+    cherche des yeux ce qu'on tenait. **Une carte gagne sa place au tirage et la
+    garde tout le sprint.** Le feedback est la marque, pas le déplacement.
+  - La carte reste visible, tamponnée et grisée, jusqu'à la fin du tour, puis
+    disparaît au sprint suivant : ce qu'on possède se relit dans le Panneau de
+    bord et sur le plateau des Fondations, pas sur l'étal.
+  - C'est la carte qui détecte l'acquisition (son descripteur *gagne* un tampon
+    qu'il n'avait pas), pas l'écran qui déclenche une animation. Revenir sur
+    l'écran ne re-tamponne donc pas ce qu'on avait déjà acheté.
 - **Le rail replié du Panneau de bord**, resté sur l'établi depuis le Lot 1, est
   fait : un clic replie la colonne en un rail de 62 px qui garde les six jauges
   en vignette (barre + valeur, tooltips complets) et rend 260 px aux cartes. Sur

@@ -133,23 +133,13 @@ func _descriptor(entry: Dictionary) -> Dictionary:
 	return UIHelpers.apply_card_placement(descriptor, int(entry.get("placement", 0)))
 
 
-## Ce qui est acquis (embauché, adopté, activé) passe en fin de rayon : le rayon
-## met en avant ce qu'il reste à décider. Une carte ne se déplace que le sprint
-## où on l'acquiert, et garde son angle — c'est le même objet, posé ailleurs.
-func _reorder_acquired() -> void:
-	var pending: Array = []
-	var acquired: Array = []
-	for entry in _cards:
-		if _is_acquired(entry):
-			acquired.append(entry)
-		else:
-			pending.append(entry)
-
-	_cards = pending + acquired
-	for rank in _cards.size():
-		shelf_grid.move_child(_cards[rank]["node"], rank)
-
-
+## **Rien ne bouge dans le rayon.** Un premier jet reléguait en fin de rayon ce
+## qui venait d'être acquis, pour mettre en avant ce qu'il restait à décider :
+## c'était un mauvais échange. La carte qu'on vient d'acheter est précisément
+## celle qu'on regarde, et la voir sauter ailleurs au moment du clic casse le
+## lien entre le geste et son effet — on cherche des yeux ce qu'on tenait. Le
+## feedback d'acquisition est le **tampon** posé sur place (§5.2), pas un
+## déplacement. Une carte gagne sa place au tirage et la garde tout le sprint.
 func _is_acquired(entry: Dictionary) -> bool:
 	match entry.get("kind", ""):
 		"candidate":
@@ -219,7 +209,6 @@ func _refresh_reroll_button() -> void:
 func _refresh_shelf() -> void:
 	for entry in _cards:
 		entry["node"].set_descriptor(_descriptor(entry))
-	_reorder_acquired()
 	_refresh_shelf_head()
 	_refresh_reroll_button()
 

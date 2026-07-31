@@ -19,6 +19,11 @@ const COLOR_RULE := Color("#d4d9df")       # filets pointillés des cartes
 const COLOR_AMBER := Color("#8a6d00")      # eyebrows, catégories, coûts
 const COLOR_SHELF := Color("#23408e")      # titres de rayon
 
+## L'encre du tampon d'acquisition (« ADOPTÉE », « EMBAUCHÉ·E », « ACTIVÉE ») —
+## le rouge de tampon administratif, volontairement hors palette : c'est la
+## seule marque qui dise « c'est fait, et ça ne se défait pas ».
+const COLOR_STAMP := Color("#c0392b")
+
 const COLOR_GOOD := Color("#2f9e63")
 const COLOR_WARN := Color("#b3801a")
 const COLOR_DANGER := Color("#d3543f")

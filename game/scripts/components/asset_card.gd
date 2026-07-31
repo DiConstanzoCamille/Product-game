@@ -33,10 +33,18 @@ const MIN_WIDTH := 236
 ## UIHelpers.SHADOW_* pour pourquoi la géométrie ne bouge pas côté boutons.
 const HOVER_TWEEN := 0.14
 
+## Le tampon d'acquisition : durée de la frappe, angle de pose et échelle de
+## départ. Il « tombe » de haut — d'où l'échelle initiale — et s'écrase net.
+const STAMP_PUNCH := 0.24
+const STAMP_ANGLE := -12.0
+const STAMP_START_SCALE := 2.8
+
 var _descriptor: Dictionary = {}
 var _tilt_degrees: float = 0.0
 var _hovered: bool = false
 var _paper: StyleBoxFlat = null
+var _stamp: Control = null
+var _stamp_should_punch: bool = false
 
 
 ## Fabrique : instancie la scène et lui donne son descripteur. La carte se
@@ -49,9 +57,16 @@ static func create(descriptor: Dictionary) -> AssetCard:
 	return card
 
 
+## La carte détecte elle-même l'acquisition : si le descripteur **gagne** un
+## tampon qu'il n'avait pas, c'est que l'Actif vient d'être acquis et le tampon
+## se joue. L'écran n'a rien à déclencher — il change l'état, la carte réagit.
+## Rien ne se joue au premier descripteur (carte construite hors de l'arbre) :
+## revenir sur l'écran ne re-tamponne pas ce qu'on a acheté au sprint dernier.
 func set_descriptor(descriptor: Dictionary) -> void:
+	var had_stamp: bool = _descriptor.get("stamp", "") != ""
 	_descriptor = descriptor
 	if is_inside_tree():
+		_stamp_should_punch = not had_stamp and descriptor.get("stamp", "") != ""
 		_rebuild()
 
 
@@ -128,6 +143,7 @@ func _rebuild() -> void:
 	_apply_paper_style()
 	_apply_tilt()
 	_build_decorations()
+	_build_stamp()
 
 	_zone_type(vbox)
 	_zone_identity(vbox)
@@ -199,6 +215,77 @@ func _build_decorations() -> void:
 		)
 	place.call()
 	layer.resized.connect(place)
+
+
+## Le **tampon d'acquisition** (proposition UI §5.2) : « ADOPTÉE »,
+## « EMBAUCHÉ·E », « ACTIVÉE » en travers de la carte. C'est le feedback de
+## l'acte — la carte ne bouge pas de sa place dans le rayon, elle porte
+## simplement la marque de ce qui vient d'être fait.
+##
+## Il vit dans le calque "Decorations" comme le scotch : un PanelContainer
+## étirerait un enfant direct sur toute la carte et le tampon recouvrirait le
+## contenu. Le calque, lui, est un Control nu — il ne remet donc pas à zéro la
+## rotation ni l'échelle du tampon, ce qu'un Container ferait à chaque passe de
+## layout (le piège déjà rencontré sur l'inclinaison des cartes).
+func _build_stamp() -> void:
+	_stamp = null
+	var text: String = _descriptor.get("stamp", "")
+	if text == "":
+		return
+
+	var layer: Control = get_node("Decorations")
+	var stamp := PanelContainer.new()
+	stamp.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(UIHelpers.COLOR_STAMP.r, UIHelpers.COLOR_STAMP.g, UIHelpers.COLOR_STAMP.b, 0.07)
+	style.border_color = UIHelpers.COLOR_STAMP
+	style.set_border_width_all(3)
+	style.set_corner_radius_all(6)
+	style.content_margin_left = 14
+	style.content_margin_right = 14
+	style.content_margin_top = 5
+	style.content_margin_bottom = 5
+	stamp.add_theme_stylebox_override("panel", style)
+
+	var label := Label.new()
+	label.text = text
+	UIHelpers.apply_heading(label, 21, 700.0)
+	label.add_theme_color_override("font_color", UIHelpers.COLOR_STAMP)
+	stamp.add_child(label)
+	layer.add_child(stamp)
+	_stamp = stamp
+
+	# Le calque est positionné à la main : sans conteneur pour le faire, le
+	# tampon doit se donner sa taille et se recentrer à chaque redimensionnement.
+	var place := func():
+		stamp.size = stamp.get_combined_minimum_size()
+		stamp.pivot_offset = stamp.size / 2.0
+		stamp.position = ((layer.size - stamp.size) / 2.0).round()
+	place.call()
+	layer.resized.connect(place)
+
+	if _stamp_should_punch:
+		_stamp_should_punch = false
+		_punch_stamp()
+	else:
+		stamp.rotation_degrees = STAMP_ANGLE
+
+
+## La frappe : le tampon tombe de haut (grande échelle), s'écrase net et se
+## redresse d'un rien — l'« impact franc » demandé par le §5.2. Pas de
+## déplacement de la carte : le geste doit se lire sans que le rayon bouge.
+func _punch_stamp() -> void:
+	_stamp.scale = Vector2(STAMP_START_SCALE, STAMP_START_SCALE)
+	_stamp.rotation_degrees = STAMP_ANGLE - 9.0
+	_stamp.modulate.a = 0.0
+
+	var tween := create_tween().set_parallel(true)
+	tween.tween_property(_stamp, "scale", Vector2.ONE, STAMP_PUNCH) \
+		.set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
+	tween.tween_property(_stamp, "rotation_degrees", STAMP_ANGLE, STAMP_PUNCH) \
+		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tween.tween_property(_stamp, "modulate:a", 1.0, STAMP_PUNCH * 0.45)
 
 
 # ── ① Type + rareté + référence + punaise ─────────────────────────────────

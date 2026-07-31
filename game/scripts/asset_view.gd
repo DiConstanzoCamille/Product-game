@@ -148,6 +148,7 @@ static func for_decision(card: Dictionary) -> Dictionary:
 		"cost": "%d 🪙 · 1 slot de grande décision · %d/%d activées" % [cost, used, max_activations],
 		"primary": primary,
 		"dimmed": activated,
+		"stamp": "ACTIVÉE" if activated else "",
 	}, "decision", card_id, card, activated)
 
 
@@ -207,6 +208,7 @@ static func for_candidate(candidate: Dictionary) -> Dictionary:
 		"primary": primary,
 		"secondary": secondary,
 		"dimmed": hired,
+		"stamp": "EMBAUCHÉ·E" if hired else "",
 	}, "candidate", candidate.get("id", ""), candidate, hired)
 
 
@@ -261,6 +263,7 @@ static func for_practice(practice: Dictionary) -> Dictionary:
 		"cost": "%d 🪙" % cost,
 		"primary": primary,
 		"dimmed": owned,
+		"stamp": "ADOPTÉE" if owned else "",
 	}, "practice", practice_id, practice, owned)
 
 
