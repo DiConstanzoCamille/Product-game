@@ -775,3 +775,41 @@ qu'on peut activer *n'importe quand* ne se décide jamais maintenant.
     pour le Moral parmi celles tirées**, et ré-essaie chaque sprint. Le critère
     de recette (« la spirale burn-out reste atteignable ») tient toujours, mais
     il fallait que l'IA de test apprenne à jouer avec l'offre, comme un joueur.
+
+## 24. Phase C — Roadmap profonde (Lot 0)
+
+La Roadmap consomme maintenant exclusivement `data/backlog.json`; le fichier
+`roadmap-features.json` reste la donnée de démonstration de la landing.
+
+- **Tirage persistant.** `SprintState.current_backlog_draw` stocke 4 à 5
+  propositions filtrées par époque pour le sprint. Le tirage utilise un sac;
+  revenir sur l'écran ne change jamais l'offre. Les epics entamés s'ajoutent
+  systématiquement aux nouvelles propositions jusqu'à leur complétion. Toute
+  livraison quitte définitivement le sac: le même ROI ne peut pas être encaissé
+  deux fois.
+- **Informations et paris.** Le coût en points est toujours visible. ROI,
+  Impact client et Risque sont masqués par défaut; Discovery, UX research et
+  Tech radar révèlent définitivement leur colonne. **Plonger dans une feature**
+  consomme l'Énergie configurée dans `balance.json` et révèle les trois valeurs
+  pour le seul sprint courant.
+- **Epics.** Le joueur choisit librement le nombre de points investi dans un
+  epic, dont `costPoints` est le total. Aucune conséquence ne tombe avant la
+  complétion; les attributs et `completionEffects` se résolvent alors une seule
+  fois. **Abandonner l'epic** remet sa progression à zéro, sans remboursement;
+  il quitte l'offre courante puis peut revenir dans un futur cycle du sac.
+- **Résolution réelle.** Une livraison ajoute son `roi` au MRR récurrent du
+  mandat, applique son impact client et son risque (plus les quick wins et les
+  effets de complétion), puis révèle ces chiffres dans la Résolution. Le bonus
+  Designer, la pénalité de surchauffe modulée par les PM et le bonus OKR restent
+  résolus par le moteur, jamais par l'UI.
+- **Recette.** Le smoke test logique vérifie la taille et la persistance du
+  tirage, les révélations de Plonger, l'Énergie dépensée, le ROI permanent et
+  la progression puis la complétion d'un epic.
+
+## 25. Inbox en fil interne
+
+L'Inbox conserve exactement le même tirage, les mêmes choix et les mêmes
+deltas. Seule sa forme change : chaque événement porte un `channel`, le message
+entrant affiche son expéditeur et son horodatage, puis le choix retenu rejoint
+le fil comme réponse du joueur avant la conséquence. Un événement sans canal
+retombe sur `#direction-produit`.

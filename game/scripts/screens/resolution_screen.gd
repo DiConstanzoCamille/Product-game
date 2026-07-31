@@ -56,6 +56,7 @@ func _load_hud(old_values: Dictionary) -> void:
 
 	_animate_revenue_callout()
 	_add_energy_line()
+	_add_roadmap_delivery_line()
 
 	var index := 0
 	for resource in GameData.resources:
@@ -92,6 +93,7 @@ func _animate_revenue_callout() -> void:
 	var payroll: int = SprintState.last_payroll
 	var cost: int = SprintState.last_tresorerie_cost
 	var pieces_delta: int = SprintState.last_pieces_delta
+	var roi_bonus: int = SprintState.last_roi_revenue_bonus
 	var net: int = revenue - payroll + cost
 	var model_label: String = model.get("label", "Revenu")
 
@@ -100,8 +102,8 @@ func _animate_revenue_callout() -> void:
 	var tween := create_tween()
 	tween.tween_method(
 		func(v: float):
-			revenue_label.text = "💰 %s : +%d  ·  👥 Masse salariale : −%d  ·  💸 Décisions : %s%d  ·  Net trésorerie : %s%d  ·  🪙 Pièces %s%d (solde %d)" % [
-				model_label, int(round(v)),
+			revenue_label.text = "💰 %s : +%d (dont ROI backlog +%d)  ·  👥 Masse salariale : −%d  ·  💸 Décisions : %s%d  ·  Net trésorerie : %s%d  ·  🪙 Pièces %s%d (solde %d)" % [
+				model_label, int(round(v)), roi_bonus,
 				payroll,
 				"+" if cost >= 0 else "−", abs(cost),
 				"+" if net >= 0 else "−", abs(net),
@@ -148,6 +150,40 @@ func _add_energy_line() -> void:
 	var content: Node = $Margin/VBox/Scroll/Content
 	content.add_child(energy_label)
 	content.move_child(energy_label, revenue_label.get_index() + 1)
+
+
+## Ce sont les chiffres réels qui étaient masqués sur la Roadmap. La
+## Résolution est volontairement le seul endroit qui les révèle sans pratique.
+func _add_roadmap_delivery_line() -> void:
+	var report: Dictionary = SprintState.last_roadmap_report
+	if int(report.get("sprint", -1)) != SprintState.sprint_number:
+		return
+	var delivered: Array = report.get("delivered", [])
+	var progress: Array = report.get("epicUpdates", [])
+	if delivered.is_empty() and progress.is_empty():
+		return
+
+	var lines: Array = []
+	for item in delivered:
+		lines.append("%s %s : ROI +%d MRR/sprint · Impact client %+d · Risque dette %+d" % [
+			item.get("icon", "📌"), item.get("name", ""), int(item.get("roi", 0)),
+			int(item.get("clientImpact", 0)), int(item.get("risk", 0))
+		])
+	for update in progress:
+		if not update.get("completed", false):
+			var item: Dictionary = update.get("item", {})
+			lines.append("%s %s : +%d pts investis, %d pts restants" % [
+				item.get("icon", "📌"), item.get("name", ""), int(update.get("invested", 0)),
+				SprintState.get_epic_remaining(item.get("id", ""))
+			])
+
+	var label := Label.new()
+	label.text = "Livraisons Roadmap\n%s" % "\n".join(lines)
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD
+	label.add_theme_font_size_override("font_size", 14)
+	var content: Node = $Margin/VBox/Scroll/Content
+	content.add_child(label)
+	content.move_child(label, revenue_label.get_index() + 2)
 
 
 ## 🧘 Souffler (spec §7.2) — proposé à la Résolution : renoncer aux actions

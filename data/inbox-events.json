@@ -3,6 +3,7 @@
     {
       "id": "priya-lead-engineering",
       "from": "Priya, Lead Engineering",
+      "channel": "#direction-produit",
       "sprint": 8,
       "status": "non lu",
       "subject": "On peut parler deux minutes ?",
@@ -31,6 +32,7 @@
     {
       "id": "sofia-incident-prod",
       "from": "Sofia, PM Senior",
+      "channel": "#incidents",
       "sprint": 2,
       "status": "urgent",
       "subject": "Incident en prod, en pleine démo client",
@@ -59,6 +61,7 @@
     {
       "id": "board-question-budget",
       "from": "Le board",
+      "channel": "#board-confidentiel",
       "sprint": 4,
       "status": "urgent",
       "subject": "Une question sur le budget outillage",
@@ -87,6 +90,7 @@
     {
       "id": "kevin-surcharge",
       "from": "Kevin, Ops Junior",
+      "channel": "#equipe-produit",
       "sprint": 6,
       "status": "non lu",
       "subject": "Je ne vais pas tenir le rythme",
@@ -115,6 +119,7 @@
     {
       "id": "concurrent-feature",
       "from": "Veille concurrentielle",
+      "channel": "#veille-marche",
       "sprint": 10,
       "status": "non lu",
       "subject": "Un concurrent sort la feature que vous préparez",
@@ -143,6 +148,7 @@
     {
       "id": "rgpd-audit-surprise",
       "from": "Direction juridique",
+      "channel": "#juridique",
       "sprint": 1,
       "status": "urgent",
       "subject": "Audit RGPD surprise avant signature",
@@ -171,6 +177,7 @@
     {
       "id": "investisseur-visite",
       "from": "Un investisseur historique",
+      "channel": "#relations-investisseurs",
       "sprint": 3,
       "status": "urgent",
       "subject": "Visite surprise avant le comité",
@@ -199,6 +206,7 @@
     {
       "id": "bug-securite",
       "from": "Équipe technique",
+      "channel": "#incidents",
       "sprint": 5,
       "status": "non lu",
       "subject": "Faille de sécurité mineure repérée",
@@ -227,6 +235,7 @@
     {
       "id": "churn-client-cle",
       "from": "Équipe commerciale",
+      "channel": "#clients-strategiques",
       "sprint": 7,
       "status": "urgent",
       "subject": "Un client historique menace de partir",
@@ -255,6 +264,7 @@
     {
       "id": "recrutement-difficile",
       "from": "Équipe RH",
+      "channel": "#rh-confidentiel",
       "sprint": 9,
       "status": "non lu",
       "subject": "Le poste ouvert ne trouve pas preneur",
@@ -283,6 +293,7 @@
     {
       "id": "daily-qui-derape",
       "from": "L'équipe",
+      "channel": "#equipe-produit",
       "sprint": 3,
       "status": "non lu",
       "subject": "Le daily dure 45 minutes depuis une semaine",
@@ -312,6 +323,7 @@
     {
       "id": "coach-agile-burnout",
       "from": "Coach agile externe",
+      "channel": "#transformation-agile",
       "sprint": 8,
       "status": "urgent",
       "subject": "Je pars plus tôt que prévu",
