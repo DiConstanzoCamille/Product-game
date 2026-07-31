@@ -35,6 +35,7 @@ var failures: int = 0
 
 func _ready() -> void:
 	print("=== SMOKE TEST UI ===")
+	_test_ui_scale_settings()
 	SprintState.reset_run()
 	SprintState.activated_cards.append("notion")
 	SprintState.activated_card_sprints["notion"] = 1
@@ -62,6 +63,21 @@ func _fail(message: String) -> void:
 	failures += 1
 	push_error(message)
 	print("ASSERTION ÉCHOUÉE : %s" % message)
+
+
+func _test_ui_scale_settings() -> void:
+	var viewport := Vector2i(
+		int(ProjectSettings.get_setting("display/window/size/viewport_width", 0)),
+		int(ProjectSettings.get_setting("display/window/size/viewport_height", 0))
+	)
+	var window := Vector2i(
+		int(ProjectSettings.get_setting("display/window/size/window_width_override", 0)),
+		int(ProjectSettings.get_setting("display/window/size/window_height_override", 0))
+	)
+	if viewport != Vector2i(1280, 720) or window != Vector2i(1600, 900):
+		_fail("L'UI doit etre rendue de 1280x720 vers une fenetre 1600x900.")
+	if ProjectSettings.get_setting("display/window/stretch/mode", "") != "canvas_items":
+		_fail("Le mode canvas_items doit garder l'interface lisible au redimensionnement.")
 
 
 ## Joue les deux gestes spécifiques à la Roadmap profonde : révéler une carte
