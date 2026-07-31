@@ -1304,35 +1304,9 @@ func add_pending(deltas: Dictionary, note: String = "") -> void:
 		pending_journal_lines.append(note)
 
 
-## Revenu du sprint selon le modèle économique du scénario (§15, remanié en
-## Phase A) — proportionnel à la Valeur perçue au-dessus du seuil de
-## notoriété (offset), érodé par un Moral bas (churn). Sous le seuil de
-## décrochage (pressure.revenueCutoffValeurPercue), plus aucun revenu :
-## la mort passe par la spirale économique, plus de couperet direct (§8.3).
-func compute_revenue() -> int:
-	var model: Dictionary = get_business_model()
-	if model.is_empty():
-		return 0
-	last_roi_revenue_bonus = recurring_roi
-
-	var valeur: float = resource_values.get("valeur-percue", 0.0)
-	var cutoff: float = float(GameData.balance.get("pressure", {}).get("revenueCutoffValeurPercue", 5))
-	if valeur <= cutoff:
-		return recurring_roi
-
-	var moral: float = resource_values.get("moral", 0.0)
-	var per_point: float = model.get("revenuePerValeurPercuePoint", 0.0)
-	var offset: float = model.get("revenueValeurPercueOffset", 0.0)
-	var floor_factor: float = model.get("moralChurnFloor", 0.4)
-	var ceiling_factor: float = model.get("moralChurnCeiling", 1.2)
-	var moral_factor: float = clamp(moral / 100.0, floor_factor, ceiling_factor)
-
-	return int(round(max(valeur - offset, 0.0) * per_point * moral_factor)) + recurring_roi
-
-
 ## Applique le panier d'effets aux ressources (+ masse salariale, effets de
-## roster et de pratiques, décroissance de la Valeur perçue, revenu du
-## sprint et flux de pièces), journalise, joue la revue de board au sprint 6,
+## roster et de pratiques, décroissance de la Valeur perçue, conversion
+## Traction × Levier × Impact, flux de pièces), journalise, joue la revue de board au sprint 6,
 ## puis vérifie les fins de mandat (seuils de ressources, ou longueur
 ## atteinte). Retourne l'id de la fin atteinte, ou "" si le mandat continue.
 ## À appeler une seule fois par sprint, depuis l'écran de Résolution.
@@ -1340,9 +1314,12 @@ func apply_pending_and_check() -> String:
 	last_tresorerie_cost = int(round(pending_deltas.get("tresorerie", 0.0)))
 
 	_apply_per_sprint_effects()
+	last_score_report = ScoreResolver.resolve(_build_score_snapshot(), {
+		"scoring": GameData.scoring,
+		"hidden_traits": GameData.hidden_traits,
+	})
 	_apply_payroll()
-	_apply_revenue()
-	_apply_pieces_flow()
+	_apply_score_conversion()
 
 	var bounds: Dictionary = GameData.balance.get("resourceBounds", {"min": 0, "max": 100})
 	var min_value: float = bounds.get("min", 0)
@@ -1434,6 +1411,75 @@ func _apply_per_sprint_effects() -> void:
 			"📈 Le marché avance sans vous attendre : Valeur perçue −%d" % int(decay))
 
 
+## Snapshot immuable du sprint. Les deltas de contenu et de pratiques ont
+## déjà été accumulés ; le score lit donc les ressources telles qu'elles
+## seront après Résolution, sans les appliquer une seconde fois.
+func _build_score_snapshot() -> Dictionary:
+	var score_squads: Array = []
+	var primary_report: Dictionary = last_roadmap_report if int(last_roadmap_report.get("sprint", -1)) == sprint_number else {}
+	for squad_index in squads.size():
+		var squad: Dictionary = squads[squad_index]
+		var delivered: Array = []
+		var spent_points := 0
+		var capacity := int(squad.get("capacity", get_effective_capacity()))
+		if squad_index == 0:
+			delivered = primary_report.get("delivered", [])
+			spent_points = int(primary_report.get("plannedPoints", 0))
+			capacity = int(primary_report.get("capacity", get_effective_capacity()))
+			squad["delivered"] = delivered
+			squad["capacity"] = capacity
+			squad["spent_points"] = spent_points
+			squads[squad_index] = squad
+		else:
+			delivered = squad.get("delivered", [])
+			spent_points = int(squad.get("spent_points", squad.get("planned_points", 0)))
+		score_squads.append({
+			"id": squad.get("id", "equipe-%d" % squad_index),
+			"roster": squad.get("roster", []),
+			"capacity": capacity,
+			"delivered": delivered,
+			"spent_points": spent_points,
+		})
+
+	return {
+		"sprint": sprint_number,
+		"squads": score_squads,
+		"resources": _projected_score_resources(),
+		"mrr": mrr,
+		"recurring_roi": recurring_roi,
+		"budget": pieces,
+		"business_model_id": business_model_id,
+		"active_tools": _active_tool_entries(),
+		"owned_practices": owned_practices,
+		"strategy_ids": activated_cards,
+		"board_review_failed": board_review_state == "failed",
+		"streak": streak,
+	}
+
+
+func _active_tool_entries() -> Array:
+	var entries: Array = []
+	for card_id in activated_cards:
+		var activated_sprint := int(activated_card_sprints.get(card_id, sprint_number))
+		entries.append({
+			"id": card_id,
+			"active_sprints": max(0, sprint_number - activated_sprint + 1),
+		})
+	return entries
+
+
+func _projected_score_resources() -> Dictionary:
+	var bounds: Dictionary = GameData.balance.get("resourceBounds", {"min": 0, "max": 100})
+	var minimum: float = bounds.get("min", 0)
+	var maximum: float = bounds.get("max", 100)
+	var projected := resource_values.duplicate()
+	for resource_id in pending_deltas.keys():
+		if not projected.has(resource_id):
+			continue
+		projected[resource_id] = clamp(float(projected[resource_id]) + float(pending_deltas[resource_id]), minimum, maximum)
+	return projected
+
+
 func _apply_payroll() -> void:
 	last_payroll = get_payroll()
 	if last_payroll > 0:
@@ -1441,45 +1487,37 @@ func _apply_payroll() -> void:
 		pending_journal_lines.append("Masse salariale : −%d 💰 (%d personnes)" % [last_payroll, get_roster().size()])
 
 
-func _apply_revenue() -> void:
-	last_revenue = compute_revenue()
+## Convertit le rapport du ScoreResolver en état de jeu. Aucun calcul de
+## score ne vit ici : le rapport est la seule source de vérité de l'économie.
+func _apply_score_conversion() -> void:
+	var conversion: Dictionary = last_score_report.get("conversion", {})
+	var mrr_report: Dictionary = conversion.get("mrr", {})
+	var budget_report: Dictionary = conversion.get("budget", {})
+
+	mrr = float(mrr_report.get("after", mrr))
+	streak = int(last_score_report.get("next_streak", 0))
+	last_revenue = int(round(mrr))
+	last_roi_revenue_bonus = int(round(float(mrr_report.get("recurring_roi_gain", 0.0))))
 	if last_revenue != 0:
 		pending_deltas["tresorerie"] = pending_deltas.get("tresorerie", 0.0) + last_revenue
-		var model_label: String = get_business_model().get("label", "revenu")
-		pending_journal_lines.append("Revenus (%s) : %s%d" % [
-			model_label, "+" if last_revenue >= 0 else "−", abs(last_revenue)
-		])
-	elif resource_values.get("valeur-percue", 100.0) <= float(GameData.balance.get("pressure", {}).get("revenueCutoffValeurPercue", 5)):
-		pending_journal_lines.append("📉 Valeur perçue en décrochage — plus aucun revenu ce sprint.")
+		pending_journal_lines.append("MRR : +%d (dont backlog +%d)" % [last_revenue, last_roi_revenue_bonus])
 
-
-## Flux de pièces de la Résolution (§3) : allocation du board (réduite si la
-## revue a été ratée), prime de performance sur le revenu, et deltas de
-## pièces accumulés pendant le sprint (quick wins, événements Inbox).
-func _apply_pieces_flow() -> void:
-	var pieces_conf: Dictionary = GameData.balance.get("pieces", {})
-	var allocation := int(pieces_conf.get("boardAllocationPerSprint", 2))
-	if board_review_state == "failed":
-		allocation = int(pieces_conf.get("boardAllocationIfReviewFailed", 1))
-	var divider := int(pieces_conf.get("revenuePerformanceDivider", 4))
-	var performance := 0
-	if divider > 0 and last_revenue > 0:
-		performance = int(floor(float(last_revenue) / float(divider)))
+	for resource_id in conversion.get("resource_deltas", {}).keys():
+		var delta: float = float(conversion["resource_deltas"][resource_id])
+		if not is_zero_approx(delta):
+			pending_deltas[resource_id] = pending_deltas.get(resource_id, 0.0) + delta
 
 	var pending_pieces := int(round(pending_deltas.get("pieces", 0.0)))
 	pending_deltas.erase("pieces")
-
-	var total := allocation + performance + pending_pieces
+	var score_budget_gain := int(budget_report.get("gain", 0))
 	var before := pieces
-	pieces = max(0, pieces + total)
+	pieces = max(0, pieces + pending_pieces + score_budget_gain)
 	last_pieces_delta = pieces - before
 
-	var parts: Array = ["allocation +%d" % allocation]
-	if performance > 0:
-		parts.append("performance +%d" % performance)
+	var parts: Array = ["rapport +%d" % score_budget_gain]
 	if pending_pieces != 0:
 		parts.append("décisions %s%d" % ["+" if pending_pieces >= 0 else "−", abs(pending_pieces)])
-	pending_journal_lines.append("🪙 Pièces : %s (solde %d)" % [" · ".join(parts), pieces])
+	pending_journal_lines.append("🪙 Budget d'investissement : %s (solde %d)" % [" · ".join(parts), pieces])
 
 
 ## Flux d'Énergie de la Résolution (§7.1) : régénération modulée par le

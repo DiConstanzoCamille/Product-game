@@ -102,7 +102,7 @@ Pas de dépendance/plugin externe : tout est construit avec les nœuds et l'API 
 
 ## Chargement des données
 
-`GameData` (autoload) charge chaque fichier de `data/` au démarrage : `GameData.resources`, `GameData.cards`, `GameData.eras`, `GameData.endings`, `GameData.foundations`, `GameData.backlog`, `GameData.inbox_events`, `GameData.recruitment_archetypes`, `GameData.recruitment_demo`, `GameData.hud_demo`, `GameData.structure`, `GameData.companies`.
+`GameData` (autoload) charge chaque fichier de `data/` au démarrage, notamment `resources`, `cards`, `eras`, `endings`, `foundations`, `backlog`, `inbox_events`, `balance`, `companies`, `candidates`, `practices`, `hidden_traits` et `scoring`.
 
 `SprintState` (autoload) porte l'état complet du mandat en cours : `sprint_number`, `team_profile`, `era_id`, `company_id` et `business_model_id` (fixés au choix du scénario + de l'entreprise), les 6 `resource_values`, le panier d'effets en attente, le journal, et les grandes décisions activées. L'équipe est déjà stockée dans `squads[]` (une seule squad principale aujourd'hui) ; chaque entrée porte son `roster`, backlog local, capacité, livraisons et progression d'epics. `get_roster()` fournit la vue globale aplatie pour l'UI et les règles transverses.
 
@@ -123,14 +123,15 @@ Pas de dépendance/plugin externe : tout est construit avec les nœuds et l'API 
 
 ## Tests
 
-`game/tests/` contient deux scripts headless (aucune fenêtre requise) :
+`game/tests/` contient trois suites headless (aucune fenêtre requise) :
 
 ```bash
 godot --headless --path game res://tests/smoke_test_logic.tscn  # simule des mandats complets, 3 profils de joueur
 godot --headless --path game res://tests/smoke_test_ui.tscn     # instancie les 9 écrans + joue les gestes des Investissements
+godot --headless --path game -s res://tests/score_resolver_cases.gd  # verrouille les scores exacts et le contrat multi-équipe
 ```
 
-`smoke_test_logic` fait rejouer des mandats entiers avec trois stratégies (`stress`, `greedy`, `careful`) et vérifie que les ressources restent dans les bornes et qu'une fin est toujours atteinte. C'est le filet de sécurité à relancer après tout changement dans `EffectResolver`, `SprintState` ou `data/balance.json`.
+`smoke_test_logic` fait rejouer des mandats entiers avec trois stratégies (`stress`, `greedy`, `careful`), vérifie l'application économique du rapport et garde les ressources dans leurs bornes. `score_resolver_cases` couvre séparément les formules exactes, sans UI ni mutation de `SprintState`.
 
 ## Prochaines étapes possibles
 

@@ -17,6 +17,7 @@ func _initialize() -> void:
 	candidates_data = _load_data("candidates.json").get("candidates", [])
 	companies_data = _load_data("companies.json").get("companies", [])
 	_test_feature_and_epic_traction()
+	_test_hand_bonus_order()
 	_test_quick_wins_are_one_hand_bonus()
 	_test_recent_hires_and_notion()
 	_test_streak_and_friction_rules()
@@ -60,6 +61,22 @@ func _test_quick_wins_are_one_hand_bonus() -> void:
 	_assert_equal(_label_count(report["squads"][0]["lines"], "Focus"), 1, "Focus ne doit etre applique qu'une seule fois par main.")
 
 
+func _test_hand_bonus_order() -> void:
+	var rules: Dictionary = scoring_data.duplicate(true)
+	rules["streak"]["leverPerSprint"] = 0.0
+	var delivered: Array = []
+	for index in 3:
+		delivered.append({"id": "focus-%d" % index, "name": "Focus", "costPoints": 1, "clientImpact": 0, "quickWin": false, "tags": ["growth"]})
+	var report := _resolve([_squad("a", delivered, [], 3, 3)], {}, rules)
+	var squad_report: Dictionary = report["squads"][0]
+	_assert_equal(float(squad_report.get("traction", 0.0)), 29.5, "Les bonus doivent suivre 12 x 1.25 x 1.3 + 10 = 29.5.")
+	var labels: Array = []
+	for line in squad_report.get("lines", []):
+		if int(line.get("step", 0)) == 2 and line.get("type", "") != "budget_add":
+			labels.append(line.get("label", ""))
+	_assert_equal(labels, ["Sprint parfait", "Focus", "Livraison groupée"], "L'ordre anime des bonus de main doit rester fixe.")
+
+
 func _test_recent_hires_and_notion() -> void:
 	var feature := _traction_feature(25)
 	var inherited := [{"id": "a", "role": "dev", "seniority": "junior", "hiredSprint": 0}, {"id": "b", "role": "designer", "seniority": "junior", "hiredSprint": 0}]
@@ -77,11 +94,22 @@ func _test_recent_hires_and_notion() -> void:
 	report = _resolve([_squad("a", [feature], notion_roster)], {"sprint": 10, "active_tools": ["notion"]}, _rules_without_streak())
 	_assert_equal(float(report.get("global", {}).get("lever", 0.0)), 1.32, "Notion doit compter les juniors OU les recrues de moins de 4 sprints.")
 
+	var inherited_senior := [{"id": "senior", "role": "dev", "seniority": "senior", "hiredSprint": 0}]
+	report = _resolve([_squad("a", [feature], inherited_senior)], {"sprint": 3, "active_tools": ["notion"]}, _rules_without_streak())
+	_assert_equal(float(report.get("global", {}).get("lever", 0.0)), 1.0, "Un senior herite n'est jamais une recrue recente pour Notion.")
+	_assert_true(_has_label_prefix(report.get("global", {}).get("lines", []), "Notion · 0 éligibles"), "Un outil actif a zero doit rester visible et expliquer son decompte.")
+
+	var ghost_junior := [{"id": "ghost", "role": "dev", "seniority": "junior", "hiredSprint": 0, "hidden_trait": "fantome", "hiddenRevealed": true}]
+	report = _resolve([_squad("a", [feature], ghost_junior)], {"sprint": 10, "active_tools": ["notion"]}, _rules_without_streak())
+	_assert_equal(float(report.get("global", {}).get("lever", 0.0)), 1.08, "Le Fantome doit contribuer a moitie au levier de Notion, avant adoption x2.")
+
 
 func _test_streak_and_friction_rules() -> void:
 	var feature := _traction_feature(25)
 	var report := _resolve([_squad("a", [feature])], {"streak": 0})
 	_assert_true(_has_label(report["squads"][0]["lines"], "Série de livraisons"), "Le premier sprint livre doit compter dans la serie.")
+	_assert_equal(_step_for_label(report["squads"][0]["lines"], "Série de livraisons"), 2, "La serie appartient a l'etape Bonus de main.")
+	_assert_true(_label_index(report["squads"][0]["lines"], "Série de livraisons") < _label_index(report["squads"][0]["lines"], "Sous-total"), "Le rapport doit placer la serie avant le sous-total d'equipe.")
 	_assert_equal(int(report.get("next_streak", -1)), 1, "Le premier sprint livre doit faire passer la serie a 1.")
 	report = _resolve([_squad("a", [])], {"streak": 4})
 	_assert_equal(int(report.get("next_streak", -1)), 0, "Un sprint vide doit casser la serie.")
@@ -136,6 +164,7 @@ func _test_multi_squad_contract() -> void:
 	_assert_equal(report.get("squads", []).size(), 2, "Le resolver doit conserver un sous-rapport par equipe.")
 	_assert_equal(int(report.get("global", {}).get("impact", -1)), 31, "Deux sous-totaux 10 et 21 doivent etre sommes, pas moyennes.")
 	for squad_report in report.get("squads", []):
+		_assert_true(_has_label(squad_report.get("lines", []), "Sous-total"), "Chaque equipe doit exposer son sous-total dans le rapport anime.")
 		for line in squad_report.get("lines", []):
 			_assert_true(line.get("scope", "") == "local" and line.has("squad_id"), "Chaque ligne locale doit porter son squad_id.")
 			_assert_false("squad" in String(line.get("label", "")).to_lower(), "Le libelle joueur d'une ligne locale ne doit jamais contenir le mot squad.")
@@ -204,12 +233,33 @@ func _has_label(lines: Array, label: String) -> bool:
 	return false
 
 
+func _has_label_prefix(lines: Array, prefix: String) -> bool:
+	for line in lines:
+		if String(line.get("label", "")).begins_with(prefix):
+			return true
+	return false
+
+
 func _label_count(lines: Array, label: String) -> int:
 	var count := 0
 	for line in lines:
 		if line.get("label", "") == label:
 			count += 1
 	return count
+
+
+func _step_for_label(lines: Array, label: String) -> int:
+	for line in lines:
+		if line.get("label", "") == label:
+			return int(line.get("step", 0))
+	return -1
+
+
+func _label_index(lines: Array, label: String) -> int:
+	for index in lines.size():
+		if lines[index].get("label", "") == label:
+			return index
+	return -1
 
 
 func _load_data(file_name: String) -> Dictionary:

@@ -166,7 +166,7 @@ func _refresh_shelf_head() -> void:
 	else:
 		parts.append("🃏 %d/%d grandes décisions activées" % [used, maximum])
 	if SprintState.next_hire_discount > 0:
-		parts.append("réseau : −%d 🪙 sur la prochaine embauche" % SprintState.next_hire_discount)
+		parts.append("réseau : −%d 🪙 de budget sur la prochaine embauche" % SprintState.next_hire_discount)
 
 	shelf_head.add_child(UIHelpers.make_shelf_head("📦 L'étal du sprint", " · ".join(parts)))
 
@@ -195,7 +195,7 @@ func _refresh_reroll_button() -> void:
 	var cost := SprintState.shop_reroll_cost()
 	reroll_button.text = "🎲 Re-tirer l'offre — %d 🪙" % cost
 	reroll_button.disabled = SprintState.pieces < cost
-	reroll_button.tooltip_text = "Re-tire tout le rayon, sauf ce qui est punaisé 📌.\nLe prix monte à chaque re-tirage du sprint (le prochain coûtera %d 🪙) et repart à %d au sprint suivant.\nVous avez %d 🪙." % [
+	reroll_button.tooltip_text = "Re-tire tout le rayon, sauf ce qui est punaisé 📌.\nLe prix monte à chaque re-tirage du sprint (le prochain coûtera %d 🪙) et repart à %d au sprint suivant.\nBudget d'investissement disponible : %d 🪙." % [
 		cost + int(reroll_conf.get("costIncrement", 1)),
 		int(reroll_conf.get("baseCost", 1)),
 		SprintState.pieces,

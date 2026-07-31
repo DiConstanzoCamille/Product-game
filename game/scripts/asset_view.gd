@@ -123,13 +123,13 @@ static func for_decision(card: Dictionary) -> Dictionary:
 		primary = {
 			"text": "Activer (%d 🪙 — insuffisant)" % cost,
 			"disabled": true,
-			"tooltip": "Il vous manque %d 🪙. Une grande décision se paie comme une embauche." % (cost - SprintState.pieces),
+			"tooltip": "Il vous manque %d 🪙 de budget d'investissement. Une grande décision se paie comme une embauche." % (cost - SprintState.pieces),
 		}
 	else:
 		primary = {
 			"text": "Activer (%d 🪙 + 1 slot)" % cost,
 			"disabled": false,
-			"tooltip": "Deux coûts distincts : %d 🪙 tout de suite (le budget d'action qu'on ne mettra pas dans une embauche) et 1 des %d slots du mandat.\nIrréversible. Les effets tombent à la Résolution." % [cost, max_activations],
+			"tooltip": "Deux coûts distincts : %d 🪙 de budget d'investissement tout de suite et 1 des %d slots du mandat.\nIrréversible. Les effets tombent à la Résolution." % [cost, max_activations],
 		}
 
 	return _with_shared({

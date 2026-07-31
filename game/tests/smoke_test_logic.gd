@@ -38,6 +38,7 @@ func _ready() -> void:
 	_test_inbox_channels()
 	_test_backlog_rules()
 	_test_investment_draw_rules()
+	_test_score_resolution_integration()
 
 	for strategy in ["stress", "greedy", "careful"]:
 		print("\n=== SMOKE TEST LOGIQUE — %s ===" % strategy.to_upper())
@@ -176,6 +177,65 @@ func _test_backlog_rules() -> void:
 	report = SprintState.commit_backlog_plan([{"id": epic.get("id", ""), "points": SprintState.get_epic_remaining(epic.get("id", ""))}])
 	if not SprintState.completed_backlog_ids.has(epic.get("id", "")) or report.get("delivered", []).size() != 1:
 		_fail("L'epic n'a pas livré ses effets à la complétion.")
+
+
+## Le rapport de score est la source unique de l'économie : les quick wins
+## n'ajoutent plus leur ancien +1 individuel, et le MRR récurrent n'est jamais
+## versé deux fois dans la trésorerie.
+func _test_score_resolution_integration() -> void:
+	print("=== SMOKE TEST LOGIQUE — INTEGRATION SCORE ===")
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+	var quick_wins: Array = []
+	for feature in GameData.backlog.get("features", []):
+		if bool(feature.get("quickWin", false)):
+			quick_wins.append(feature)
+			if quick_wins.size() == 2:
+				break
+	if quick_wins.size() != 2:
+		_fail("Le test d'integration a besoin de deux quick wins dans le backlog.")
+		return
+
+	SprintState.current_backlog_draw = {"sprint": SprintState.sprint_number, "items": quick_wins}
+	var plan: Array = []
+	for feature in quick_wins:
+		plan.append({"id": feature.get("id", ""), "points": feature.get("costPoints", 0)})
+	SprintState.commit_backlog_plan(plan)
+	SprintState.add_pending({"pieces": 3}, "Inbox test : budget ponctuel")
+	var pieces_before := SprintState.pieces
+	var treasury_before := float(SprintState.resource_values.get("tresorerie", 0.0))
+	var payroll := SprintState.get_payroll()
+	SprintState.apply_pending_and_check()
+
+	var report: Dictionary = SprintState.last_score_report
+	var conversion: Dictionary = report.get("conversion", {})
+	var budget: Dictionary = conversion.get("budget", {})
+	var mrr_report: Dictionary = conversion.get("mrr", {})
+	if report.is_empty() or int(report.get("next_streak", 0)) != 1 or SprintState.streak != 1:
+		_fail("Un sprint avec livraisons doit produire un rapport et commencer la serie.")
+	if int(budget.get("quick_win_bonus", 0)) != 2:
+		_fail("Le rapport doit attribuer exactement +2 de budget aux deux quick wins.")
+	var expected_pieces := pieces_before + 3 + int(budget.get("gain", 0))
+	if SprintState.pieces != expected_pieces or SprintState.last_pieces_delta != expected_pieces - pieces_before:
+		_fail("Les quick wins historiques ont ete comptes deux fois dans les pieces (%d au lieu de %d)." % [SprintState.pieces, expected_pieces])
+	if int(round(SprintState.mrr)) != SprintState.last_revenue or int(round(float(mrr_report.get("after", 0.0)))) != SprintState.last_revenue:
+		_fail("Le revenu applique doit etre exactement le MRR final du rapport.")
+	if int(round(float(mrr_report.get("recurring_roi_gain", 0.0)))) != SprintState.last_roi_revenue_bonus:
+		_fail("Le bonus recurring_roi du rapport n'est pas expose a l'UI.")
+	var expected_treasury: float = clamp(treasury_before - payroll + SprintState.last_revenue, 0.0, 100.0)
+	if not is_equal_approx(float(SprintState.resource_values.get("tresorerie", 0.0)), expected_treasury):
+		_fail("La tresorerie doit recevoir le MRR une seule fois (%s au lieu de %s)." % [SprintState.resource_values.get("tresorerie", 0.0), expected_treasury])
+
+	SprintState.sprint_number += 1
+	SprintState.apply_pending_and_check()
+	if int(SprintState.last_score_report.get("next_streak", -1)) != 0 or SprintState.streak != 0:
+		_fail("Un sprint vide doit remettre la serie a zero.")
+	SprintState.activated_cards = ["sprint-retro"]
+	SprintState.activated_card_sprints = {"sprint-retro": 1}
+	SprintState.sprint_number = 3
+	var snapshot := SprintState._build_score_snapshot()
+	var tools: Array = snapshot.get("active_tools", [])
+	if tools.is_empty() or tools[0].get("id", "") != "sprint-retro" or int(tools[0].get("active_sprints", 0)) != 3:
+		_fail("Le snapshot doit transmettre active_sprints pour les outils cumulatifs.")
 
 
 func _offer_has_item(items: Array, item_id: String) -> bool:

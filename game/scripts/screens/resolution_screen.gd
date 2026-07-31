@@ -18,14 +18,29 @@ const MANDATE_END_SCENE := "res://scenes/screens/mandate_end_screen.tscn"
 @onready var era_label: Label = $Margin/VBox/Scroll/Content/HeaderRow/EraLabel
 @onready var cpo_label: Label = $Margin/VBox/Scroll/Content/HeaderRow/CpoLabel
 @onready var revenue_label: Label = $Margin/VBox/Scroll/Content/RevenueLabel
+@onready var score_replay: VBoxContainer = $Margin/VBox/Scroll/Content/ScoreReplay
+@onready var score_title: Label = $Margin/VBox/Scroll/Content/ScoreReplay/ScoreHeader/ScoreTitle
+@onready var score_status: Label = $Margin/VBox/Scroll/Content/ScoreReplay/ScoreHeader/ScoreStatus
+@onready var score_lines: VBoxContainer = $Margin/VBox/Scroll/Content/ScoreReplay/ScoreLines
 @onready var gauges_grid: GridContainer = $Margin/VBox/Scroll/Content/GaugesGrid
 @onready var journal_title: Label = $Margin/VBox/Scroll/Content/JournalTitle
 @onready var journal_container: VBoxContainer = $Margin/VBox/Scroll/Content/JournalContainer
 @onready var alert_label: Label = $Margin/VBox/Scroll/Content/AlertLabel
 @onready var foundations_button: Button = $Margin/VBox/BottomBar/FoundationsButton
 @onready var next_sprint_button: Button = $Margin/VBox/BottomBar/NextSprintButton
+@onready var score_audio: AudioStreamPlayer = $ScoreAudio
 
 var mandate_ending: String = ""
+var _score_events: Array = []
+var _score_event_index := 0
+var _score_replay_delay := 0.25
+var _score_replay_speed := 1.0
+var _score_replay_token := 0
+var _score_replay_clicks := 0
+var _score_finished := false
+var _score_tone_stream: AudioStreamWAV
+var _score_last_audio_step := -1
+var _score_audio_step_ticks := 0
 
 
 func _ready() -> void:
@@ -43,9 +58,19 @@ func _ready() -> void:
 	_load_hud(old_values)
 	_setup_next_button()
 	_setup_breather_button()
+	_setup_score_replay()
 
 	if int(SprintState.board_review_result.get("sprint", -1)) == SprintState.sprint_number:
 		_show_board_review_overlay()
+
+
+func _exit_tree() -> void:
+	_score_replay_token += 1
+	_score_finished = true
+	if is_instance_valid(score_audio):
+		score_audio.stop()
+		score_audio.stream = null
+	_score_tone_stream = null
 
 
 func _load_hud(old_values: Dictionary) -> void:
@@ -78,6 +103,252 @@ func _load_hud(old_values: Dictionary) -> void:
 	alert_label.text = _build_alert_text()
 
 
+## La Résolution ne calcule jamais le score. Elle ne fait que rejouer, dans
+## l'ordre contractuel du rapport, les lignes produites par ScoreResolver.
+func _setup_score_replay() -> void:
+	for child in score_lines.get_children():
+		child.queue_free()
+	_score_events.clear()
+	_score_event_index = 0
+	_score_replay_clicks = 0
+	_score_finished = false
+
+	var report: Dictionary = SprintState.last_score_report
+	if report.is_empty():
+		score_replay.visible = false
+		return
+	score_replay.visible = true
+	score_title.text = "Traction × Levier = Impact"
+	score_status.text = "Calcul en cours"
+	var squad_reports: Array = report.get("squads", [])
+	var many_teams := squad_reports.size() > 1
+	for squad_report in squad_reports:
+		if many_teams:
+			_add_score_divider(squad_report.get("id", ""))
+		for line in squad_report.get("lines", []):
+			_add_score_event(line)
+	for line in report.get("global", {}).get("lines", []):
+		_add_score_event(line)
+
+	if _score_events.is_empty():
+		score_status.text = "Aucun score ce sprint"
+		_score_finished = true
+		return
+	_setup_score_audio()
+	_score_replay_token += 1
+	_replay_score_report(_score_replay_token)
+
+
+func _add_score_event(line: Dictionary) -> void:
+	var label := Label.new()
+	label.custom_minimum_size = Vector2(0, 26)
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD
+	label.add_theme_font_size_override("font_size", 14)
+	label.visible = false
+	score_lines.add_child(label)
+	_score_events.append({"kind": "line", "line": line, "node": label})
+
+
+func _add_score_divider(squad_id: String) -> void:
+	var divider := Label.new()
+	divider.text = _squad_display_name(squad_id)
+	divider.custom_minimum_size = Vector2(0, 28)
+	divider.autowrap_mode = TextServer.AUTOWRAP_WORD
+	divider.add_theme_font_size_override("font_size", 15)
+	divider.add_theme_color_override("font_color", UIHelpers.COLOR_AMBER)
+	divider.visible = false
+	score_lines.add_child(divider)
+	_score_events.append({"kind": "divider", "node": divider})
+
+
+func _replay_score_report(token: int) -> void:
+	while _score_event_index < _score_events.size():
+		if token != _score_replay_token or not is_inside_tree():
+			return
+		var wait_time := _score_replay_delay / _score_replay_speed
+		await get_tree().create_timer(wait_time).timeout
+		if token != _score_replay_token or _score_finished:
+			return
+		_reveal_next_score_event()
+	if token == _score_replay_token:
+		_finish_score_replay()
+
+
+func _reveal_next_score_event() -> void:
+	if _score_event_index >= _score_events.size():
+		return
+	var event: Dictionary = _score_events[_score_event_index]
+	_score_event_index += 1
+	var label: Label = event["node"]
+	label.visible = true
+	if event.get("kind", "line") == "divider":
+		return
+	var line: Dictionary = event["line"]
+	_style_score_line(label, line)
+	_animate_score_line(label, line)
+	_play_score_tick(int(line.get("step", 0)))
+	if _is_combo_line(line):
+		_shake_score_replay()
+
+
+func _animate_score_line(label: Label, line: Dictionary) -> void:
+	var before := float(line.get("before", 0.0))
+	var after := float(line.get("after", before))
+	label.text = _format_score_line(line, before)
+	var duration := 0.2 / _score_replay_speed
+	var tween := create_tween()
+	tween.tween_method(func(value: float):
+		if is_instance_valid(label):
+			label.text = _format_score_line(line, value), before, after, duration
+	).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	if line.get("type", "") == "impact":
+		tween.tween_callback(func(): _flash_impact(label))
+
+
+func _format_score_line(line: Dictionary, current: float) -> String:
+	var label: String = line.get("label", "")
+	var icon: String = line.get("icon", "")
+	var type: String = line.get("type", "")
+	var before := float(line.get("before", 0.0))
+	if type == "impact":
+		return "%s  %s  %d" % [icon, label, int(round(current))]
+	if type == "traction_multiplier" or type == "impact_multiplier":
+		return "%s  %s ×%s   %s -> %s" % [icon, label, String.num(float(line.get("value", 1.0)), 2), _score_number(before), _score_number(current)]
+	if type == "total_lever_cap":
+		return "%s  %s : plafond %s" % [icon, label, _score_number(current)]
+	var value := float(line.get("value", 0.0))
+	var prefix := "+" if value >= 0.0 else "-"
+	return "%s  %s  %s%s   %s -> %s" % [icon, label, prefix, _score_number(abs(value)), _score_number(before), _score_number(current)]
+
+
+func _score_number(value: float) -> String:
+	return str(int(round(value))) if is_equal_approx(value, round(value)) else String.num(value, 2)
+
+
+func _style_score_line(label: Label, line: Dictionary) -> void:
+	var line_type: String = line.get("type", "")
+	var friction := int(line.get("step", 0)) == 7
+	if friction:
+		label.add_theme_color_override("font_color", UIHelpers.COLOR_DANGER)
+	elif line_type == "impact":
+		var impact: int = abs(int(round(float(line.get("after", line.get("value", 0.0))))))
+		var font_size: int = clampi(24 + int(round(sqrt(float(impact)) * 1.25)), 24, 38)
+		label.custom_minimum_size = Vector2(0, 44)
+		label.add_theme_font_size_override("font_size", font_size)
+		label.add_theme_color_override("font_color", UIHelpers.COLOR_AMBER)
+	elif _is_combo_line(line):
+		var combo_color: Color = UIHelpers.COLOR_GOOD if float(line.get("value", 0.0)) >= 0.0 else UIHelpers.COLOR_DANGER
+		var combo_background: Color = combo_color
+		combo_background.a = 0.18
+		var combo_style: StyleBoxFlat = StyleBoxFlat.new()
+		combo_style.bg_color = combo_background
+		combo_style.set_corner_radius_all(6)
+		combo_style.content_margin_left = 8
+		combo_style.content_margin_right = 8
+		combo_style.content_margin_top = 4
+		combo_style.content_margin_bottom = 4
+		label.add_theme_stylebox_override("normal", combo_style)
+		label.add_theme_color_override("font_color", combo_color)
+	else:
+		label.add_theme_color_override("font_color", UIHelpers.COLOR_INK)
+
+
+func _is_combo_line(line: Dictionary) -> bool:
+	if line.get("scope", "") != "local" or line.get("type", "") != "lever_add":
+		return false
+	for combo in GameData.scoring.get("local", {}).get("organizationCombos", []):
+		if line.get("label", "") == combo.get("label", ""):
+			return true
+	return false
+
+
+func _flash_impact(label: Label) -> void:
+	if not is_instance_valid(label):
+		return
+	var tween := create_tween()
+	tween.tween_property(label, "modulate", Color(1.0, 0.82, 0.24, 1.0), 0.08)
+	tween.tween_property(label, "modulate", Color.WHITE, 0.22)
+
+
+func _shake_score_replay() -> void:
+	var origin := score_replay.position
+	var tween := create_tween()
+	tween.tween_property(score_replay, "position:x", origin.x + 4.0, 0.035)
+	tween.tween_property(score_replay, "position:x", origin.x - 3.0, 0.045)
+	tween.tween_property(score_replay, "position:x", origin.x, 0.05)
+
+
+func _squad_display_name(squad_id: String) -> String:
+	for squad in SprintState.squads:
+		if squad.get("id", "") == squad_id:
+			return squad.get("name", "Equipe produit")
+	return "Equipe produit"
+
+
+func _setup_score_audio() -> void:
+	_score_tone_stream = AudioStreamWAV.new()
+	_score_tone_stream.format = AudioStreamWAV.FORMAT_8_BITS
+	_score_tone_stream.mix_rate = 22050
+	_score_tone_stream.stereo = false
+	var frames := 420
+	var samples := PackedByteArray()
+	samples.resize(frames)
+	for frame in frames:
+		var envelope := 1.0 - float(frame) / float(frames)
+		var phase := TAU * float(frame) * 220.0 / float(_score_tone_stream.mix_rate)
+		samples[frame] = clampi(int(round(128.0 + sin(phase) * 11.0 * envelope)), 0, 255)
+	_score_tone_stream.data = samples
+	score_audio.stream = _score_tone_stream
+
+
+func _play_score_tick(step: int) -> void:
+	if _score_tone_stream == null:
+		return
+	if step != _score_last_audio_step:
+		_score_last_audio_step = step
+		_score_audio_step_ticks = 0
+	_score_audio_step_ticks += 1
+	score_audio.pitch_scale = min(1.8, 0.9 + 0.08 * (_score_audio_step_ticks - 1))
+	score_audio.stop()
+	score_audio.play()
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if _score_finished or not event is InputEventMouseButton:
+		return
+	if not event.pressed or event.button_index != MOUSE_BUTTON_LEFT:
+		return
+	_score_replay_clicks += 1
+	if _score_replay_clicks == 1:
+		_accelerate_score_replay()
+	else:
+		_reveal_score_replay()
+	get_viewport().set_input_as_handled()
+
+
+func _accelerate_score_replay() -> void:
+	if _score_finished:
+		return
+	_score_replay_speed = 4.0
+	score_status.text = "Rythme rapide"
+
+
+func _reveal_score_replay() -> void:
+	if _score_finished:
+		return
+	_score_replay_token += 1
+	while _score_event_index < _score_events.size():
+		_reveal_next_score_event()
+	_finish_score_replay()
+
+
+func _finish_score_replay() -> void:
+	if _score_finished:
+		return
+	_score_finished = true
+	score_status.text = "Score final"
+
+
 ## Bloc "Revenus" mis en avant, séparé des coûts — répond au besoin de rendre
 ## le ROI visible : un compteur défile de 0 jusqu'au revenu réel du sprint,
 ## à côté de la masse salariale, du coût net des décisions, du solde
@@ -102,7 +373,7 @@ func _animate_revenue_callout() -> void:
 	var tween := create_tween()
 	tween.tween_method(
 		func(v: float):
-			revenue_label.text = "💰 %s : +%d (dont ROI backlog +%d)  ·  👥 Masse salariale : −%d  ·  💸 Décisions : %s%d  ·  Net trésorerie : %s%d  ·  🪙 Pièces %s%d (solde %d)" % [
+			revenue_label.text = "💰 %s : +%d (dont ROI backlog +%d)  ·  👥 Masse salariale : −%d  ·  💸 Décisions : %s%d  ·  Net trésorerie : %s%d  ·  🪙 Budget %s%d (solde %d)" % [
 				model_label, int(round(v)), roi_bonus,
 				payroll,
 				"+" if cost >= 0 else "−", abs(cost),
@@ -249,14 +520,14 @@ func _show_board_review_overlay() -> void:
 	var verdict := Label.new()
 	var review_conf: Dictionary = GameData.balance.get("pressure", {}).get("boardReview", {})
 	if passed:
-		verdict.text = "Le comité applaudit poliment. +%d 🪙 de budget d'action, 🎯 Capital politique +%d." % [
+		verdict.text = "Le comité applaudit poliment. +%d 🪙 de Budget d'investissement, 🎯 Capital politique +%d." % [
 			int(review_conf.get("successPieces", 5)), int(review_conf.get("successCapitalPolitique", 8))
 		]
 		verdict.add_theme_color_override("font_color", UIHelpers.COLOR_GOOD)
 	else:
-		verdict.text = "Le comité « prend note ». 🎯 Capital politique %d, et l'allocation tombe à %d 🪙/sprint pour le reste du mandat." % [
+		verdict.text = "Le comité « prend note ». 🎯 Capital politique %d, et l'allocation plancher tombe à %d 🪙/sprint pour le reste du mandat." % [
 			int(review_conf.get("failCapitalPolitique", -12)),
-			int(GameData.balance.get("pieces", {}).get("boardAllocationIfReviewFailed", 1))
+			int(GameData.scoring.get("conversion", {}).get("budget", {}).get("failedReviewAllocation", 1))
 		]
 		verdict.add_theme_color_override("font_color", UIHelpers.COLOR_DANGER)
 	verdict.autowrap_mode = TextServer.AUTOWRAP_WORD
@@ -341,12 +612,10 @@ func _build_alert_text() -> String:
 	var extreme: Dictionary = worst_resource.get("extreme", {})
 	match worst_state:
 		"danger":
-			# Depuis la Phase A, la Valeur perçue ne déclenche plus de fin
-			# directe : sous le seuil de décrochage, c'est le revenu qui meurt.
+			# La Valeur perçue ne déclenche plus de fin directe et ne coupe plus
+			# artificiellement le MRR : elle reste une pression de marché.
 			if worst_resource.get("id", "") == "valeur-percue":
-				return "⚠️ 📈 Valeur perçue en zone critique — sous %d, plus aucun revenu ne tombera." % int(
-					GameData.balance.get("pressure", {}).get("revenueCutoffValeurPercue", 5)
-				)
+				return "⚠️ 📈 Valeur perçue en zone critique — une livraison forte devient urgente."
 			return "⚠️ %s %s en zone critique — encore un peu et : %s" % [
 				worst_resource.get("icon", ""), worst_resource.get("name", ""), extreme.get("outcome", "")
 			]

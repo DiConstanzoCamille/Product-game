@@ -164,7 +164,7 @@ func _build_rail(vbox: VBoxContainer) -> void:
 
 	var pieces := _label("🪙\n%d" % SprintState.pieces, 12, UIHelpers.PANEL_FG)
 	pieces.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	pieces.tooltip_text = "🪙 Pièces — le budget d'action que le board vous accorde."
+	pieces.tooltip_text = "🪙 Budget d'investissement — les moyens disponibles pour recruter, adopter des pratiques et activer des décisions."
 	pieces.mouse_filter = Control.MOUSE_FILTER_STOP
 	vbox.add_child(_spaced(pieces, 8, 0))
 
@@ -315,8 +315,10 @@ func _gauge(text: String, value: float, maximum: float, color: Color, tooltip: S
 func _pieces_row() -> Control:
 	var row := HBoxContainer.new()
 	row.mouse_filter = Control.MOUSE_FILTER_STOP
-	row.tooltip_text = "🪙 Pièces — le budget d'action que le board vous accorde.\nSe gagne : allocation par sprint, performance (revenu), quick wins.\nSe dépense : embauches, pratiques, indemnités de licenciement."
-	row.add_child(_label("🪙 Pièces", 12, UIHelpers.PANEL_FG))
+	row.tooltip_text = "🪙 Budget d'investissement.\nSe gagne : Impact du sprint, allocation plancher et combo Quick wins.\nSe dépense : embauches, pratiques, indemnités de licenciement."
+	var label := _label("🪙 Budget d'investissement", 12, UIHelpers.PANEL_FG, true)
+	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(label)
 	row.add_child(_spacer_h())
 	var value := _label("%d" % SprintState.pieces, 13, UIHelpers.PANEL_FG)
 	UIHelpers.apply_mono(value, 13, true)
@@ -547,9 +549,9 @@ func _build_board_review(vbox: VBoxContainer) -> void:
 
 	match SprintState.board_review_state:
 		"passed":
-			vbox.add_child(_label("✅ Revue passée — budget d'action débloqué.", 10, UIHelpers.PANEL_GOOD, true))
+			vbox.add_child(_label("✅ Revue passée — budget d'investissement débloqué.", 10, UIHelpers.PANEL_GOOD, true))
 		"failed":
-			vbox.add_child(_label("❌ Revue ratée — allocation de pièces réduite jusqu'à la fin du mandat.", 10, UIHelpers.PANEL_DANGER, true))
+			vbox.add_child(_label("❌ Revue ratée — budget d'investissement réduit jusqu'à la fin du mandat.", 10, UIHelpers.PANEL_DANGER, true))
 
 
 # ── Petits constructeurs ─────────────────────────────────────────────────

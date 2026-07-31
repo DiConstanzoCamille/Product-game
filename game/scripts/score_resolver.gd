@@ -48,12 +48,10 @@ static func resolve(snapshot: Dictionary, tables: Dictionary = {}) -> Dictionary
 		var tool: Dictionary = global_rules.get("tools", {}).get(tool_id, {})
 		if tool.is_empty():
 			continue
-		var tool_value := _tool_lever(tool, tool_entry, all_roster, snapshot, resources)
-		if is_zero_approx(tool_value):
-			continue
+		var tool_value := _tool_lever(tool, tool_entry, all_roster, snapshot, resources, hidden_traits)
 		var tool_before := global_lever
 		global_lever += tool_value
-		global_lines.append(_line(step, "global", tool.get("icon", "🛠️"), _tool_label(tool, all_roster, snapshot), "lever_add", tool_value, tool_before, global_lever))
+		global_lines.append(_line(step, "global", tool.get("icon", "🛠️"), _tool_label(tool, tool_entry, all_roster, snapshot, hidden_traits), "lever_add", tool_value, tool_before, global_lever))
 
 	step = 5
 	for strategy_id in strategy_ids:
@@ -172,12 +170,12 @@ static func _resolve_squad(squad: Dictionary, snapshot: Dictionary, rules: Dicti
 	var bonuses: Dictionary = rules.get("traction", {}).get("handBonuses", {})
 	var spent_points := int(squad.get("spent_points", squad.get("planned_points", _items_points(delivered))))
 	var capacity := int(squad.get("capacity", 0))
-	if delivered.size() >= int(bonuses.get("bundle", {}).get("minimumDelivered", 9999)):
-		traction = _add_hand_bonus(lines, squad_id, traction, bonuses.get("bundle", {}), "tractionBonus")
 	if _is_perfect_sprint(spent_points, capacity, bonuses.get("perfectSprint", {})):
 		traction = _multiply_hand_bonus(lines, squad_id, traction, bonuses.get("perfectSprint", {}))
 	if _has_focus(delivered, bonuses.get("focus", {})):
 		traction = _multiply_hand_bonus(lines, squad_id, traction, bonuses.get("focus", {}))
+	if delivered.size() >= int(bonuses.get("bundle", {}).get("minimumDelivered", 9999)):
+		traction = _add_hand_bonus(lines, squad_id, traction, bonuses.get("bundle", {}), "tractionBonus")
 	if _has_completed_epic(delivered):
 		traction = _multiply_hand_bonus(lines, squad_id, traction, bonuses.get("completedEpic", {}))
 	var quick_win_budget := 0
@@ -189,6 +187,15 @@ static func _resolve_squad(squad: Dictionary, snapshot: Dictionary, rules: Dicti
 	var roster: Array = squad.get("roster", [])
 	var local_rule: Dictionary = rules.get("local", {})
 	var local_lever := float(local_rule.get("baseLever", 1.0))
+	var streak_rule: Dictionary = rules.get("streak", {})
+	var streak_lever := 0.0
+	if not delivered.is_empty() and not overheated:
+		streak_lever = min((float(snapshot.get("streak", 0)) + 1.0) * float(streak_rule.get("leverPerSprint", 0.0)), float(streak_rule.get("maxLever", 0.0)))
+	if not is_zero_approx(streak_lever):
+		var streak_before := local_lever
+		local_lever += streak_lever
+		lines.append(_line(2, "local", streak_rule.get("icon", "🔥"), streak_rule.get("label", "Série de livraisons"), "lever_add", streak_lever, streak_before, local_lever, squad_id))
+
 	var role_rules: Dictionary = local_rule.get("roles", {})
 	var designer_weight := _role_weight(roster, "designer", hidden_traits)
 	var designer_rule: Dictionary = role_rules.get("designer", {})
@@ -236,21 +243,15 @@ static func _resolve_squad(squad: Dictionary, snapshot: Dictionary, rules: Dicti
 		local_lever += hidden_lever
 		lines.append(_line(3, "local", hidden_rule.get("icon", "✨"), hidden_rule.get("name", "Trait caché"), "lever_add", hidden_lever, hidden_before, local_lever, squad_id))
 
-	var streak_rule: Dictionary = rules.get("streak", {})
-	var streak_lever := 0.0
-	if not delivered.is_empty() and not overheated:
-		streak_lever = min((float(snapshot.get("streak", 0)) + 1.0) * float(streak_rule.get("leverPerSprint", 0.0)), float(streak_rule.get("maxLever", 0.0)))
-	if not is_zero_approx(streak_lever):
-		var streak_before := local_lever
-		local_lever += streak_lever
-		lines.append(_line(3, "local", streak_rule.get("icon", "🔥"), streak_rule.get("label", "Série de livraisons"), "lever_add", streak_lever, streak_before, local_lever, squad_id))
+	var subtotal := traction * local_lever
+	lines.append(_line(3, "local", "📌", "Sous-total", "subtotal", subtotal, 0.0, subtotal, squad_id))
 
 	return {
 		"id": squad_id,
 		"lines": lines,
 		"traction": traction,
 		"local_lever": local_lever,
-		"subtotal": traction * local_lever,
+		"subtotal": subtotal,
 		"delivered_count": delivered.size(),
 		"quick_win_budget": quick_win_budget,
 	}
@@ -469,34 +470,40 @@ static func _ids_from(source: Variant) -> Array:
 	return ids.filter(func(id): return id != "")
 
 
-static func _tool_lever(tool: Dictionary, entry: Dictionary, roster: Array, snapshot: Dictionary, resources: Dictionary) -> float:
-	var eligible := _matching_employee_count(roster, tool.get("eligible", {}), snapshot)
-	var refractory := _matching_employee_count(roster, tool.get("refractory", {}), snapshot)
+static func _tool_lever(tool: Dictionary, entry: Dictionary, roster: Array, snapshot: Dictionary, resources: Dictionary, hidden_traits: Dictionary) -> float:
+	var eligible := _matching_employee_count(roster, tool.get("eligible", {}), snapshot, hidden_traits)
+	var refractory := _matching_employee_count(roster, tool.get("refractory", {}), snapshot, hidden_traits)
 	var result := eligible * float(tool.get("perEligible", 0.0)) + refractory * float(tool.get("perRefractory", 0.0))
 	if tool.has("cumulativePerSprint"):
 		result += float(entry.get("active_sprints", entry.get("activeSprints", 0))) * float(tool.get("cumulativePerSprint", 0.0))
 	for condition in tool.get("flatConditions", []):
-		if _matches_global_condition(condition.get("when", {}), roster, snapshot, resources):
+		if _matches_global_condition(condition.get("when", {}), roster, snapshot, resources, hidden_traits):
 			result += float(condition.get("lever", 0.0))
 	var adoption: Dictionary = tool.get("adoption", {})
-	if not adoption.is_empty() and _matches_global_condition(adoption.get("condition", {}), roster, snapshot, resources):
+	if not adoption.is_empty() and _matches_global_condition(adoption.get("condition", {}), roster, snapshot, resources, hidden_traits):
 		result *= float(adoption.get("multiplier", 1.0))
 	return result
 
 
-static func _tool_label(tool: Dictionary, roster: Array, snapshot: Dictionary) -> String:
-	var eligible := _matching_employee_count(roster, tool.get("eligible", {}), snapshot)
-	var refractory := _matching_employee_count(roster, tool.get("refractory", {}), snapshot)
-	return "%s · %d éligibles, %d réfractaires" % [tool.get("label", "Outil"), int(eligible), int(refractory)]
+static func _tool_label(tool: Dictionary, entry: Dictionary, roster: Array, snapshot: Dictionary, hidden_traits: Dictionary) -> String:
+	if tool.has("cumulativePerSprint"):
+		var active_sprints := int(entry.get("active_sprints", entry.get("activeSprints", 0)))
+		return "%s · %d sprint%s actif%s" % [tool.get("label", "Outil"), active_sprints, "s" if active_sprints > 1 else "", "s" if active_sprints > 1 else ""]
+	var eligible := _matching_employee_count(roster, tool.get("eligible", {}), snapshot, hidden_traits)
+	var refractory := _matching_employee_count(roster, tool.get("refractory", {}), snapshot, hidden_traits)
+	return "%s · %s éligibles, %s réfractaires" % [tool.get("label", "Outil"), _count_label(eligible), _count_label(refractory)]
 
 
-static func _matching_employee_count(roster: Array, condition: Dictionary, snapshot: Dictionary) -> float:
+static func _matching_employee_count(roster: Array, condition: Dictionary, snapshot: Dictionary, hidden_traits: Dictionary = {}) -> float:
 	if condition.is_empty():
-		return roster.size()
+		var all_weight := 0.0
+		for member in roster:
+			all_weight += _employee_weight(member, hidden_traits)
+		return all_weight
 	var count := 0.0
 	for member in roster:
 		if _employee_matches(member, condition, snapshot):
-			count += 1.0
+			count += _employee_weight(member, hidden_traits)
 	return count
 
 
@@ -520,14 +527,15 @@ static func _employee_matches(member: Dictionary, condition: Dictionary, snapsho
 		return false
 	var sprint := int(snapshot.get("sprint", snapshot.get("sprint_number", 1)))
 	var hired := int(member.get("hiredSprint", member.get("hired_sprint", 0)))
-	if condition.has("hiredWithinSprints") and sprint - hired >= int(condition.get("hiredWithinSprints", 0)):
-		return false
+	if condition.has("hiredWithinSprints"):
+		if hired <= 0 or sprint - hired >= int(condition.get("hiredWithinSprints", 0)):
+			return false
 	if condition.has("hiredBeforeSprints") and sprint - hired < int(condition.get("hiredBeforeSprints", 0)):
 		return false
 	return true
 
 
-static func _matches_global_condition(condition: Dictionary, roster: Array, snapshot: Dictionary, resources: Dictionary) -> bool:
+static func _matches_global_condition(condition: Dictionary, roster: Array, snapshot: Dictionary, resources: Dictionary, hidden_traits: Dictionary = {}) -> bool:
 	if condition.is_empty():
 		return false
 	if condition.has("rosterMinimum") and roster.size() < int(condition.get("rosterMinimum", 0)):
@@ -542,7 +550,7 @@ static func _matches_global_condition(condition: Dictionary, roster: Array, snap
 		if float(resources.get(resource_id, 0.0)) > float(condition["resourceMaximum"][resource_id]):
 			return false
 	var no_match: Dictionary = condition.get("noMatch", {})
-	if not no_match.is_empty() and _matching_employee_count(roster, no_match, snapshot) > 0.0:
+	if not no_match.is_empty() and _matching_employee_count(roster, no_match, snapshot, hidden_traits) > 0.0:
 		return false
 	var role_seniority: Dictionary = condition.get("roleSeniorityMinimum", {})
 	if not role_seniority.is_empty():
@@ -553,6 +561,10 @@ static func _matches_global_condition(condition: Dictionary, roster: Array, snap
 		if matches < int(role_seniority.get("minimum", 0)):
 			return false
 	return true
+
+
+static func _count_label(value: float) -> String:
+	return str(int(round(value))) if is_equal_approx(value, round(value)) else String.num(value, 1)
 
 
 static func _inter_squad_lever(squads: Array, active_tools: Array, rules: Dictionary) -> Dictionary:
