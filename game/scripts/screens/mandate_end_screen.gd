@@ -1,7 +1,7 @@
 extends Control
 ## Écran de fin de mandat — atteint quand SprintState.apply_pending_and_check()
-## (appelé en Résolution) détecte un seuil de ressource franchi, ou que le
-## mandat a atteint sa longueur (data/balance.json → mandateLengthSprints).
+## (appelé en Résolution) détecte un seuil de ressource franchi, un quota
+## manqué ou une sortie choisie après T4.
 
 const START_SCREEN_SCENE := "res://scenes/screens/start_screen.tscn"
 const SCENARIO_SCENE := "res://scenes/screens/scenario_screen.tscn"

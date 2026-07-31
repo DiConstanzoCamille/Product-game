@@ -27,8 +27,7 @@
 
   "stateThresholds": { "goodMin": 60, "dangerMax": 25 },
 
-  "mandateLengthSprints": 12,
-  "trimesterLengthSprints": 6,
+  "trimesterLengthSprints": 3,
 
   "endingThresholds": [
     { "resource": "tresorerie", "comparison": "lte", "value": 0, "ending": "faillite" },

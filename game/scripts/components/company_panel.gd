@@ -47,8 +47,9 @@ func _populate() -> void:
 	_add_section_title("Le mandat")
 	_add_row("Scénario", "%s %s" % [era.get("icon", ""), era.get("name", "")])
 	_add_row("Profil d'équipe", _team_profile_label())
-	_add_row("Sprint en cours", "%d / %d" % [
-		SprintState.sprint_number, int(GameData.balance.get("mandateLengthSprints", 12))
+	_add_row("Progression", "Sprint %d · T%d · %d/%d" % [
+		SprintState.sprint_number, SprintState.quarter_index,
+		SprintState.quarter_sprint + 1, SprintState.get_quarter_length()
 	])
 	_add_text(era.get("description", ""), 12, UIHelpers.COLOR_SOFT_TEXT)
 
@@ -61,17 +62,17 @@ func _populate() -> void:
 
 	var objectives: Dictionary = company.get("boardObjectives", {})
 	if not objectives.is_empty():
-		_add_section_title("Objectifs de board — verdict au sprint %d" % int(GameData.balance.get("trimesterLengthSprints", 6)))
+		_add_section_title("Objectifs qualitatifs — bonus +8 Budget")
 		_add_text(objectives.get("title", ""), 13, UIHelpers.COLOR_AMBER)
 		for condition in objectives.get("conditions", []):
 			_add_text("• %s" % condition.get("label", ""), 12, UIHelpers.COLOR_INK)
-		match SprintState.board_review_state:
-			"passed":
-				_add_text("✅ Revue réussie — le board a débloqué du budget d'investissement.", 12, UIHelpers.COLOR_GOOD)
-			"failed":
-				_add_text("❌ Revue ratée — budget d'investissement réduit pour le reste du mandat.", 12, UIHelpers.COLOR_DANGER)
-			_:
-				_add_text("⏳ À venir — le Panneau de bord suit ces conditions en direct.", 12, UIHelpers.COLOR_SOFT_TEXT)
+		var latest_bonus := int(SprintState.quarter_result.get("qualitativeBonus", 0))
+		if not SprintState.quarter_result.is_empty() and latest_bonus > 0:
+			_add_text("✅ Dernier trimestre : objectifs tenus, +%d Budget." % latest_bonus, 12, UIHelpers.COLOR_GOOD)
+		elif not SprintState.quarter_result.is_empty():
+			_add_text("○ Dernier trimestre : bonus non obtenu. Le quota reste la seule condition de passage.", 12, UIHelpers.COLOR_SOFT_TEXT)
+		else:
+			_add_text("⏳ Le Panneau de bord suit ces conditions en direct.", 12, UIHelpers.COLOR_SOFT_TEXT)
 
 	_add_section_title("L'équipe en détail — %d pts produits · %d 💰/sprint" % [
 		SprintState.get_effective_capacity(), SprintState.get_payroll()

@@ -4,6 +4,7 @@
     { "id": "rachat", "icon": "🤝", "label": "Rachat", "note": "Un plus gros vous avale. Votre roadmap devient un slide dans leur QBR." },
     { "id": "faillite", "icon": "💸", "label": "Faillite", "note": "Le runway touche zéro avant le product-market fit." },
     { "id": "burnout-fondateur", "icon": "🔥", "label": "Burn-out fondateur·rice", "note": "Vous démissionnez. La légende veut que vous ayez eu raison, en privé." },
+    { "id": "remercie", "icon": "🪑", "label": "Remercié·e", "note": "Le comité vous remercie pour votre contribution. Un cabinet accompagnera la transition." },
     { "id": "exode-equipe", "icon": "🚪", "label": "Exode d'équipe", "note": "Ils partent tous la même semaine. Vous découvrez un canal Slack sans vous." },
     { "id": "remplace-par-ia", "icon": "🤖", "label": "Remplacé·e par l'IA", "note": "Le board a fini par répondre à sa propre question." },
     { "id": "entreprise-zombie", "icon": "🧟", "label": "Entreprise zombie", "note": "Tout continue de tourner. Plus personne ne sait pourquoi." },

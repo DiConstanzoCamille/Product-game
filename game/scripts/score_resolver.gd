@@ -118,7 +118,7 @@ static func resolve(snapshot: Dictionary, tables: Dictionary = {}) -> Dictionary
 	var before_frictions := local_total * global_traction_multiplier * global_lever * moral_factor
 	var resolved_impact := before_frictions
 	resolved_impact = _apply_resource_friction(resolved_impact, global_lines, friction_rules.get("cynisme", {}), resources)
-	resolved_impact = _apply_resource_friction(resolved_impact, global_lines, friction_rules.get("dette", {}), resources)
+	resolved_impact = _apply_resource_friction(resolved_impact, global_lines, friction_rules.get("dette", {}), resources, float(snapshot.get("debt_friction_scale", 1.0)))
 	var overheat_rule: Dictionary = friction_rules.get("overheat", {})
 	if overheated and not overheat_rule.is_empty():
 		var overheat_before := resolved_impact
@@ -162,7 +162,7 @@ static func _resolve_squad(squad: Dictionary, snapshot: Dictionary, rules: Dicti
 
 	for item in delivered:
 		var before := traction
-		var item_traction := _item_traction(item, feature_rule, epic_rule, strategy_ids, strategy_rules)
+		var item_traction := _item_traction(item, feature_rule, epic_rule, strategy_ids, strategy_rules, snapshot)
 		traction += item_traction
 		var item_icon: String = item.get("icon", "📦" if bool(item.get("epic", false)) else "📊")
 		lines.append(_line(1, "local", item_icon, item.get("name", item.get("id", "Livraison")), "traction_add", item_traction, before, traction, squad_id))
@@ -257,11 +257,13 @@ static func _resolve_squad(squad: Dictionary, snapshot: Dictionary, rules: Dicti
 	}
 
 
-static func _item_traction(item: Dictionary, feature_rule: Dictionary, epic_rule: Dictionary, strategy_ids: Array, strategy_rules: Dictionary) -> float:
+static func _item_traction(item: Dictionary, feature_rule: Dictionary, epic_rule: Dictionary, strategy_ids: Array, strategy_rules: Dictionary, snapshot: Dictionary) -> float:
 	var result := 0.0
 	if bool(item.get("epic", false)):
 		result = float(item.get("costPoints", 0)) * float(epic_rule.get("pointsMultiplier", 0.0))
 	else:
+		if int(item.get("clientImpact", 0)) < int(snapshot.get("minimum_client_impact_for_traction", 0)):
+			return 0.0
 		result = float(item.get("costPoints", 0)) * float(feature_rule.get("pointsMultiplier", 0.0))
 		result += float(item.get("clientImpact", 0)) * float(feature_rule.get("clientImpactMultiplier", 0.0))
 	for strategy_id in strategy_ids:
@@ -600,14 +602,14 @@ static func _composition_signature(roster: Array) -> String:
 	return ",".join(parts)
 
 
-static func _apply_resource_friction(impact: float, lines: Array, rule: Dictionary, resources: Dictionary) -> float:
+static func _apply_resource_friction(impact: float, lines: Array, rule: Dictionary, resources: Dictionary, scale: float = 1.0) -> float:
 	if rule.is_empty():
 		return impact
 	var resource_value := float(resources.get(rule.get("resource", ""), 0.0))
 	var threshold := float(rule.get("threshold", INF))
 	if resource_value <= threshold:
 		return impact
-	var multiplier: float = max(0.0, 1.0 - (resource_value - threshold) / float(rule.get("divisor", 1.0)))
+	var multiplier: float = max(0.0, 1.0 - scale * (resource_value - threshold) / float(rule.get("divisor", 1.0)))
 	var after: float = impact * multiplier
 	lines.append(_line(7, "global", rule.get("icon", "✂️"), "%s %d" % [rule.get("label", "Frein"), int(resource_value)], "impact_multiplier", multiplier, impact, after))
 	return after

@@ -26,7 +26,16 @@ Les 3 contextes de run (§10) : `id`, `icon`, `period`, `name`, `description`, `
 
 ## `endings.json`
 
-Les 8 fins de mandat (§12) : `id`, `icon`, `label`, `note`. Le fait que certaines fins soient propres à une seule époque reste une question ouverte (§13) — non tranché dans ce fichier.
+Les 9 fins de mandat (§12) : `id`, `icon`, `label`, `note`. `remercie` est la fin immédiate d'un quota trimestriel manqué. Le fait que certaines fins soient propres à une seule époque reste une question ouverte (§13) — non tranché dans ce fichier.
+
+## `quotas.json`
+
+Le contrat du boss trimestriel (spec scoring §11), consommé par `SprintState` et les écrans de board.
+
+- `version` — version du contrat ; `careerLevels` est une table indexée par identifiant de niveau de carrière. Seul `pm` est rempli avant le lot 5 ; `quarterQuotas` est le tableau ordonné des quotas d'Impact brut T1 a T4 (`[120, 270, 560, 1050]`).
+- `longMandate` — `quotaMultiplier` (multiplicateur appliqué à chaque trimestre T5+) et `requirementsAccumulate` (les exigences tirées restent actives dans ce mode).
+- `requirements[]` — pool à tirage aléatoire, avec `id` stable, `icon`, `name`, `description` joueur et `effects` plat. Les clefs supportées sont `hiringFrozen`, `payrollMultiplier`, `minimumClientImpactForTraction`, `debtFrictionScale`, `quarterLength`, `quotaMultiplier`, `forcedStrategyPool` (tableau d'IDs de `scoring.json`), `practiceCynisme` et `toolsFrozen`.
+- `qualitativeBonusBudget` — récompense en Budget si tous les objectifs qualitatifs de `companies.json` sont tenus en plus du quota. Le montant initial est volontairement conservateur : `8` par trimestre, à ajuster en playtest. `qualitativeBonus` documente sa condition, son texte et ses paramètres de mode long (`enabled`, `accumulates`).
 
 ## `foundations.json`
 
@@ -96,7 +105,7 @@ La mécanique de fond, hors contenu chiffré (§2, §3, §6.1/6.2, §7, §11) :
 Toutes les valeurs numériques nécessaires à la simulation persistante du MVP jouable (§14 du carnet de règles) — consommé uniquement par `game/`, jamais par `landing/`, pour garder la maquette de présentation indépendante de l'équilibrage :
 
 - `startingResources` — valeur de départ des 6 ressources ; `startingResourceOverrides` — surcharges par entreprise (ex. la trésorerie tendue de Karavel) ; `resourceBounds` (min/max, 0-100) ; `resourceDirection` (`high-good` / `low-good`, pour savoir quel sens est "bon") ; `stateThresholds` (`goodMin`/`dangerMax`, pour l'affichage bon/attention/danger).
-- `mandateLengthSprints`, `trimesterLengthSprints` — durée du mandat et du point de contrôle trimestriel (la revue de board tombe à la fin du sprint `trimesterLengthSprints`).
+- `trimesterLengthSprints` — longueur nominale d'un trimestre (3 sprints). Le quota, ses exceptions et le point de contrôle trimestriel vivent dans `quotas.json`; la sortie après T4 ou le mandat long remplacent l'ancienne longueur fixe du mandat.
 - `endingThresholds[]` — seuil par ressource déclenchant une fin négative (`resource`, `comparison`: `lte`/`gte`, `value`, `ending`) ; `endingThresholdOverrides` — ajustement de ces seuils par époque. La Valeur perçue n'y figure plus : elle reste une pression de marché, sans couper artificiellement le MRR. Depuis la Phase B, la pseudo-ressource `energie` y est acceptée (elle lit `SprintState.energy`, pas une jauge de `resources.json`) : le burn-out fondateur·rice se déclenche sur Énergie ≤ 0 (spec profondeur §8.3).
 - `goodEnding` — comment calculer la fin positive (IPO vs Rachat) quand le mandat va à son terme sans fin négative.
 - `cardAxisResourceMap` — comment les 4 axes de `cards.json` se convertissent en deltas sur les 6 ressources (`resource`, `invert`).

@@ -116,9 +116,7 @@ func _build_company_card(company: Dictionary) -> Control:
 	var objectives: Dictionary = company.get("boardObjectives", {})
 	if not objectives.is_empty():
 		var objectives_label := Label.new()
-		var lines: Array = ["🏛️ Revue de board (sprint %d) : %s" % [
-			int(GameData.balance.get("trimesterLengthSprints", 6)), objectives.get("title", "")
-		]]
+		var lines: Array = ["🏛️ Bonus qualitatif à chaque quota (+8 Budget) : %s" % objectives.get("title", "")]
 		for condition in objectives.get("conditions", []):
 			lines.append("   • %s" % condition.get("label", ""))
 		objectives_label.text = "\n".join(lines)

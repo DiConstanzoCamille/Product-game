@@ -16,7 +16,8 @@ Product-game/
 │   ├── resources.json               # les 6 jauges + leurs tensions
 │   ├── cards.json                   # cartes structurelles calibrées (RICE, Notion, Jira)
 │   ├── eras.json                    # les 3 contextes de run
-│   ├── endings.json                 # les 8 fins de mandat
+│   ├── endings.json                 # les 9 fins de mandat
+│   ├── quotas.json                  # quotas trimestriels et exigences du board
 │   ├── foundations.json             # effets persistants sur le plateau
 │   ├── roadmap-features.json        # features proposables en phase Roadmap
 │   ├── inbox-events.json            # événements aléatoires de la phase Inbox
@@ -51,7 +52,7 @@ Product-game/
 - [`docs/data-schema.md`](docs/data-schema.md) — le détail du schéma de chaque fichier JSON.
 - [`docs/tech-stack.md`](docs/tech-stack.md) — le choix du moteur de jeu (Godot 4) et les alternatives écartées (Three.js, Unity, Unreal, stack web).
 - [`docs/spec-profondeur-gameplay.md`](docs/spec-profondeur-gameplay.md) — la spécification de la prochaine phase de gameplay (économie de pièces, équipe/roster à rôles, shop à tirage aléatoire, roadmap profonde avec epics et informations cachées) — les phases A et B sont implémentées, la phase C reste à faire, la phase D est remplacée par la spec ci-dessous.
-- [`docs/spec-scoring-sprint.md`](docs/spec-scoring-sprint.md) — **la cible de gameplay validée** : le sprint se résout en un score à combos (`📊 Traction × ⚙️ Levier = 💥 Impact`), l'Impact devient la monnaie, le board impose un quota d'Impact tous les 3 sprints dont l'échec termine le run, et le modèle est conçu pour tenir d'une squad à une organisation entière. Conception uniquement, pas encore implémentée.
+- [`docs/spec-scoring-sprint.md`](docs/spec-scoring-sprint.md) — **la vision de gameplay en cours d'implémentation** : le sprint se résout en un score à combos (`📊 Traction × ⚙️ Levier = 💥 Impact`) et le board impose un quota d'Impact tous les 3 sprints. Le score, son replay, les quotas PM et leurs exigences sont jouables ; l'organisation multi-squad reste un lot ultérieur.
 - [`landing/index.html`](landing/index.html) — une page de présentation interactive du concept : cartes retournables, jauges de ressources, aperçu d'écrans de jeu (inbox, roadmap, recrutement), présentation des époques et des fins de mandat. Toutes ses données viennent de `data/`, pas de contenu codé en dur.
 - [`game/`](game/README.md) — le projet Godot 4 : un mandat complet est jouable de bout en bout (Accueil → Inbox → Roadmap → Investissements → Résolution → sprint suivant → fin de mandat), avec une vraie simulation persistante des 6 ressources et les mêmes `data/*.json` que la landing page (plus `data/balance.json`, propre au jeu), une identité visuelle propre (polices de marque, icônes, portraits, fond quadrillé, animations légères — toutes licences libres, détail dans `game/assets/THIRD_PARTY_NOTICES.md`). Pas encore équilibré (tous les nombres sont dans `data/balance.json`, ajustables sans toucher au code) — voir `game/README.md` pour le détail et les limites connues.
 
@@ -76,10 +77,8 @@ Chaque bonne pratique a un prix. Le·la joueur·se le découvre en le payant : u
 | Échelle | Durée fictive | Rôle |
 |---|---|---|
 | **Sprint** | ~2 semaines | Unité de jeu de base — un tour complet |
-| **Trimestre** | 6 sprints *(cible : 3)* | Point de contrôle : revue de board, événement "boss" |
-| **Mandat** | 12 sprints | Le run entier, de la nomination à la sortie |
-
-*(La [spec de scoring](docs/spec-scoring-sprint.md) ramène le trimestre à 3 sprints — 4 « boss » par mandat au lieu d'un seul.)*
+| **Trimestre** | 3 sprints | Quota d'Impact et exigence du board, événement "boss" |
+| **Mandat** | 4 trimestres, puis optionnellement sans limite | Le run entier, de la nomination à la sortie ou au mandat long |
 
 ## Les six ressources
 

@@ -46,6 +46,9 @@ func _ready() -> void:
 	await _test_investments_interactions()
 	await _test_resolution_replay()
 	await _test_resolution_multi_team_replay()
+	await _test_quarter_result_uses_global_sprint()
+	await _test_quota_sidebar_and_freezes()
+	await _test_t4_mandate_choice()
 
 	if failures > 0:
 		print("=== SMOKE TEST UI : ÉCHEC — %d assertion(s) en erreur ===" % failures)
@@ -99,7 +102,6 @@ func _test_roadmap_interactions() -> void:
 	screen.queue_free()
 	viewport.queue_free()
 	await get_tree().process_frame
-
 
 ## Joue les cinq gestes de l'écran Investissements en émettant depuis les
 ## boutons réels : adopter une pratique, embaucher, activer une décision,
@@ -160,7 +162,6 @@ func _test_investments_interactions() -> void:
 	screen.queue_free()
 	viewport.queue_free()
 	await get_tree().process_frame
-
 
 ## La Résolution lit le rapport déjà calculé, et ses deux gestes globaux
 ## doivent accélérer puis révéler le flux sans attendre la durée réelle.
@@ -232,6 +233,173 @@ func _test_resolution_multi_team_replay() -> void:
 	screen.queue_free()
 	viewport.queue_free()
 	await get_tree().process_frame
+
+
+## `quarter_result.sprint` est le sprint global de cloture, pas le numero de
+## sprint dans le trimestre. Le verdict de T2 se produit donc bien au sprint 6
+## et ne doit pas disparaitre a cause d'une confusion entre ces deux horloges.
+func _test_quarter_result_uses_global_sprint() -> void:
+	print("  → verdict trimestriel au sprint global 6")
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+	SprintState.sprint_number = 6
+	SprintState.quarter_index = 2
+	SprintState.quarter_sprint = 3
+	SprintState.quarter_exit_choice_pending = true  # evite une nouvelle resolution runtime dans _ready
+	SprintState.quarter_result = {
+		"sprint": 6,
+		"quarter": 2,
+		"quota": 270,
+		"impact": 302,
+		"length": 2,
+		"passed": true,
+		"qualitativeBonus": 8,
+		"objectives": [],
+		"requirementIds": [],
+	}
+
+	var viewport := SubViewport.new()
+	viewport.size = Vector2i(1600, 900)
+	add_child(viewport)
+	var screen: Control = load("res://scenes/screens/resolution_screen.tscn").instantiate()
+	viewport.add_child(screen)
+	for i in 3:
+		await get_tree().process_frame
+	screen._reveal_score_replay()
+	for i in 3:
+		await get_tree().process_frame
+	if int(screen._quota_data.get("sprint", -1)) != 6:
+		_fail("Le verdict T2 doit conserver son sprint global de cloture (6).")
+	if int(screen._quota_data.get("length", -1)) != 2:
+		_fail("Le verdict d'un trimestre court doit conserver sa longueur cloturee.")
+	if screen.find_child("QuarterVerdictOverlay", true, false) == null:
+		_fail("Le verdict T2 au sprint global 6 doit ouvrir son overlay trimestriel.")
+
+	screen.queue_free()
+	viewport.queue_free()
+	await get_tree().process_frame
+
+	# Au sprint suivant, le resultat conserve est historique : la Resolution
+	# doit afficher le progres du trimestre en cours, pas rejouer ce verdict.
+	SprintState.sprint_number = 7
+	SprintState.quarter_index = 3
+	SprintState.quarter_sprint = 1
+	SprintState.quarter_impact = 45
+	SprintState.quarter_exit_choice_pending = true
+	var current_viewport := SubViewport.new()
+	current_viewport.size = Vector2i(1600, 900)
+	add_child(current_viewport)
+	var current_screen: Control = load("res://scenes/screens/resolution_screen.tscn").instantiate()
+	current_viewport.add_child(current_screen)
+	for i in 3:
+		await get_tree().process_frame
+	if int(current_screen._quota_data.get("quarter", -1)) != 3:
+		_fail("Un ancien quarter_result ne doit pas etre reutilise au sprint suivant.")
+	if current_screen._quota_data.has("passed"):
+		_fail("Le progres d'un trimestre ouvert ne doit pas declencher de verdict.")
+	current_screen.queue_free()
+	current_viewport.queue_free()
+	await get_tree().process_frame
+
+
+func _test_quota_sidebar_and_freezes() -> void:
+	print("  → panneau quota et gels d'investissement")
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+	SprintState.quarter_requirement_ids = ["hiring-freeze", "tool-freeze"]
+	SprintState.quarter_requirement_id = "tool-freeze"
+
+	var viewport := SubViewport.new()
+	viewport.size = Vector2i(1600, 900)
+	add_child(viewport)
+	var screen: Control = load("res://scenes/screens/investments_screen.tscn").instantiate()
+	viewport.add_child(screen)
+	for i in 4:
+		await get_tree().process_frame
+	if screen.side_panel.find_child("QuotaSection", true, false) == null:
+		_fail("Le panneau latéral doit afficher en permanence la section de quota.")
+
+	var candidate: Dictionary = GameData.candidates[0]
+	var candidate_view: Dictionary = AssetView.for_candidate(candidate)
+	if not bool(candidate_view.get("primary", {}).get("disabled", false)):
+		_fail("Un gel des embauches doit desactiver la carte candidat avant le clic.")
+	if "gel" not in str(candidate_view.get("primary", {}).get("text", "")).to_lower():
+		_fail("La carte candidat gelee doit expliquer la raison du refus.")
+
+	var tool_card: Dictionary = {}
+	for card in GameData.cards.get("cards", []):
+		if card.get("family", "") == "outil-process":
+			tool_card = card
+			break
+	var tool_view: Dictionary = AssetView.for_decision(tool_card)
+	if not bool(tool_view.get("primary", {}).get("disabled", false)):
+		_fail("Un gel des outils doit desactiver la carte decision avant le clic.")
+	if "outillage" not in str(tool_view.get("primary", {}).get("text", "")).to_lower():
+		_fail("La carte outil gelee doit expliquer la raison du refus.")
+
+	var practice_view: Dictionary = AssetView.for_practice(GameData.practices[0])
+	if "gele" in str(practice_view.get("primary", {}).get("text", "")).to_lower():
+		_fail("Le gel des outils ne doit pas empecher l'achat des pratiques.")
+
+	screen.queue_free()
+	viewport.queue_free()
+	await get_tree().process_frame
+
+
+func _test_t4_mandate_choice() -> void:
+	print("  → choix T4 sortie ou mandat long")
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+	SprintState.sprint_number = 12
+	SprintState.quarter_index = 4
+	SprintState.quarter_sprint = 3
+	SprintState.quarter_exit_choice_pending = true
+	SprintState.quarter_result = {
+		"sprint": 12,
+		"quarter": 4,
+		"quota": 1050,
+		"impact": 1180,
+		"passed": true,
+		"qualitativeBonus": 0,
+		"objectives": [],
+		"requirementIds": [],
+	}
+
+	var viewport := SubViewport.new()
+	viewport.size = Vector2i(1600, 900)
+	add_child(viewport)
+	var screen: Control = load("res://scenes/screens/resolution_screen.tscn").instantiate()
+	viewport.add_child(screen)
+	for i in 3:
+		await get_tree().process_frame
+	screen._reveal_score_replay()
+	for i in 3:
+		await get_tree().process_frame
+	var overlay := screen.find_child("QuarterVerdictOverlay", true, false)
+	var exit_button := overlay.find_child("ExitMandateButton", true, false) if overlay != null else null
+	var stay_button := overlay.find_child("StayLongMandateButton", true, false) if overlay != null else null
+	if exit_button == null or stay_button == null:
+		_fail("Le verdict T4 doit proposer les deux chemins de mandat.")
+	elif not screen.next_sprint_button.disabled:
+		_fail("Le sprint suivant doit rester bloque tant que le choix T4 n'est pas fait.")
+	else:
+		stay_button.pressed.emit()
+		await get_tree().process_frame
+		if not SprintState.long_mandate or SprintState.quarter_index != 5:
+			_fail("Rester a T4 doit ouvrir le mandat long et preparer T5.")
+		if screen.next_sprint_button.disabled:
+			_fail("Rester a T4 doit debloquer le sprint suivant.")
+
+	screen.queue_free()
+	viewport.queue_free()
+	await get_tree().process_frame
+
+	# Le chemin de sortie est isole du clic UI (qui change volontairement de
+	# scene) mais verifie le meme contrat que le bouton "Quitter".
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+	SprintState.sprint_number = 12
+	SprintState.quarter_index = 4
+	SprintState.quarter_exit_choice_pending = true
+	var exit_ending: String = SprintState.choose_mandate_path(false)
+	if exit_ending not in ["ipo", "rachat"] or not SprintState.is_mandate_over or SprintState.ending_id != exit_ending:
+		_fail("Quitter sur la victoire T4 doit conduire a une fin positive et au routage de fin de mandat.")
 
 
 func _primary_button_of(card: Control) -> Button:

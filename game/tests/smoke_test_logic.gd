@@ -39,6 +39,7 @@ func _ready() -> void:
 	_test_backlog_rules()
 	_test_investment_draw_rules()
 	_test_score_resolution_integration()
+	_test_quarter_runtime()
 
 	for strategy in ["stress", "greedy", "careful"]:
 		print("\n=== SMOKE TEST LOGIQUE — %s ===" % strategy.to_upper())
@@ -185,6 +186,10 @@ func _test_backlog_rules() -> void:
 func _test_score_resolution_integration() -> void:
 	print("=== SMOKE TEST LOGIQUE — INTEGRATION SCORE ===")
 	SprintState.reset_run("agile-transformation", "meridia-corp")
+	# Isole l'economie ScoreResolver du tirage aleatoire d'une exigence.
+	SprintState.quarter_requirement_ids = ["hiring-freeze"]
+	SprintState.quarter_requirement_id = "hiring-freeze"
+	SprintState.quarter_forced_strategy_id = ""
 	var quick_wins: Array = []
 	for feature in GameData.backlog.get("features", []):
 		if bool(feature.get("quickWin", false)):
@@ -236,6 +241,127 @@ func _test_score_resolution_integration() -> void:
 	var tools: Array = snapshot.get("active_tools", [])
 	if tools.is_empty() or tools[0].get("id", "") != "sprint-retro" or int(tools[0].get("active_sprints", 0)) != 3:
 		_fail("Le snapshot doit transmettre active_sprints pour les outils cumulatifs.")
+
+
+func _test_quarter_runtime() -> void:
+	print("=== SMOKE TEST LOGIQUE — QUOTAS TRIMESTRIELS ===")
+	# T1 : le compteur progresse une fois par Resolution et un run qui livre
+	# uniquement du travail interne visible par personne est remercie au T3.
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+	SprintState.quarter_requirement_ids = ["visibility-mandate"]
+	SprintState.quarter_requirement_id = "visibility-mandate"
+	for sprint in range(3):
+		SprintState.last_roadmap_report = {
+			"sprint": SprintState.sprint_number,
+			"plannedPoints": 1,
+			"capacity": 1,
+			"delivered": [{"id": "internal-%d" % sprint, "name": "Travail interne", "costPoints": 1, "clientImpact": 0, "risk": 0, "quickWin": false, "tags": ["tech"]}],
+		}
+		var ending := SprintState.apply_pending_and_check()
+		if sprint < 2:
+			if SprintState.quarter_sprint != sprint + 1 or ending != "":
+				_fail("La progression T1 doit rester ouverte apres le sprint %d." % (sprint + 1))
+			SprintState.sprint_number += 1
+		elif ending != "remercie" or not SprintState.is_mandate_over:
+			_fail("Un trimestre de livraisons sans Traction doit mener a 'remercie' au plus tard au T3.")
+
+	# Les exigences runtime modifient les actions et le snapshot, sans UI.
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+	SprintState.quarter_requirement_ids = ["short-quarter"]
+	if SprintState.get_quarter_length() != 2 or SprintState.get_current_quota() != 90:
+		_fail("Le trimestre court doit valoir 2 sprints et 75 %% du quota T1 (90).")
+	SprintState.quarter_requirement_ids = ["finance-watch"]
+	var base_payroll := SprintState.get_payroll()
+	SprintState._apply_payroll()
+	if SprintState.last_payroll != base_payroll * 2:
+		_fail("L'exigence masse salariale doit doubler le prelevement.")
+	SprintState.pending_deltas.clear()
+	SprintState.quarter_requirement_ids = ["hiring-freeze"]
+	if SprintState.hire_candidate(GameData.candidates[0]) != "quarter-requirement":
+		_fail("Le gel des embauches doit refuser hire_candidate.")
+	SprintState.quarter_requirement_ids = ["tool-freeze"]
+	if SprintState.activate_decision("rice") != "quarter-requirement":
+		_fail("Le gel des outils doit refuser les cartes outil/process.")
+	SprintState.quarter_requirement_ids = ["steering-committee"]
+	SprintState.pieces = 20
+	var practice_id: String = GameData.practices[0].get("id", "")
+	SprintState.buy_practice(practice_id)
+	if int(SprintState.pending_deltas.get("cynisme", 0.0)) != 4:
+		_fail("Le comite de pilotage doit faire monter le Cynisme de 4 par pratique.")
+	SprintState.quarter_requirement_ids = ["board-injunction"]
+	SprintState._assign_forced_strategy()
+	var forced_snapshot := SprintState._build_score_snapshot()
+	if SprintState.quarter_forced_strategy_id == "" or not forced_snapshot.get("strategy_ids", []).has(SprintState.quarter_forced_strategy_id) or SprintState.activated_cards.has(SprintState.quarter_forced_strategy_id):
+		_fail("L'injonction doit injecter une strategie au score sans activer de carte.")
+
+	# Bonus qualitatif : une seule fois a la revue, en plus du gain ScoreResolver.
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+	SprintState.quarter_requirement_ids = ["hiring-freeze"]
+	SprintState.activated_cards = ["rice"]
+	for sprint in range(3):
+		SprintState.last_roadmap_report = {
+			"sprint": SprintState.sprint_number,
+			"plannedPoints": 40,
+			"capacity": 40,
+			"delivered": [{"id": "quota-%d" % sprint, "name": "Livraison quota", "costPoints": 40, "clientImpact": 1, "risk": 0, "quickWin": false, "tags": ["growth"]}],
+		}
+		SprintState.apply_pending_and_check()
+		if sprint < 2:
+			SprintState.sprint_number += 1
+	if int(SprintState.quarter_result.get("qualitativeBonus", 0)) != 8:
+		_fail("Les objectifs qualitatifs tenus doivent accorder exactement 8 pieces une fois.")
+	if SprintState.quarter_index != 2 or int(SprintState.quarter_result.get("quarter", 0)) != 1:
+		_fail("Le resultat T1 doit rester disponible pendant que T2 est deja prepare.")
+	var bonus_delta := int(SprintState.last_score_report.get("conversion", {}).get("budget", {}).get("gain", 0)) + 8
+	if SprintState.last_pieces_delta != bonus_delta:
+		_fail("Le bonus qualitatif doit etre ajoute une seule fois au dernier flux de pieces.")
+	SprintState.sprint_number += 1
+	SprintState.last_roadmap_report.clear()
+	SprintState.apply_pending_and_check()
+	if SprintState.last_pieces_delta != int(SprintState.last_score_report.get("conversion", {}).get("budget", {}).get("gain", 0)):
+		_fail("Un sprint hors revue ne doit pas rejouer le bonus qualitatif.")
+	var review_entries := 0
+	for entry in SprintState.journal:
+		if String(entry.get("text", "")).contains("Revue trimestrielle"):
+			review_entries += 1
+	if review_entries != 1:
+		_fail("Le journal ne doit inscrire le bonus qualitatif qu'a sa revue unique.")
+
+	# T4 ne tranche plus seul la fin : rester ouvre T5 avec le quota long.
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+	SprintState.quarter_index = 4
+	SprintState.quarter_requirement_ids = ["hiring-freeze"]
+	SprintState.quarter_requirement_id = "hiring-freeze"
+	SprintState.quarter_sprint = SprintState.get_quarter_length() - 1
+	SprintState.quarter_impact = SprintState.get_current_quota()
+	SprintState.activated_cards = ["rice"]
+	SprintState.last_roadmap_report.clear()
+	SprintState.apply_pending_and_check()
+	if not SprintState.quarter_exit_choice_pending or SprintState.is_mandate_over or int(SprintState.quarter_result.get("quarter", 0)) != 4:
+		_fail("La reussite T4 doit attendre explicitement le choix de mandat.")
+	if SprintState.choose_mandate_path(true) != "" or not SprintState.long_mandate or SprintState.quarter_index != 5:
+		_fail("Le choix de rester doit ouvrir le mandat long au T5.")
+	if int(SprintState.quarter_result.get("quarter", 0)) != 4:
+		_fail("Le resultat T4 doit rester lisible apres la preparation du T5.")
+	if SprintState.quarter_requirement_ids.size() < 2:
+		_fail("Le mandat long doit ajouter une exigence au lieu d'ecraser celle du T4.")
+	SprintState.quarter_requirement_ids = ["hiring-freeze", "tool-freeze"]
+	if SprintState.get_current_quota() != 2310 or SprintState.quarter_requirement_ids.size() < 2:
+		_fail("Le T5 long doit partir a 2310 et conserver les exigences accumulees.")
+
+	# La revue de quota a la priorite sur un seuil fatal : une seule fin est emise.
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+	SprintState.quarter_sprint = 2
+	SprintState.quarter_impact = 0
+	SprintState.quarter_requirement_ids = ["hiring-freeze"]
+	SprintState.resource_values["tresorerie"] = 0.0
+	var endings: Array = []
+	var on_ending := func(ending_id: String): endings.append(ending_id)
+	SprintState.ending_reached.connect(on_ending)
+	var quota_ending := SprintState.apply_pending_and_check()
+	SprintState.ending_reached.disconnect(on_ending)
+	if quota_ending != "remercie" or SprintState.ending_id != "remercie" or endings != ["remercie"]:
+		_fail("Un echec de quota concurrent d'un seuil fatal doit emettre une seule fin 'remercie'.")
 
 
 func _offer_has_item(items: Array, item_id: String) -> bool:
@@ -449,6 +575,8 @@ func _test_gated_card_lease() -> void:
 	# Karavel : équipe 100 % junior, donc le prérequis « 2 seniors » de
 	# Shape Up est faux au départ — c'est tout l'intérêt de la carte gatée.
 	SprintState.reset_run("agile-transformation", "karavel-scaleup")
+	SprintState.quarter_requirement_ids = ["hiring-freeze"]
+	SprintState.quarter_requirement_id = "hiring-freeze"
 	var lease := int(GameData.balance.get("shopDraw", {}).get("lockedLeaseSprints", 6))
 	var gated := SprintState.find_card("shape-up")
 	if gated.get("requires", {}).is_empty():
@@ -498,6 +626,8 @@ func _test_gated_card_lease() -> void:
 
 	# Le bail expire : au-delà, la carte n'est plus garantie sur le rayon.
 	SprintState.reset_run("agile-transformation", "meridia-corp")
+	SprintState.quarter_requirement_ids = ["hiring-freeze"]
+	SprintState.quarter_requirement_id = "hiring-freeze"
 	SprintState.leased_decisions["shape-up"] = 4
 	SprintState.sprint_number = 5
 	if SprintState.get_leased_decision_ids().has("shape-up"):
@@ -622,6 +752,8 @@ func _play_one_mandate(run_index: int, strategy: String, company_id: String) -> 
 	while not SprintState.is_mandate_over and sprint_count < 30:
 		sprint_count += 1
 		_play_sprint(strategy)
+		if SprintState.quarter_exit_choice_pending:
+			SprintState.choose_mandate_path(false)
 
 	if not SprintState.is_mandate_over:
 		_fail("Run %d (%s, %s) n'a jamais atteint de fin après 30 sprints — probable bug de seuils." % [run_index, strategy, company_id])

@@ -1,8 +1,8 @@
 {
   "temporalScales": [
     { "id": "sprint", "duration": "~2 semaines", "role": "Unité de jeu de base — un tour complet" },
-    { "id": "trimestre", "duration": "~6 sprints", "role": "Point de contrôle : revue de board, événement « boss »" },
-    { "id": "mandat", "duration": "Variable", "role": "Le run entier, de la nomination à la sortie" }
+    { "id": "trimestre", "duration": "3 sprints", "role": "Quota d'Impact et exigence du board, événement « boss »" },
+    { "id": "mandat", "duration": "4 trimestres puis optionnellement sans limite", "role": "Le run entier, de la nomination à la sortie ou au mandat long" }
   ],
   "sprintPhases": [
     { "order": 1, "id": "inbox", "name": "Inbox", "description": "Un événement aléatoire tombe (le « chaos humain ») et force un choix avant toute planification." },

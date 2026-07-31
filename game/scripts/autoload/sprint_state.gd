@@ -10,8 +10,8 @@ extends Node
 ## le panier d'un coup via apply_pending_and_check() — plus la masse
 ## salariale, les effets de roster/pratiques, la décroissance de la Valeur
 ## perçue, le revenu du modèle économique, le flux de pièces et la
-## régénération d'Énergie du joueur — affiche le delta réel, joue la revue
-## de board au sprint 6, et détecte une éventuelle fin de mandat. Voir
+## régénération d'Énergie du joueur — affiche le delta réel, résout le quota
+## trimestriel, et détecte une éventuelle fin de mandat. Voir
 ## docs/carnet-de-regles.md §14-18 pour le détail des décisions de conception.
 
 signal ending_reached(id: String)
@@ -57,6 +57,15 @@ var recurring_roi: int = 0                 # bonus de MRR permanent acquis par l
 var last_roadmap_report: Dictionary = {}   # livraison réelle affichée à la Résolution
 var board_review_state: String = "pending"  # "pending" | "passed" | "failed"
 var board_review_result: Dictionary = {}    # {sprint, passed, title, conditions:[{label, ok}]} — pour l'overlay de verdict
+var quarter_impact: int = 0
+var quarter_index: int = 1
+var quarter_requirement_id: String = ""
+var quarter_requirement_ids: Array = []
+var quarter_sprint: int = 0
+var quarter_result: Dictionary = {}
+var quarter_exit_choice_pending: bool = false
+var long_mandate: bool = false
+var quarter_forced_strategy_id: String = ""
 var current_shop_offer: Dictionary = {}     # {sprint, candidates:[...], practices:[ids], decisions:[ids], leased:[ids], rerolls} — tirage des Investissements
 var reserved_assets: Array = []             # 📌 [{kind, id, data, sprint, paid}] — punaisés, réinjectés dans l'offre suivante
 var leased_decisions: Dictionary = {}       # 🔒 card_id -> sprint d'expiration du bail d'une carte à prérequis
@@ -72,6 +81,8 @@ var _inbox_event_bag: Array = []       # ids restants à tirer dans le "sac" cou
 var _last_inbox_event_id: String = ""  # évite une répétition immédiate entre deux sacs
 var _hired_candidate_ids: Array = []   # candidats déjà embauchés ce mandat (ne reviennent pas au tirage)
 var _backlog_bag: Array = []           # sac des propositions de Roadmap, filtré par ère
+var _quarter_requirement_bag: Array = []
+var _last_quarter_requirement_id: String = ""
 
 
 ## À appeler au lancement d'un nouveau mandat, une fois le scénario et
@@ -115,6 +126,17 @@ func reset_run(chosen_era_id: String = "", chosen_company_id: String = "") -> vo
 	last_roadmap_report.clear()
 	board_review_state = "pending"
 	board_review_result.clear()
+	quarter_impact = 0
+	quarter_index = 1
+	quarter_requirement_id = ""
+	quarter_requirement_ids.clear()
+	quarter_sprint = 0
+	quarter_result.clear()
+	quarter_exit_choice_pending = false
+	long_mandate = false
+	quarter_forced_strategy_id = ""
+	_quarter_requirement_bag.clear()
+	_last_quarter_requirement_id = ""
 	current_shop_offer.clear()
 	energy = int(get_energy_conf().get("start", 70))
 	energy_spent_this_sprint = 0
@@ -156,6 +178,7 @@ func reset_run(chosen_era_id: String = "", chosen_company_id: String = "") -> vo
 	for resource in GameData.resources:
 		var resource_id: String = resource.get("id", "")
 		resource_values[resource_id] = float(overrides.get(resource_id, starting.get(resource_id, 50)))
+	_prepare_quarter(1)
 	get_effective_capacity()
 
 
@@ -188,6 +211,181 @@ func get_company() -> Dictionary:
 		if company.get("id", "") == company_id:
 			return company
 	return {}
+
+
+## Contrat public de la couche UI des quotas. Le runtime accepte aussi la
+## premiere version du JSON, afin que les sauvegardes de developpement ne
+## dependent pas de la migration de donnees.
+func get_current_quota() -> int:
+	var level: Dictionary = GameData.quotas.get("careerLevels", {}).get("pm", {})
+	var configured: Variant = level.get("quarterQuotas", [])
+	var base_quota := 0.0
+	if configured is Array and quarter_index <= configured.size():
+		base_quota = float(configured[quarter_index - 1])
+	elif configured is Dictionary:
+		base_quota = float(configured.get(str(min(quarter_index, 4)), 0))
+	if base_quota <= 0.0:
+		base_quota = 1050.0
+
+	var long_conf: Dictionary = GameData.quotas.get("longMandate", {})
+	if quarter_index >= int(long_conf.get("fromQuarter", 5)):
+		var multiplier := float(long_conf.get("quotaMultiplier", 2.2))
+		base_quota *= pow(multiplier, quarter_index - 4)
+	return int(round(base_quota * float(_active_quarter_effects().get("quotaMultiplier", 1.0))))
+
+
+func get_quarter_length() -> int:
+	return max(1, int(_active_quarter_effects().get("quarterLength", 3)))
+
+
+func get_active_quarter_requirements() -> Array:
+	var requirements: Array = []
+	for requirement_id in quarter_requirement_ids:
+		var requirement := _quarter_requirement_by_id(requirement_id)
+		if not requirement.is_empty():
+			requirements.append(requirement)
+	return requirements
+
+
+func get_quarter_requirement_text() -> String:
+	var parts: Array = []
+	for requirement in get_active_quarter_requirements():
+		parts.append("%s %s — %s" % [requirement.get("icon", ""), requirement.get("name", ""), requirement.get("description", "")])
+	return "\n".join(parts)
+
+
+func get_quarter_requirement_effects() -> Dictionary:
+	return _active_quarter_effects().duplicate(true)
+
+
+func get_quarter_progress() -> Dictionary:
+	return {
+		"quarter": quarter_index,
+		"impact": quarter_impact,
+		"quota": get_current_quota(),
+		"sprint": quarter_sprint,
+		"length": get_quarter_length(),
+		"requirementIds": quarter_requirement_ids.duplicate(),
+	}
+
+
+func is_quarter_requirement_active(effect: String) -> bool:
+	var value: Variant = _active_quarter_effects().get(effect, false)
+	return value == true or (value is float and value != 0.0) or (value is int and value != 0) or (value is Array and not value.is_empty())
+
+
+func choose_mandate_path(stay: bool) -> String:
+	if not quarter_exit_choice_pending:
+		return "no-choice"
+	quarter_exit_choice_pending = false
+	if stay:
+		long_mandate = true
+		_prepare_quarter(quarter_index + 1)
+		return ""
+	var ending := _resolve_good_ending()
+	is_mandate_over = true
+	ending_id = ending
+	ending_reached.emit(ending)
+	return ending
+
+
+func _quarter_requirement_by_id(requirement_id: String) -> Dictionary:
+	for requirement in GameData.quotas.get("requirements", []):
+		if requirement.get("id", "") == requirement_id:
+			return requirement
+	return {}
+
+
+func _draw_quarter_requirement_id(excluded: Array = []) -> String:
+	var attempts := 0
+	var max_attempts: int = max(1, GameData.quotas.get("requirements", []).size() * 2)
+	while attempts < max_attempts:
+		if _quarter_requirement_bag.is_empty():
+			for requirement in GameData.quotas.get("requirements", []):
+				var refill_id: String = requirement.get("id", "")
+				if refill_id != "" and not excluded.has(refill_id):
+					_quarter_requirement_bag.append(refill_id)
+			_quarter_requirement_bag.shuffle()
+			if _quarter_requirement_bag.size() > 1 and _quarter_requirement_bag[-1] == _last_quarter_requirement_id:
+				var swap_index := randi() % (_quarter_requirement_bag.size() - 1)
+				var swap_value: String = _quarter_requirement_bag[-1]
+				_quarter_requirement_bag[-1] = _quarter_requirement_bag[swap_index]
+				_quarter_requirement_bag[swap_index] = swap_value
+		if _quarter_requirement_bag.is_empty():
+			return ""
+		var requirement_id: String = _quarter_requirement_bag.pop_back()
+		attempts += 1
+		if excluded.has(requirement_id):
+			continue
+		_last_quarter_requirement_id = requirement_id
+		return requirement_id
+	return ""
+
+
+func _prepare_quarter(next_quarter: int) -> void:
+	quarter_index = next_quarter
+	quarter_impact = 0
+	quarter_sprint = 0
+	quarter_forced_strategy_id = ""
+	var long_conf: Dictionary = GameData.quotas.get("longMandate", {})
+	var accumulate := quarter_index >= int(long_conf.get("fromQuarter", 5)) and bool(long_conf.get("requirementsAccumulate", true))
+	var requirement_id := _draw_quarter_requirement_id(quarter_requirement_ids if accumulate else [])
+	if accumulate:
+		if requirement_id != "" and not quarter_requirement_ids.has(requirement_id):
+			quarter_requirement_ids.append(requirement_id)
+	else:
+		quarter_requirement_ids = [requirement_id] if requirement_id != "" else []
+	quarter_requirement_id = requirement_id
+	_assign_forced_strategy()
+
+
+func _active_quarter_effects() -> Dictionary:
+	var result: Dictionary = {}
+	for requirement in get_active_quarter_requirements():
+		var raw: Dictionary = requirement.get("effects", {})
+		var normalized := _normalize_quarter_effects(raw)
+		for key in normalized.keys():
+			var value: Variant = normalized[key]
+			if key in ["payrollMultiplier", "debtFrictionScale", "quotaMultiplier"]:
+				result[key] = float(result.get(key, 1.0)) * float(value)
+			elif key == "minimumClientImpactForTraction":
+				result[key] = max(int(result.get(key, 0)), int(value))
+			elif key == "quarterLength":
+				result[key] = min(int(result.get(key, value)), int(value))
+			elif key == "forcedStrategyPool":
+				var pool: Array = result.get(key, [])
+				for strategy_id in value:
+					if not pool.has(strategy_id):
+						pool.append(strategy_id)
+				result[key] = pool
+			else:
+				result[key] = value
+	return result
+
+
+func _normalize_quarter_effects(raw: Dictionary) -> Dictionary:
+	var result := raw.duplicate(true)
+	# Compatibilite de la premiere ecriture de quotas.json avec le contrat final.
+	if raw.has("salaryMultiplier"):
+		result["payrollMultiplier"] = raw.get("salaryMultiplier", 1.0)
+	if raw.has("featureTraction"):
+		result["minimumClientImpactForTraction"] = int(raw.get("featureTraction", {}).get("clientImpactMax", 0)) + 1
+	if raw.has("friction"):
+		result["debtFrictionScale"] = raw.get("friction", {}).get("debtMultiplier", 1.0)
+	if raw.has("trimester"):
+		result["quarterLength"] = raw.get("trimester", {}).get("sprintLength", 3)
+		result["quotaMultiplier"] = raw.get("trimester", {}).get("quotaMultiplier", 1.0)
+	if raw.has("strategy") and bool(raw.get("strategy", {}).get("forced", false)):
+		result["forcedStrategyPool"] = GameData.scoring.get("global", {}).get("strategies", {}).keys()
+	return result
+
+
+func _assign_forced_strategy() -> void:
+	var pool: Array = _active_quarter_effects().get("forcedStrategyPool", [])
+	if pool.is_empty():
+		return
+	pool.shuffle()
+	quarter_forced_strategy_id = str(pool[0])
 
 
 func get_companies_for_era(target_era_id: String) -> Array:
@@ -937,6 +1135,8 @@ func activate_decision(card_id: String) -> String:
 	var card := find_card(card_id)
 	if card.is_empty():
 		return "introuvable"
+	if is_quarter_requirement_active("toolsFrozen") and card.get("family", "") in ["outil-process", "methodologie-orga"]:
+		return "quarter-requirement"
 	if not card_requirement_state(card).get("ok", true):
 		return "prerequis"
 	var cost := decision_cost(card_id)
@@ -1157,6 +1357,8 @@ func _roll_hidden_trait() -> String:
 ## Embauche un candidat de l'offre du sprint. Retourne "" si l'embauche a eu
 ## lieu, sinon la raison du refus ("pieces" ou "cap").
 func hire_candidate(candidate: Dictionary) -> String:
+	if is_quarter_requirement_active("hiringFrozen"):
+		return "quarter-requirement"
 	if get_roster().size() >= get_team_cap():
 		return "cap"
 	var cost: int = max(0, int(candidate.get("costPieces", 0)) - next_hire_discount)
@@ -1232,7 +1434,7 @@ func buy_practice(practice_id: String) -> String:
 	pieces -= cost
 	owned_practices.append(practice_id)
 	release_reservation("practice", practice_id)
-	var cynisme := float(GameData.balance.get("shopDraw", {}).get("practiceCynisme", 2))
+	var cynisme := float(_active_quarter_effects().get("practiceCynisme", GameData.balance.get("shopDraw", {}).get("practiceCynisme", 2)))
 	add_pending({"cynisme": cynisme}, "Nouvelle pratique : %s %s (%d 🪙) — un process de plus, l'organisation lève les yeux au ciel" % [
 		practice.get("icon", ""), practice.get("name", ""), cost
 	])
@@ -1306,11 +1508,13 @@ func add_pending(deltas: Dictionary, note: String = "") -> void:
 
 ## Applique le panier d'effets aux ressources (+ masse salariale, effets de
 ## roster et de pratiques, décroissance de la Valeur perçue, conversion
-## Traction × Levier × Impact, flux de pièces), journalise, joue la revue de board au sprint 6,
-## puis vérifie les fins de mandat (seuils de ressources, ou longueur
-## atteinte). Retourne l'id de la fin atteinte, ou "" si le mandat continue.
+## Traction × Levier × Impact, flux de pièces), journalise, puis vérifie les
+## fins de ressources et la revue trimestrielle. Retourne l'id de la fin
+## atteinte, ou "" si le mandat continue.
 ## À appeler une seule fois par sprint, depuis l'écran de Résolution.
 func apply_pending_and_check() -> String:
+	if quarter_exit_choice_pending:
+		return ""
 	last_tresorerie_cost = int(round(pending_deltas.get("tresorerie", 0.0)))
 
 	_apply_per_sprint_effects()
@@ -1334,13 +1538,14 @@ func apply_pending_and_check() -> String:
 		applied[resource_id] = new_value - resource_values[resource_id]
 		resource_values[resource_id] = new_value
 
-	if last_pieces_delta != 0:
-		applied["pieces"] = last_pieces_delta
-
 	_apply_energy_flow()
 	var energy_sprint_delta := int(last_energy_report.get("sprintDelta", 0))
 	if energy_sprint_delta != 0:
 		applied["energie"] = energy_sprint_delta
+
+	var quarter_ending := _record_quarter_resolution()
+	if last_pieces_delta != 0:
+		applied["pieces"] = last_pieces_delta
 
 	journal.append({
 		"sprint": sprint_number,
@@ -1353,8 +1558,8 @@ func apply_pending_and_check() -> String:
 	_resolve_trial_periods()
 	_resolve_silent_quits()
 
-	if sprint_number == int(GameData.balance.get("trimesterLengthSprints", 6)) and board_review_state == "pending":
-		_run_board_review()
+	if quarter_ending != "":
+		return quarter_ending
 
 	var bad_ending := _check_bad_endings()
 	if bad_ending != "":
@@ -1362,13 +1567,6 @@ func apply_pending_and_check() -> String:
 		ending_id = bad_ending
 		ending_reached.emit(bad_ending)
 		return bad_ending
-
-	if sprint_number >= int(GameData.balance.get("mandateLengthSprints", 12)):
-		var good_ending := _resolve_good_ending()
-		is_mandate_over = true
-		ending_id = good_ending
-		ending_reached.emit(good_ending)
-		return good_ending
 
 	return ""
 
@@ -1451,10 +1649,18 @@ func _build_score_snapshot() -> Dictionary:
 		"business_model_id": business_model_id,
 		"active_tools": _active_tool_entries(),
 		"owned_practices": owned_practices,
-		"strategy_ids": activated_cards,
-		"board_review_failed": board_review_state == "failed",
+		"strategy_ids": _score_strategy_ids(),
+		"minimum_client_impact_for_traction": int(_active_quarter_effects().get("minimumClientImpactForTraction", 0)),
+		"debt_friction_scale": float(_active_quarter_effects().get("debtFrictionScale", 1.0)),
 		"streak": streak,
 	}
+
+
+func _score_strategy_ids() -> Array:
+	var strategy_ids := activated_cards.duplicate()
+	if quarter_forced_strategy_id != "" and not strategy_ids.has(quarter_forced_strategy_id):
+		strategy_ids.append(quarter_forced_strategy_id)
+	return strategy_ids
 
 
 func _active_tool_entries() -> Array:
@@ -1481,7 +1687,7 @@ func _projected_score_resources() -> Dictionary:
 
 
 func _apply_payroll() -> void:
-	last_payroll = get_payroll()
+	last_payroll = int(round(float(get_payroll()) * float(_active_quarter_effects().get("payrollMultiplier", 1.0))))
 	if last_payroll > 0:
 		pending_deltas["tresorerie"] = pending_deltas.get("tresorerie", 0.0) - last_payroll
 		pending_journal_lines.append("Masse salariale : −%d 💰 (%d personnes)" % [last_payroll, get_roster().size()])
@@ -1518,6 +1724,52 @@ func _apply_score_conversion() -> void:
 	if pending_pieces != 0:
 		parts.append("décisions %s%d" % ["+" if pending_pieces >= 0 else "−", abs(pending_pieces)])
 	pending_journal_lines.append("🪙 Budget d'investissement : %s (solde %d)" % [" · ".join(parts), pieces])
+
+
+func _record_quarter_resolution() -> String:
+	quarter_impact += int(last_score_report.get("global", {}).get("impact", 0))
+	quarter_sprint += 1
+	if quarter_sprint < get_quarter_length():
+		return ""
+
+	var objectives := evaluate_board_objectives()
+	var qualitative_ok := true
+	for objective in objectives:
+		if not bool(objective.get("ok", false)):
+			qualitative_ok = false
+	var passed := quarter_impact >= get_current_quota()
+	var qualitative_bonus := 0
+	if passed and qualitative_ok:
+		qualitative_bonus = int(GameData.quotas.get("qualitativeBonusBudget", GameData.quotas.get("qualitativeBonus", {}).get("budget", 8)))
+		pieces += qualitative_bonus
+		last_pieces_delta += qualitative_bonus
+
+	quarter_result = {
+		"sprint": sprint_number,
+		"quarter": quarter_index,
+		"length": get_quarter_length(),
+		"quota": get_current_quota(),
+		"impact": quarter_impact,
+		"passed": passed,
+		"qualitativeBonus": qualitative_bonus,
+		"objectives": objectives,
+		"requirementIds": quarter_requirement_ids.duplicate(),
+	}
+	board_review_state = "passed" if qualitative_ok else "failed"
+	board_review_result = quarter_result.duplicate(true)
+	pending_journal_lines.append("Revue trimestrielle : %d / %d Impact%s" % [
+		quarter_impact, get_current_quota(), " · bonus qualitatif +%d 🪙" % qualitative_bonus if qualitative_bonus > 0 else ""
+	])
+	if not passed:
+		is_mandate_over = true
+		ending_id = "remercie"
+		ending_reached.emit(ending_id)
+		return ending_id
+	if quarter_index == 4 and not long_mandate:
+		quarter_exit_choice_pending = true
+		return ""
+	_prepare_quarter(quarter_index + 1)
+	return ""
 
 
 ## Flux d'Énergie de la Résolution (§7.1) : régénération modulée par le
@@ -1650,12 +1902,9 @@ func _resolve_silent_quits() -> void:
 		})
 
 
-## Confronte les conditions de la revue de board (companies.json →
-## boardObjectives) à l'état courant, sans rien modifier. Appelée deux fois :
-## par _run_board_review() au sprint de mi-mandat, qui en tire le verdict, et
-## par le Panneau de bord, qui les affiche cochées **en direct** — comprendre
-## ce qu'il faut prioriser ne devrait pas demander d'attendre le sprint 6
-## (docs/proposition-ui-interface.md §4.2).
+## Confronte les objectifs qualitatifs de l'entreprise à l'état courant, sans
+## rien modifier. Le runtime les relit lors de chaque revue trimestrielle et
+## l'UI peut les afficher en direct.
 ## Retourne [{label, ok, current}] ; `current` est la valeur lue, pour
 ## l'affichage « ✗ (47) ».
 func evaluate_board_objectives() -> Array:
@@ -1703,50 +1952,6 @@ func evaluate_condition(condition: Dictionary) -> Dictionary:
 			ok = owned_practices.has(condition.get("practice", ""))
 			current = "oui" if ok else "non"
 	return {"ok": ok, "current": current}
-
-
-## La revue de board (§8.2) — le "boss" de mi-mandat : l'état de la boîte
-## est comparé aux objectifs fixés par l'entreprise à l'embauche.
-func _run_board_review() -> void:
-	var objectives: Dictionary = get_company().get("boardObjectives", {})
-	var review_conf: Dictionary = GameData.balance.get("pressure", {}).get("boardReview", {})
-	var conditions: Array = evaluate_board_objectives()
-	var all_ok := true
-	for condition in conditions:
-		if not condition.get("ok", false):
-			all_ok = false
-
-	var bounds: Dictionary = GameData.balance.get("resourceBounds", {"min": 0, "max": 100})
-	if all_ok:
-		board_review_state = "passed"
-		pieces += int(review_conf.get("successPieces", 5))
-		var gain := float(review_conf.get("successCapitalPolitique", 8))
-		resource_values["capital-politique"] = clamp(
-			resource_values.get("capital-politique", 0.0) + gain, float(bounds.get("min", 0)), float(bounds.get("max", 100)))
-		journal.append({
-			"sprint": sprint_number,
-			"text": "🏛️ Revue de board : objectifs tenus. Le comité applaudit poliment et débloque du budget d'action (+%d 🪙, 🎯 +%d)." % [
-				int(review_conf.get("successPieces", 5)), int(gain)
-			],
-			"deltas": "",
-		})
-	else:
-		board_review_state = "failed"
-		var loss := float(review_conf.get("failCapitalPolitique", -12))
-		resource_values["capital-politique"] = clamp(
-			resource_values.get("capital-politique", 0.0) + loss, float(bounds.get("min", 0)), float(bounds.get("max", 100)))
-		journal.append({
-			"sprint": sprint_number,
-			"text": "🏛️ Revue de board : objectifs manqués. Le comité « prend note » (🎯 %d), et l'allocation de pièces est réduite pour le reste du mandat." % int(loss),
-			"deltas": "",
-		})
-
-	board_review_result = {
-		"sprint": sprint_number,
-		"passed": all_ok,
-		"title": objectives.get("title", ""),
-		"conditions": conditions,
-	}
 
 
 ## Fins négatives par seuil (balance.json → endingThresholds). La
