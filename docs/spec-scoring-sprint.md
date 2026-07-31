@@ -472,6 +472,37 @@ juste : **une organisation qui va mal ne combote pas.** Tout le build
 patiemment construit devient inopérant tant que l'équipe n'est pas réparée —
 ce qui donne enfin une raison mécanique de dépenser pour le Moral.
 
+### 8.1 Le 🎯 Capital politique — hypothèses de travail
+
+*Non tranché. Consigné pour ne pas reperdre le raisonnement en playtest.*
+
+Le Capital politique **n'est pas une monnaie** (la piste du lobbying a été
+écartée, §9.4) et **ne doit pas devenir un levier de score majeur**. Trois
+hypothèses de rôle, à valider en jouant :
+
+1. **C'est un indicateur avant tout.** Il se lit, il ne se dépense pas. Les
+   deltas qui l'affectent restent **anecdotiques** — quelques points par
+   sprint, jamais des paquets de 20.
+2. **Il module légèrement, il ne décide pas.** Au mieux un petit
+   multiplicateur au bord du calcul (un frein doux sous un seuil, un bonus
+   marginal au-dessus), jamais un facteur de l'ordre du Cynisme ou du Moral.
+3. **Il garde son couperet.** Capital politique à 0 → fin `Rachat hostile`.
+   C'est sa vraie fonction : une jauge qu'on regarde du coin de l'œil et qui
+   tue si on l'ignore trop longtemps.
+
+**D'où il bouge :** des choix de sprint, pas des achats. Le cas typique, et
+il branche trois systèmes d'un coup :
+
+> 💼 Le Sales (§9.4) a vendu une feature qui n'existe pas. Elle arrive dans
+> votre backlog sans que vous l'ayez choisie.
+> — **La faire** : elle consomme des points de capacité pour une Traction
+> médiocre (elle n'a pas été priorisée pour ses mérites).
+> — **Ne pas la faire** : 🎯 Capital politique en baisse, et un coût
+> financier (le deal tombe). Vous gardez votre capacité pour mieux.
+
+C'est le bon gabarit : un arbitrage lisible, un coût des deux côtés, et le
+Capital politique qui **enregistre** la décision plutôt que de la payer.
+
 ---
 
 ## 9. La conversion — l'Impact devient de l'argent qui compose
@@ -937,7 +968,7 @@ Règles d'animation :
 | Traits visibles décoratifs | Modificateurs de Levier (§6.2) |
 | Roadmap sur 4 features de démo | `backlog.json` branché, points/ROI/impact/risque réels |
 | Cap d'effectif figé | Achetable au Comité (§12) |
-| 🎯 Capital politique | **Inchangé** — la piste du lobbying est écartée (§9.4), à surveiller en playtest |
+| 🎯 Capital politique | **Inchangé dans sa nature** — indicateur, pas monnaie. Hypothèses de rôle en §8.1 |
 | `roster[]` | `squads[]` de longueur 1 (§13.5) |
 | Fins par jauge à l'extrême | **Conservées** + nouvelle fin `remercie` sur quota manqué |
 
@@ -1031,18 +1062,14 @@ run visuel, et la mise à jour du carnet de règles.
 | Pilotage des équipes subies | **Aucun.** Pas de lobbying, pas d'achat. Elles appliquent leur taux et déclenchent leurs événements ; on s'adapte (§9.4) |
 | Déblocage de carrière | **Strict** — il faut gagner pour évoluer. Et les niveaux verrouillés sont **visibles avec leur condition** (§13.4) |
 
-### 18.2 Encore ouvert
+### 18.2 Réglages en attente de playtest
 
-Plus de question de conception bloquante. Restent trois réglages, qui se
-trancheront mieux en jouant qu'en discutant :
+**Plus aucune question de conception bloquante.** Ce qui reste sont des
+valeurs, pas des choix de structure — on pose une base et on ajuste en
+jouant :
 
-1. **Combien d'outils portent un `slotBonus`** — 2 ou 3 sur le catalogue ?
-   Trop peu et les outils cumulatifs restent rares au point d'être
-   anecdotiques ; trop et les slots cessent d'être une contrainte.
-2. **La courbe de prix des outils** (8-18 💶) face au Budget d'un T1 (~24 💶) —
-   le rythme visé est 1 à 2 achats au premier Comité, à vérifier au smoke
-   test.
-3. **Le Capital politique** (§9.4) : sans le lobbying, il garde ses deux
-   seuls usages actuels. Si la jauge reste purement défensive après
-   playtest, lui trouver un débouché — mais pas en rendant pilotable ce qui
-   ne doit pas l'être.
+| Réglage | Base posée | Comment on tranchera |
+|---|---|---|
+| Nombre d'outils à `slotBonus` | **Peu** — pas de cible chiffrée | Émergera en construisant le catalogue d'outils et d'objets. On regarde après coup si les slots restent une contrainte |
+| Courbe de prix des outils | 8-18 💶 contre ~24 💶 au T1 | Smoke test puis playtest. Rythme visé : 1 à 2 achats au premier Comité |
+| Rôle du Capital politique | Indicateur, deltas anecdotiques, petit multiplicateur, couperet à 0 | Hypothèses consignées en **§8.1** — à creuser quand le score tournera |
