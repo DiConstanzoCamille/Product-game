@@ -38,8 +38,7 @@ Product-game/
     │   ├── start_screen.tscn
     │   ├── inbox_screen.tscn
     │   ├── roadmap_screen.tscn
-    │   ├── decisions_screen.tscn
-    │   ├── recruitment_screen.tscn
+    │   ├── investments_screen.tscn
     │   ├── resolution_screen.tscn
     │   └── foundations_screen.tscn
     └── scripts/

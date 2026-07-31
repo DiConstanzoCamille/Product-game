@@ -239,16 +239,41 @@ jauges. C'est faux thématiquement et plat mécaniquement. Elles se scindent
 en **trois familles qui n'agissent pas sur le même objet, ne s'achètent pas
 au même endroit et ne se déclenchent pas au même moment.**
 
-| Famille | Agit sur | Conditionnée par | S'achète | Limite |
-|---|---|---|---|---|
-| 🛠️ **Outils internes** | ⚙️ Levier, **par employé** | La composition de l'équipe | Comité d'investissement | **Les slots** (§7.1.1) et le prix — pas le nombre d'achats |
-| 🧭 **Décisions stratégiques** | 📊 Traction, conversion, marché | L'état du produit | Comité d'investissement | **1 par trimestre**, irréversible |
-| 🧱 **Stack technique** | Le Marché et le risque des features | — | Comité, début de mandat surtout | 1 active à la fois |
+### 7.0 Ce qui existe déjà — ne pas le refaire
 
-Les trois s'achètent au **Comité de fin de trimestre** — c'est le moment de
-respiration où l'on regarde sa machine, pas le sprint. Le Marché du sprint
-garde ce qui relève du quotidien : **les gens et les habitudes** (candidats,
-pratiques).
+Le **Lot 2 de la refonte UI** (carnet §20-21, mergé le 30/07/2026) a livré la
+moitié de l'infrastructure que cette section supposait absente. À prendre
+comme acquis :
+
+- L'écran `investments_screen` **existe** : Grandes décisions et Marché sont
+  déjà fusionnés, le sprint fait déjà 4 phases.
+- Les grandes décisions sont déjà **tirées** au lieu d'être un menu permanent
+  (raretés `commune`/`notable`/`rare` pondérées, `eraWeights`, garde-fous
+  `guaranteedPerSprint`), déjà **payantes en 🪙** (`costPieces`), et déjà
+  soumises à un **slot de mandat** (`structuralDecisionMaxActivations: 4`).
+- Un **reroll** à prix croissant, une **réserve** (punaise) et un **bail**
+  (`lockedLeaseSprints`) existent déjà.
+- Les cartes portent déjà un champ **`family`** (`outil-process`,
+  `methodologie-orga`).
+
+**Conséquence sur cette spec :** le tirage par sprint est *meilleur* que le
+Comité pour les outils, parce qu'il produit du **regret** — *« ça me coûte un
+slot sur quatre, mais est-ce que je la reverrai ? »*. On ne le déplace pas.
+Ce qui suit ne change donc que trois choses : **ce que les cartes font**
+(§7.1), **combien de slots on a et comment on en libère un** (§7.1.1), et
+**une quatrième famille qui, elle, n'existe pas** (§7.2).
+
+### 7.0.b Où vit chaque famille
+
+| Famille | `family` existant | Agit sur | S'obtient | Limite |
+|---|---|---|---|---|
+| 🛠️ **Outils internes** | `outil-process` + `methodologie-orga` | ⚙️ Levier, **par employé** | Tirage du sprint (existant) | **Les slots** (§7.1.1) et le prix — jamais un compteur d'achats |
+| 🧱 **Stack technique** | `stack-technique` *(à créer)* | Le tirage et le risque des features | Tirage du sprint | 1 active à la fois |
+| 🧭 **Décisions stratégiques** | **nouvelle** | 📊 Traction, conversion, marché | **Comité de fin de trimestre** | **1 par trimestre**, irréversible |
+
+Les deux premières relèvent du quotidien et gardent leur place dans l'étal.
+La troisième est d'une autre nature — on ne décide pas de passer en open
+source entre deux tickets — et justifie à elle seule le Comité (§12).
 
 ### 7.1 🛠️ Les outils internes — un bonus qui vit dans l'équipe
 
@@ -293,12 +318,13 @@ grandit quand on recrute.**
 
 ### 7.1.1 Les slots d'outillage — la vraie limite
 
-**Aucune limite du nombre d'achats par trimestre.** Ce qui borne l'outillage,
+Le slot de mandat existe déjà (`structuralDecisionMaxActivations: 4`) — il
+s'agit de le **généraliser**, pas de l'inventer. Ce qui borne l'outillage,
 ce sont deux choses qui bornent différemment :
 
-- **Le prix**, qui gate le **début** de partie : 8 à 18 💶 pièce, quand un
-  trimestre rapporte ~24 💶 au T1. On achète 1 à 2 outils par Comité, et
-  chaque achat fait mal.
+- **Le prix**, qui gate le **début** de partie : les `costPieces` actuels
+  (2 pour un rituel, 6 pour Jira) contre ~5 💶 gagnés par sprint. On achète
+  1 outil tous les deux sprints, et chaque achat fait mal.
 - **Les slots**, qui gatent la **fin** de partie : l'organisation ne peut
   porter que `N` outils actifs simultanément.
 
@@ -310,7 +336,8 @@ de PM commence donc à **2 slots réellement libres**.
 
 En cours de run, on peut en ouvrir **2 de plus au maximum**, au Comité, à
 prix croissant (12 puis 20 💶). Le gros de la capacité d'outillage se gagne
-en carrière, pas en budget.
+en carrière, pas en budget. *(Le `structuralDecisionMaxActivations: 4` fixe
+d'aujourd'hui devient donc `3 + achats` au niveau PM.)*
 
 > **Le basculement est le cœur du late game.** Au T1 on manque d'argent ; au
 > T4 on a 90 💶 par trimestre et **on manque de place**. La question passe de
@@ -341,7 +368,8 @@ Levier n'aurait aucun coût d'opportunité.
 
 ### 7.1.2 Remplacer un outil — le coût de bascule
 
-Un slot occupé peut être libéré au Comité au profit d'un autre outil. C'est
+Aujourd'hui un slot dépensé l'est **définitivement** : les 4 activations d'un
+mandat sont irrévocables. Un slot occupé devient libérable, au Comité. C'est
 enfin le **coût de bascule** que le carnet promet depuis le §7 sans jamais
 l'avoir implémenté :
 
@@ -443,15 +471,16 @@ elle travaille.* On ne désinstalle pas « parler à ses clients ».
 
 ### 7.5 Conséquence sur les phases du sprint
 
-La phase 3 « Grandes décisions » **disparaît en tant qu'écran** : les trois
-familles partent au Comité de fin de trimestre, le Marché garde les
-candidats et les pratiques. On passe de 5 phases à 4 — ce que la refonte UI
-voulait faire de toute façon ([Lot 2](proposition-ui-interface.md)). Les
-deux chantiers convergent.
+**Rien à faire — c'est déjà fait.** Le Lot 2 UI a supprimé l'écran Grandes
+décisions et ramené le sprint à 4 phases (Inbox → Roadmap → Investissements
+→ Résolution). Le Comité de fin de trimestre (§12) **s'ajoute** à ce
+découpage sans le modifier : il tombe tous les 3 sprints, entre une
+Résolution et l'Inbox suivante.
 
-Effet de bord bienvenu : le sprint redevient **rapide** (Inbox → Roadmap →
-Marché → Résolution), et toute la réflexion de construction se concentre au
-Comité, tous les 3 sprints. Un rythme court/long au lieu d'un rythme plat.
+Ce qu'on gagne : un rythme **court/long** au lieu d'un rythme plat. Trois
+sprints rapides où l'on joue son étal, puis un temps d'arrêt où l'on regarde
+sa machine. C'est là que se prennent les décisions stratégiques, les
+bascules d'outils et les investissements de croissance.
 
 ---
 
@@ -721,26 +750,29 @@ Entre deux trimestres, un écran dédié. C'est là qu'on dépense le Budget gag
 en franchissant le quota, et là que se répare le trou « pas de gestion
 d'équipe ».
 
-Le Marché de sprint (candidats, pratiques) reste le petit achat régulier. Le
-Comité est le **gros achat structurel** — et le seul endroit où l'on touche
-à l'outillage et à la stratégie.
+L'écran `investments_screen` reste le rendez-vous de **chaque sprint** :
+candidats, pratiques, outils, stack, avec son tirage, ses raretés, son
+reroll et sa punaise. Le Comité est un écran **différent**, qui n'apparaît
+que tous les 3 sprints, et qui ne propose que ce qui ne se décide pas au fil
+de l'eau.
 
 | Investissement | Coût 💶 | Effet |
 |---|---|---|
-| 🛠️ **Outil interne** | 8-18 | Autant qu'on veut, tant qu'il reste des **slots** et du budget (§7.1.1) |
-| 🔧 **Ouvrir un slot d'outillage** | 12 puis 20 | +1 slot, **2 maximum par run** (la base vient du niveau de carrière) |
-| ♻️ **Remplacer un outil** | prix du nouvel outil + **coût de bascule** | Libère un slot (§7.1.2) |
 | 🧭 **Décision stratégique** | 15-30 | **1 seule par trimestre**, parmi 2-3 proposées (§7.2) |
+| 🔧 **Ouvrir un slot d'outillage** | 12 puis 20 | +1 slot, **2 maximum par run** (la base vient du niveau de carrière) |
+| ♻️ **Libérer un slot** | **coût de bascule** (§7.1.2) | Retire un outil actif — son remplaçant se rachètera à l'étal |
 | 🪑 **Ouvrir un poste** | 6, puis 10, 16… | +1 au cap d'effectif |
 | 📈 **Promotion** | 5 | Un junior devient senior (salaire +1, contribution senior) |
 | 🚀 **Palier de produit** | 12 / 25 / 45 | +0.5 Levier permanent, +1 feature proposée par sprint |
 | 🏝️ **Séminaire d'équipe** | 8 | −15 Cynisme |
 | 🧹 **Sprint de remise à plat** | 6 + **un sprint entier** | −20 Dette, 0 Traction ce sprint |
 | 🤝 **Rachat d'un concurrent** | 30 | +12 MRR, +1 employé aléatoire, +8 Dette |
-| 🔄 **Reroll du Marché** | 3 | Retire l'offre du sprint |
-| 🎯 **Chasseur de têtes** | 8 | Prochain Marché : 4 candidats, traits révélés |
+| 🎯 **Chasseur de têtes** | 8 | Prochain étal : 4 candidats, traits révélés |
 | 🏛️ **Plan de redressement** | 20 | Un rattrapage de quota dans le mandat |
 | 🎲 **Avance sur trimestre** | — | +10 💶 contre −80 d'Impact sur le quota en cours |
+
+*(Pas de reroll ici : il existe déjà à l'étal, par sprint, à prix croissant —
+carnet §21. On ne le duplique pas.)*
 
 Le cap d'effectif devient un **objet de jeu**, et le licenciement (déjà
 implémenté : clic sur une ligne du roster dans le Panneau de bord) prend un
@@ -962,9 +994,10 @@ Règles d'animation :
 | Décroissance Valeur perçue −2/sprint | **Conservée** + churn de MRR : deux pressions distinctes |
 | Revue de board au sprint 6, qualitative | Quota chiffré tous les 3 sprints + exigence + objectifs qualitatifs en bonus (§11) |
 | Mandat = 12 sprints | 4 trimestres, puis mode long mandat (§11.4) |
-| Grandes décisions = coût ponctuel, 3 cartes | **Trois familles distinctes** (§7), écran de phase supprimé, tout part au Comité |
-| `structuralDecisionMaxActivations: 4` | Supprimé — remplacé par **les slots d'outillage** (§7.1.1) pour les outils, et par 1 décision stratégique par trimestre |
-| « Coût de bascule » du carnet §7, jamais implémenté | **Le remplacement d'un outil** (§7.1.2), avec un Cynisme croissant par bascule |
+| Grandes décisions = coût ponctuel sur les jauges | **Levier par employé éligible** (§7.1) + une **4e famille stratégique** au Comité (§7.2) |
+| `structuralDecisionMaxActivations: 4` fixe et définitif | **Slots indexés sur le niveau de carrière** (3 au PM), +2 achetables, et **libérables** (§7.1.1) |
+| « Coût de bascule » du carnet §7, jamais implémenté | **Libérer un slot** (§7.1.2), Cynisme croissant par bascule |
+| Écran Investissements, tirage, raretés, reroll, punaise, bail | **Conservés tels quels** — le tirage produit du regret, on n'y touche pas (§7.0) |
 | Traits visibles décoratifs | Modificateurs de Levier (§6.2) |
 | Roadmap sur 4 features de démo | `backlog.json` branché, points/ROI/impact/risque réels |
 | Cap d'effectif figé | Achetable au Comité (§12) |
@@ -983,8 +1016,8 @@ pas une réécriture.
 | Fichier | Statut | Contenu |
 |---|---|---|
 | `data/scoring.json` | **nouveau** | Combos de main, combos d'organisation locaux et globaux, formules de freins |
-| `data/tools.json` | **nouveau** | Outils internes (§7.1) : `perEmployee`, `eligibility`, `refractory`, `adoptionCondition`, `costBudget`, `slotBonus`, `cumulative` |
-| `data/strategy.json` | **nouveau** | Décisions stratégiques (§7.2) et stack (§7.3) |
+| `data/cards.json` | **modifié, pas remplacé** | Les cartes existantes gagnent le modèle par employé (§7.1) : `perEmployee`, `eligibility`, `refractory`, `adoptionCondition`, `slotBonus`, `cumulative`. Elles gardent `family`, `rarity`, `costPieces`, `eraWeights` |
+| `data/strategy.json` | **nouveau** | Décisions stratégiques (§7.2) — la seule famille qui n'existe pas encore |
 | `data/quotas.json` | **nouveau** | Quotas **par niveau de carrière** × trimestre, courbe du mode long, pool des exigences |
 | `data/investments.json` | **nouveau** | Catalogue du Comité (§12) |
 | `data/careers.json` | **nouveau** *(lot 5)* | Niveaux de carrière, nombre de squads, **slots de base**, conditions de déblocage et leur libellé affiché |
@@ -993,7 +1026,7 @@ pas une réécriture.
 | `data/inbox-events.json` | modifié | + `supportTeam` et `levelRange` : les événements des équipes subies, filtrés par leur niveau (§9.4) |
 | `data/balance.json` | modifié | + `scoring`, `impactToMrr`, churn, `budgetFromImpact`, `toolSlots` (base, coûts d'ouverture, plafond, coût de bascule), `trimesterLengthSprints: 3` |
 | `data/endings.json` | modifié | + `remercie` |
-| `data/cards.json` | **remplacé** | éclaté vers `tools.json` et `strategy.json` |
+| `data/practices.json` | modifié | + champ `levier` conditionnel (§5.4) |
 
 `SprintState` gagne : `squads[]`, `traction`, `levier`, `last_score_report`,
 `mrr`, `quarter_impact`, `quarter_index`, `quarter_requirement_id`, `streak`,
@@ -1022,10 +1055,11 @@ headless : le smoke test vérifie des scores, pas des pixels.
   escaladés, exigences, fin `remercie`, barre de quota permanente, mode long
   mandat à ×2.2.
   → *Critère : un joueur qui ne construit pas de moteur meurt à T2 ou T3.*
-- **Lot 3 — Les trois familles de décisions** : éclatement de `cards.json`,
-  outils internes à bonus par employé, **slots d'outillage et coût de
-  bascule**, décisions stratégiques au Comité, suppression de l'écran
-  Grandes décisions (converge avec le Lot 2 UI).
+- **Lot 3 — Les familles de décisions** : outils internes à bonus par
+  employé (sur les `cards.json` existants, qui portent déjà `family`,
+  `rarity` et `costPieces`), **slots indexés carrière et coût de bascule**,
+  nouvelle famille stratégique au Comité. Le tirage, l'écran et le reroll du
+  Lot 2 UI sont **réutilisés tels quels**.
   → *Critères : (1) Notion est excellent chez Karavel et mauvais chez
   Meridia sans qu'aucune valeur ne soit écrite en dur pour ça ; (2) au T1 on
   manque d'argent, au T4 on manque de slots.*
