@@ -34,6 +34,7 @@ var failures: int = 0
 
 func _ready() -> void:
 	_test_energy_rules()
+	_test_investment_draw_rules()
 
 	for strategy in ["stress", "greedy", "careful"]:
 		print("\n=== SMOKE TEST LOGIQUE — %s ===" % strategy.to_upper())
@@ -63,6 +64,274 @@ func _fail(message: String) -> void:
 	failures += 1
 	push_error(message)
 	print("ASSERTION ÉCHOUÉE : %s" % message)
+
+
+## Vérifications déterministes du tirage des Investissements (carnet §21) :
+## les grandes décisions sont tirées comme le reste de l'offre, une carte
+## activée ne revient jamais, et le re-tirage se paie de plus en plus cher.
+func _test_investment_draw_rules() -> void:
+	print("=== SMOKE TEST LOGIQUE — TIRAGE DES INVESTISSEMENTS ===")
+	var draw_conf: Dictionary = GameData.balance.get("shopDraw", {})
+	var reroll_conf: Dictionary = draw_conf.get("reroll", {})
+	var base_cost := int(reroll_conf.get("baseCost", 1))
+	var increment := int(reroll_conf.get("costIncrement", 1))
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+
+	var offer := SprintState.get_shop_offer()
+	var decisions: Array = offer.get("decisions", [])
+	if decisions.is_empty():
+		_fail("L'offre du sprint 1 ne propose aucune grande décision.")
+	if _has_duplicate(decisions):
+		_fail("L'offre propose deux fois la même grande décision : %s." % [decisions])
+	if SprintState.get_shop_offer().get("decisions", []) != decisions:
+		_fail("Le rayon des décisions a été re-tiré en revisitant l'écran.")
+
+	# Le prix du re-tirage part de sa base et monte à chaque usage du sprint.
+	if SprintState.shop_reroll_cost() != base_cost:
+		_fail("Premier re-tirage à %d 🪙 au lieu de %d." % [SprintState.shop_reroll_cost(), base_cost])
+	SprintState.pieces = 20
+	var pieces_before := SprintState.pieces
+	if SprintState.reroll_shop_offer() != "":
+		_fail("Re-tirage refusé alors que les pièces suffisent.")
+	if SprintState.pieces != pieces_before - base_cost:
+		_fail("Le re-tirage a coûté %d 🪙 au lieu de %d." % [pieces_before - SprintState.pieces, base_cost])
+	if SprintState.shop_reroll_cost() != base_cost + increment:
+		_fail("Deuxième re-tirage à %d 🪙 au lieu de %d." % [SprintState.shop_reroll_cost(), base_cost + increment])
+	SprintState.reroll_shop_offer()
+	if SprintState.shop_reroll_cost() != base_cost + 2 * increment:
+		_fail("Troisième re-tirage à %d 🪙 au lieu de %d." % [SprintState.shop_reroll_cost(), base_cost + 2 * increment])
+
+	# À sec, on ne re-tire pas.
+	SprintState.pieces = 0
+	if SprintState.reroll_shop_offer() != "pieces":
+		_fail("Re-tirage accepté sans pièces.")
+
+	# Le prix repart à sa base au sprint suivant.
+	SprintState.sprint_number += 1
+	if SprintState.shop_reroll_cost() != base_cost:
+		_fail("Le prix du re-tirage n'est pas reparti à %d au sprint suivant (%d)." % [base_cost, SprintState.shop_reroll_cost()])
+
+	# Une grande décision se paie comme le reste du rayon.
+	var priced_id: String = SprintState.get_shop_offer().get("decisions", [""])[0]
+	var price := SprintState.decision_cost(priced_id)
+	if price <= 0:
+		_fail("La décision « %s » ne coûte rien — elle est hors du modèle du shop." % priced_id)
+	SprintState.pieces = max(0, price - 1)
+	if SprintState.activate_decision(priced_id) != "pieces":
+		_fail("« %s » s'est activée avec %d 🪙 pour un prix de %d." % [priced_id, SprintState.pieces, price])
+	if SprintState.activated_cards.has(priced_id):
+		_fail("« %s » a été marquée activée malgré le refus pour pièces insuffisantes." % priced_id)
+
+	# Une décision activée sort du tirage : elle ne doit plus jamais reparaître.
+	SprintState.pieces = 20
+	var activated_id: String = SprintState.get_shop_offer().get("decisions", [""])[0]
+	var pieces_at_activation := SprintState.pieces
+	var activation_cost := SprintState.decision_cost(activated_id)
+	if SprintState.activate_decision(activated_id) != "":
+		_fail("Activation refusée pour « %s » alors qu'un slot est libre." % activated_id)
+	if SprintState.pieces != pieces_at_activation - activation_cost:
+		_fail("L'activation de « %s » a coûté %d 🪙 au lieu de %d." % [
+			activated_id, pieces_at_activation - SprintState.pieces, activation_cost])
+	for sprint in range(30):
+		SprintState.sprint_number += 1
+		if SprintState.get_shop_offer().get("decisions", []).has(activated_id):
+			_fail("La décision activée « %s » est ressortie au tirage du sprint %d." % [activated_id, SprintState.sprint_number])
+			break
+
+	_test_mixed_shelf()
+	_test_rarity_weights()
+	_test_reservation()
+	_test_gated_card_lease()
+
+	print("Tirage des Investissements : OK (%d emplacements par sprint, re-tirage %d 🪙 +%d)" % [
+		int(draw_conf.get("slotsPerSprint", 6)), base_cost, increment])
+
+
+## Le rayon unique : les trois types se partagent `slotsPerSprint`
+## emplacements, avec un minimum garanti par type. C'est le garde-fou qui
+## empêche un sprint entièrement inutile — et la seule entorse au hasard pur.
+func _test_mixed_shelf() -> void:
+	var conf: Dictionary = GameData.balance.get("shopDraw", {})
+	var total := int(conf.get("slotsPerSprint", 6))
+	var guaranteed: Dictionary = conf.get("guaranteedPerSprint", {})
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+
+	var seen_mix := {}
+	for sprint in range(200):
+		SprintState.sprint_number = sprint + 1
+		var offer := SprintState.get_shop_offer()
+		var slots: Array = offer.get("slots", [])
+		if slots.size() != total:
+			_fail("Le rayon propose %d emplacements au lieu de %d au sprint %d." % [
+				slots.size(), total, SprintState.sprint_number])
+			return
+
+		var counts := {"candidate": 0, "practice": 0, "decision": 0}
+		for slot in slots:
+			counts[slot.get("kind", "")] = int(counts.get(slot.get("kind", ""), 0)) + 1
+		for kind in counts.keys():
+			if counts[kind] < int(guaranteed.get(kind, 0)):
+				_fail("Minimum garanti non tenu au sprint %d : %d %s pour %d attendu(s)." % [
+					SprintState.sprint_number, counts[kind], kind, int(guaranteed.get(kind, 0))])
+				return
+
+		# Les trois listes par type doivent rester le reflet exact des slots.
+		if offer.get("candidates", []).size() != counts["candidate"] \
+				or offer.get("practices", []).size() != counts["practice"] \
+				or offer.get("decisions", []).size() != counts["decision"]:
+			_fail("Les listes par type ne correspondent pas aux emplacements au sprint %d." % SprintState.sprint_number)
+			return
+
+		seen_mix["%d-%d-%d" % [counts["candidate"], counts["practice"], counts["decision"]]] = true
+
+	# Le mélange doit vraiment varier : si un seul dosage sort sur 200 sprints,
+	# le "hasard entre types" n'en est pas un.
+	if seen_mix.size() < 4:
+		_fail("Seulement %d dosages de rayon différents sur 200 sprints — le tirage entre types ne varie pas assez." % seen_mix.size())
+	print("  dosages de rayon observés sur 200 sprints (candidats-pratiques-décisions) : %d combinaisons" % seen_mix.size())
+
+
+## Les taux d'apparition : une carte `rare` doit sortir nettement moins souvent
+## qu'une `commune`, et le coefficient d'époque doit peser. Test statistique —
+## la marge est large exprès, il vérifie un ordre de grandeur, pas une valeur.
+func _test_rarity_weights() -> void:
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+	var weights: Dictionary = GameData.balance.get("shopDraw", {}).get("rarityWeights", {})
+
+	var counts: Dictionary = {}
+	for sprint in range(600):
+		SprintState.sprint_number = sprint + 1
+		for card_id in SprintState.get_shop_offer().get("decisions", []):
+			counts[card_id] = int(counts.get(card_id, 0)) + 1
+
+	# rice (commune, poids 100) contre shape-up (rare, poids 12).
+	var commune := int(counts.get("rice", 0))
+	var rare := int(counts.get("shape-up", 0))
+	if commune <= rare:
+		_fail("La carte rare « shape-up » (%d sorties) n'est pas plus rare que « rice » (%d) sur 600 sprints." % [rare, commune])
+	if rare == 0:
+		_fail("La carte rare « shape-up » n'est jamais sortie sur 600 sprints — poids nul ?")
+
+	# jira est `notable` (poids 40) mais double son poids en Transformation
+	# agile (eraWeights) : il doit sortir plus qu'une notable sans coefficient.
+	if int(counts.get("jira", 0)) <= int(counts.get("sprint-retro", 0)):
+		_fail("Le coefficient d'époque de « jira » (%d sorties) ne pèse pas face à « sprint-retro » (%d)." % [
+			int(counts.get("jira", 0)), int(counts.get("sprint-retro", 0))])
+	print("  taux observés sur 600 sprints (poids %s) : %s" % [weights, counts])
+
+
+## 📌 Réserver : l'Actif punaisé traverse un re-tirage et le sprint suivant,
+## puis la punaise tombe. Décoller rembourse la pièce.
+func _test_reservation() -> void:
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+	SprintState.pieces = 20
+	var cost := SprintState.reserve_cost()
+	var offer := SprintState.get_shop_offer()
+	var pinned_id: String = offer.get("decisions", [""])[0]
+
+	var pieces_before := SprintState.pieces
+	if SprintState.toggle_reservation("decision", pinned_id, SprintState.find_card(pinned_id)) != "":
+		_fail("Réservation refusée alors que les pièces suffisent.")
+	if SprintState.pieces != pieces_before - cost:
+		_fail("La réservation a coûté %d 🪙 au lieu de %d." % [pieces_before - SprintState.pieces, cost])
+	if not SprintState.is_reserved("decision", pinned_id):
+		_fail("« %s » n'est pas marquée réservée après la punaise." % pinned_id)
+
+	# Un re-tirage ne doit pas emporter ce qu'on a payé pour garder.
+	SprintState.reroll_shop_offer()
+	if not SprintState.get_shop_offer().get("decisions", []).has(pinned_id):
+		_fail("Le re-tirage a emporté la carte réservée « %s »." % pinned_id)
+
+	# Elle traverse le sprint suivant...
+	SprintState.sprint_number += 1
+	if not SprintState.get_shop_offer().get("decisions", []).has(pinned_id):
+		_fail("La carte réservée « %s » a disparu au sprint suivant." % pinned_id)
+
+	# ...puis la punaise tombe : elle n'est plus garantie.
+	SprintState.sprint_number += 1
+	SprintState.get_shop_offer()
+	if SprintState.is_reserved("decision", pinned_id):
+		_fail("La réservation de « %s » a survécu deux sprints — elle doit tenir un sprint." % pinned_id)
+
+	# Décoller la punaise rembourse.
+	var other_id: String = SprintState.get_shop_offer().get("decisions", [""])[0]
+	pieces_before = SprintState.pieces
+	SprintState.toggle_reservation("decision", other_id, SprintState.find_card(other_id))
+	SprintState.toggle_reservation("decision", other_id, SprintState.find_card(other_id))
+	if SprintState.pieces != pieces_before:
+		_fail("Décoller la punaise n'a pas remboursé la pièce (%d → %d)." % [pieces_before, SprintState.pieces])
+	if SprintState.is_reserved("decision", other_id):
+		_fail("« %s » est restée réservée après avoir décollé la punaise." % other_id)
+
+
+## 🔒 Une carte à prérequis prend un bail dès qu'elle sort : elle reste sur le
+## rayon le trimestre entier, verrouillée tant que la condition est fausse.
+func _test_gated_card_lease() -> void:
+	# Karavel : équipe 100 % junior, donc le prérequis « 2 seniors » de
+	# Shape Up est faux au départ — c'est tout l'intérêt de la carte gatée.
+	SprintState.reset_run("agile-transformation", "karavel-scaleup")
+	var lease := int(GameData.balance.get("shopDraw", {}).get("lockedLeaseSprints", 6))
+	var gated := SprintState.find_card("shape-up")
+	if gated.get("requires", {}).is_empty():
+		_fail("La carte « shape-up » n'a plus de prérequis — le test du bail ne vaut plus rien.")
+		return
+
+	# On force sa sortie en tirant jusqu'à ce qu'elle tombe.
+	var drawn_at := 0
+	for sprint in range(400):
+		SprintState.sprint_number = sprint + 1
+		if SprintState.get_shop_offer().get("decisions", []).has("shape-up"):
+			drawn_at = SprintState.sprint_number
+			break
+	if drawn_at == 0:
+		_fail("« shape-up » n'est jamais sortie en 400 sprints.")
+		return
+
+	if SprintState.get_lease_expiry("shape-up") != drawn_at + lease:
+		_fail("Bail de « shape-up » jusqu'au sprint %d au lieu de %d." % [
+			SprintState.get_lease_expiry("shape-up"), drawn_at + lease])
+
+	# Verrouillée : le roster de départ n'a pas 2 seniors.
+	if SprintState.card_requirement_state(gated).get("ok", true):
+		_fail("« shape-up » est activable alors que le prérequis n'est pas rempli.")
+	if SprintState.activate_decision("shape-up") != "prerequis":
+		_fail("« shape-up » s'est activée malgré son prérequis non rempli.")
+
+	# Elle reste punaisée sur toute la durée du bail, même sans être tirée.
+	for sprint in range(lease):
+		SprintState.sprint_number = drawn_at + sprint
+		if not SprintState.get_leased_decision_ids().has("shape-up"):
+			_fail("« shape-up » a quitté le rayon au sprint %d, avant la fin de son bail." % SprintState.sprint_number)
+			break
+
+	# Le prérequis rempli — et les pièces en poche, une décision s'achète — elle
+	# s'active.
+	SprintState.sprint_number = drawn_at + 1
+	SprintState.pieces = 20
+	SprintState.roster.append({"id": "t1", "name": "Test", "role": "dev", "seniority": "senior", "salary": 2, "trait": "", "hidden_trait": "", "hiddenRevealed": true, "hiredSprint": 1})
+	SprintState.roster.append({"id": "t2", "name": "Test2", "role": "dev", "seniority": "senior", "salary": 2, "trait": "", "hidden_trait": "", "hiddenRevealed": true, "hiredSprint": 1})
+	if not SprintState.card_requirement_state(gated).get("ok", false):
+		_fail("« shape-up » reste verrouillée avec 2 seniors au roster.")
+	if SprintState.activate_decision("shape-up") != "":
+		_fail("« shape-up » refuse de s'activer alors que son prérequis est rempli.")
+	if SprintState.get_leased_decision_ids().has("shape-up"):
+		_fail("« shape-up » reste punaisée après activation.")
+
+	# Le bail expire : au-delà, la carte n'est plus garantie sur le rayon.
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+	SprintState.leased_decisions["shape-up"] = 4
+	SprintState.sprint_number = 5
+	if SprintState.get_leased_decision_ids().has("shape-up"):
+		_fail("Le bail de « shape-up » n'a pas expiré au sprint 5 (échéance 4).")
+
+
+func _has_duplicate(ids: Array) -> bool:
+	var seen: Array = []
+	for id in ids:
+		if seen.has(id):
+			return true
+		seen.append(id)
+	return false
 
 
 ## Vérifications déterministes des règles d'Énergie (spec profondeur §7) :
@@ -254,26 +523,45 @@ func _play_sprint(strategy: String) -> void:
 		])
 		SprintState.delivered_feature_ids = feature_ids.duplicate()
 
-	# Phase 3 — Grandes décisions. "greedy" en active deux, aux sprints 2 et 4
-	# (un joueur pressé mais pas au point de brûler la trésorerie en cartes) ;
-	# "stress" en active une au sprint 1 puis n'a plus la tête à ça — il faut
-	# que la trésorerie survive assez longtemps pour que le burn-out arrive.
-	var wants_card := (strategy == "stress" and SprintState.sprint_number == 1) or (strategy == "greedy" and SprintState.sprint_number in [2, 4])
-	if wants_card and SprintState.activated_cards.size() < int(GameData.balance.get("structuralDecisionMaxActivations", 4)):
-		for card in GameData.cards.get("cards", []):
-			var card_id: String = card.get("id", "")
-			if not SprintState.activated_cards.has(card_id):
-				var card_deltas := EffectResolver.resolve_card_activation(card_id, SprintState.team_profile, SprintState.era_id)
-				SprintState.add_pending(card_deltas, "Grande décision : %s" % card.get("name", card_id))
-				SprintState.activated_cards.append(card_id)
-				SprintState.activated_card_sprints[card_id] = SprintState.sprint_number
-				break
-
-	# Phase 4 — Marché : tirage stocké (pas de re-tirage en revisitant).
+	# Phase 3 — Investissements : une seule offre pour les deux rayons, tirée
+	# une fois par sprint (revisiter l'écran ne re-tire pas).
 	var offer := SprintState.get_shop_offer()
 	var offer_again := SprintState.get_shop_offer()
 	if not _same_offer(offer, offer_again):
-		_fail("Le Marché a été retiré deux fois au sprint %d — l'offre doit être stockée." % SprintState.sprint_number)
+		_fail("L'offre a été re-tirée deux fois au sprint %d — elle doit être stockée." % SprintState.sprint_number)
+
+	# 🎲 Re-tirage : "greedy" retente sa chance au sprint 3 s'il a les moyens —
+	# le chemin payant du re-tirage reste couvert, prix croissant compris.
+	if strategy == "greedy" and SprintState.sprint_number == 3 and SprintState.pieces >= SprintState.shop_reroll_cost() + 3:
+		SprintState.reroll_shop_offer()
+		offer = SprintState.get_shop_offer()
+
+	# Rayon 🃏 — on ne peut activer que ce qui a été **tiré** : depuis que les
+	# décisions sortent au hasard, aucune stratégie ne peut plus compter sur une
+	# carte précise, et les deux profils ont dû apprendre à faire avec l'offre.
+	#  · "greedy" prend ce qui passe aux sprints 2 et 4 (pressé, mais pas au
+	#    point de brûler la trésorerie en cartes) ;
+	#  · "stress" cherche la carte qui abîme le plus le Moral et n'en active
+	#    qu'une — la spirale du burn-out a besoin d'un Moral cassé tôt (régén
+	#    ×0), et la trésorerie doit survivre assez longtemps pour y arriver.
+	#    Il ré-essaie chaque sprint tant qu'il n'a rien trouvé.
+	if strategy == "stress" and SprintState.activated_cards.is_empty():
+		var worst := _worst_moral_decision(offer)
+		if worst != "":
+			SprintState.activate_decision(worst)
+	elif strategy == "greedy" and SprintState.sprint_number in [2, 4]:
+		for card_id in offer.get("decisions", []):
+			if SprintState.activate_decision(card_id) == "":
+				break
+
+	# 📌 "greedy" punaise ce qu'il ne peut pas encore payer : au sprint 5, s'il
+	# reste un candidat trop cher sur l'étal, il le réserve pour le sprint
+	# suivant plutôt que de le perdre au tirage.
+	if strategy == "greedy" and SprintState.sprint_number == 5 and SprintState.pieces >= SprintState.reserve_cost():
+		for candidate in offer.get("candidates", []):
+			if int(candidate.get("costPieces", 0)) > SprintState.pieces:
+				SprintState.toggle_reservation("candidate", candidate.get("id", ""), candidate)
+				break
 
 	if strategy == "stress":
 		# Plus d'achats compulsifs : ce CPO-là compense tout de sa personne —
@@ -303,7 +591,7 @@ func _play_sprint(strategy: String) -> void:
 		if SprintState.pieces < 2 and SprintState.resource_values.get("capital-politique", 0.0) > 40.0 and SprintState.personal_action_refusal() == "":
 			SprintState.do_negotiate_extension()
 
-	# Phase 5 — Résolution.
+	# Phase 4 — Résolution.
 	var ending := SprintState.apply_pending_and_check()
 	if ending != "":
 		return
@@ -337,6 +625,25 @@ func _worst_moral_choice(choices: Array) -> Dictionary:
 			worst_moral = moral
 			worst = choice
 	return worst
+
+
+## La décision tirée qui abîme le plus le Moral, cartes verrouillées écartées.
+## Le pendant de _worst_moral_choice() pour le rayon 🃏 : "stress" ne choisit
+## plus une carte connue d'avance, il prend la pire de ce que l'offre propose.
+func _worst_moral_decision(offer: Dictionary) -> String:
+	var worst_id := ""
+	var worst_moral := INF
+	for card_id in offer.get("decisions", []):
+		if SprintState.activated_cards.has(card_id):
+			continue
+		if not SprintState.card_requirement_state(SprintState.find_card(card_id)).get("ok", true):
+			continue
+		var deltas := EffectResolver.resolve_card_activation(card_id, SprintState.team_profile, SprintState.era_id)
+		var moral := float(deltas.get("moral", 0.0))
+		if moral < worst_moral:
+			worst_moral = moral
+			worst_id = card_id
+	return worst_id
 
 
 ## Heuristique simple : la somme des deltas négatifs la moins pénalisante

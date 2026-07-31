@@ -43,7 +43,7 @@ text="← Accueil"
 size_flags_horizontal=3
 
 [node name="SprintLabel" type="Label" parent="Margin/VBox/TopBar"]
-text="Sprint 1 — Phase 5 : Résolution"
+text="Sprint 1 — Phase 4 : Résolution"
 
 [node name="Scroll" type="ScrollContainer" parent="Margin/VBox"]
 size_flags_vertical=3

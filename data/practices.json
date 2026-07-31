@@ -40,6 +40,7 @@
     },
     {
       "id": "product-analytics",
+      "rarity": "notable",
       "icon": "📊",
       "name": "Product analytics",
       "costPieces": 5,
@@ -49,6 +50,7 @@
     },
     {
       "id": "segmentation-clients",
+      "rarity": "notable",
       "icon": "💼",
       "name": "Segmentation clients",
       "costPieces": 5,
@@ -67,6 +69,7 @@
     },
     {
       "id": "retros-sinceres",
+      "rarity": "rare",
       "icon": "🫶",
       "name": "Rétrospectives sincères",
       "costPieces": 3,
