@@ -38,6 +38,7 @@ var last_revenue: int = 0              # revenu du modèle économique au dernie
 var last_tresorerie_cost: int = 0      # somme des coûts/gains de décisions sur la trésorerie (hors revenu et masse salariale)
 var last_payroll: int = 0              # masse salariale prélevée au dernier sprint résolu
 var last_pieces_delta: int = 0         # flux net de pièces au dernier sprint résolu
+var last_roi_revenue_bonus: int = 0    # part MRR du revenu du sprint résolu
 
 # --- Phase A : l'entreprise ---
 var pieces: int = 0                    # 🪙 budget d'action de l'entreprise (jamais négatif)
@@ -45,7 +46,12 @@ var roster: Array = []                 # employés {id, name, role, seniority, s
 var owned_practices: Array = []        # ids de pratiques achetées (permanentes pour le mandat)
 var fired_count: int = 0               # licenciements prononcés ce mandat (le cynisme monte à partir du 2e)
 var next_hire_discount: int = 0        # remise 🪙 sur le prochain recrutement (trait caché Réseau)
-var delivered_feature_ids: Array = []  # features livrées ce sprint (posées par l'écran Roadmap)
+var current_backlog_draw: Dictionary = {}  # {sprint, items} — tirage Roadmap persistant
+var epic_progress: Dictionary = {}         # epic_id -> {invested, startedSprint}
+var completed_backlog_ids: Array = []      # livraisons définitives, hors du sac
+var revealed_backlog_sprint: Dictionary = {}  # feature_id -> sprint du Plonger temporaire
+var recurring_roi: int = 0                 # bonus de MRR permanent acquis par les livraisons
+var last_roadmap_report: Dictionary = {}   # livraison réelle affichée à la Résolution
 var board_review_state: String = "pending"  # "pending" | "passed" | "failed"
 var board_review_result: Dictionary = {}    # {sprint, passed, title, conditions:[{label, ok}]} — pour l'overlay de verdict
 var current_shop_offer: Dictionary = {}     # {sprint, candidates:[...], practices:[ids], decisions:[ids], leased:[ids], rerolls} — tirage des Investissements
@@ -62,6 +68,7 @@ var last_energy_report: Dictionary = {}  # détail du delta Énergie de la derni
 var _inbox_event_bag: Array = []       # ids restants à tirer dans le "sac" courant
 var _last_inbox_event_id: String = ""  # évite une répétition immédiate entre deux sacs
 var _hired_candidate_ids: Array = []   # candidats déjà embauchés ce mandat (ne reviennent pas au tirage)
+var _backlog_bag: Array = []           # sac des propositions de Roadmap, filtré par ère
 
 
 ## À appeler au lancement d'un nouveau mandat, une fois le scénario et
@@ -84,15 +91,22 @@ func reset_run(chosen_era_id: String = "", chosen_company_id: String = "") -> vo
 	last_tresorerie_cost = 0
 	last_payroll = 0
 	last_pieces_delta = 0
+	last_roi_revenue_bonus = 0
 	_inbox_event_bag.clear()
 	_last_inbox_event_id = ""
 	_hired_candidate_ids.clear()
+	_backlog_bag.clear()
 	reserved_assets.clear()
 	leased_decisions.clear()
 	owned_practices.clear()
 	fired_count = 0
 	next_hire_discount = 0
-	delivered_feature_ids.clear()
+	current_backlog_draw.clear()
+	epic_progress.clear()
+	completed_backlog_ids.clear()
+	revealed_backlog_sprint.clear()
+	recurring_roi = 0
+	last_roadmap_report.clear()
 	board_review_state = "pending"
 	board_review_result.clear()
 	current_shop_offer.clear()
@@ -246,7 +260,7 @@ func get_payroll() -> int:
 	return total
 
 
-## Contexte de roster passé à EffectResolver.resolve_roadmap() — poids des
+## Contexte de roster passé à EffectResolver.resolve_backlog() — poids des
 ## rôles qui modulent les effets de la Roadmap (PM, Designer).
 func get_roster_context() -> Dictionary:
 	return {
@@ -396,6 +410,223 @@ func plan_breather() -> String:
 		"deltas": "",
 	})
 	return ""
+
+
+# --- Roadmap profonde : backlog, epics et informations révélées (spec §6) ---
+
+func get_backlog_offer() -> Dictionary:
+	if int(current_backlog_draw.get("sprint", -1)) == sprint_number:
+		return current_backlog_draw
+	current_backlog_draw = _draw_backlog_offer()
+	return current_backlog_draw
+
+
+func find_backlog_item(item_id: String) -> Dictionary:
+	for feature in GameData.backlog.get("features", []):
+		if feature.get("id", "") == item_id:
+			return feature
+	for epic in GameData.backlog.get("epics", []):
+		if epic.get("id", "") == item_id:
+			return epic
+	return {}
+
+
+func is_backlog_epic(item: Dictionary) -> bool:
+	return bool(item.get("epic", false))
+
+
+func get_epic_invested(item_id: String) -> int:
+	return int(epic_progress.get(item_id, {}).get("invested", 0))
+
+
+func get_epic_remaining(item_id: String) -> int:
+	var item := find_backlog_item(item_id)
+	return max(0, int(item.get("costPoints", 0)) - get_epic_invested(item_id))
+
+
+func get_epic_started_sprint(item_id: String) -> int:
+	return int(epic_progress.get(item_id, {}).get("startedSprint", 0))
+
+
+## Abandonne un epic entamé : les points engagés sont perdus, le chantier
+## quitte l'offre actuelle et redevient éligible à un futur cycle du sac.
+func abandon_epic(item_id: String) -> String:
+	if not epic_progress.has(item_id):
+		return "pas-en-cours"
+	var item := find_backlog_item(item_id)
+	if item.is_empty() or not is_backlog_epic(item):
+		return "introuvable"
+	var lost_points := get_epic_invested(item_id)
+	epic_progress.erase(item_id)
+	var retained: Array = []
+	for offered_item in get_backlog_offer().get("items", []):
+		if offered_item.get("id", "") != item_id:
+			retained.append(offered_item)
+	current_backlog_draw["items"] = retained
+	pending_journal_lines.append("Abandon de l'epic %s : %d points engagés sont perdus. Le chantier retournera peut-être un jour sur la table." % [
+		item.get("name", item_id), lost_points
+	])
+	return ""
+
+
+func backlog_attribute_revealed(item_id: String, attribute: String) -> bool:
+	for practice_id in owned_practices:
+		if find_practice(practice_id).get("unlocks", "") == attribute:
+			return true
+	return int(revealed_backlog_sprint.get(item_id, -1)) == sprint_number
+
+
+func do_feature_dive(item_id: String) -> String:
+	var refusal := personal_action_refusal()
+	if refusal != "":
+		return refusal
+	if find_backlog_item(item_id).is_empty() or not _backlog_offer_contains(item_id):
+		return "introuvable"
+	if int(revealed_backlog_sprint.get(item_id, -1)) == sprint_number:
+		return "deja-revele"
+
+	var cost := get_personal_action_cost("featureDive")
+	_spend_energy(cost)
+	revealed_backlog_sprint[item_id] = sprint_number
+	pending_journal_lines.append("🔬 Plongée dans %s (−%d ⚡) : les vrais chiffres sortent enfin du tableur." % [
+		find_backlog_item(item_id).get("name", item_id), cost
+	])
+	return ""
+
+
+func backlog_plan_points(plan: Array) -> int:
+	var total := 0
+	for entry in plan:
+		total += max(0, int(entry.get("points", 0)))
+	return total
+
+
+## Enregistre le choix de Roadmap. L'UI ne fait que construire `plan`; ici les
+## points sont consommés, les epics progressent, et seuls les items terminés
+## produisent leurs attributs réels.
+func commit_backlog_plan(plan: Array) -> Dictionary:
+	var offer := get_backlog_offer()
+	var available: Dictionary = {}
+	for item in offer.get("items", []):
+		available[item.get("id", "")] = item
+
+	var spent := 0
+	var delivered: Array = []
+	var epic_updates: Array = []
+	var seen: Dictionary = {}
+	for entry in plan:
+		var item_id: String = entry.get("id", "")
+		if seen.has(item_id) or completed_backlog_ids.has(item_id) or not available.has(item_id):
+			continue
+		seen[item_id] = true
+		var item: Dictionary = available[item_id]
+		if is_backlog_epic(item):
+			var invested: int = min(max(0, int(entry.get("points", 0))), get_epic_remaining(item_id))
+			if invested <= 0:
+				continue
+			var progress: Dictionary = epic_progress.get(item_id, {"invested": 0, "startedSprint": sprint_number})
+			progress["invested"] = int(progress.get("invested", 0)) + invested
+			epic_progress[item_id] = progress
+			spent += invested
+			if int(progress["invested"]) >= int(item.get("costPoints", 0)):
+				epic_progress.erase(item_id)
+				completed_backlog_ids.append(item_id)
+				delivered.append(item)
+				epic_updates.append({"item": item, "invested": invested, "completed": true})
+			else:
+				epic_updates.append({"item": item, "invested": invested, "completed": false})
+		else:
+			var cost := int(item.get("costPoints", 0))
+			if cost <= 0:
+				continue
+			spent += cost
+			delivered.append(item)
+			completed_backlog_ids.append(item_id)
+
+	var capacity := get_effective_capacity()
+	var deltas := EffectResolver.resolve_backlog(delivered, spent, capacity, get_roster_context(), has_practice("okr"))
+	var roi_gain := 0
+	for item in delivered:
+		roi_gain += int(item.get("roi", 0))
+	recurring_roi += roi_gain
+
+	if not deltas.is_empty():
+		add_pending(deltas)
+	last_roadmap_report = {
+		"sprint": sprint_number,
+		"plannedPoints": spent,
+		"capacity": capacity,
+		"delivered": delivered,
+		"epicUpdates": epic_updates,
+		"roiGain": roi_gain,
+		"deltas": deltas,
+	}
+	pending_journal_lines.append("Roadmap : %d pts / %d capacité%s" % [
+		spent, capacity, " · %d livraison(s)" % delivered.size() if not delivered.is_empty() else ""
+	])
+	return last_roadmap_report
+
+
+func _draw_backlog_offer() -> Dictionary:
+	var conf: Dictionary = GameData.balance.get("backlogDraw", {})
+	var minimum := int(conf.get("itemsPerSprintMin", 0))
+	var maximum: int = max(minimum, int(conf.get("itemsPerSprintMax", minimum)))
+	var items: Array = _active_epic_items()
+	var target_total: int = randi_range(minimum, maximum)
+	var regular_count: int = max(0, target_total - items.size())
+	while regular_count > 0 and items.size() < maximum:
+		var item := _draw_backlog_item(items)
+		if item.is_empty():
+			break
+		items.append(item)
+		regular_count -= 1
+	return {"sprint": sprint_number, "items": items}
+
+
+func _active_epic_items() -> Array:
+	var result: Array = []
+	for item_id in epic_progress.keys():
+		var item := find_backlog_item(item_id)
+		if not item.is_empty() and get_epic_remaining(item_id) > 0:
+			result.append(item)
+	return result
+
+
+func _draw_backlog_item(already_drawn: Array) -> Dictionary:
+	var excluded: Dictionary = {}
+	for item in already_drawn:
+		excluded[item.get("id", "")] = true
+	var attempts := 0
+	var max_attempts: int = max(1, GameData.backlog.get("features", []).size() + GameData.backlog.get("epics", []).size()) * 2
+	while attempts < max_attempts:
+		if _backlog_bag.is_empty():
+			_refill_backlog_bag()
+		if _backlog_bag.is_empty():
+			return {}
+		var item_id: String = _backlog_bag.pop_back()
+		var item := find_backlog_item(item_id)
+		attempts += 1
+		if item.is_empty() or excluded.has(item_id) or completed_backlog_ids.has(item_id):
+			continue
+		return item
+	return {}
+
+
+func _refill_backlog_bag() -> void:
+	for feature in GameData.backlog.get("features", []):
+		if _available_for_era(feature) and not completed_backlog_ids.has(feature.get("id", "")):
+			_backlog_bag.append(feature.get("id", ""))
+	for epic in GameData.backlog.get("epics", []):
+		if _available_for_era(epic) and not completed_backlog_ids.has(epic.get("id", "")):
+			_backlog_bag.append(epic.get("id", ""))
+	_backlog_bag.shuffle()
+
+
+func _backlog_offer_contains(item_id: String) -> bool:
+	for item in get_backlog_offer().get("items", []):
+		if item.get("id", "") == item_id:
+			return true
+	return false
 
 
 # --- Les Investissements : tirage du sprint (spec profondeur §5) ---
@@ -1022,11 +1253,12 @@ func compute_revenue() -> int:
 	var model: Dictionary = get_business_model()
 	if model.is_empty():
 		return 0
+	last_roi_revenue_bonus = recurring_roi
 
 	var valeur: float = resource_values.get("valeur-percue", 0.0)
 	var cutoff: float = float(GameData.balance.get("pressure", {}).get("revenueCutoffValeurPercue", 5))
 	if valeur <= cutoff:
-		return 0
+		return recurring_roi
 
 	var moral: float = resource_values.get("moral", 0.0)
 	var per_point: float = model.get("revenuePerValeurPercuePoint", 0.0)
@@ -1035,7 +1267,7 @@ func compute_revenue() -> int:
 	var ceiling_factor: float = model.get("moralChurnCeiling", 1.2)
 	var moral_factor: float = clamp(moral / 100.0, floor_factor, ceiling_factor)
 
-	return int(round(max(valeur - offset, 0.0) * per_point * moral_factor))
+	return int(round(max(valeur - offset, 0.0) * per_point * moral_factor)) + recurring_roi
 
 
 ## Applique le panier d'effets aux ressources (+ masse salariale, effets de
@@ -1081,8 +1313,6 @@ func apply_pending_and_check() -> String:
 
 	pending_deltas.clear()
 	pending_journal_lines.clear()
-	delivered_feature_ids.clear()
-
 	_resolve_trial_periods()
 	_resolve_silent_quits()
 

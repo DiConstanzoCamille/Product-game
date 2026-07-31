@@ -1,23 +1,23 @@
 extends Control
-## Phase 1 — Inbox (docs/carnet-de-regles.md §3). Un événement force un choix
-## avant toute planification. Les données viennent de data/inbox-events.json.
+## Phase 1 — Inbox. Un événement force un choix avant toute planification.
+## Le choix et ses effets restent portés par SprintState ; cet écran les raconte
+## comme le fil interne qui vient de tomber dans l'openspace.
 
 const NEXT_SCENE := "res://scenes/screens/roadmap_screen.tscn"
 const START_SCREEN_SCENE := "res://scenes/screens/start_screen.tscn"
+const DEFAULT_CHANNEL := "#direction-produit"
 
 @onready var sprint_label: Label = $Margin/VBox/TopBar/SprintLabel
 @onready var back_button: Button = $Margin/VBox/TopBar/BackButton
-@onready var from_row: HBoxContainer = $Margin/VBox/Scroll/Content/FromRow
-@onready var from_label: Label = $Margin/VBox/Scroll/Content/FromRow/FromLabel
-@onready var subject_label: Label = $Margin/VBox/Scroll/Content/SubjectLabel
-@onready var body_label: Label = $Margin/VBox/Scroll/Content/BodyLabel
-@onready var choices_container: VBoxContainer = $Margin/VBox/Scroll/Content/ChoicesContainer
-@onready var reveal_label: Label = $Margin/VBox/Scroll/Content/RevealLabel
+@onready var channel_label: Label = $Margin/VBox/Thread/ThreadBody/ChannelHeader/ChannelLabel
+@onready var channel_meta_label: Label = $Margin/VBox/Thread/ThreadBody/ChannelHeader/ChannelMetaLabel
+@onready var scroll: ScrollContainer = $Margin/VBox/Thread/ThreadBody/Scroll
+@onready var messages_container: VBoxContainer = $Margin/VBox/Thread/ThreadBody/Scroll/Messages
 @onready var next_button: Button = $Margin/VBox/BottomBar/NextButton
 
 var event: Dictionary
 var choice_buttons: Array[Button] = []
-var choice_made: bool = false
+var choice_made := false
 var side_panel: Control = null
 
 
@@ -25,45 +25,109 @@ func _ready() -> void:
 	back_button.pressed.connect(func(): get_tree().change_scene_to_file(START_SCREEN_SCENE))
 	next_button.pressed.connect(func(): get_tree().change_scene_to_file(NEXT_SCENE))
 	next_button.disabled = true
-	reveal_label.visible = false
 
 	UIHelpers.apply_mono(sprint_label, 12)
-	UIHelpers.apply_heading(subject_label, 26, 600.0)
+	UIHelpers.apply_mono(channel_meta_label, 12)
 	UIHelpers.style_primary_button(next_button)
 	UIHelpers.fade_in(self)
 
 	sprint_label.text = "Sprint %d — Phase 1 : Inbox" % SprintState.sprint_number
-
-	# Rien de l'écran Inbox ne dépend du roster ni des pièces : le panneau se
-	# tient à jour tout seul, l'écran n'a pas à écouter ses changements.
 	side_panel = UIHelpers.attach_side_panel(self)
-
 	_load_event()
 
 
 func _load_event() -> void:
 	event = SprintState.draw_inbox_event()
 	if event.is_empty():
-		subject_label.text = "Aucun événement disponible."
+		channel_label.text = DEFAULT_CHANNEL
+		channel_meta_label.text = "Aucun message"
+		_append_system_note("Aucun événement disponible.")
 		return
 
 	var sender: String = event.get("from", "")
+	channel_label.text = "💬 %s" % event.get("channel", DEFAULT_CHANNEL)
+	channel_meta_label.text = "Sprint %d · %s" % [SprintState.sprint_number, _timestamp()]
+	_append_incoming_message(sender, event.get("subject", ""), event.get("text", ""))
+	_append_reply_drafts(event.get("choices", []))
+
+
+func _append_incoming_message(sender: String, subject: String, body: String) -> void:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 10)
+	messages_container.add_child(row)
+
 	var first_name := sender.split(",")[0].strip_edges()
-	var avatar := UIHelpers.make_avatar(first_name, 40)
-	from_row.add_child(avatar)
-	from_row.move_child(avatar, 0)
+	var avatar := UIHelpers.make_avatar(first_name, 38)
+	avatar.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	row.add_child(avatar)
 
-	from_label.text = "De : %s · %s" % [sender, event.get("status", "")]
-	subject_label.text = event.get("subject", "")
-	body_label.text = event.get("text", "")
+	var column := VBoxContainer.new()
+	column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	column.add_theme_constant_override("separation", 4)
+	row.add_child(column)
 
-	for choice in event.get("choices", []):
-		var btn := Button.new()
-		btn.text = choice.get("label", "")
-		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		btn.pressed.connect(_on_choice_pressed.bind(choice))
-		choices_container.add_child(btn)
-		choice_buttons.append(btn)
+	var meta := Label.new()
+	meta.text = "%s  ·  %s" % [sender, _timestamp()]
+	meta.add_theme_color_override("font_color", UIHelpers.COLOR_SOFT_TEXT)
+	meta.add_theme_font_size_override("font_size", 13)
+	column.add_child(meta)
+
+	var bubble := PanelContainer.new()
+	bubble.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	bubble.add_theme_stylebox_override("panel", _bubble_style(Color.WHITE, UIHelpers.COLOR_RULE, 7))
+	column.add_child(bubble)
+
+	var copy := VBoxContainer.new()
+	copy.add_theme_constant_override("separation", 6)
+	bubble.add_child(copy)
+
+	var subject_label := Label.new()
+	subject_label.text = subject
+	subject_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	UIHelpers.apply_heading(subject_label, 18, 600.0)
+	copy.add_child(subject_label)
+
+	var body_label := Label.new()
+	body_label.text = body
+	body_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	body_label.add_theme_color_override("font_color", UIHelpers.COLOR_FLAVOR)
+	body_label.add_theme_font_size_override("font_size", 15)
+	copy.add_child(body_label)
+
+
+func _append_reply_drafts(choices: Array) -> void:
+	var composer := VBoxContainer.new()
+	composer.name = "ReplyComposer"
+	composer.add_theme_constant_override("separation", 8)
+	messages_container.add_child(composer)
+
+	var separator := HSeparator.new()
+	composer.add_child(separator)
+
+	var prompt := Label.new()
+	prompt.text = "VOTRE RÉPONSE"
+	UIHelpers.apply_mono(prompt, 12, true)
+	prompt.add_theme_color_override("font_color", UIHelpers.COLOR_AMBER)
+	composer.add_child(prompt)
+
+	var replies := VBoxContainer.new()
+	replies.name = "ReplyDrafts"
+	replies.add_theme_constant_override("separation", 2)
+	composer.add_child(replies)
+
+	for choice in choices:
+		var button := Button.new()
+		button.text = "▸  %s" % choice.get("label", "")
+		button.flat = true
+		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		button.custom_minimum_size = Vector2(0, 38)
+		button.tooltip_text = "Envoyer cette réponse"
+		button.add_theme_font_size_override("font_size", 15)
+		button.add_theme_color_override("font_hover_color", UIHelpers.COLOR_SHELF)
+		button.pressed.connect(_on_choice_pressed.bind(choice))
+		replies.add_child(button)
+		choice_buttons.append(button)
 
 
 func _on_choice_pressed(choice: Dictionary) -> void:
@@ -71,12 +135,114 @@ func _on_choice_pressed(choice: Dictionary) -> void:
 		return
 	choice_made = true
 
-	reveal_label.text = choice.get("reveal", "")
-	reveal_label.visible = true
-	next_button.disabled = false
+	for button in choice_buttons:
+		button.disabled = true
 
-	for btn in choice_buttons:
-		btn.disabled = true
+	var composer := messages_container.get_node_or_null("ReplyComposer")
+	if composer != null:
+		composer.queue_free()
+
+	_append_outgoing_message(choice.get("label", ""))
+	_append_consequence_message(choice.get("reveal", ""))
+	next_button.disabled = false
 
 	var note := "%s → %s" % [event.get("subject", ""), choice.get("label", "")]
 	SprintState.add_pending(choice.get("effects", {}), note)
+	call_deferred("_scroll_to_latest")
+
+
+func _append_outgoing_message(text: String) -> void:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 10)
+	messages_container.add_child(row)
+
+	var spacer := Control.new()
+	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(spacer)
+
+	var column := VBoxContainer.new()
+	column.custom_minimum_size = Vector2(0, 0)
+	column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	column.add_theme_constant_override("separation", 4)
+	row.add_child(column)
+
+	var meta := Label.new()
+	meta.text = "Vous  ·  %s" % _timestamp()
+	meta.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	meta.add_theme_color_override("font_color", UIHelpers.COLOR_SOFT_TEXT)
+	meta.add_theme_font_size_override("font_size", 13)
+	column.add_child(meta)
+
+	var bubble := PanelContainer.new()
+	bubble.add_theme_stylebox_override("panel", _bubble_style(Color("e8f0ff"), UIHelpers.COLOR_SHELF, 7))
+	column.add_child(bubble)
+
+	var label := Label.new()
+	label.text = text
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	label.add_theme_color_override("font_color", UIHelpers.COLOR_INK)
+	label.add_theme_font_size_override("font_size", 15)
+	bubble.add_child(label)
+
+
+func _append_consequence_message(text: String) -> void:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 10)
+	messages_container.add_child(row)
+
+	var avatar := UIHelpers.make_avatar("system", 30)
+	avatar.modulate = Color(UIHelpers.COLOR_SHELF.r, UIHelpers.COLOR_SHELF.g, UIHelpers.COLOR_SHELF.b, 0.65)
+	avatar.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	row.add_child(avatar)
+
+	var column := VBoxContainer.new()
+	column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	column.add_theme_constant_override("separation", 4)
+	row.add_child(column)
+
+	var meta := Label.new()
+	meta.text = "Mise à jour du fil  ·  %s" % _timestamp()
+	meta.add_theme_color_override("font_color", UIHelpers.COLOR_SOFT_TEXT)
+	meta.add_theme_font_size_override("font_size", 13)
+	column.add_child(meta)
+
+	var bubble := PanelContainer.new()
+	bubble.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	bubble.add_theme_stylebox_override("panel", _bubble_style(Color("fff7db"), UIHelpers.COLOR_AMBER, 7))
+	column.add_child(bubble)
+
+	var label := Label.new()
+	label.text = text
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	label.add_theme_color_override("font_color", UIHelpers.COLOR_FLAVOR)
+	label.add_theme_font_size_override("font_size", 15)
+	bubble.add_child(label)
+
+
+func _append_system_note(text: String) -> void:
+	var label := Label.new()
+	label.text = text
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	label.add_theme_color_override("font_color", UIHelpers.COLOR_SOFT_TEXT)
+	messages_container.add_child(label)
+
+
+func _bubble_style(background: Color, border: Color, radius: int) -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = background
+	style.border_color = border
+	style.set_border_width_all(1)
+	style.set_corner_radius_all(radius)
+	style.content_margin_left = 14
+	style.content_margin_right = 14
+	style.content_margin_top = 11
+	style.content_margin_bottom = 11
+	return style
+
+
+func _timestamp() -> String:
+	return "09:%02d" % (10 + SprintState.sprint_number)
+
+
+func _scroll_to_latest() -> void:
+	scroll.scroll_vertical = int(scroll.get_v_scroll_bar().max_value)

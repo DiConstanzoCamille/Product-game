@@ -42,13 +42,14 @@ func _ready() -> void:
 	for path in SCREENS:
 		await _instantiate_and_free(path)
 
+	await _test_roadmap_interactions()
 	await _test_investments_interactions()
 
 	if failures > 0:
 		print("=== SMOKE TEST UI : ÉCHEC — %d assertion(s) en erreur ===" % failures)
 		get_tree().quit(1)
 		return
-	print("=== SMOKE TEST UI : OK — %d écrans instanciés, gestes des Investissements joués ===" % SCREENS.size())
+	print("=== SMOKE TEST UI : OK — %d écrans instanciés, gestes Roadmap/Investissements joués ===" % SCREENS.size())
 	get_tree().quit()
 
 
@@ -56,6 +57,46 @@ func _fail(message: String) -> void:
 	failures += 1
 	push_error(message)
 	print("ASSERTION ÉCHOUÉE : %s" % message)
+
+
+## Joue les deux gestes spécifiques à la Roadmap profonde : révéler une carte
+## via Plonger puis ajouter une feature au panier. Le moteur teste les effets;
+## ici on vérifie que les vrais contrôles portent bien le geste jusqu'à lui.
+func _test_roadmap_interactions() -> void:
+	print("  → gestes de l'écran Roadmap")
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+	var viewport := SubViewport.new()
+	viewport.size = Vector2i(1600, 900)
+	add_child(viewport)
+	var screen: Control = load("res://scenes/screens/roadmap_screen.tscn").instantiate()
+	viewport.add_child(screen)
+	for i in 10:
+		await get_tree().process_frame
+
+	if screen.backlog_controls.is_empty():
+		_fail("La Roadmap n'a affiché aucun item du backlog.")
+	else:
+		var control: Dictionary = screen.backlog_controls[0]
+		var item: Dictionary = control["item"]
+		var energy_before := SprintState.energy
+		var dive: Button = control["dive"]
+		dive.pressed.emit()
+		await get_tree().process_frame
+		if SprintState.energy != energy_before - SprintState.get_personal_action_cost("featureDive"):
+			_fail("Le bouton Plonger de la Roadmap n'a pas dépensé l'Énergie configurée.")
+
+		for candidate_control in screen.backlog_controls:
+			if candidate_control.has("select"):
+				var select: CheckButton = candidate_control["select"]
+				select.button_pressed = true
+				await get_tree().process_frame
+				if screen._current_plan().is_empty():
+					_fail("Le contrôle de sélection Roadmap ne produit aucun plan.")
+				break
+
+	screen.queue_free()
+	viewport.queue_free()
+	await get_tree().process_frame
 
 
 ## Joue les cinq gestes de l'écran Investissements en émettant depuis les

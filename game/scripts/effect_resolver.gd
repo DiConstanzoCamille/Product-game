@@ -104,26 +104,12 @@ static func delta_is_good(resource_id: String, value: float) -> bool:
 	return value <= 0.0
 
 
-## Coût total en points d'une sélection de features (balance.json →
-## roadmap.featureCostPoints ; 1 point par défaut).
-static func roadmap_points_cost(selected_feature_ids: Array) -> int:
-	var cost_points: Dictionary = GameData.balance.get("roadmap", {}).get("featureCostPoints", {})
-	var total := 0
-	for feature_id in selected_feature_ids:
-		total += int(cost_points.get(feature_id, 1))
-	return total
-
-
-## Deltas de la Roadmap (Phase A) : somme des effets des features
-## sélectionnées — effets Valeur perçue divisés si aucun Designer au roster,
-## bonus Designer par feature livrée (plafonné), pièces des quick wins — plus
-## la pénalité de surchauffe si le panier dépasse la capacité en points,
-## modulée par les PM présents (spec profondeur §4.2, §6.2). Le contexte de
-## roster vient de SprintState.get_roster_context().
-static func resolve_roadmap(selected_feature_ids: Array, capacity_points: int, roster_context: Dictionary = {}) -> Dictionary:
+## Deltas de la Roadmap profonde : les attributs réels viennent directement
+## de `backlog.json`. Seuls les items livrés (feature ou epic achevé) gagnent
+## leur ROI, impact client et risque; un epic entamé ne fait encore rien.
+static func resolve_backlog(delivered_items: Array, spent_points: int, capacity_points: int, roster_context: Dictionary = {}, has_okr: bool = false) -> Dictionary:
 	var roadmap_conf: Dictionary = GameData.balance.get("roadmap", {})
-	var feature_effects: Dictionary = roadmap_conf.get("featureEffects", {})
-	var quick_win_pieces: Dictionary = roadmap_conf.get("quickWinPieces", {})
+	var backlog_conf: Dictionary = GameData.balance.get("backlogDraw", {})
 	var roles: Dictionary = GameData.balance.get("roles", {})
 	var designer_conf: Dictionary = roles.get("designer", {})
 	var pm_conf: Dictionary = roles.get("pm", {})
@@ -135,23 +121,28 @@ static func resolve_roadmap(selected_feature_ids: Array, capacity_points: int, r
 		valeur_divisor = float(designer_conf.get("valeurEffectsDivisorIfAbsent", 2))
 
 	var deltas: Dictionary = {}
-	for feature_id in selected_feature_ids:
-		var effect: Dictionary = feature_effects.get(feature_id, {})
-		for resource_id in effect.keys():
-			var value := float(effect[resource_id])
-			if resource_id == "valeur-percue":
-				value /= valeur_divisor
-			deltas[resource_id] = deltas.get(resource_id, 0.0) + value
-		deltas["pieces"] = deltas.get("pieces", 0.0) + float(quick_win_pieces.get(feature_id, 0))
+	for item in delivered_items:
+		var client_impact := float(item.get("clientImpact", 0)) / valeur_divisor
+		var risk := float(item.get("risk", 0))
+		if client_impact != 0.0:
+			deltas["valeur-percue"] = deltas.get("valeur-percue", 0.0) + client_impact
+		if risk != 0.0:
+			deltas["dette-organisationnelle"] = deltas.get("dette-organisationnelle", 0.0) + risk
+		if item.get("quickWin", false):
+			deltas["pieces"] = deltas.get("pieces", 0.0) + float(backlog_conf.get("quickWinPieces", 0))
+		for resource_id in item.get("completionEffects", {}).keys():
+			deltas[resource_id] = deltas.get(resource_id, 0.0) + float(item["completionEffects"][resource_id])
+		if has_okr and int(item.get("roi", 0)) >= int(backlog_conf.get("strongRoiThreshold", 0)):
+			deltas["capital-politique"] = deltas.get("capital-politique", 0.0) + float(backlog_conf.get("okrCapitalPolitiqueBonus", 0))
 
-	if designer_weight > 0.0 and not selected_feature_ids.is_empty():
+	if designer_weight > 0.0 and not delivered_items.is_empty():
 		var per_feature: float = min(
 			floor(designer_weight) * float(designer_conf.get("valeurPerFeatureDelivered", 1)),
 			float(designer_conf.get("valeurPerFeatureDeliveredMax", 2))
 		)
-		deltas["valeur-percue"] = deltas.get("valeur-percue", 0.0) + per_feature * selected_feature_ids.size()
+		deltas["valeur-percue"] = deltas.get("valeur-percue", 0.0) + per_feature * delivered_items.size()
 
-	if roadmap_points_cost(selected_feature_ids) > capacity_points:
+	if spent_points > capacity_points:
 		var penalty: Dictionary = roadmap_conf.get("overCapacityPenalty", {})
 		var reduction: float = min(
 			pm_weight * float(pm_conf.get("overloadReductionPerPm", 0.25)),

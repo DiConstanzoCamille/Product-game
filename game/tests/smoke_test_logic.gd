@@ -34,6 +34,8 @@ var failures: int = 0
 
 func _ready() -> void:
 	_test_energy_rules()
+	_test_inbox_channels()
+	_test_backlog_rules()
 	_test_investment_draw_rules()
 
 	for strategy in ["stress", "greedy", "careful"]:
@@ -64,6 +66,78 @@ func _fail(message: String) -> void:
 	failures += 1
 	push_error(message)
 	print("ASSERTION ÉCHOUÉE : %s" % message)
+
+
+func _test_inbox_channels() -> void:
+	for event in GameData.inbox_events:
+		if String(event.get("channel", "")).strip_edges() == "":
+			_fail("L'événement Inbox '%s' n'a pas de canal." % event.get("id", ""))
+
+
+func _test_backlog_rules() -> void:
+	print("=== SMOKE TEST LOGIQUE — BACKLOG PROFOND ===")
+	var conf: Dictionary = GameData.balance.get("backlogDraw", {})
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+	var offer := SprintState.get_backlog_offer()
+	var items: Array = offer.get("items", [])
+	var minimum := int(conf.get("itemsPerSprintMin", 0))
+	var maximum := int(conf.get("itemsPerSprintMax", 0))
+	if items.size() < minimum or items.size() > maximum:
+		_fail("Le backlog propose %d items au lieu de %d-%d." % [items.size(), minimum, maximum])
+	if SprintState.get_backlog_offer() != offer:
+		_fail("Le backlog a été re-tiré en revisitant la Roadmap.")
+
+	var feature: Dictionary = GameData.backlog.get("features", [])[0]
+	SprintState.current_backlog_draw = {"sprint": SprintState.sprint_number, "items": [feature]}
+	if SprintState.backlog_attribute_revealed(feature.get("id", ""), "roi"):
+		_fail("Le ROI est révélé sans pratique ni plongée.")
+	var energy_before := SprintState.energy
+	if SprintState.do_feature_dive(feature.get("id", "")) != "":
+		_fail("Plonger dans une feature a été refusé sans raison.")
+	if not SprintState.backlog_attribute_revealed(feature.get("id", ""), "risk"):
+		_fail("Plonger n'a pas révélé tous les attributs de la feature.")
+	if SprintState.energy != energy_before - SprintState.get_personal_action_cost("featureDive"):
+		_fail("Plonger n'a pas débité le coût configuré en énergie.")
+	var report := SprintState.commit_backlog_plan([{"id": feature.get("id", ""), "points": feature.get("costPoints", 0)}])
+	if report.get("delivered", []).size() != 1 or SprintState.recurring_roi != int(feature.get("roi", 0)):
+		_fail("La livraison n'a pas appliqué le ROI permanent du backlog.")
+	if not SprintState.completed_backlog_ids.has(feature.get("id", "")):
+		_fail("Une feature livrée n'a pas quitté le sac du backlog.")
+	var roi_after_delivery := SprintState.recurring_roi
+	report = SprintState.commit_backlog_plan([{"id": feature.get("id", ""), "points": feature.get("costPoints", 0)}])
+	if not report.get("delivered", []).is_empty() or SprintState.recurring_roi != roi_after_delivery:
+		_fail("Une feature déjà livrée a pu être encaissée deux fois.")
+
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+	var epic: Dictionary = GameData.backlog.get("epics", [])[0]
+	SprintState.current_backlog_draw = {"sprint": SprintState.sprint_number, "items": [epic]}
+	var first_investment: int = min(3, int(epic.get("costPoints", 0)) - 1)
+	report = SprintState.commit_backlog_plan([{"id": epic.get("id", ""), "points": first_investment}])
+	if SprintState.get_epic_invested(epic.get("id", "")) != first_investment or not report.get("delivered", []).is_empty():
+		_fail("L'epic a livré avant sa complétion ou perdu sa progression.")
+	SprintState.sprint_number += 1
+	SprintState.current_backlog_draw.clear()
+	offer = SprintState.get_backlog_offer()
+	items = offer.get("items", [])
+	if items.size() > maximum or not _offer_has_item(items, epic.get("id", "")):
+		_fail("Un epic actif doit rester dans une offre plafonnée à %d items." % maximum)
+	if SprintState.abandon_epic(epic.get("id", "")) != "" or SprintState.get_epic_invested(epic.get("id", "")) != 0:
+		_fail("Abandonner un epic doit perdre sa progression sans remboursement.")
+	SprintState._backlog_bag.clear()
+	SprintState._refill_backlog_bag()
+	if not SprintState._backlog_bag.has(epic.get("id", "")):
+		_fail("Un epic abandonné n'est plus éligible au retour dans le sac.")
+	SprintState.current_backlog_draw = {"sprint": SprintState.sprint_number, "items": [epic]}
+	report = SprintState.commit_backlog_plan([{"id": epic.get("id", ""), "points": SprintState.get_epic_remaining(epic.get("id", ""))}])
+	if not SprintState.completed_backlog_ids.has(epic.get("id", "")) or report.get("delivered", []).size() != 1:
+		_fail("L'epic n'a pas livré ses effets à la complétion.")
+
+
+func _offer_has_item(items: Array, item_id: String) -> bool:
+	for item in items:
+		if item.get("id", "") == item_id:
+			return true
+	return false
 
 
 ## Vérifications déterministes du tirage des Investissements (carnet §21) :
@@ -496,32 +570,19 @@ func _play_sprint(strategy: String) -> void:
 	elif strategy == "greedy" and SprintState.energy >= 50 and SprintState.personal_action_refusal() == "":
 		SprintState.do_self_work()
 
-	# Phase 2 — Roadmap : sélection en points contre la capacité du roster.
+	# Phase 2 — Roadmap : le vrai tirage persistant du backlog remplace les
+	# données de démo. Greedy reste sous la capacité; stress pousse tout.
 	var capacity := SprintState.get_effective_capacity()
-	var feature_ids: Array = []
-	var cost_points: Dictionary = GameData.balance.get("roadmap", {}).get("featureCostPoints", {})
-	if strategy == "stress":
-		for feature in GameData.roadmap_features.get("features", []):
-			feature_ids.append(feature.get("id", ""))
-	elif strategy == "greedy":
-		# Remplit la capacité par coût croissant (le plus de features possible,
-		# quick wins compris) sans jamais déclencher la surchauffe.
-		var by_cost: Array = []
-		for feature in GameData.roadmap_features.get("features", []):
-			by_cost.append(feature.get("id", ""))
-		by_cost.sort_custom(func(a, b): return int(cost_points.get(a, 1)) < int(cost_points.get(b, 1)))
-		var used := 0
-		for feature_id in by_cost:
-			var points := int(cost_points.get(feature_id, 1))
-			if used + points <= capacity:
-				feature_ids.append(feature_id)
-				used += points
-	if not feature_ids.is_empty() or strategy != "careful":
-		var roadmap_deltas := EffectResolver.resolve_roadmap(feature_ids, capacity, SprintState.get_roster_context())
-		SprintState.add_pending(roadmap_deltas, "Roadmap : %d features (%d pts / %d)" % [
-			feature_ids.size(), EffectResolver.roadmap_points_cost(feature_ids), capacity
-		])
-		SprintState.delivered_feature_ids = feature_ids.duplicate()
+	var plan: Array = []
+	var roadmap_offer := SprintState.get_backlog_offer()
+	var used := 0
+	for item in roadmap_offer.get("items", []):
+		var points := SprintState.get_epic_remaining(item.get("id", "")) if SprintState.is_backlog_epic(item) else int(item.get("costPoints", 0))
+		if strategy == "stress" or (strategy == "greedy" and used + points <= capacity):
+			plan.append({"id": item.get("id", ""), "points": points})
+			used += points
+	if strategy != "careful":
+		SprintState.commit_backlog_plan(plan)
 
 	# Phase 3 — Investissements : une seule offre pour les deux rayons, tirée
 	# une fois par sprint (revisiter l'écran ne re-tire pas).

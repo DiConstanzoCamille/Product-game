@@ -17,7 +17,7 @@ var cards: Dictionary = {}
 var eras: Array = []
 var endings: Array = []
 var foundations: Dictionary = {}
-var roadmap_features: Dictionary = {}
+var backlog: Dictionary = {}
 var inbox_events: Array = []
 var recruitment_archetypes: Dictionary = {}
 var recruitment_demo: Dictionary = {}
@@ -85,9 +85,9 @@ func _load_all() -> void:
 	if foundations_data:
 		foundations = foundations_data
 
-	var roadmap_data = _load_json("roadmap-features.json")
-	if roadmap_data:
-		roadmap_features = roadmap_data
+	var backlog_data = _load_json("backlog.json")
+	if backlog_data:
+		backlog = backlog_data
 
 	var inbox_data = _load_json("inbox-events.json")
 	if inbox_data:
