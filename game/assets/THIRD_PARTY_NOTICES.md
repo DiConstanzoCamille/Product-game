@@ -42,6 +42,9 @@ Générés localement avec [DiceBear](https://www.dicebear.com/) (style **Notion
 | `priya.svg` | Priya, Lead Engineering (événement Inbox) | `priya` |
 | `sofia.svg` | Sofia — PM Senior (recrutement) | `sofia` |
 | `kevin.svg` | Kevin — Ops Junior (recrutement) | `kevin` |
+| `lina.svg`, `marc.svg`, `théo.svg`, `aïcha.svg`, `hugo.svg`, `bertrand.svg`, `claire.svg`, `nadia.svg`, `yann.svg` | Candidats nommés du marché | prénom sans accent comme seed |
+| `hervé.svg`, `danielle.svg`, `marek.svg`, `solange.svg`, `patrice.svg` | Roster initial de Meridia | prénom sans accent comme seed |
+| `jade.svg`, `bilal.svg`, `emma.svg`, `nino.svg`, `lou.svg` | Roster initial de Karavel | prénom sans accent comme seed |
 | `mckinsey-consultant.svg` | Contractuel / archétype consultant | `mckinsey-consultant` |
 | `cpo-player.svg` | Le·la joueur·se (CPO), réservé usage futur | `cpo-player` |
 

@@ -15,23 +15,34 @@ const MANDATE_END_SCENE := "res://scenes/screens/mandate_end_screen.tscn"
 
 @onready var sprint_label: Label = $Margin/VBox/TopBar/SprintLabel
 @onready var back_button: Button = $Margin/VBox/TopBar/BackButton
-@onready var era_label: Label = $Margin/VBox/Scroll/Content/HeaderRow/EraLabel
-@onready var cpo_label: Label = $Margin/VBox/Scroll/Content/HeaderRow/CpoLabel
-@onready var revenue_label: Label = $Margin/VBox/Scroll/Content/RevenueLabel
-@onready var score_replay: VBoxContainer = $Margin/VBox/Scroll/Content/ScoreReplay
-@onready var score_title: Label = $Margin/VBox/Scroll/Content/ScoreReplay/ScoreHeader/ScoreTitle
-@onready var score_status: Label = $Margin/VBox/Scroll/Content/ScoreReplay/ScoreHeader/ScoreStatus
-@onready var score_lines: VBoxContainer = $Margin/VBox/Scroll/Content/ScoreReplay/ScoreLines
-@onready var quota_replay: VBoxContainer = $Margin/VBox/Scroll/Content/QuotaReplay
-@onready var quota_title: Label = $Margin/VBox/Scroll/Content/QuotaReplay/QuotaHeader/QuotaTitle
-@onready var quota_status: Label = $Margin/VBox/Scroll/Content/QuotaReplay/QuotaHeader/QuotaStatus
-@onready var quota_progress: ProgressBar = $Margin/VBox/Scroll/Content/QuotaReplay/QuotaProgress
-@onready var quota_label: Label = $Margin/VBox/Scroll/Content/QuotaReplay/QuotaLabel
-@onready var quota_verdict: Label = $Margin/VBox/Scroll/Content/QuotaReplay/QuotaVerdict
-@onready var gauges_grid: GridContainer = $Margin/VBox/Scroll/Content/GaugesGrid
-@onready var journal_title: Label = $Margin/VBox/Scroll/Content/JournalTitle
-@onready var journal_container: VBoxContainer = $Margin/VBox/Scroll/Content/JournalContainer
-@onready var alert_label: Label = $Margin/VBox/Scroll/Content/AlertLabel
+@onready var era_label: Label = $Margin/VBox/Scroll/Content/HeroCard/Margin/HeaderVBox/HeaderRow/EraLabel
+@onready var cpo_label: Label = $Margin/VBox/Scroll/Content/HeroCard/Margin/HeaderVBox/HeaderRow/CpoLabel
+@onready var revenue_label: Label = $Margin/VBox/Scroll/Content/HeroCard/Margin/HeaderVBox/RevenueLabel
+@onready var economics_detail: Label = $Margin/VBox/Scroll/Content/HeroCard/Margin/HeaderVBox/EconomicsDetail
+@onready var impact_card: PanelContainer = $Margin/VBox/Scroll/Content/ImpactCard
+@onready var impact_eyebrow: Label = $Margin/VBox/Scroll/Content/ImpactCard/Margin/VBox/ImpactEyebrow
+@onready var impact_value: Label = $Margin/VBox/Scroll/Content/ImpactCard/Margin/VBox/ImpactValue
+@onready var impact_progress: ProgressBar = $Margin/VBox/Scroll/Content/ImpactCard/Margin/VBox/ImpactProgress
+@onready var impact_context: Label = $Margin/VBox/Scroll/Content/ImpactCard/Margin/VBox/ImpactContext
+@onready var score_replay: VBoxContainer = $Margin/VBox/Scroll/Content/ScoreCard/Margin/ScoreReplay
+@onready var score_title: Label = $Margin/VBox/Scroll/Content/ScoreCard/Margin/ScoreReplay/ScoreHeader/ScoreTitle
+@onready var score_status: Label = $Margin/VBox/Scroll/Content/ScoreCard/Margin/ScoreReplay/ScoreHeader/ScoreStatus
+@onready var score_lines: VBoxContainer = $Margin/VBox/Scroll/Content/ScoreCard/Margin/ScoreReplay/ScoreLines
+@onready var quota_card: PanelContainer = $Margin/VBox/Scroll/Content/QuotaCard
+@onready var quota_replay: VBoxContainer = $Margin/VBox/Scroll/Content/QuotaCard/Margin/QuotaReplay
+@onready var quota_title: Label = $Margin/VBox/Scroll/Content/QuotaCard/Margin/QuotaReplay/QuotaHeader/QuotaTitle
+@onready var quota_status: Label = $Margin/VBox/Scroll/Content/QuotaCard/Margin/QuotaReplay/QuotaHeader/QuotaStatus
+@onready var quota_progress: ProgressBar = $Margin/VBox/Scroll/Content/QuotaCard/Margin/QuotaReplay/QuotaProgress
+@onready var quota_label: Label = $Margin/VBox/Scroll/Content/QuotaCard/Margin/QuotaReplay/QuotaLabel
+@onready var quota_verdict: Label = $Margin/VBox/Scroll/Content/QuotaCard/Margin/QuotaReplay/QuotaVerdict
+@onready var gauges_grid: GridContainer = $Margin/VBox/Scroll/Content/ResourcesCard/Margin/VBox/GaugesGrid
+@onready var journal_title: Label = $Margin/VBox/Scroll/Content/JournalCard/Margin/VBox/JournalTitle
+@onready var journal_container: VBoxContainer = $Margin/VBox/Scroll/Content/JournalCard/Margin/VBox/JournalContainer
+@onready var alert_label: Label = $Margin/VBox/Scroll/Content/JournalCard/Margin/VBox/AlertLabel
+@onready var resources_card: PanelContainer = $Margin/VBox/Scroll/Content/ResourcesCard
+@onready var journal_card: PanelContainer = $Margin/VBox/Scroll/Content/JournalCard
+@onready var stat_strip: PanelContainer = $Margin/VBox/StatStrip
+@onready var stats: HBoxContainer = $Margin/VBox/StatStrip/Margin/Stats
 @onready var foundations_button: Button = $Margin/VBox/BottomBar/FoundationsButton
 @onready var next_sprint_button: Button = $Margin/VBox/BottomBar/NextSprintButton
 @onready var score_audio: AudioStreamPlayer = $ScoreAudio
@@ -47,6 +58,11 @@ var _score_finished := false
 var _score_tone_stream: AudioStreamWAV
 var _score_last_audio_step := -1
 var _score_audio_step_ticks := 0
+var _impact_total := 0
+var _impact_event_count := 0
+var _impact_revealed_count := 0
+var _impact_tween: Tween
+var _strip_stat_tweens: Array[Tween] = []
 var _quota_data: Dictionary = {}
 var _quota_before := 0
 var _quota_started := false
@@ -66,6 +82,7 @@ func _ready() -> void:
 	var old_values: Dictionary = SprintState.resource_values.duplicate()
 	mandate_ending = SprintState.apply_pending_and_check()
 	UIHelpers.attach_company_menu(self)
+	_style_resolution_sections()
 
 	_load_hud(old_values)
 	_setup_next_button()
@@ -84,22 +101,63 @@ func _exit_tree() -> void:
 	_score_tone_stream = null
 
 
+func _style_resolution_sections() -> void:
+	_style_section($Margin/VBox/Scroll/Content/HeroCard, UIHelpers.PANEL_BG, UIHelpers.COLOR_INK, 2)
+	_style_section(impact_card, Color("#173b70"), UIHelpers.COLOR_SHELF, 2)
+	_style_section($Margin/VBox/Scroll/Content/ScoreCard, Color("#ffffff"), UIHelpers.COLOR_SHELF, 2)
+	_style_section($Margin/VBox/Scroll/Content/QuotaCard, Color("#fff7de"), UIHelpers.COLOR_AMBER, 1)
+	_style_section($Margin/VBox/Scroll/Content/ResourcesCard, Color("#ffffff"), UIHelpers.COLOR_RULE, 1)
+	_style_section($Margin/VBox/Scroll/Content/JournalCard, Color("#eef1f4"), UIHelpers.COLOR_RULE, 1)
+	_style_section(stat_strip, UIHelpers.PANEL_BG, UIHelpers.COLOR_INK, 2)
+	if era_label != null:
+		era_label.add_theme_color_override("font_color", UIHelpers.PANEL_FG)
+	if cpo_label != null:
+		cpo_label.add_theme_color_override("font_color", UIHelpers.PANEL_MUTED)
+	if economics_detail != null:
+		economics_detail.add_theme_color_override("font_color", UIHelpers.PANEL_MUTED)
+	if score_title != null:
+		UIHelpers.apply_heading(score_title, 20, 650.0)
+	UIHelpers.apply_mono(impact_eyebrow, 12, true)
+	impact_eyebrow.add_theme_color_override("font_color", Color("#b7cef8"))
+	impact_value.add_theme_color_override("font_color", Color("#ffffff"))
+	impact_context.add_theme_color_override("font_color", Color("#d7e5ff"))
+	impact_progress.add_theme_stylebox_override("fill", UIHelpers.make_bar_fill_style(UIHelpers.COLOR_AMBER))
+	impact_progress.add_theme_stylebox_override("background", UIHelpers.make_bar_background_style())
+	var resources_title := get_node_or_null("Margin/VBox/Scroll/Content/ResourcesCard/Margin/VBox/ResourcesTitle") as Label
+	if resources_title != null:
+		UIHelpers.apply_mono(resources_title, 12, true)
+
+
+func _style_section(panel: PanelContainer, background: Color, border: Color, border_width: int) -> void:
+	var style := StyleBoxFlat.new()
+	style.bg_color = background
+	style.border_color = border
+	style.set_border_width_all(border_width)
+	style.set_corner_radius_all(12)
+	style.shadow_color = UIHelpers.SHADOW_COLOR
+	style.shadow_size = 6
+	style.shadow_offset = Vector2(2, 3)
+	panel.add_theme_stylebox_override("panel", style)
+
+
 func _load_hud(old_values: Dictionary) -> void:
 	var era: Dictionary = SprintState.get_era()
-	UIHelpers.apply_heading(era_label, 17, 600.0)
+	UIHelpers.apply_heading(era_label, 17, 650.0)
 	era_label.text = "%s %s — Sprint %d" % [era.get("icon", ""), era.get("name", ""), SprintState.sprint_number]
 	cpo_label.text = "CPO : Vous · profil %s" % SprintState.team_profile.capitalize()
+	cpo_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 
-	_animate_revenue_callout()
-	_add_energy_line()
-	_add_roadmap_delivery_line()
+	revenue_label.text = "VOS CHOIX ENTRENT EN JEU"
+	revenue_label.add_theme_color_override("font_color", UIHelpers.PANEL_FG)
+	economics_detail.text = "Chaque décision est expliquée ici, puis son effet fait monter l'impact du sprint."
 
-	var index := 0
-	for resource in GameData.resources:
-		gauges_grid.add_child(_build_gauge(resource, old_values, index))
-		index += 1
+	resources_card.visible = false
+	journal_card.visible = false
+	for index in GameData.resources.size():
+		stats.add_child(_build_strip_stat(GameData.resources[index], old_values, index))
 
-	journal_title.text = "Journal du sprint"
+	journal_title.text = "JOURNAL DU SPRINT"
+	UIHelpers.apply_mono(journal_title, 12, true)
 	var recent: Array = SprintState.journal.slice(max(0, SprintState.journal.size() - 6), SprintState.journal.size())
 	recent.reverse()
 	for entry in recent:
@@ -123,6 +181,9 @@ func _setup_score_replay() -> void:
 	_score_event_index = 0
 	_score_replay_clicks = 0
 	_score_finished = false
+	_impact_total = 0
+	_impact_event_count = 0
+	_impact_revealed_count = 0
 
 	var report: Dictionary = SprintState.last_score_report
 	if report.is_empty():
@@ -130,17 +191,37 @@ func _setup_score_replay() -> void:
 		_finish_score_replay()
 		return
 	score_replay.visible = true
-	score_title.text = "Traction × Levier = Impact"
-	score_status.text = "Calcul en cours"
+	score_title.text = "VOS CHOIX CE SPRINT"
+	score_status.text = "Ils vont se combiner"
 	var squad_reports: Array = report.get("squads", [])
-	var many_teams := squad_reports.size() > 1
 	for squad_report in squad_reports:
-		if many_teams:
-			_add_score_divider(squad_report.get("id", ""))
+		var delivery_lines: Array = []
 		for line in squad_report.get("lines", []):
-			_add_score_event(line)
+			if line.get("type", "") == "traction_add" and int(line.get("step", 0)) == 1:
+				delivery_lines.append(line)
+		if not delivery_lines.is_empty():
+			_add_score_divider("LIVRAISONS PRODUIT")
+			for line in delivery_lines:
+				_add_score_event(line, _choice_copy_for_delivery(line))
+
+	var team_choices := _team_choice_lines(squad_reports)
+	if not team_choices.is_empty():
+		_add_score_divider("ÉQUIPE MOBILISÉE")
+		for choice in team_choices:
+			_add_score_event(choice.get("line", {}), choice)
+
+	var factor_lines: Array = _external_factor_lines(report.get("global", {}).get("lines", []))
+	if not factor_lines.is_empty():
+		_add_score_divider("LEVIERS & FRICTIONS")
+		var factor_choice := _external_factor_choice(factor_lines)
+		_add_score_event(factor_choice.get("line", {}), factor_choice)
+
 	for line in report.get("global", {}).get("lines", []):
-		_add_score_event(line)
+		if line.get("type", "") == "impact":
+			_add_score_event(line, _choice_copy_for_impact(line))
+			_impact_total = int(round(float(line.get("after", line.get("value", 0.0)))))
+
+	_set_impact_quarter_display(_quota_before, false)
 
 	if _score_events.is_empty():
 		score_status.text = "Aucun score ce sprint"
@@ -151,20 +232,29 @@ func _setup_score_replay() -> void:
 	_replay_score_report(_score_replay_token)
 
 
-func _add_score_event(line: Dictionary) -> void:
-	var label := Label.new()
-	label.custom_minimum_size = Vector2(0, 26)
-	label.autowrap_mode = TextServer.AUTOWRAP_WORD
-	label.add_theme_font_size_override("font_size", 14)
-	label.visible = false
-	score_lines.add_child(label)
-	_score_events.append({"kind": "line", "line": line, "node": label})
+func _add_score_event(line: Dictionary, choice: Dictionary = {}) -> void:
+	var button := Button.new()
+	button.custom_minimum_size = Vector2(0, 34)
+	button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	button.add_theme_font_size_override("font_size", 14)
+	button.visible = false
+	var display: String = choice.get("display", _format_choice_line(line))
+	var detail: String = choice.get("detail", _technical_detail(line))
+	button.text = display
+	button.tooltip_text = "Plus d'info"
+	button.pressed.connect(func(): _open_choice_details(display, detail))
+	score_lines.add_child(button)
+	_score_events.append({"kind": "line", "line": line, "node": button, "display": display, "detail": detail})
+	_impact_event_count += 1
 
 
 func _add_score_divider(squad_id: String) -> void:
 	var divider := Label.new()
 	divider.text = _squad_display_name(squad_id)
-	divider.custom_minimum_size = Vector2(0, 28)
+	if squad_id == "LIVRAISONS PRODUIT" or squad_id == "ÉQUIPE MOBILISÉE" or squad_id == "LEVIERS & FRICTIONS":
+		divider.text = squad_id
+	divider.custom_minimum_size = Vector2(0, 20)
 	divider.autowrap_mode = TextServer.AUTOWRAP_WORD
 	divider.add_theme_font_size_override("font_size", 15)
 	divider.add_theme_color_override("font_color", UIHelpers.COLOR_AMBER)
@@ -191,30 +281,30 @@ func _reveal_next_score_event() -> void:
 		return
 	var event: Dictionary = _score_events[_score_event_index]
 	_score_event_index += 1
-	var label: Label = event["node"]
-	label.visible = true
+	var node: Control = event["node"]
+	node.visible = true
 	if event.get("kind", "line") == "divider":
 		return
 	var line: Dictionary = event["line"]
-	_style_score_line(label, line)
-	_animate_score_line(label, line)
+	var button := node as Button
+	_style_choice_line(button, line)
+	_animate_choice_line(button, event)
+	_update_impact_projection(line)
+	_update_strip_stats()
 	_play_score_tick(int(line.get("step", 0)))
 	if _is_combo_line(line):
 		_shake_score_replay()
 
 
-func _animate_score_line(label: Label, line: Dictionary) -> void:
-	var before := float(line.get("before", 0.0))
-	var after := float(line.get("after", before))
-	label.text = _format_score_line(line, before)
-	var duration := 0.2 / _score_replay_speed
+func _animate_choice_line(button: Button, event: Dictionary) -> void:
+	button.modulate.a = 0.0
+	button.position.x -= 14.0
 	var tween := create_tween()
-	tween.tween_method(func(value: float):
-		if is_instance_valid(label):
-			label.text = _format_score_line(line, value), before, after, duration
-	).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	if line.get("type", "") == "impact":
-		tween.tween_callback(func(): _flash_impact(label))
+	tween.set_parallel(true)
+	tween.tween_property(button, "modulate:a", 1.0, 0.16 / _score_replay_speed)
+	tween.tween_property(button, "position:x", button.position.x + 14.0, 0.16 / _score_replay_speed).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	if event.get("line", {}).get("type", "") == "impact":
+		tween.chain().tween_callback(func(): _flash_impact(button))
 
 
 func _format_score_line(line: Dictionary, current: float) -> String:
@@ -231,6 +321,275 @@ func _format_score_line(line: Dictionary, current: float) -> String:
 	var value := float(line.get("value", 0.0))
 	var prefix := "+" if value >= 0.0 else "-"
 	return "%s  %s  %s%s   %s -> %s" % [icon, label, prefix, _score_number(abs(value)), _score_number(before), _score_number(current)]
+
+
+func _format_choice_line(line: Dictionary) -> String:
+	var icon: String = line.get("icon", "•")
+	var label: String = line.get("label", "Facteur")
+	var line_type: String = line.get("type", "")
+	var value := float(line.get("value", 0.0))
+	if line_type == "traction_add":
+		return "%s %s  ·  +%s traction" % [icon, label, _score_number(value)]
+	if line_type == "lever_add":
+		return "%s %s  ·  %s%s levier" % [icon, label, "+" if value >= 0.0 else "", _score_number(value)]
+	if line_type == "traction_multiplier" or line_type == "impact_multiplier":
+		return "%s %s  ·  ×%s impact" % [icon, label, String.num(value, 2)]
+	if line_type == "budget_add":
+		return "%s %s  ·  +%s budget" % [icon, label, _score_number(value)]
+	if line_type == "impact":
+		return "%s Impact final  ·  %s" % [icon, _score_number(float(line.get("after", value)))]
+	return "%s %s" % [icon, label]
+
+
+func _choice_copy_for_delivery(line: Dictionary) -> Dictionary:
+	return {
+		"display": _format_choice_line(line),
+		"detail": "Cette feature a été réellement livrée ce sprint. Elle apporte de la traction avant que l'équipe et les leviers de l'organisation ne la transforment en impact.\n\nCalcul : %s" % _format_score_line(line, float(line.get("after", 0.0))),
+	}
+
+
+func _choice_copy_for_factor(line: Dictionary) -> Dictionary:
+	var detail := "Ce facteur vient de votre organisation : outil, pratique, stratégie ou contrainte actuelle.\n\nCalcul : %s" % _format_score_line(line, float(line.get("after", 0.0)))
+	if int(line.get("step", 0)) == 7:
+		detail = "C'est un frein issu de l'état de l'entreprise. Il réduit l'impact potentiel du sprint.\n\nCalcul : %s" % _format_score_line(line, float(line.get("after", 0.0)))
+	return {"display": _format_choice_line(line), "detail": detail}
+
+
+func _choice_copy_for_impact(line: Dictionary) -> Dictionary:
+	return {
+		"display": _format_choice_line(line),
+		"detail": "L'impact final combine les livraisons, les bonus de l'équipe, vos investissements et les freins de l'organisation. Il alimente ensuite le quota trimestriel.\n\nCalcul : %s" % _format_score_line(line, float(line.get("after", 0.0))),
+	}
+
+
+func _team_choice_lines(squad_reports: Array) -> Array:
+	var choices: Array = []
+	for squad_report in squad_reports:
+		var squad_id: String = squad_report.get("id", "")
+		var roster: Array = []
+		for squad in SprintState.squads:
+			if squad.get("id", "") == squad_id:
+				roster = squad.get("roster", [])
+				break
+		var delivered_count := int(squad_report.get("delivered_count", 0))
+		var role_lines: Array = squad_report.get("lines", [])
+		for role_id in ["dev", "designer", "pm", "ops"]:
+			var members: Array = _members_with_role(roster, role_id)
+			if members.is_empty():
+				continue
+			var role_conf: Dictionary = GameData.balance.get("roles", {}).get(role_id, {})
+			var role_label: String = role_conf.get("label", role_id.capitalize())
+			var icon: String = role_conf.get("icon", "👤")
+			var names := ", ".join(members)
+			var score_line := _matching_role_score_line(role_lines, role_label)
+			var display := ""
+			var detail := ""
+			if not score_line.is_empty():
+				display = "%s %s  ·  %s" % [icon, names, _format_choice_line(score_line).split("·", false, 1)[1].strip_edges()]
+				detail = "%s mobilise son rôle de %s pour ce sprint.\n\nCalcul : %s" % [names, role_label, _format_score_line(score_line, float(score_line.get("after", 0.0)))]
+			else:
+				var capacity: int = 0
+				for member in roster:
+					if member.get("role", "") == role_id:
+						capacity += int(role_conf.get("capacityPerEmployee", {}).get(member.get("seniority", "junior"), 0))
+				if role_id == "dev":
+					display = "%s %s  ·  capacité de livraison %d pts" % [icon, names, capacity]
+					detail = "%s portent la réalisation des features. Leur capacité a permis de planifier les livraisons de ce sprint." % names
+				elif role_id == "ops":
+					display = "%s %s  ·  stabilise la dette de l'organisation" % [icon, names]
+					detail = "%s assure l'Ops : la dette organisationnelle est contenue à chaque Résolution." % names
+				else:
+					display = "%s %s  ·  mobilisé%s sur %d livraison%s" % [icon, names, "s" if members.size() > 1 else "", delivered_count, "s" if delivered_count > 1 else ""]
+					detail = "%s sont mobilisés comme %s. Leur bonus ne s'active que lorsque les conditions du sprint sont réunies." % [names, role_label]
+			var synthetic_line := score_line.duplicate(true)
+			if synthetic_line.is_empty():
+				synthetic_line = {"icon": icon, "label": role_label, "type": "team", "value": 0.0, "after": 0.0, "step": 3}
+			choices.append({"line": synthetic_line, "display": display, "detail": detail})
+	if choices.size() <= 1:
+		return choices
+	var names: Array = []
+	var summaries: Array = []
+	var details: Array = []
+	var representative: Dictionary = choices[0].get("line", {})
+	for choice in choices:
+		var display: String = choice.get("display", "")
+		var before_effect := display.split("·", false, 1)[0].strip_edges()
+		var effect := display.split("·", false, 1)[1].strip_edges() if display.contains("·") else display
+		if before_effect != "":
+			names.append(before_effect)
+		summaries.append(effect)
+		details.append(choice.get("detail", ""))
+	return [{
+		"line": representative,
+		"display": "👥 %s  ·  %s" % [", ".join(names), " · ".join(summaries)],
+		"detail": "Voici les personnes mobilisées et leur effet dans ce sprint :\n\n%s" % "\n\n".join(details),
+	}]
+
+
+func _members_with_role(roster: Array, role_id: String) -> Array:
+	var names: Array = []
+	for member in roster:
+		if member.get("role", "") == role_id:
+			names.append(str(member.get("name", role_id.capitalize())))
+	return names
+
+
+func _matching_role_score_line(lines: Array, role_label: String) -> Dictionary:
+	for line in lines:
+		if int(line.get("step", 0)) == 3 and line.get("label", "") == role_label:
+			return line
+	return {}
+
+
+func _external_factor_lines(lines: Array) -> Array:
+	var factors: Array = []
+	for line in lines:
+		var line_type: String = line.get("type", "")
+		if line_type == "impact" or line_type == "mrr" or line_type == "budget" or line_type == "resource_delta":
+			continue
+		if line_type == "lever_add" or line_type == "traction_multiplier" or line_type == "impact_multiplier" or line_type == "total_lever_cap":
+			factors.append(line)
+	return factors
+
+
+func _external_factor_choice(lines: Array) -> Dictionary:
+	var labels: Array = []
+	var details: Array = []
+	var representative: Dictionary = lines[0]
+	for line in lines:
+		labels.append(_format_choice_line(line))
+		details.append(_choice_copy_for_factor(line).get("detail", ""))
+	var preview := " · ".join(labels.slice(0, 2))
+	if labels.size() > 2:
+		preview += " · +%d autre%s" % [labels.size() - 2, "s" if labels.size() > 3 else ""]
+	return {
+		"line": representative,
+		"display": "🧰 Fondations & contexte  ·  %s" % preview,
+		"detail": "Ces choix et contraintes modulent le résultat de la livraison :\n\n%s" % "\n\n".join(details),
+	}
+
+
+func _style_choice_line(button: Button, line: Dictionary) -> void:
+	var positive := float(line.get("value", 0.0)) >= 0.0
+	var is_friction := int(line.get("step", 0)) == 7
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color("#f7f9fc") if not is_friction else Color("#fff2ef")
+	style.border_color = UIHelpers.COLOR_RULE if not is_friction else UIHelpers.COLOR_DANGER
+	style.set_border_width_all(1)
+	style.set_corner_radius_all(7)
+	style.content_margin_left = 12
+	style.content_margin_right = 12
+	style.content_margin_top = 7
+	style.content_margin_bottom = 7
+	button.add_theme_stylebox_override("normal", style)
+	var hover := style.duplicate() as StyleBoxFlat
+	hover.bg_color = Color("#eaf1fc")
+	button.add_theme_stylebox_override("hover", hover)
+	button.add_theme_color_override("font_color", UIHelpers.COLOR_DANGER if is_friction else (UIHelpers.COLOR_INK if positive else UIHelpers.COLOR_DANGER))
+
+
+func _update_impact_projection(line: Dictionary) -> void:
+	_impact_revealed_count += 1
+	var sprint_projection := 0
+	if line.get("type", "") == "impact":
+		sprint_projection = _impact_total
+	else:
+		var ratio := float(_impact_revealed_count) / float(max(1, _impact_event_count))
+		sprint_projection = int(round(float(_impact_total) * ratio))
+	var target := _quota_before + sprint_projection
+	if is_instance_valid(_impact_tween):
+		_impact_tween.kill()
+	var from := float(impact_progress.value)
+	_impact_tween = create_tween()
+	_impact_tween.tween_method(func(value: float):
+		if is_instance_valid(impact_value):
+			_set_impact_quarter_display(int(round(value)), line.get("type", "") == "impact")
+	, from, float(target), 0.22 / _score_replay_speed).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+
+
+func _set_impact_quarter_display(value: int, final: bool) -> void:
+	var quota: int = maxi(1, int(_quota_data.get("quota", 1)))
+	var quarter: int = int(_quota_data.get("quarter", SprintState.quarter_index))
+	var clamped: int = clampi(value, 0, quota)
+	impact_eyebrow.text = "IMPACT TRIMESTRIEL · T%d" % quarter
+	impact_progress.max_value = quota
+	impact_progress.value = clamped
+	impact_value.text = "%d / %d" % [clamped, quota]
+	var sprint_gain: int = maxi(0, clamped - _quota_before)
+	if final:
+		impact_context.text = "Objectif trimestriel : %d · ce sprint +%d" % [quota, sprint_gain]
+	else:
+		impact_context.text = "Objectif trimestriel : %d · ce sprint +%d en cours" % [quota, sprint_gain]
+
+
+func _update_strip_stats() -> void:
+	var ratio := float(_impact_revealed_count) / float(max(1, _impact_event_count))
+	for child in stats.get_children():
+		var box := child as Control
+		if box == null or not box.has_meta("strip_old"):
+			continue
+		var old_value: float = float(box.get_meta("strip_old"))
+		var new_value: float = float(box.get_meta("strip_new"))
+		var bar := box.get_meta("strip_bar") as ProgressBar
+		var value_label := box.get_meta("strip_value") as Label
+		if bar == null or value_label == null:
+			continue
+		var target := lerpf(old_value, new_value, ratio)
+		var tween := create_tween()
+		tween.tween_method(func(current: float):
+			if is_instance_valid(bar) and is_instance_valid(value_label):
+				bar.value = current
+				value_label.text = "%d" % int(round(current))
+		, float(bar.value), target, 0.18 / _score_replay_speed).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		_strip_stat_tweens.append(tween)
+
+
+func _technical_detail(line: Dictionary) -> String:
+	return "Détail du calcul appliqué à ce choix :\n\n%s" % _format_score_line(line, float(line.get("after", 0.0)))
+
+
+func _open_choice_details(title_text: String, detail_text: String) -> void:
+	var overlay := ColorRect.new()
+	overlay.name = "ChoiceDetailsOverlay"
+	overlay.color = Color(0.02, 0.05, 0.1, 0.64)
+	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(overlay)
+
+	var center := CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	overlay.add_child(center)
+	var panel := PanelContainer.new()
+	panel.custom_minimum_size = Vector2(520, 0)
+	center.add_child(panel)
+	_style_section(panel, Color("#ffffff"), UIHelpers.COLOR_SHELF, 2)
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 24)
+	margin.add_theme_constant_override("margin_top", 22)
+	margin.add_theme_constant_override("margin_right", 24)
+	margin.add_theme_constant_override("margin_bottom", 20)
+	panel.add_child(margin)
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 12)
+	margin.add_child(vbox)
+	var eyebrow := Label.new()
+	eyebrow.text = "PLUS D'INFO"
+	UIHelpers.apply_mono(eyebrow, 12, true)
+	eyebrow.add_theme_color_override("font_color", UIHelpers.COLOR_SHELF)
+	vbox.add_child(eyebrow)
+	var title := Label.new()
+	title.text = title_text
+	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	UIHelpers.apply_heading(title, 21, 650.0)
+	vbox.add_child(title)
+	var detail := Label.new()
+	detail.text = detail_text
+	detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	detail.add_theme_font_size_override("font_size", 14)
+	vbox.add_child(detail)
+	var close := Button.new()
+	close.text = "Fermer"
+	close.pressed.connect(func(): overlay.queue_free())
+	vbox.add_child(close)
 
 
 func _score_number(value: float) -> String:
@@ -274,12 +633,12 @@ func _is_combo_line(line: Dictionary) -> bool:
 	return false
 
 
-func _flash_impact(label: Label) -> void:
-	if not is_instance_valid(label):
+func _flash_impact(control: Control) -> void:
+	if not is_instance_valid(control):
 		return
 	var tween := create_tween()
-	tween.tween_property(label, "modulate", Color(1.0, 0.82, 0.24, 1.0), 0.08)
-	tween.tween_property(label, "modulate", Color.WHITE, 0.22)
+	tween.tween_property(control, "modulate", Color(1.0, 0.82, 0.24, 1.0), 0.08)
+	tween.tween_property(control, "modulate", Color.WHITE, 0.22)
 
 
 func _shake_score_replay() -> void:
@@ -379,6 +738,7 @@ func _finish_score_replay() -> void:
 ## trimestre. C'est le dernier temps du replay, y compris lors de la
 ## revelation instantanee au second clic.
 func _setup_quota_replay() -> void:
+	quota_card.visible = false
 	quota_replay.visible = false
 	quota_verdict.text = ""
 	_quota_started = false
@@ -401,29 +761,16 @@ func _setup_quota_replay() -> void:
 
 func _start_quota_replay() -> void:
 	_quota_started = true
-	quota_replay.visible = true
-	quota_status.text = "Impact du sprint"
-	var token := _quota_replay_token + 1
-	_quota_replay_token = token
-	var target := int(_quota_data.get("impact", 0))
-	if _score_replay_clicks >= 2:
-		_reveal_quota_replay()
-		return
-	_quota_tween = create_tween()
-	_quota_tween.tween_method(func(value: float):
-		if token == _quota_replay_token and is_instance_valid(quota_progress):
-			_set_quota_display(int(round(value)), false)
-	, float(_quota_before), float(target), 0.65 / _score_replay_speed).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
-	_quota_tween.tween_callback(func():
-		if token == _quota_replay_token:
-			_finish_quota_replay()
-	)
+	quota_card.visible = false
+	quota_replay.visible = false
+	_finish_quota_replay()
 
 
 func _set_quota_display(value: int, final: bool) -> void:
 	var quota := int(_quota_data.get("quota", 0))
 	quota_progress.value = clampi(value, 0, max(1, quota))
 	quota_label.text = "Impact brut %d / %d" % [value, quota]
+	_set_impact_quarter_display(value, final)
 	if final and _quota_data.has("passed"):
 		var passed := bool(_quota_data.get("passed", false))
 		quota_status.text = "Quota atteint" if passed else "Quota manqué"
@@ -440,7 +787,8 @@ func _reveal_quota_replay() -> void:
 	_quota_replay_token += 1
 	if is_instance_valid(_quota_tween):
 		_quota_tween.kill()
-	quota_replay.visible = true
+	quota_card.visible = false
+	quota_replay.visible = false
 	_set_quota_display(int(_quota_data.get("impact", 0)), true)
 	_finish_quota_replay()
 
@@ -479,22 +827,20 @@ func _animate_revenue_callout() -> void:
 	var payroll: int = SprintState.last_payroll
 	var cost: int = SprintState.last_tresorerie_cost
 	var pieces_delta: int = SprintState.last_pieces_delta
-	var roi_bonus: int = SprintState.last_roi_revenue_bonus
 	var net: int = revenue - payroll + cost
 	var model_label: String = model.get("label", "Revenu")
 
 	revenue_label.add_theme_color_override("font_color", UIHelpers.COLOR_GOOD if net >= 0 else UIHelpers.COLOR_DANGER)
+	economics_detail.text = "%s +%d  ·  Masse salariale −%d  ·  Décisions %s%d  ·  Budget %s%d (solde %d)" % [
+		model_label, revenue, payroll,
+		"+" if cost >= 0 else "−", abs(cost),
+		"+" if pieces_delta >= 0 else "−", abs(pieces_delta), SprintState.pieces,
+	]
 
 	var tween := create_tween()
 	tween.tween_method(
 		func(v: float):
-			revenue_label.text = "💰 %s : +%d (dont ROI backlog +%d)  ·  👥 Masse salariale : −%d  ·  💸 Décisions : %s%d  ·  Net trésorerie : %s%d  ·  🪙 Budget %s%d (solde %d)" % [
-				model_label, int(round(v)), roi_bonus,
-				payroll,
-				"+" if cost >= 0 else "−", abs(cost),
-				"+" if net >= 0 else "−", abs(net),
-				"+" if pieces_delta >= 0 else "−", abs(pieces_delta), SprintState.pieces,
-			],
+			revenue_label.text = "NET TRÉSORERIE  %s%d" % ["+" if int(round(v)) - payroll + cost >= 0 else "−", abs(int(round(v)) - payroll + cost)],
 		0.0, float(revenue), 0.7
 	).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 
@@ -533,7 +879,7 @@ func _add_energy_line() -> void:
 		"font_color", UIHelpers.COLOR_GOOD if sprint_delta >= 0 else UIHelpers.COLOR_DANGER)
 	energy_label.tooltip_text = UIHelpers.energy_tooltip()
 
-	var content: Node = $Margin/VBox/Scroll/Content
+	var content: Node = $Margin/VBox/Scroll/Content/HeroCard/Margin/HeaderVBox
 	content.add_child(energy_label)
 	content.move_child(energy_label, revenue_label.get_index() + 1)
 
@@ -567,9 +913,9 @@ func _add_roadmap_delivery_line() -> void:
 	label.text = "Livraisons Roadmap\n%s" % "\n".join(lines)
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD
 	label.add_theme_font_size_override("font_size", 14)
-	var content: Node = $Margin/VBox/Scroll/Content
+	var content: Node = $Margin/VBox/Scroll/Content/HeroCard/Margin/HeaderVBox
 	content.add_child(label)
-	content.move_child(label, revenue_label.get_index() + 2)
+	content.move_child(label, economics_detail.get_index() + 1)
 
 
 ## 🧘 Souffler (spec §7.2) — proposé à la Résolution : renoncer aux actions
@@ -692,6 +1038,49 @@ func _on_stay_long_mandate_pressed(dim: Control) -> void:
 	next_sprint_button.disabled = false
 	next_sprint_button.text = "Sprint suivant →"
 	next_sprint_button.pressed.connect(_on_next_sprint_pressed)
+
+
+## Bandeau fixe : le résultat de la run reste sous les yeux pendant que la
+## partie haute rejoue les choix et le calcul de l'Impact.
+func _build_strip_stat(resource: Dictionary, old_values: Dictionary, index: int) -> Control:
+	var resource_id: String = resource.get("id", "")
+	var old_value: float = old_values.get(resource_id, 0.0)
+	var new_value: float = SprintState.resource_values.get(resource_id, 0.0)
+	var delta: int = int(round(new_value - old_value))
+	var state: String = EffectResolver.gauge_state(resource_id, new_value)
+	var box := VBoxContainer.new()
+	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	box.add_theme_constant_override("separation", 3)
+	var header := HBoxContainer.new()
+	box.add_child(header)
+	var icon := Label.new()
+	icon.text = resource.get("icon", "•")
+	icon.add_theme_font_size_override("font_size", 13)
+	header.add_child(icon)
+	var value := Label.new()
+	value.text = "%d" % int(round(old_value))
+	value.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	value.add_theme_font_size_override("font_size", 13)
+	value.add_theme_color_override("font_color", UIHelpers.PANEL_FG)
+	header.add_child(value)
+	var delta_label := Label.new()
+	delta_label.text = "%+d" % delta if delta != 0 else "—"
+	delta_label.add_theme_font_size_override("font_size", 12)
+	delta_label.add_theme_color_override("font_color", UIHelpers.panel_state_color(state))
+	header.add_child(delta_label)
+	var bar := ProgressBar.new()
+	bar.custom_minimum_size = Vector2(0, 6)
+	bar.max_value = 100
+	bar.value = old_value
+	bar.show_percentage = false
+	bar.add_theme_stylebox_override("fill", UIHelpers.make_bar_fill_style(UIHelpers.panel_state_color(state)))
+	bar.add_theme_stylebox_override("background", UIHelpers.make_bar_background_style())
+	box.add_child(bar)
+	box.set_meta("strip_old", old_value)
+	box.set_meta("strip_new", new_value)
+	box.set_meta("strip_bar", bar)
+	box.set_meta("strip_value", value)
+	return box
 
 
 func _build_gauge(resource: Dictionary, old_values: Dictionary, index: int) -> Control:

@@ -75,6 +75,10 @@ const FONT_MONO_SEMIBOLD := preload("res://assets/fonts/IBMPlexMono-SemiBold.ttf
 const ICON_DIR := "res://assets/icons/"
 const AVATAR_DIR := "res://assets/avatars/"
 const ITEM_ICON_PATH := "res://assets/items-kenney/PNG/Colored/genericItem_color_%03d.png"
+const DECOR_DIR := "res://assets/decor/"
+const STAMP_DIR := "res://assets/stamps/"
+const SENDER_BADGE_DIR := "res://assets/sender-badges/"
+const DECISION_DESK_SCRIPT := preload("res://scripts/components/decision_desk.gd")
 
 const GAUGE_ICONS := {
 	"tresorerie": "wallet",
@@ -285,7 +289,7 @@ static func make_item_icon(index: int, size: int = 34) -> TextureRect:
 	return rect
 
 
-## Portrait DiceBear si dispo pour `seed_name` (minuscules), sinon icône générique.
+## Portrait DiceBear si disponible pour `seed_name` (minuscules), sinon icône générique.
 static func make_avatar(seed_name: String, size: int = 48) -> TextureRect:
 	var rect := TextureRect.new()
 	var path := AVATAR_DIR + seed_name.to_lower() + ".svg"
@@ -301,9 +305,9 @@ static func make_avatar(seed_name: String, size: int = 48) -> TextureRect:
 
 
 ## Identité d'une personne : le portrait DiceBear s'il existe, sinon une
-## pastille d'initiale (le badge d'accès du spike). Seuls cinq personnages ont
-## un portrait dédié — la pastille est donc le cas courant, et elle reste
-## lisible à 22 px dans le roster du panneau.
+## pastille d'initiale. Tous les personnages nommés du roster et du marché ont
+## désormais un portrait ; la pastille reste le repli explicite des expéditeurs
+## collectifs (board, juridique, équipe…) et des futurs profils anonymes.
 static func make_person_badge(person_name: String, size: int = 36, bg: Color = PILL_CANDIDATE) -> Control:
 	var path := AVATAR_DIR + person_name.to_lower() + ".svg"
 	if ResourceLoader.exists(path):
@@ -327,6 +331,138 @@ static func make_person_badge(person_name: String, size: int = 36, bg: Color = P
 	initial.add_theme_color_override("font_color", Color.WHITE)
 	badge.add_child(initial)
 	return badge
+
+
+## Les expéditeurs de l'Inbox sont soit des personnes (portrait), soit des
+## collectifs. Dans ce second cas, un badge métier évite de faire passer le
+## board ou le juridique pour une personne anonyme.
+static func make_sender_badge(sender: String, size: int = 38) -> Control:
+	var first_name := sender.split(",")[0].strip_edges()
+	var portrait_path := AVATAR_DIR + first_name.to_lower() + ".svg"
+	if ResourceLoader.exists(portrait_path):
+		return make_person_badge(first_name, size)
+
+	var collective := ""
+	match sender.to_lower():
+		"le board", "un investisseur historique": collective = "board"
+		"direction juridique": collective = "legal"
+		"équipe technique", "l'équipe": collective = "tech"
+		"équipe commerciale": collective = "sales"
+		"équipe rh": collective = "hr"
+		"veille concurrentielle": collective = "market-watch"
+	if collective == "":
+		return make_person_badge(first_name, size, COLOR_SHELF)
+
+	var badge := TextureRect.new()
+	badge.texture = load(SENDER_BADGE_DIR + collective + ".svg")
+	badge.custom_minimum_size = Vector2(size, size)
+	badge.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	badge.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	badge.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	return badge
+
+
+## Tampon vectoriel prêt à être posé dans un flux ou sur un ticket. Les
+## libellés dynamiques des cartes d'Actif restent construits en texte ; ces
+## fichiers servent aux états partagés de l'interface.
+static func make_stamp(kind: String, width: int = 110) -> TextureRect:
+	var stamp := TextureRect.new()
+	stamp.texture = load(STAMP_DIR + kind + ".svg")
+	stamp.custom_minimum_size = Vector2(width, round(float(width) * 80.0 / 240.0))
+	stamp.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	stamp.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	stamp.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return stamp
+
+
+## Installe l'espace de décision dans un portable posé sur un bureau. Contrairement
+## au premier cadre SVG, la dalle est opaque : le papier réglé appartient à
+## l'ordinateur et aucun élément de mobilier ne passe devant les contrôles.
+static func attach_decision_workspace(screen: Control, decision_path: NodePath) -> void:
+	var target := screen.get_node_or_null(decision_path)
+	var margin := screen.get_node_or_null("Margin")
+	var background := screen.get_node_or_null("Background")
+	if not (target is Control) or not (margin is Control) or not (background is ColorRect):
+		return
+
+	# Le fond quadrillé quitte le plein écran pour devenir la dalle du portable.
+	# Le reste de l'écran est le bureau ; le Panneau de bord continue d'être un
+	# écran séparé, à droite, comme le moniteur de stand-up de l'équipe.
+	var desk_background := background as ColorRect
+	desk_background.material = null
+	desk_background.color = Color("#c9ad88")
+	# On rend de la place sous la dalle : le portable a un menton et une base,
+	# ce ne sont pas des éléments qui doivent se faire couper par la BottomBar.
+	if margin is MarginContainer:
+		var content_margin := margin as MarginContainer
+		content_margin.add_theme_constant_override("margin_bottom",
+			content_margin.get_theme_constant("margin_bottom") + 72)
+
+	var desk = DECISION_DESK_SCRIPT.new()
+	desk.name = "DecisionDesk"
+	desk.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	desk.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	desk.modulate.a = 0.0
+	screen.add_child(desk)
+	screen.move_child(desk, margin.get_index())
+
+	var paper := ColorRect.new()
+	paper.name = "LaptopDisplay"
+	paper.material = load("res://resources/shaders/grid_background_material.tres")
+	paper.color = COLOR_SCREEN_BG
+	paper.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	paper.modulate.a = 0.0
+	screen.add_child(paper)
+	screen.move_child(paper, margin.get_index())
+
+	var props: Array[TextureRect] = []
+	for file_name in ["desk-sticky-note.svg", "desk-paperclip.svg", "desk-coffee.svg"]:
+		var prop := TextureRect.new()
+		prop.texture = load(DECOR_DIR + file_name)
+		prop.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		prop.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		prop.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		prop.modulate = Color(1, 1, 1, 0.0)
+		screen.add_child(prop)
+		screen.move_child(prop, desk.get_index())
+		props.append(prop)
+
+	var place := func():
+		var target_rect := (target as Control).get_global_rect()
+		var local_target := Rect2(target_rect.position - screen.get_global_rect().position, target_rect.size)
+		if local_target.size.x < 360.0 or local_target.size.y < 220.0:
+			desk.visible = false
+			paper.visible = false
+			for prop in props:
+				prop.visible = false
+			return
+		desk.visible = true
+		paper.visible = true
+		for prop in props:
+			prop.visible = true
+		var display := local_target.grow(12)
+		paper.position = display.position
+		paper.size = display.size
+		desk.set_display_rect(display)
+		# Accessoires volontairement hors de la dalle : ils donnent l'échelle du
+		# bureau sans jamais recouvrir l'interface.
+		props[0].position = Vector2(maxf(12.0, display.position.x - 74.0), display.position.y + 46.0)
+		props[0].size = Vector2(62, 58)
+		props[1].position = Vector2(display.position.x + 18.0, maxf(14.0, display.position.y - 72.0))
+		props[1].size = Vector2(42, 54)
+		props[2].position = Vector2(maxf(14.0, display.position.x - 94.0), display.end.y - 96.0)
+		props[2].size = Vector2(86, 86)
+	place.call()
+	screen.resized.connect(place)
+	(target as Control).resized.connect(place)
+	# Au premier affichage, les Containers finissent leur passe de mise en page
+	# après `_ready()`. Ce second placement garantit le bon calage dès la frame 1.
+	screen.get_tree().process_frame.connect(place, CONNECT_ONE_SHOT)
+	var tween := screen.create_tween().set_parallel(true)
+	tween.tween_property(desk, "modulate:a", 1.0, 0.32).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tween.tween_property(paper, "modulate:a", 1.0, 0.3).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	for prop in props:
+		tween.tween_property(prop, "modulate:a", 0.72, 0.42).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 
 
 static func fade_in(control: Control, duration: float = 0.3) -> void:
@@ -467,5 +603,3 @@ static func instantiate_company_dossier(screen: Control) -> Control:
 	var panel: Control = panel_scene.instantiate()
 	screen.add_child(panel)
 	return panel
-
-
