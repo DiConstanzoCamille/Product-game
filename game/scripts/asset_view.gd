@@ -107,6 +107,16 @@ static func for_decision(card: Dictionary) -> Dictionary:
 	var tool_frozen: bool = SprintState.is_quarter_requirement_active("toolsFrozen") \
 		and card.get("family", "") in ["outil-process", "methodologie-orga"]
 
+	# La preview d'impact (Lot 3 §5.1) consomme le **même** calcul que l'activation
+	# réelle (SprintState.activate_decision()) : aucune règle réimplémentée ici.
+	var preview: Dictionary = {}
+	if not activated:
+		preview = {
+			"resource_deltas": EffectResolver.resolve_card_activation(card_id, SprintState.team_profile, SprintState.era_id),
+			"pieces_cost": cost,
+			"unknown_resource_ids": [],
+		}
+
 	var primary: Dictionary = {}
 	if activated:
 		primary = {
@@ -160,6 +170,7 @@ static func for_decision(card: Dictionary) -> Dictionary:
 		# Le tampon SVG signale le seul blocage structurel : une condition à
 		# atteindre. Le manque de pièces, lui, reste une information de coût.
 		"status_stamp": "blocked" if requirement.get("gated", false) and not requirement.get("ok", false) else "",
+		"preview": preview,
 	}, "decision", card_id, card, activated)
 
 
@@ -200,8 +211,22 @@ static func for_candidate(candidate: Dictionary) -> Dictionary:
 		primary = {"text": "Embaucher (%d 🪙)" % cost, "disabled": false}
 
 	var secondary: Dictionary = {}
-	if not hired and not candidate.get("hiddenRevealed", false):
+	var hidden_unrevealed: bool = not hired and not candidate.get("hiddenRevealed", false)
+	if hidden_unrevealed:
 		secondary = _one_on_one_action()
+
+	# Embaucher ne bouge aucune des 6 jauges dans l'immédiat (la contribution de
+	# rôle et les effets de trait ne comptent qu'à partir de la prochaine
+	# Résolution) — seuls le budget d'action et l'effectif changent tout de suite.
+	# Un trait caché non révélé, lui, PEUT toucher une jauge dès qu'il se
+	# révélera : la preview le montre comme inconnu (❓) plutôt que de le taire.
+	var preview: Dictionary = {}
+	if not hired:
+		preview = {
+			"resource_deltas": {},
+			"pieces_cost": cost,
+			"unknown_resource_ids": EffectResolver.hidden_trait_resource_ids() if hidden_unrevealed else [],
+		}
 
 	var cost_text := "%d 🪙 · effectif %d/%d → %d/%d" % [cost, headcount, cap, headcount + 1, cap]
 	if SprintState.next_hire_discount > 0:
@@ -226,6 +251,7 @@ static func for_candidate(candidate: Dictionary) -> Dictionary:
 		"secondary": secondary,
 		"dimmed": hired,
 		"stamp": "EMBAUCHÉ·E" if hired else "",
+		"preview": preview,
 	}, "candidate", candidate.get("id", ""), candidate, hired)
 
 
@@ -248,7 +274,13 @@ static func for_practice(practice: Dictionary) -> Dictionary:
 			"delta": "%s/sprint" % signed(int(value)),
 			"good": EffectResolver.delta_is_good(resource_id, value),
 		})
-	var cynisme := int(GameData.balance.get("shopDraw", {}).get("practiceCynisme", 2))
+	# Même calcul que l'achat réel (SprintState.buy_practice(), qui passe par
+	# EffectResolver.practice_purchase_deltas()) : ce que la preview d'impact
+	# projette à l'achat, et rien de plus — le `perSprint` n'entre qu'à la
+	# prochaine Résolution, pas au clic. Effets de trimestre inclus (une
+	# exigence active peut remplacer le practiceCynisme de base).
+	var purchase_deltas := EffectResolver.practice_purchase_deltas(SprintState.get_quarter_requirement_effects())
+	var cynisme := int(purchase_deltas.get("cynisme", 0))
 	impacts.append({
 		"label": "🎭 Cynisme — un process de plus",
 		"delta": signed(cynisme),
@@ -263,6 +295,10 @@ static func for_practice(practice: Dictionary) -> Dictionary:
 		primary = {"text": "Adopter (%d 🪙 — insuffisant)" % cost, "disabled": true}
 	else:
 		primary = {"text": "Adopter (%d 🪙)" % cost, "disabled": false}
+
+	var preview: Dictionary = {}
+	if not owned:
+		preview = {"resource_deltas": purchase_deltas, "pieces_cost": cost, "unknown_resource_ids": []}
 
 	return _with_shared({
 		"kind": "practice",
@@ -281,6 +317,7 @@ static func for_practice(practice: Dictionary) -> Dictionary:
 		"primary": primary,
 		"dimmed": owned,
 		"stamp": "ADOPTÉE" if owned else "",
+		"preview": preview,
 	}, "practice", practice_id, practice, owned)
 
 

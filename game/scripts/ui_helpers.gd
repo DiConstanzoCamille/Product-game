@@ -130,6 +130,76 @@ class WavyRule extends Control:
 			draw_polyline(points, rule_color, 2.0)
 
 
+## Segment fantôme de la preview d'impact (Refonte UI Lot 3, §5.1) : hachures à
+## pulsation lente entre la valeur engagée d'une jauge et sa valeur projetée si
+## l'action survolée est jouée. Un Control nu, comme DashedRule/WavyRule — rien
+## ici n'est un Container, donc rien ne remet à zéro son échelle ou sa rotation.
+class HatchOverlay extends Control:
+	var hatch_color: Color = Color("#f0b44a")
+	var stripe: float = 6.0
+
+	func _init() -> void:
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	func _ready() -> void:
+		modulate.a = 0.55
+		var tween := create_tween().set_loops()
+		tween.tween_property(self, "modulate:a", 0.9, 0.75).set_trans(Tween.TRANS_SINE)
+		tween.tween_property(self, "modulate:a", 0.35, 0.75).set_trans(Tween.TRANS_SINE)
+
+	func _draw() -> void:
+		if size.x <= 0.0 or size.y <= 0.0:
+			return
+		draw_rect(Rect2(Vector2.ZERO, size), Color(hatch_color.r, hatch_color.g, hatch_color.b, 0.28), true)
+		var x := -size.y
+		while x < size.x:
+			draw_line(Vector2(x, size.y), Vector2(x + size.y, 0.0), hatch_color, 1.6)
+			x += stripe
+
+
+## Enveloppe un contrôle dans un `Control` nu pour l'extraire de la remise à
+## zéro que son conteneur parent impose à `position`/`rotation`/`scale` à
+## chaque tri (piège documenté : HBoxContainer, VBoxContainer, GridContainer…).
+## Le nœud enveloppé peut ensuite être animé librement une fois posé dans un
+## conteneur — le geste qu'utilisaient déjà le scotch et le tampon de la carte
+## d'Actif (asset_card.gd → calque « Decorations »), généralisé ici pour le
+## Panneau de bord (punch d'une valeur de jauge, slide-in d'une recrue).
+static func wrap_animatable(node: Control) -> Control:
+	var wrap := Control.new()
+	node.position = Vector2.ZERO
+	wrap.add_child(node)
+	var sync := func():
+		var min_size: Vector2 = node.get_combined_minimum_size()
+		wrap.custom_minimum_size = min_size
+		node.size = min_size
+	sync.call()
+	if node.has_signal("resized"):
+		node.resized.connect(sync)
+	return wrap
+
+
+## Fait voler une chip de delta d'un point de l'écran à un autre (impulsion à
+## l'achat, Lot 3 §5.2) — le geste « la carte parle à sa jauge ». `host` doit
+## être déjà dans l'arbre (l'écran de phase) : la chip s'y ajoute en
+## `top_level = true`, donc en coordonnées globales, et se libère elle-même à
+## l'arrivée.
+static func fly_chip(host: Node, text: String, color: Color, from_global: Vector2, to_global: Vector2, duration: float = 0.2) -> void:
+	var chip := Label.new()
+	chip.text = text
+	chip.add_theme_color_override("font_color", color)
+	apply_mono(chip, 13, true)
+	chip.top_level = true
+	chip.z_index = 100
+	chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	host.add_child(chip)
+	chip.global_position = from_global
+	var tween := chip.create_tween()
+	tween.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
+	tween.tween_property(chip, "global_position", to_global, duration)
+	tween.chain().tween_property(chip, "modulate:a", 0.0, duration * 0.4)
+	tween.tween_callback(chip.queue_free)
+
+
 ## Vide un conteneur qu'on va reconstruire — **détacher d'abord, libérer
 ## ensuite**.
 ##

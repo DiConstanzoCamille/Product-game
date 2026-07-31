@@ -26,6 +26,14 @@ signal primary_pressed
 signal secondary_pressed
 signal pin_pressed
 
+## Preview d'impact au survol (Refonte UI Lot 3 §5.1) : la carte ne calcule
+## rien, elle relaie le champ `preview` de son descripteur (posé par
+## AssetView — resource_deltas/pieces_cost/unknown_resource_ids) au moment où
+## le survol change. L'écran hôte branche ça sur side_panel.show_preview() /
+## clear_preview().
+signal preview_requested(preview: Dictionary)
+signal preview_cleared
+
 const MIN_WIDTH := 236
 
 ## Le geste de survol : la carte se **redresse et se soulève**, comme une fiche
@@ -130,6 +138,11 @@ func _set_hovered(entered: bool) -> void:
 			UIHelpers.SHADOW_SIZE_HOVER if entered else UIHelpers.SHADOW_SIZE_REST + 2, HOVER_TWEEN)
 		tween.tween_property(_paper, "shadow_offset",
 			UIHelpers.SHADOW_OFFSET_HOVER if entered else Vector2(2, 4), HOVER_TWEEN)
+
+	if entered:
+		preview_requested.emit(_descriptor.get("preview", {}))
+	else:
+		preview_cleared.emit()
 
 
 func _rebuild() -> void:

@@ -203,6 +203,24 @@
     }
   },
 
+  "_comment_thresholdNarratives": "Libellés de conséquence pour la preview d'impact (Refonte UI Lot 3, docs/proposition-ui-interface.md §5.1) — « faire parler les seuils ». Ces textes ne portent AUCUNE valeur numérique : les seuils eux-mêmes restent lus à leur unique source (energy.moralRegenTiers, pressure.revenueCutoffValeurPercue, endingThresholds) pour que rééquilibrer un seuil ne demande jamais de toucher deux endroits.",
+  "thresholdNarratives": {
+    "moralRegenTiers": [
+      "",
+      "sous ce seuil, votre régénération d'⚡ tombe à ×0,5 — une équipe qui va mal vous épuise",
+      "sous ce seuil, votre régénération d'⚡ tombe à zéro"
+    ],
+    "revenueCutoff": "sous ce seuil, plus aucun revenu ne tombera ce sprint",
+    "endingConsequences": {
+      "faillite": "fin de mandat si la Trésorerie y reste : faillite",
+      "exode-equipe": "fin de mandat si le Moral y reste : exode de l'équipe",
+      "entreprise-zombie": "fin de mandat si la Dette y reste : entreprise zombie",
+      "rachat-hostile": "fin de mandat si le Capital politique y reste : rachat hostile",
+      "remplace-par-ia": "fin de mandat si le Cynisme y reste : remplacé·e par l'IA",
+      "burnout-fondateur": "fin de mandat si l'Énergie y reste : burn-out fondateur·rice"
+    }
+  },
+
   "roadmap": {
     "overCapacityPenalty": { "dette-organisationnelle": 10, "cynisme": 6, "moral": -4 }
   },

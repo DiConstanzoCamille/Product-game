@@ -1589,8 +1589,10 @@ func buy_practice(practice_id: String) -> String:
 	pieces -= cost
 	owned_practices.append(practice_id)
 	release_reservation("practice", practice_id)
-	var cynisme := float(_active_quarter_effects().get("practiceCynisme", GameData.balance.get("shopDraw", {}).get("practiceCynisme", 2)))
-	add_pending({"cynisme": cynisme}, "Nouvelle pratique : %s %s (%d 🪙) — un process de plus, l'organisation lève les yeux au ciel" % [
+	# Même calcul que la preview d'impact du survol (EffectResolver.practice_purchase_deltas(),
+	# nourrie des mêmes effets de trimestre actifs) : un seul endroit décide de
+	# ce qu'une pratique fait tomber à l'achat.
+	add_pending(EffectResolver.practice_purchase_deltas(get_quarter_requirement_effects()), "Nouvelle pratique : %s %s (%d 🪙) — un process de plus, l'organisation lève les yeux au ciel" % [
 		practice.get("icon", ""), practice.get("name", ""), cost
 	])
 

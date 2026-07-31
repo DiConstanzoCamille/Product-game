@@ -208,6 +208,85 @@ static func resource_label(resource_id: String) -> String:
 	return resource_id
 
 
+## Deltas immédiats d'un achat de pratique — seul le Cynisme (balance.json →
+## shopDraw.practiceCynisme, éventuellement remplacé par une exigence de
+## trimestre active — voir SprintState.get_quarter_requirement_effects())
+## tombe au moment de l'achat ; le reste de son effet (`perSprint`) entre dans
+## la boucle générale des pratiques possédées à la prochaine Résolution, pas
+## au clic. Même source que SprintState.buy_practice() applique via
+## add_pending() — la preview d'impact (Lot 3 §5.1) et l'achat partagent ce
+## seul calcul. `quarter_effects` est optionnel : {} pour un appel hors
+## contexte de sprint (aucun test ne le fournit aujourd'hui).
+static func practice_purchase_deltas(quarter_effects: Dictionary = {}) -> Dictionary:
+	var cynisme := float(quarter_effects.get("practiceCynisme", GameData.balance.get("shopDraw", {}).get("practiceCynisme", 2)))
+	return {"cynisme": cynisme} if cynisme != 0.0 else {}
+
+
+## Ressources potentiellement modifiées par un trait caché non révélé, dérivées
+## du pool (data/hidden-traits.json) : seuls les effets `xPerSprint` se voient
+## sur une jauge du Panneau de bord (`contributionFactor`, `capacityBonus`,
+## `salaryRaiseAtTrialEnd`, `nextHireDiscountPieces`… n'y apparaissent pas).
+## Sert la chip ❓ scintillante de la preview d'impact (Lot 3 §5.1) : « ici,
+## vous pariez » — sans dire sur quoi si le pool n'a rien qui morde une jauge.
+static func hidden_trait_resource_ids() -> Array:
+	var ids: Array = []
+	for hidden_trait in GameData.hidden_traits.get("traits", []):
+		for effect_key in hidden_trait.get("effects", {}).keys():
+			if effect_key.ends_with("PerSprint"):
+				var resource_id: String = effect_key.substr(0, effect_key.length() - "PerSprint".length())
+				if not ids.has(resource_id):
+					ids.append(resource_id)
+	return ids
+
+
+## Une projection franchit-elle un seuil, dans le sens qui rapproche du
+## déclencheur ? "lte" : on passe de strictement au-dessus à au-dessous ou égal
+## (le sens des seuils "low-good" / plancher) ; "gte" l'inverse (plafond).
+static func _crosses_threshold(old_value: float, new_value: float, boundary: float, comparison: String) -> bool:
+	if comparison == "lte":
+		return old_value > boundary and new_value <= boundary
+	return old_value < boundary and new_value >= boundary
+
+
+## Lignes de conséquence quand une projection franchit un seuil mécanique connu
+## — « faire parler les seuils » (Lot 3 §5.1) : pas le chiffre, la conséquence.
+## Les seuils numériques restent lus à leur unique source (energy, pressure,
+## endingThresholds/endingThresholdOverrides) ; seuls les libellés viennent de
+## balance.json → thresholdNarratives, pour qu'aucun nombre ne soit dupliqué
+## entre la règle et son commentaire. Retourne un tableau de textes (sans le ⚠️,
+## ajouté par l'affichage).
+static func threshold_consequences(resource_id: String, old_value: float, new_value: float, era_id: String) -> Array:
+	var lines: Array = []
+	var narratives: Dictionary = GameData.balance.get("thresholdNarratives", {})
+
+	if resource_id == "moral":
+		var tiers: Array = GameData.balance.get("energy", {}).get("moralRegenTiers", [])
+		var labels: Array = narratives.get("moralRegenTiers", [])
+		for i in range(1, tiers.size()):
+			var boundary := float(tiers[i - 1].get("moralMin", 0))
+			if i < labels.size() and String(labels[i]) != "" and _crosses_threshold(old_value, new_value, boundary, "lte"):
+				lines.append(String(labels[i]))
+
+	if resource_id == "valeur-percue":
+		var cutoff := float(GameData.balance.get("pressure", {}).get("revenueCutoffValeurPercue", 5))
+		var label: String = narratives.get("revenueCutoff", "")
+		if label != "" and _crosses_threshold(old_value, new_value, cutoff, "lte"):
+			lines.append(label)
+
+	var ending_labels: Dictionary = narratives.get("endingConsequences", {})
+	var overrides: Dictionary = GameData.balance.get("endingThresholdOverrides", {}).get(era_id, {})
+	for threshold in GameData.balance.get("endingThresholds", []):
+		if threshold.get("resource", "") != resource_id:
+			continue
+		var value := float(overrides.get(resource_id, threshold.get("value", 0)))
+		var comparison: String = threshold.get("comparison", "lte")
+		var ending_label: String = ending_labels.get(threshold.get("ending", ""), "")
+		if ending_label != "" and _crosses_threshold(old_value, new_value, value, comparison):
+			lines.append(ending_label)
+
+	return lines
+
+
 static func _find_card(card_id: String) -> Dictionary:
 	for card in GameData.cards.get("cards", []):
 		if card.get("id", "") == card_id:
