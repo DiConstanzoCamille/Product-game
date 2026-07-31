@@ -965,3 +965,115 @@ et `=== SMOKE TEST UI : OK — 9 écrans instanciés, gestes
 Roadmap/Investissements joués ===`. Les critères permanents (`careful` perd
 avant la fin du mandat, `stress` atteint le burn-out) restent asserté dans
 le test lui-même.
+
+## 29. Refonte UI — Lot 3 : ressentir ses achats (preview, impulsion, engagement)
+
+Troisième lot de la [proposition UI](proposition-ui-interface.md §5), en
+réponse au manque relevé dès le lot 1 (§19) : le panneau affichait un état,
+mais rien ne montrait qu'un clic venait de le bouger. **Option 1 — projection
+visuelle — actée le 30/07/2026** : mécaniquement rien ne change,
+`add_pending()` s'applique toujours à la seule Résolution ; le panneau lit
+`valeur + somme des pendings` et l'habille. La règle de partage reste celle
+d'avant le lot : ce que le joueur décide se voit tout de suite (deltas d'achat,
+effectif, budget) ; ce que la simulation lui fait — revenu, masse salariale,
+décroissance, traits cachés — reste révélé à la Résolution.
+
+- **La preview consomme le calcul de la carte, jamais un second.**
+  `AssetView.for_decision/for_candidate/for_practice()` posent un champ
+  `preview` (`resource_deltas`, `pieces_cost`, `unknown_resource_ids`) sur le
+  descripteur, en appelant `EffectResolver.resolve_card_activation()` et la
+  nouvelle `EffectResolver.practice_purchase_deltas()` — jamais un calcul
+  réécrit pour l'occasion. `practice_purchase_deltas()` prend en paramètre les
+  effets de trimestre actifs (`SprintState.get_quarter_requirement_effects()`)
+  pour rester honnête quand une exigence remplace le Cynisme de base d'une
+  pratique : c'est le même chemin que `SprintState.buy_practice()` emprunte
+  pour appliquer réellement le delta. Une embauche ne bouge aucune jauge dans
+  l'immédiat (la contribution de rôle ne compte qu'à la Résolution) — sa
+  preview a un `resource_deltas` vide, mais `unknown_resource_ids` liste les
+  jauges qu'un trait caché non révélé *pourrait* toucher
+  (`EffectResolver.hidden_trait_resource_ids()`, dérivé des `xPerSprint` du
+  pool `hidden-traits.json`) : la ligne « 🔒 Trait caché » posée au lot 1
+  (§19) trouve enfin son écho sur le panneau.
+- **`AssetCard` relaie, ne calcule pas.** Au survol, elle émet
+  `preview_requested(preview)` / `preview_cleared` ; `investments_screen.gd`
+  — seul écran qui pose des cartes d'Actif à côté du panneau — les branche sur
+  `SidePanel.show_preview()` / `clear_preview()`. Sans ce branchement le champ
+  `preview` du descripteur n'aurait jamais eu de spectateur : c'est la seule
+  raison technique qui a fait sortir ce lot de `side_panel.gd` /
+  `asset_card.gd` / `asset_view.gd` / `ui_helpers.gd`.
+- **La jauge en barre gagne un second segment.** `SidePanel._gauge()`
+  distingue maintenant `base_value` (après la dernière Résolution),
+  `engaged_value` (avec les pendings du sprint en cours, §5.3) et
+  `preview_target` (avec la preview survolée, §5.1). Un ▲ discret marque
+  `base_value` et un liseré d'accent tant qu'un pending est non nul ; un
+  segment hachuré à pulsation lente (`UIHelpers.HatchOverlay`, un `Control` nu
+  — un `Container` y écraserait la géométrie à chaque tri) couvre l'écart
+  `engaged_value → preview_target` ; les jauges non concernées par la preview
+  en cours s'estompent (`modulate.a = 0.35`). Un trait caché non révélé pose un
+  `❓` scintillant à la place du delta.
+- **Les seuils parlent, sans dupliquer leur valeur.**
+  `EffectResolver.threshold_consequences()` détecte qu'une projection
+  franchit `energy.moralRegenTiers`, `pressure.revenueCutoffValeurPercue` ou
+  un `endingThresholds`/`endingThresholdOverrides`, et n'affiche que ce que
+  `balance.json → thresholdNarratives` lui donne comme libellé — les seuils
+  eux-mêmes restent lus à leur unique source mécanique. Une pratique
+  rééquilibrée qui déplace un seuil n'a donc jamais besoin qu'on retouche un
+  texte : le texte ne connaît pas le nombre.
+- **L'engagement (§5.3) était déjà à moitié acquis.** Le panneau affichait
+  déjà `valeur + pendings` en germe côté quota ; le lot généralise le calcul à
+  toutes les jauges (`SidePanel._last_engaged`) et y ajoute l'animation :
+  franchissement d'un `_build()` à l'autre détecté par comparaison à l'état
+  précédent, comme le panneau le fait déjà pour le quota — aucun signal
+  spécifique à câbler côté écran, `refresh()` suffit toujours. Le
+  franchissement anime la barre (tween 300 ms) et punch l'échelle de la valeur
+  (`UIHelpers.wrap_animatable()`, qui sort le Label du tri du conteneur — le
+  piège déjà documenté), les pièces se décomptent en roulement selon le même
+  principe.
+- **L'impulsion à l'achat (§5.2) vole réellement de la carte à la jauge.**
+  `investments_screen.gd` capture la preview de l'Actif juste avant l'appel
+  à `SprintState` (elle disparaît dès que l'Actif devient possédé/activé), et
+  si l'achat réussit, fait voler une chip par ressource touchée plus une pour
+  le coût, de `AssetCard.get_global_rect()` vers
+  `SidePanel.gauge_global_rect()`/`pieces_global_rect()`
+  (`UIHelpers.fly_chip()`, ~200 ms). Le tampon d'acquisition (ACTIVÉE /
+  EMBAUCHÉ·E / ADOPTÉE) était **déjà livré par la PR #11** : `AssetCard`
+  détecte elle-même qu'un descripteur gagne un `stamp` qu'il n'avait pas et
+  joue la frappe — ce lot n'y a rien changé. Une embauche fait glisser sa
+  ligne dans le roster du panneau (`SidePanel._team_row()` compare le roster
+  affiché à celui du `_build()` précédent, comme pour les jauges) plutôt que
+  de l'y faire apparaître sèchement.
+- **Piège rencontré : un tween créé sur `self` survit à son propre nœud
+  animé.** `SidePanel._build()` reconstruit toute la colonne à chaque
+  `refresh()`, en libérant ses enfants (`UIHelpers.clear_children()`). Un
+  tween instancié via `create_tween()` sur le panneau (qui ne meurt jamais)
+  continue de tourner après que la jauge ou le Label qu'il animait a été
+  libéré — sa fermeture (`tween_method`) appelle alors une méthode sur un
+  objet mort et fait planter le smoke test UI, qui enchaîne les refresh() sans
+  laisser une image respirer. Le correctif : instancier chaque tween sur le
+  nœud qu'il anime (`fill.create_tween()`, `value.create_tween()`…) —
+  `Node.create_tween()` tue automatiquement le tween quand ce nœud précis est
+  libéré, ce que `self.create_tween()` ne fait pas.
+- **Ce que le WIP interrompu apportait, gardé tel quel après rebase.** Une
+  session précédente avait pris ce lot jusqu'à ~90 % avant une coupure : le
+  calcul de preview (`AssetView`, `EffectResolver.practice_purchase_deltas()`
+  / `hidden_trait_resource_ids()` / `threshold_consequences()`), le segment
+  hachuré, les jauges d'engagement et `UIHelpers.wrap_animatable()`/`fly_chip()`
+  étaient déjà écrits et de bonne facture — le rebase sur le tronc scoring
+  (lots 0-2, PRs #21→#24) s'est résolu sans conflit sur `side_panel.gd` (les
+  deux diffs touchaient des fonctions disjointes) et avec un seul vrai
+  conflit, sur `SprintState.buy_practice()`, résolu en branchant les effets de
+  trimestre dans `practice_purchase_deltas()` plutôt qu'en choisissant un
+  camp. Ce que le WIP avait laissé inachevé — déclaré mais jamais câblé — a
+  été complété dans ce lot : le slide-in du roster (les variables
+  `_last_roster_ids`/`_roster_initialized` existaient déjà, sans écriture ni
+  lecture), la chip volante de l'impulsion, et le branchement
+  `preview_requested`/`preview_cleared` vers le panneau, sans lequel la
+  preview entière restait invisible. Un second rebase, sur les PR #26
+  (familles de décisions, §28) et #27 (bureau de décision de la Roadmap), n'a
+  reconflit qu'une ligne d'`asset_view.gd` — les deux nouveaux champs de
+  descripteur (`status_stamp` du #27, `preview` de ce lot) coexistent sans
+  se gêner sur la même carte de décision.
+- **Recette.** Les deux smoke tests headless passent sans modification —
+  cf. sortie collée dans la PR. Run visuel non fait ici (pas d'affichage
+  disponible) : voir la PR pour la liste précise de ce qu'un humain doit
+  regarder, écran par écran.
