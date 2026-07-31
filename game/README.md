@@ -104,7 +104,7 @@ Pas de dépendance/plugin externe : tout est construit avec les nœuds et l'API 
 
 `GameData` (autoload) charge chaque fichier de `data/` au démarrage : `GameData.resources`, `GameData.cards`, `GameData.eras`, `GameData.endings`, `GameData.foundations`, `GameData.backlog`, `GameData.inbox_events`, `GameData.recruitment_archetypes`, `GameData.recruitment_demo`, `GameData.hud_demo`, `GameData.structure`, `GameData.companies`.
 
-`SprintState` (autoload) porte l'état complet du mandat en cours : `sprint_number`, `team_profile`, `era_id`, `company_id` et `business_model_id` (fixés au choix du scénario + de l'entreprise), les 6 `resource_values`, le panier d'effets en attente, le journal, et les grandes décisions activées.
+`SprintState` (autoload) porte l'état complet du mandat en cours : `sprint_number`, `team_profile`, `era_id`, `company_id` et `business_model_id` (fixés au choix du scénario + de l'entreprise), les 6 `resource_values`, le panier d'effets en attente, le journal, et les grandes décisions activées. L'équipe est déjà stockée dans `squads[]` (une seule squad principale aujourd'hui) ; chaque entrée porte son `roster`, backlog local, capacité, livraisons et progression d'epics. `get_roster()` fournit la vue globale aplatie pour l'UI et les règles transverses.
 
 ## Limites connues
 

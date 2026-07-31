@@ -327,13 +327,14 @@ func _pieces_row() -> Control:
 
 # ── Équipe : le roster enfin permanent, et actionnable ───────────────────
 func _build_team(vbox: VBoxContainer) -> void:
+	var roster: Array = SprintState.get_roster()
 	var head := HBoxContainer.new()
 	var title := _label("ÉQUIPE", 10, UIHelpers.PANEL_ACCENT)
 	UIHelpers.apply_mono(title, 10, true)
 	head.add_child(title)
 	head.add_child(_spacer_h())
 	var stats := _label("%d/%d · %d pts · %d 💰/sprint" % [
-		SprintState.roster.size(), SprintState.get_team_cap(),
+		roster.size(), SprintState.get_team_cap(),
 		SprintState.get_effective_capacity(), SprintState.get_payroll()
 	], 10, UIHelpers.PANEL_MUTED)
 	UIHelpers.apply_mono(stats, 10)
@@ -341,11 +342,11 @@ func _build_team(vbox: VBoxContainer) -> void:
 	head.add_child(stats)
 	vbox.add_child(_spaced(head, 10, 6))
 
-	if SprintState.roster.is_empty():
+	if roster.is_empty():
 		vbox.add_child(_label("Plus personne. Une organisation parfaitement silencieuse.", 10, UIHelpers.PANEL_MUTED, true))
 		return
 
-	for employee in SprintState.roster:
+	for employee in roster:
 		vbox.add_child(_team_row(employee))
 
 

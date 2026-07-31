@@ -28,6 +28,7 @@ var companies: Array = []
 var candidates: Array = []
 var practices: Array = []
 var hidden_traits: Dictionary = {}
+var scoring: Dictionary = {}
 
 var is_loaded: bool = false
 
@@ -128,6 +129,10 @@ func _load_all() -> void:
 	var hidden_traits_data = _load_json("hidden-traits.json")
 	if hidden_traits_data:
 		hidden_traits = hidden_traits_data
+
+	var scoring_data = _load_json("scoring.json")
+	if scoring_data:
+		scoring = scoring_data
 
 	is_loaded = resources.size() > 0 and not cards.is_empty() and not balance.is_empty()
 

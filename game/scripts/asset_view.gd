@@ -161,7 +161,7 @@ static func for_candidate(candidate: Dictionary) -> Dictionary:
 	var cost: int = max(0, int(candidate.get("costPieces", 0)) - SprintState.next_hire_discount)
 	var hired: bool = candidate.get("hired", false)
 	var cap := SprintState.get_team_cap()
-	var headcount := SprintState.roster.size()
+	var headcount := SprintState.get_roster().size()
 
 	var impacts: Array = _role_impact_lines(role_id, seniority)
 	impacts.append({

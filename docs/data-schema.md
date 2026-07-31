@@ -125,3 +125,13 @@ Les "offres d'emploi" (§16, enrichies en §17) — le cadre RP d'une run, chois
 ## Ce qui reste hors JSON
 
 Les hypothèses non tranchées et les archétypes de CPO non validés (§13 du carnet de règles) restent en markdown : ce sont des questions de conception ouvertes, pas encore des données de jeu.
+
+## État de run `SprintState`
+
+L'état runtime n'est pas sérialisé en JSON, mais son contrat prépare l'échelle
+multi-équipe du score : `squads[]` contient aujourd'hui une seule entrée
+`{id, name, roster[], backlog_draw, capacity, delivered[], epic_progress}`.
+`get_roster()` est uniquement une vue aplatie de lecture sur les rosters des
+squads ; les mutations de l'expérience PM actuelle ciblent le roster de la
+squad principale. `last_score_report`, `mrr` et `streak` existent déjà comme
+état neutre pour la future résolution Traction × Levier = Impact.

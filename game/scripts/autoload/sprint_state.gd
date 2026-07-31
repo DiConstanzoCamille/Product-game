@@ -1,6 +1,6 @@
 extends Node
 ## Autoload : état complet d'un mandat (run) — les 6 ressources persistantes,
-## le scénario choisi, le roster (Phase A), les pièces, les pratiques, les
+## le scénario choisi, les squads (une seule aujourd'hui), les pièces, les pratiques, les
 ## grandes décisions activées, le journal, et le panier d'effets en attente
 ## pour le sprint en cours.
 ##
@@ -39,10 +39,13 @@ var last_tresorerie_cost: int = 0      # somme des coûts/gains de décisions su
 var last_payroll: int = 0              # masse salariale prélevée au dernier sprint résolu
 var last_pieces_delta: int = 0         # flux net de pièces au dernier sprint résolu
 var last_roi_revenue_bonus: int = 0    # part MRR du revenu du sprint résolu
+var last_score_report: Dictionary = {} # rapport immuable réservé au futur ScoreResolver
+var mrr: float = 0.0                   # stock de MRR réservé à la conversion du score
+var streak: int = 0                    # sprints livrés consécutifs, réservé au score
 
 # --- Phase A : l'entreprise ---
 var pieces: int = 0                    # 🪙 budget d'action de l'entreprise (jamais négatif)
-var roster: Array = []                 # employés {id, name, role, seniority, salary, trait, hidden_trait, hiddenRevealed, hiredSprint}
+var squads: Array = []                 # [{id, name, roster, backlog_draw, capacity, delivered, epic_progress}]
 var owned_practices: Array = []        # ids de pratiques achetées (permanentes pour le mandat)
 var fired_count: int = 0               # licenciements prononcés ce mandat (le cynisme monte à partir du 2e)
 var next_hire_discount: int = 0        # remise 🪙 sur le prochain recrutement (trait caché Réseau)
@@ -92,6 +95,9 @@ func reset_run(chosen_era_id: String = "", chosen_company_id: String = "") -> vo
 	last_payroll = 0
 	last_pieces_delta = 0
 	last_roi_revenue_bonus = 0
+	last_score_report.clear()
+	mrr = 0.0
+	streak = 0
 	_inbox_event_bag.clear()
 	_last_inbox_event_id = ""
 	_hired_candidate_ids.clear()
@@ -118,21 +124,31 @@ func reset_run(chosen_era_id: String = "", chosen_company_id: String = "") -> vo
 
 	var company: Dictionary = get_company()
 	pieces = int(company.get("startingPieces", 0))
-	roster.clear()
+	var primary_roster: Array = []
 	var salaries: Dictionary = GameData.balance.get("salaries", {})
 	for member in company.get("startingRoster", []):
 		var seniority: String = member.get("seniority", "junior")
-		roster.append({
+		primary_roster.append({
 			"id": member.get("id", ""),
 			"name": member.get("name", ""),
 			"role": member.get("role", ""),
 			"seniority": seniority,
 			"salary": int(salaries.get(seniority, 1)),
 			"trait": member.get("trait", ""),
+			"visible_trait_id": member.get("visible_trait_id", ""),
 			"hidden_trait": "",
 			"hiddenRevealed": true,  # l'équipe héritée a déjà fait sa période d'essai
 			"hiredSprint": 0,
 		})
+	squads = [{
+		"id": "squad-principale",
+		"name": "Equipe produit",
+		"roster": primary_roster,
+		"backlog_draw": {},
+		"capacity": 0,
+		"delivered": [],
+		"epic_progress": {},
+	}]
 
 	resource_values.clear()
 	var starting: Dictionary = GameData.balance.get("startingResources", {})
@@ -140,6 +156,7 @@ func reset_run(chosen_era_id: String = "", chosen_company_id: String = "") -> vo
 	for resource in GameData.resources:
 		var resource_id: String = resource.get("id", "")
 		resource_values[resource_id] = float(overrides.get(resource_id, starting.get(resource_id, 50)))
+	get_effective_capacity()
 
 
 func _pick_random_playable_era() -> String:
@@ -187,14 +204,43 @@ func get_business_model() -> Dictionary:
 
 # --- Roster, rôles et capacité (spec profondeur §4) ---
 
+## Vue de lecture aplatie du personnel de toutes les squads. Les dictionnaires
+## employés restent les objets de l'état local ; ne jamais ajouter ou retirer
+## un membre à cette vue.
+func get_roster() -> Array:
+	var flattened: Array = []
+	for squad in squads:
+		flattened.append_array(squad.get("roster", []))
+	return flattened
+
+
+## La première run n'a qu'une équipe. Ce point d'entrée évite que les actions
+## actuelles écrivent par erreur dans la vue aplatie pendant la transition.
+func get_primary_squad() -> Dictionary:
+	if squads.is_empty():
+		return {}
+	return squads[0]
+
+
+func _get_primary_roster() -> Array:
+	return get_primary_squad().get("roster", [])
+
 func get_team_cap() -> int:
 	return int(get_company().get("teamCap", 6))
 
 
 func find_employee(employee_id: String) -> Dictionary:
-	for employee in roster:
-		if employee.get("id", "") == employee_id:
-			return employee
+	var owner := _find_employee_owner(employee_id)
+	if not owner.is_empty():
+		return owner.get("employee", {})
+	return {}
+
+
+func _find_employee_owner(employee_id: String) -> Dictionary:
+	for squad in squads:
+		for employee in squad.get("roster", []):
+			if employee.get("id", "") == employee_id:
+				return {"squad": squad, "employee": employee}
 	return {}
 
 
@@ -218,7 +264,7 @@ func employee_contribution_factor(employee: Dictionary) -> float:
 ## leur facteur de contribution) — sert aux pénalités d'absence et aux caps.
 func get_role_weight(role_id: String) -> float:
 	var total := 0.0
-	for employee in roster:
+	for employee in get_roster():
 		if employee.get("role", "") == role_id:
 			total += employee_contribution_factor(employee)
 	return total
@@ -229,11 +275,21 @@ func get_role_weight(role_id: String) -> float:
 ## de cumul de leur rôle), les Pépites révélées ajoutent leur bonus, et
 ## "Faire le taf soi-même" (§7.2) ajoute les points payés en Énergie.
 func get_effective_capacity() -> int:
+	var total := 0
+	for squad_index in squads.size():
+		var squad: Dictionary = squads[squad_index]
+		var capacity := _calculate_squad_capacity(squad, squad_index == 0)
+		squad["capacity"] = capacity
+		total += capacity
+	return total
+
+
+func _calculate_squad_capacity(squad: Dictionary, include_self_work: bool) -> int:
 	var roles: Dictionary = GameData.balance.get("roles", {})
 	var total := 0.0
 	var role_counts: Dictionary = {}
 
-	for employee in roster:
+	for employee in squad.get("roster", []):
 		var role_id: String = employee.get("role", "")
 		var role_conf: Dictionary = roles.get(role_id, {})
 		var per_employee: float = float(role_conf.get("capacityPerEmployee", {}).get(employee.get("seniority", "junior"), 0))
@@ -249,13 +305,13 @@ func get_effective_capacity() -> int:
 			var hidden_trait: Dictionary = get_hidden_trait(employee.get("hidden_trait", ""))
 			total += float(hidden_trait.get("effects", {}).get("capacityBonus", 0))
 
-	return int(floor(max(total, 0.0))) + self_work_capacity
+	return int(floor(max(total, 0.0))) + (self_work_capacity if include_self_work else 0)
 
 
 ## Masse salariale du sprint — prélevée à chaque Résolution (spec §4.3).
 func get_payroll() -> int:
 	var total := 0
-	for employee in roster:
+	for employee in get_roster():
 		total += int(employee.get("salary", 0))
 	return total
 
@@ -1101,7 +1157,7 @@ func _roll_hidden_trait() -> String:
 ## Embauche un candidat de l'offre du sprint. Retourne "" si l'embauche a eu
 ## lieu, sinon la raison du refus ("pieces" ou "cap").
 func hire_candidate(candidate: Dictionary) -> String:
-	if roster.size() >= get_team_cap():
+	if get_roster().size() >= get_team_cap():
 		return "cap"
 	var cost: int = max(0, int(candidate.get("costPieces", 0)) - next_hire_discount)
 	if pieces < cost:
@@ -1113,13 +1169,14 @@ func hire_candidate(candidate: Dictionary) -> String:
 		discount_note = " (réseau : −%d 🪙)" % next_hire_discount
 		next_hire_discount = 0
 
-	roster.append({
+	_get_primary_roster().append({
 		"id": candidate.get("id", ""),
 		"name": candidate.get("name", ""),
 		"role": candidate.get("role", ""),
 		"seniority": candidate.get("seniority", "junior"),
 		"salary": int(candidate.get("salary", GameData.balance.get("salaries", {}).get(candidate.get("seniority", "junior"), 1))),
 		"trait": candidate.get("trait", ""),
+		"visible_trait_id": candidate.get("visible_trait_id", ""),
 		"hidden_trait": candidate.get("hidden_trait", ""),
 		"hiddenRevealed": candidate.get("hiddenRevealed", false),
 		"hiredSprint": sprint_number,
@@ -1137,9 +1194,10 @@ func hire_candidate(candidate: Dictionary) -> String:
 ## baisse, et Cynisme en hausse à partir du 2e licenciement du mandat.
 ## Retourne "" si le licenciement a eu lieu, sinon la raison du refus.
 func fire_employee(employee_id: String) -> String:
-	var employee := find_employee(employee_id)
-	if employee.is_empty():
+	var owner := _find_employee_owner(employee_id)
+	if owner.is_empty():
 		return "introuvable"
+	var employee: Dictionary = owner.get("employee", {})
 	var firing: Dictionary = GameData.balance.get("firing", {})
 	var severance := int(firing.get("severancePieces", 2))
 	if pieces < severance:
@@ -1153,7 +1211,9 @@ func fire_employee(employee_id: String) -> String:
 		deltas["cynisme"] = float(firing.get("cynismePerExtraFiring", 3))
 		note += " (l'organisation commence à y voir une politique)"
 	add_pending(deltas, note)
-	roster.erase(employee)
+	var owner_squad: Dictionary = owner.get("squad", {})
+	var owner_roster: Array = owner_squad.get("roster", [])
+	owner_roster.erase(employee)
 	return ""
 
 
@@ -1354,7 +1414,7 @@ func _apply_per_sprint_effects() -> void:
 			add_pending({"dette-organisationnelle": relief})
 
 	var moral_from_traits := 0.0
-	for employee in roster:
+	for employee in get_roster():
 		if not employee.get("hiddenRevealed", false):
 			continue
 		var hidden_trait := get_hidden_trait(employee.get("hidden_trait", ""))
@@ -1378,7 +1438,7 @@ func _apply_payroll() -> void:
 	last_payroll = get_payroll()
 	if last_payroll > 0:
 		pending_deltas["tresorerie"] = pending_deltas.get("tresorerie", 0.0) - last_payroll
-		pending_journal_lines.append("Masse salariale : −%d 💰 (%d personnes)" % [last_payroll, roster.size()])
+		pending_journal_lines.append("Masse salariale : −%d 💰 (%d personnes)" % [last_payroll, get_roster().size()])
 
 
 func _apply_revenue() -> void:
@@ -1481,33 +1541,34 @@ func energy_factor_label(factor: float) -> String:
 ## traits à déclencheur (Négociateur, Réseau) tombent maintenant.
 func _resolve_trial_periods() -> void:
 	var trial := int(GameData.balance.get("trialPeriodSprints", 2))
-	for employee in roster:
-		if employee.get("hiddenRevealed", false):
-			continue
-		if sprint_number < int(employee.get("hiredSprint", 0)) + trial:
-			continue
-		employee["hiddenRevealed"] = true
+	for squad in squads:
+		for employee in squad.get("roster", []):
+			if employee.get("hiddenRevealed", false):
+				continue
+			if sprint_number < int(employee.get("hiredSprint", 0)) + trial:
+				continue
+			employee["hiddenRevealed"] = true
 
-		var trait_id: String = employee.get("hidden_trait", "")
-		if trait_id == "":
+			var trait_id: String = employee.get("hidden_trait", "")
+			if trait_id == "":
+				journal.append({
+					"sprint": sprint_number,
+					"text": "Fin de période d'essai : %s est exactement ce que le CV promettait. Ça arrive." % employee.get("name", ""),
+					"deltas": "",
+				})
+				continue
+
+			var hidden_trait := get_hidden_trait(trait_id)
+			var extra := _apply_trait_triggers(employee)
+
 			journal.append({
 				"sprint": sprint_number,
-				"text": "Fin de période d'essai : %s est exactement ce que le CV promettait. Ça arrive." % employee.get("name", ""),
+				"text": "Fin de période d'essai : %s est un·e %s %s — %s%s" % [
+					employee.get("name", ""), hidden_trait.get("name", ""), hidden_trait.get("icon", ""),
+					hidden_trait.get("description", ""), extra
+				],
 				"deltas": "",
 			})
-			continue
-
-		var hidden_trait := get_hidden_trait(trait_id)
-		var extra := _apply_trait_triggers(employee)
-
-		journal.append({
-			"sprint": sprint_number,
-			"text": "Fin de période d'essai : %s est un·e %s %s — %s%s" % [
-				employee.get("name", ""), hidden_trait.get("name", ""), hidden_trait.get("icon", ""),
-				hidden_trait.get("description", ""), extra
-			],
-			"deltas": "",
-		})
 
 
 ## Traits cachés à déclencheur (Négociateur, Réseau) — appliqués au moment
@@ -1531,15 +1592,19 @@ func _apply_trait_triggers(employee: Dictionary) -> String:
 ## prévenir au sprint d'embauche + N.
 func _resolve_silent_quits() -> void:
 	var leavers: Array = []
-	for employee in roster:
-		if not employee.get("hiddenRevealed", false):
-			continue
-		var hidden_trait := get_hidden_trait(employee.get("hidden_trait", ""))
-		var quits_at := int(hidden_trait.get("effects", {}).get("quitsAtHiredPlus", 0))
-		if quits_at > 0 and sprint_number >= int(employee.get("hiredSprint", 0)) + quits_at:
-			leavers.append(employee)
-	for employee in leavers:
-		roster.erase(employee)
+	for squad in squads:
+		for employee in squad.get("roster", []):
+			if not employee.get("hiddenRevealed", false):
+				continue
+			var hidden_trait := get_hidden_trait(employee.get("hidden_trait", ""))
+			var quits_at := int(hidden_trait.get("effects", {}).get("quitsAtHiredPlus", 0))
+			if quits_at > 0 and sprint_number >= int(employee.get("hiredSprint", 0)) + quits_at:
+				leavers.append({"squad": squad, "employee": employee})
+	for leaver in leavers:
+		var owner_squad: Dictionary = leaver.get("squad", {})
+		var owner_roster: Array = owner_squad.get("roster", [])
+		var employee: Dictionary = leaver.get("employee", {})
+		owner_roster.erase(employee)
 		journal.append({
 			"sprint": sprint_number,
 			"text": "🧨 %s a démissionné sans prévenir. Le badge est resté sur le bureau, le Slack est déjà désactivé." % employee.get("name", ""),
@@ -1591,7 +1656,7 @@ func evaluate_condition(condition: Dictionary) -> Dictionary:
 			current = "%d" % last_revenue
 		"roster-seniority-min":
 			var count := 0
-			for member in roster:
+			for member in get_roster():
 				if member.get("seniority", "") == condition.get("seniority", "senior"):
 					count += 1
 			ok = count >= int(condition.get("value", 1))

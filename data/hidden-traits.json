@@ -10,7 +10,8 @@
       "name": "Râleur d'openspace",
       "polarity": "negative",
       "description": "Commente chaque décision à voix haute, entre la machine à café et le stand-up. −1 Moral par sprint.",
-      "effects": { "moralPerSprint": -1 }
+      "effects": { "moralPerSprint": -1 },
+      "score": { "kind": "local_lever", "value": -0.1 }
     },
     {
       "id": "fantome",
@@ -18,7 +19,8 @@
       "name": "Fantôme",
       "polarity": "negative",
       "description": "Présent aux réunions, introuvable entre les réunions. Contributions de rôle divisées par 2.",
-      "effects": { "contributionFactor": 0.5 }
+      "effects": { "contributionFactor": 0.5 },
+      "score": { "kind": "contribution_factor", "value": 0.5 }
     },
     {
       "id": "negociateur",
@@ -42,7 +44,8 @@
       "name": "Pépite",
       "polarity": "positive",
       "description": "Fait tranquillement le travail de deux personnes sans jamais le mettre dans un slide. +1 point de capacité.",
-      "effects": { "capacityBonus": 1 }
+      "effects": { "capacityBonus": 1 },
+      "score": { "kind": "local_lever", "value": 0.15 }
     },
     {
       "id": "mentor",
@@ -50,7 +53,8 @@
       "name": "Mentor",
       "polarity": "positive",
       "description": "Prend les juniors sous son aile sans qu'aucun process ne le lui demande. +1 Moral par sprint.",
-      "effects": { "moralPerSprint": 1 }
+      "effects": { "moralPerSprint": 1 },
+      "score": { "kind": "local_lever", "value": 0.1 }
     },
     {
       "id": "reseau",

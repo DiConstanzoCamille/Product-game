@@ -76,11 +76,12 @@ func _populate() -> void:
 	_add_section_title("L'équipe en détail — %d pts produits · %d 💰/sprint" % [
 		SprintState.get_effective_capacity(), SprintState.get_payroll()
 	])
-	if SprintState.roster.is_empty():
+	var roster: Array = SprintState.get_roster()
+	if roster.is_empty():
 		_add_text("Plus personne. Une organisation parfaitement silencieuse.", 12, UIHelpers.COLOR_SOFT_TEXT)
 	_add_text("Les actions (🤝 1:1 · licencier) sont dans le Panneau de bord, sur la ligne de la personne.",
 		11, UIHelpers.COLOR_SOFT_TEXT)
-	for employee in SprintState.roster:
+	for employee in roster:
 		_add_employee(employee)
 
 	_add_section_title("Pratiques adoptées")

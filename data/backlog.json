@@ -10,6 +10,7 @@
       "clientImpact": 0,
       "risk": 3,
       "quickWin": false,
+      "tags": ["reporting", "enterprise"],
       "eras": ["agile-transformation"]
     },
     {
@@ -22,6 +23,7 @@
       "clientImpact": 5,
       "risk": 6,
       "quickWin": false,
+      "tags": ["experience", "client"],
       "eras": ["agile-transformation"]
     },
     {
@@ -34,6 +36,7 @@
       "clientImpact": -2,
       "risk": 4,
       "quickWin": false,
+      "tags": ["support", "automation"],
       "eras": ["agile-transformation"]
     },
     {
@@ -46,6 +49,7 @@
       "clientImpact": 2,
       "risk": 0,
       "quickWin": true,
+      "tags": ["reporting", "export"],
       "eras": ["agile-transformation"]
     },
     {
@@ -58,6 +62,7 @@
       "clientImpact": 3,
       "risk": 1,
       "quickWin": false,
+      "tags": ["security", "enterprise"],
       "eras": ["agile-transformation"]
     },
     {
@@ -70,6 +75,7 @@
       "clientImpact": -1,
       "risk": 1,
       "quickWin": true,
+      "tags": ["feedback", "growth"],
       "eras": ["agile-transformation"]
     },
     {
@@ -82,6 +88,7 @@
       "clientImpact": 0,
       "risk": -3,
       "quickWin": false,
+      "tags": ["technical", "platform"],
       "eras": ["agile-transformation"]
     },
     {
@@ -94,6 +101,7 @@
       "clientImpact": 2,
       "risk": 8,
       "quickWin": false,
+      "tags": ["reliability", "mobile"],
       "eras": ["agile-transformation"]
     },
     {
@@ -106,6 +114,7 @@
       "clientImpact": -1,
       "risk": 2,
       "quickWin": false,
+      "tags": ["growth", "engagement"],
       "eras": ["agile-transformation"]
     },
     {
@@ -118,6 +127,7 @@
       "clientImpact": 1,
       "risk": 1,
       "quickWin": false,
+      "tags": ["billing", "enterprise"],
       "eras": ["agile-transformation"]
     },
     {
@@ -130,6 +140,7 @@
       "clientImpact": 3,
       "risk": -1,
       "quickWin": true,
+      "tags": ["reliability", "transparency"],
       "eras": ["agile-transformation"]
     },
     {
@@ -142,6 +153,7 @@
       "clientImpact": 4,
       "risk": 3,
       "quickWin": false,
+      "tags": ["integration", "enterprise"],
       "eras": ["agile-transformation"]
     },
     {
@@ -154,6 +166,7 @@
       "clientImpact": -2,
       "risk": 2,
       "quickWin": false,
+      "tags": ["experience", "usability"],
       "eras": ["agile-transformation"]
     },
     {
@@ -166,6 +179,7 @@
       "clientImpact": 2,
       "risk": -2,
       "quickWin": false,
+      "tags": ["experience", "quality"],
       "eras": ["agile-transformation"]
     },
     {
@@ -178,6 +192,7 @@
       "clientImpact": 0,
       "risk": 2,
       "quickWin": false,
+      "tags": ["engagement", "mobile"],
       "eras": ["agile-transformation"]
     },
     {
@@ -190,6 +205,7 @@
       "clientImpact": 4,
       "risk": 5,
       "quickWin": false,
+      "tags": ["platform", "integration"],
       "eras": ["agile-transformation"]
     },
     {
@@ -202,6 +218,7 @@
       "clientImpact": 2,
       "risk": 0,
       "quickWin": false,
+      "tags": ["international", "localization"],
       "eras": ["agile-transformation"]
     },
     {
@@ -214,6 +231,7 @@
       "clientImpact": 0,
       "risk": 1,
       "quickWin": true,
+      "tags": ["growth", "event"],
       "eras": ["agile-transformation"]
     }
   ],

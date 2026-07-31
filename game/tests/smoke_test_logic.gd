@@ -34,6 +34,7 @@ var failures: int = 0
 
 func _ready() -> void:
 	_test_energy_rules()
+	_test_multi_squad_roster()
 	_test_inbox_channels()
 	_test_backlog_rules()
 	_test_investment_draw_rules()
@@ -72,6 +73,50 @@ func _test_inbox_channels() -> void:
 	for event in GameData.inbox_events:
 		if String(event.get("channel", "")).strip_edges() == "":
 			_fail("L'événement Inbox '%s' n'a pas de canal." % event.get("id", ""))
+
+
+func _test_multi_squad_roster() -> void:
+	print("=== SMOKE TEST LOGIQUE — ROSTER MULTI-EQUIPE ===")
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+	var primary: Dictionary = SprintState.get_primary_squad()
+	var primary_roster: Array = primary.get("roster", [])
+	var primary_count := primary_roster.size()
+	for employee in primary_roster:
+		if String(employee.get("visible_trait_id", "")) == "":
+			_fail("Le trait visible de %s a ete perdu lors de la creation du roster runtime." % employee.get("name", ""))
+	var secondary_roster: Array = [{
+		"id": "test-squad-secondaire",
+		"name": "Test secondaire",
+		"role": "dev",
+		"seniority": "junior",
+		"salary": 1,
+		"trait": "",
+		"hidden_trait": "",
+		"hiddenRevealed": true,
+		"hiredSprint": 1,
+	}]
+	SprintState.squads.append({
+		"id": "squad-secondaire",
+		"name": "Equipe plateforme",
+		"roster": secondary_roster,
+		"backlog_draw": {},
+		"capacity": 0,
+		"delivered": [],
+		"epic_progress": {},
+	})
+
+	if SprintState.get_roster().size() != primary_count + 1:
+		_fail("get_roster() n'agrège pas le roster de la seconde équipe.")
+	if SprintState.find_employee("test-squad-secondaire").is_empty():
+		_fail("Un employé de la seconde équipe est introuvable.")
+
+	SprintState.pieces = 100
+	if SprintState.fire_employee("test-squad-secondaire") != "":
+		_fail("Le licenciement de la seconde équipe a été refusé.")
+	if primary_roster.size() != primary_count:
+		_fail("Le licenciement de la seconde équipe a modifié le roster principal.")
+	if not secondary_roster.is_empty() or SprintState.get_roster().size() != primary_count:
+		_fail("Le licenciement n'a pas retiré l'employé de son roster propriétaire.")
 
 
 func _test_backlog_rules() -> void:
@@ -382,8 +427,8 @@ func _test_gated_card_lease() -> void:
 	# s'active.
 	SprintState.sprint_number = drawn_at + 1
 	SprintState.pieces = 20
-	SprintState.roster.append({"id": "t1", "name": "Test", "role": "dev", "seniority": "senior", "salary": 2, "trait": "", "hidden_trait": "", "hiddenRevealed": true, "hiredSprint": 1})
-	SprintState.roster.append({"id": "t2", "name": "Test2", "role": "dev", "seniority": "senior", "salary": 2, "trait": "", "hidden_trait": "", "hiddenRevealed": true, "hiredSprint": 1})
+	SprintState.get_primary_squad().get("roster", []).append({"id": "t1", "name": "Test", "role": "dev", "seniority": "senior", "salary": 2, "trait": "", "hidden_trait": "", "hiddenRevealed": true, "hiredSprint": 1})
+	SprintState.get_primary_squad().get("roster", []).append({"id": "t2", "name": "Test2", "role": "dev", "seniority": "senior", "salary": 2, "trait": "", "hidden_trait": "", "hiddenRevealed": true, "hiredSprint": 1})
 	if not SprintState.card_requirement_state(gated).get("ok", false):
 		_fail("« shape-up » reste verrouillée avec 2 seniors au roster.")
 	if SprintState.activate_decision("shape-up") != "":
@@ -509,7 +554,7 @@ func _play_one_mandate(run_index: int, strategy: String, company_id: String) -> 
 	SprintState.reset_run("agile-transformation", company_id)
 	print("\n--- Run %d (%s) — %s — 🪙 %d, 👥 %d/%d, capacité %d — Départ : %s ---" % [
 		run_index, strategy, company_id, SprintState.pieces,
-		SprintState.roster.size(), SprintState.get_team_cap(),
+		SprintState.get_roster().size(), SprintState.get_team_cap(),
 		SprintState.get_effective_capacity(), SprintState.resource_values
 	])
 
@@ -523,7 +568,7 @@ func _play_one_mandate(run_index: int, strategy: String, company_id: String) -> 
 
 	print("Run %d (%s, %s) terminé — sprint %d, fin='%s', 🪙 %d, ⚡ %d, 👥 %d, revue de board='%s', ressources finales=%s" % [
 		run_index, strategy, company_id, SprintState.sprint_number, SprintState.ending_id,
-		SprintState.pieces, SprintState.energy, SprintState.roster.size(), SprintState.board_review_state,
+		SprintState.pieces, SprintState.energy, SprintState.get_roster().size(), SprintState.board_review_state,
 		SprintState.resource_values
 	])
 
@@ -535,8 +580,8 @@ func _play_one_mandate(run_index: int, strategy: String, company_id: String) -> 
 		_fail("Pièces négatives : %d" % SprintState.pieces)
 	if SprintState.energy < 0 or SprintState.energy > SprintState.get_energy_max():
 		_fail("Énergie hors bornes : %d" % SprintState.energy)
-	if SprintState.roster.size() > SprintState.get_team_cap():
-		_fail("Roster au-dessus du cap : %d/%d" % [SprintState.roster.size(), SprintState.get_team_cap()])
+	if SprintState.get_roster().size() > SprintState.get_team_cap():
+		_fail("Roster au-dessus du cap : %d/%d" % [SprintState.get_roster().size(), SprintState.get_team_cap()])
 
 	# Critère de recette Phase A : "careful" (ne rien faire) doit perdre
 	# avant la fin du mandat — pas de fin positive, pas de survie.
@@ -628,8 +673,8 @@ func _play_sprint(strategy: String) -> void:
 		# Plus d'achats compulsifs : ce CPO-là compense tout de sa personne —
 		# et licencie quelqu'un chaque sprint à partir du 2e (le chemin de
 		# licenciement reste couvert, et le Moral en prend un coup de plus).
-		if SprintState.sprint_number >= 2 and SprintState.roster.size() > 1:
-			var last_employee: Dictionary = SprintState.roster[-1]
+		if SprintState.sprint_number >= 2 and SprintState.get_roster().size() > 1:
+			var last_employee: Dictionary = SprintState.get_roster()[-1]
 			SprintState.fire_employee(last_employee.get("id", ""))
 	elif strategy == "greedy":
 		# ~1 achat par sprint : une pratique les sprints pairs, sinon une
