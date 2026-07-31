@@ -7,6 +7,7 @@ const ScoreResolverScript = preload("res://scripts/score_resolver.gd")
 var failures := 0
 var scoring_data: Dictionary = {}
 var hidden_traits_data: Dictionary = {}
+var cards_data: Dictionary = {}
 var candidates_data: Array = []
 var companies_data: Array = []
 
@@ -14,12 +15,14 @@ var companies_data: Array = []
 func _initialize() -> void:
 	scoring_data = _load_data("scoring.json")
 	hidden_traits_data = _load_data("hidden-traits.json")
+	cards_data = _load_data("cards.json")
 	candidates_data = _load_data("candidates.json").get("candidates", [])
 	companies_data = _load_data("companies.json").get("companies", [])
 	_test_feature_and_epic_traction()
 	_test_hand_bonus_order()
 	_test_quick_wins_are_one_hand_bonus()
 	_test_recent_hires_and_notion()
+	_test_notion_lever_by_company_roster()
 	_test_streak_and_friction_rules()
 	_test_quarter_visible_board_and_technical_audit()
 	_test_moral_cap_and_ops_snapshot()
@@ -103,6 +106,42 @@ func _test_recent_hires_and_notion() -> void:
 	var ghost_junior := [{"id": "ghost", "role": "dev", "seniority": "junior", "hiredSprint": 0, "hidden_trait": "fantome", "hiddenRevealed": true}]
 	report = _resolve([_squad("a", [feature], ghost_junior)], {"sprint": 10, "active_tools": ["notion"]}, _rules_without_streak())
 	_assert_equal(float(report.get("global", {}).get("lever", 0.0)), 1.08, "Le Fantome doit contribuer a moitie au levier de Notion, avant adoption x2.")
+
+
+## Critère de recette de l'issue #16 : la MÊME carte Notion (un seul
+## `eligibility`/`refractory` dans cards.json) donne un Levier positif sur
+## le roster réel de Karavel (junior) et négatif sur celui de Meridia
+## (senior, ancien) — sans aucune branche `company_id`/`if` dans le moteur.
+## Assez de sprints (10) pour que l'ancienneté de l'équipe héritée de Meridia
+## (hiredSprint=0) dépasse le seuil `hiredBeforeSprints: 8` du réfractaire.
+func _test_notion_lever_by_company_roster() -> void:
+	var feature := _traction_feature(1)
+	var karavel := _company_roster("karavel-scaleup")
+	var meridia := _company_roster("meridia-corp")
+	_assert_false(karavel.is_empty(), "companies.json doit toujours déclarer karavel-scaleup pour ce cas.")
+	_assert_false(meridia.is_empty(), "companies.json doit toujours déclarer meridia-corp pour ce cas.")
+
+	var karavel_report := _resolve([_squad("a", [feature], karavel)], {"sprint": 10, "active_tools": ["notion"]}, _rules_without_streak())
+	var meridia_report := _resolve([_squad("a", [feature], meridia)], {"sprint": 10, "active_tools": ["notion"]}, _rules_without_streak())
+	var karavel_lever := float(karavel_report.get("global", {}).get("lever", 0.0))
+	var meridia_lever := float(meridia_report.get("global", {}).get("lever", 0.0))
+	_assert_true(karavel_lever > 1.0, "Notion doit rester un Levier positif sur le roster réel de Karavel (obtenu %s)." % karavel_lever)
+	_assert_true(meridia_lever < 1.0, "Notion doit devenir un Levier négatif sur le roster réel de Meridia (obtenu %s)." % meridia_lever)
+
+
+func _company_roster(company_id: String) -> Array:
+	for company in companies_data:
+		if company.get("id", "") == company_id:
+			var roster: Array = []
+			for member in company.get("startingRoster", []):
+				roster.append({
+					"id": member.get("id", ""),
+					"role": member.get("role", ""),
+					"seniority": member.get("seniority", "junior"),
+					"hiredSprint": 0,
+				})
+			return roster
+	return []
 
 
 func _test_streak_and_friction_rules() -> void:
@@ -211,7 +250,7 @@ func _resolve(squads: Array, extra: Dictionary = {}, rules: Dictionary = {}) -> 
 	for key in extra.keys():
 		snapshot[key] = extra[key]
 	var scoring: Dictionary = scoring_data if rules.is_empty() else rules
-	return ScoreResolverScript.resolve(snapshot, {"scoring": scoring, "hidden_traits": hidden_traits_data})
+	return ScoreResolverScript.resolve(snapshot, {"scoring": scoring, "hidden_traits": hidden_traits_data, "cards": cards_data})
 
 
 func _rules_without_streak() -> Dictionary:
