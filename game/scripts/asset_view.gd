@@ -157,6 +157,9 @@ static func for_decision(card: Dictionary) -> Dictionary:
 		"primary": primary,
 		"dimmed": activated,
 		"stamp": "ACTIVÉE" if activated else "",
+		# Le tampon SVG signale le seul blocage structurel : une condition à
+		# atteindre. Le manque de pièces, lui, reste une information de coût.
+		"status_stamp": "blocked" if requirement.get("gated", false) and not requirement.get("ok", false) else "",
 	}, "decision", card_id, card, activated)
 
 

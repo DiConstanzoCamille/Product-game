@@ -52,82 +52,180 @@ size_flags_vertical=3
 size_flags_horizontal=3
 theme_override_constants/separation=18
 
-[node name="HeaderRow" type="HBoxContainer" parent="Margin/VBox/Scroll/Content"]
+[node name="HeroCard" type="PanelContainer" parent="Margin/VBox/Scroll/Content"]
+custom_minimum_size=Vector2(0, 84)
+
+[node name="Margin" type="MarginContainer" parent="Margin/VBox/Scroll/Content/HeroCard"]
+theme_override_constants/margin_left=24
+theme_override_constants/margin_top=20
+theme_override_constants/margin_right=24
+theme_override_constants/margin_bottom=20
+
+[node name="HeaderVBox" type="VBoxContainer" parent="Margin/VBox/Scroll/Content/HeroCard/Margin"]
+theme_override_constants/separation=8
+
+[node name="HeaderRow" type="HBoxContainer" parent="Margin/VBox/Scroll/Content/HeroCard/Margin/HeaderVBox"]
 theme_override_constants/separation=16
 
-[node name="EraLabel" type="Label" parent="Margin/VBox/Scroll/Content/HeaderRow"]
+[node name="EraLabel" type="Label" parent="Margin/VBox/Scroll/Content/HeroCard/Margin/HeaderVBox/HeaderRow"]
 text="Époque"
 
-[node name="CpoLabel" type="Label" parent="Margin/VBox/Scroll/Content/HeaderRow"]
+[node name="CpoLabel" type="Label" parent="Margin/VBox/Scroll/Content/HeroCard/Margin/HeaderVBox/HeaderRow"]
+size_flags_horizontal=3
 theme_override_colors/font_color=Color(0.47451, 0.501961, 0.552941, 1)
 text="CPO : Vous"
 
-[node name="RevenueLabel" type="Label" parent="Margin/VBox/Scroll/Content"]
-theme_override_font_sizes/font_size=17
+[node name="RevenueLabel" type="Label" parent="Margin/VBox/Scroll/Content/HeroCard/Margin/HeaderVBox"]
+theme_override_font_sizes/font_size=28
 text=""
 
-[node name="ScoreReplay" type="VBoxContainer" parent="Margin/VBox/Scroll/Content"]
+[node name="EconomicsDetail" type="Label" parent="Margin/VBox/Scroll/Content/HeroCard/Margin/HeaderVBox"]
+theme_override_font_sizes/font_size=13
+text=""
+
+[node name="ImpactCard" type="PanelContainer" parent="Margin/VBox/Scroll/Content"]
+custom_minimum_size=Vector2(0, 118)
+
+[node name="Margin" type="MarginContainer" parent="Margin/VBox/Scroll/Content/ImpactCard"]
+theme_override_constants/margin_left=24
+theme_override_constants/margin_top=16
+theme_override_constants/margin_right=24
+theme_override_constants/margin_bottom=16
+
+[node name="VBox" type="VBoxContainer" parent="Margin/VBox/Scroll/Content/ImpactCard/Margin"]
 theme_override_constants/separation=6
 
-[node name="ScoreHeader" type="HBoxContainer" parent="Margin/VBox/Scroll/Content/ScoreReplay"]
+[node name="ImpactEyebrow" type="Label" parent="Margin/VBox/Scroll/Content/ImpactCard/Margin/VBox"]
+text="IMPACT EN COURS"
+
+[node name="ImpactValue" type="Label" parent="Margin/VBox/Scroll/Content/ImpactCard/Margin/VBox"]
+theme_override_font_sizes/font_size=38
+text="0"
+
+[node name="ImpactProgress" type="ProgressBar" parent="Margin/VBox/Scroll/Content/ImpactCard/Margin/VBox"]
+custom_minimum_size=Vector2(0, 12)
+show_percentage=false
+
+[node name="ImpactContext" type="Label" parent="Margin/VBox/Scroll/Content/ImpactCard/Margin/VBox"]
+theme_override_font_sizes/font_size=13
+text="Les décisions du sprint vont se combiner."
+
+[node name="ScoreCard" type="PanelContainer" parent="Margin/VBox/Scroll/Content"]
+
+[node name="Margin" type="MarginContainer" parent="Margin/VBox/Scroll/Content/ScoreCard"]
+theme_override_constants/margin_left=24
+theme_override_constants/margin_top=18
+theme_override_constants/margin_right=24
+theme_override_constants/margin_bottom=20
+
+[node name="ScoreReplay" type="VBoxContainer" parent="Margin/VBox/Scroll/Content/ScoreCard/Margin"]
+theme_override_constants/separation=6
+
+[node name="ScoreHeader" type="HBoxContainer" parent="Margin/VBox/Scroll/Content/ScoreCard/Margin/ScoreReplay"]
 theme_override_constants/separation=12
 
-[node name="ScoreTitle" type="Label" parent="Margin/VBox/Scroll/Content/ScoreReplay/ScoreHeader"]
+[node name="ScoreTitle" type="Label" parent="Margin/VBox/Scroll/Content/ScoreCard/Margin/ScoreReplay/ScoreHeader"]
 size_flags_horizontal=3
 theme_override_font_sizes/font_size=18
 text="Traction × Levier = Impact"
 
-[node name="ScoreStatus" type="Label" parent="Margin/VBox/Scroll/Content/ScoreReplay/ScoreHeader"]
+[node name="ScoreStatus" type="Label" parent="Margin/VBox/Scroll/Content/ScoreCard/Margin/ScoreReplay/ScoreHeader"]
 theme_override_colors/font_color=Color(0.47451, 0.501961, 0.552941, 1)
 text=""
 
-[node name="ScoreLines" type="VBoxContainer" parent="Margin/VBox/Scroll/Content/ScoreReplay"]
+[node name="ScoreLines" type="VBoxContainer" parent="Margin/VBox/Scroll/Content/ScoreCard/Margin/ScoreReplay"]
 theme_override_constants/separation=4
 
-[node name="QuotaReplay" type="VBoxContainer" parent="Margin/VBox/Scroll/Content"]
+[node name="QuotaCard" type="PanelContainer" parent="Margin/VBox/Scroll/Content"]
+
+[node name="Margin" type="MarginContainer" parent="Margin/VBox/Scroll/Content/QuotaCard"]
+theme_override_constants/margin_left=24
+theme_override_constants/margin_top=16
+theme_override_constants/margin_right=24
+theme_override_constants/margin_bottom=18
+
+[node name="QuotaReplay" type="VBoxContainer" parent="Margin/VBox/Scroll/Content/QuotaCard/Margin"]
 visible=false
 theme_override_constants/separation=6
 
-[node name="QuotaHeader" type="HBoxContainer" parent="Margin/VBox/Scroll/Content/QuotaReplay"]
+[node name="QuotaHeader" type="HBoxContainer" parent="Margin/VBox/Scroll/Content/QuotaCard/Margin/QuotaReplay"]
 theme_override_constants/separation=12
 
-[node name="QuotaTitle" type="Label" parent="Margin/VBox/Scroll/Content/QuotaReplay/QuotaHeader"]
+[node name="QuotaTitle" type="Label" parent="Margin/VBox/Scroll/Content/QuotaCard/Margin/QuotaReplay/QuotaHeader"]
 size_flags_horizontal=3
 theme_override_font_sizes/font_size=18
 text="Impact trimestriel"
 
-[node name="QuotaStatus" type="Label" parent="Margin/VBox/Scroll/Content/QuotaReplay/QuotaHeader"]
+[node name="QuotaStatus" type="Label" parent="Margin/VBox/Scroll/Content/QuotaCard/Margin/QuotaReplay/QuotaHeader"]
 theme_override_colors/font_color=Color(0.47451, 0.501961, 0.552941, 1)
 text=""
 
-[node name="QuotaProgress" type="ProgressBar" parent="Margin/VBox/Scroll/Content/QuotaReplay"]
+[node name="QuotaProgress" type="ProgressBar" parent="Margin/VBox/Scroll/Content/QuotaCard/Margin/QuotaReplay"]
 custom_minimum_size=Vector2(0, 14)
 show_percentage=false
 
-[node name="QuotaLabel" type="Label" parent="Margin/VBox/Scroll/Content/QuotaReplay"]
+[node name="QuotaLabel" type="Label" parent="Margin/VBox/Scroll/Content/QuotaCard/Margin/QuotaReplay"]
 theme_override_font_sizes/font_size=15
 text=""
 
-[node name="QuotaVerdict" type="Label" parent="Margin/VBox/Scroll/Content/QuotaReplay"]
+[node name="QuotaVerdict" type="Label" parent="Margin/VBox/Scroll/Content/QuotaCard/Margin/QuotaReplay"]
 autowrap_mode=2
 text=""
 
-[node name="GaugesGrid" type="GridContainer" parent="Margin/VBox/Scroll/Content"]
+[node name="ResourcesCard" type="PanelContainer" parent="Margin/VBox/Scroll/Content"]
+
+[node name="Margin" type="MarginContainer" parent="Margin/VBox/Scroll/Content/ResourcesCard"]
+theme_override_constants/margin_left=24
+theme_override_constants/margin_top=16
+theme_override_constants/margin_right=24
+theme_override_constants/margin_bottom=18
+
+[node name="VBox" type="VBoxContainer" parent="Margin/VBox/Scroll/Content/ResourcesCard/Margin"]
+theme_override_constants/separation=12
+
+[node name="ResourcesTitle" type="Label" parent="Margin/VBox/Scroll/Content/ResourcesCard/Margin/VBox"]
+text="ÉTAT DES RESSOURCES"
+
+[node name="GaugesGrid" type="GridContainer" parent="Margin/VBox/Scroll/Content/ResourcesCard/Margin/VBox"]
 columns=2
 theme_override_constants/h_separation=24
 theme_override_constants/v_separation=14
 
-[node name="JournalTitle" type="Label" parent="Margin/VBox/Scroll/Content"]
+[node name="JournalCard" type="PanelContainer" parent="Margin/VBox/Scroll/Content"]
+
+[node name="Margin" type="MarginContainer" parent="Margin/VBox/Scroll/Content/JournalCard"]
+theme_override_constants/margin_left=24
+theme_override_constants/margin_top=16
+theme_override_constants/margin_right=24
+theme_override_constants/margin_bottom=18
+
+[node name="VBox" type="VBoxContainer" parent="Margin/VBox/Scroll/Content/JournalCard/Margin"]
+theme_override_constants/separation=12
+
+[node name="JournalTitle" type="Label" parent="Margin/VBox/Scroll/Content/JournalCard/Margin/VBox"]
 theme_override_font_sizes/font_size=15
 text="Journal du sprint"
 
-[node name="JournalContainer" type="VBoxContainer" parent="Margin/VBox/Scroll/Content"]
+[node name="JournalContainer" type="VBoxContainer" parent="Margin/VBox/Scroll/Content/JournalCard/Margin/VBox"]
 theme_override_constants/separation=10
 
-[node name="AlertLabel" type="Label" parent="Margin/VBox/Scroll/Content"]
+[node name="AlertLabel" type="Label" parent="Margin/VBox/Scroll/Content/JournalCard/Margin/VBox"]
 theme_override_colors/font_color=Color(0.701961, 0.501961, 0.101961, 1)
 autowrap_mode=2
 text=""
+
+[node name="StatStrip" type="PanelContainer" parent="Margin/VBox"]
+custom_minimum_size=Vector2(0, 78)
+
+[node name="Margin" type="MarginContainer" parent="Margin/VBox/StatStrip"]
+theme_override_constants/margin_left=18
+theme_override_constants/margin_top=10
+theme_override_constants/margin_right=18
+theme_override_constants/margin_bottom=10
+
+[node name="Stats" type="HBoxContainer" parent="Margin/VBox/StatStrip/Margin"]
+size_flags_horizontal=3
+theme_override_constants/separation=12
 
 [node name="BottomBar" type="HBoxContainer" parent="Margin/VBox"]
 theme_override_constants/separation=10

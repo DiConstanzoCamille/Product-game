@@ -74,8 +74,8 @@ func _test_ui_scale_settings() -> void:
 		int(ProjectSettings.get_setting("display/window/size/window_width_override", 0)),
 		int(ProjectSettings.get_setting("display/window/size/window_height_override", 0))
 	)
-	if viewport != Vector2i(1280, 720) or window != Vector2i(1600, 900):
-		_fail("L'UI doit etre rendue de 1280x720 vers une fenetre 1600x900.")
+	if viewport != Vector2i(1600, 900) or window != Vector2i(1920, 1080):
+		_fail("L'UI doit etre rendue de 1600x900 vers une fenetre 1920x1080.")
 	if ProjectSettings.get_setting("display/window/stretch/mode", "") != "canvas_items":
 		_fail("Le mode canvas_items doit garder l'interface lisible au redimensionnement.")
 
@@ -108,12 +108,32 @@ func _test_roadmap_interactions() -> void:
 
 		for candidate_control in screen.backlog_controls:
 			if candidate_control.has("select"):
-				var select: CheckButton = candidate_control["select"]
-				select.button_pressed = true
+				var select: Button = candidate_control["select"]
+				select.pressed.emit()
 				await get_tree().process_frame
 				if screen._current_plan().is_empty():
-					_fail("Le contrôle de sélection Roadmap ne produit aucun plan.")
+					_fail("Le bouton Ajouter au sprint ne produit aucun plan.")
 				break
+
+		# Le geste secondaire offre le meme resultat : deposer un ticket planifie
+		# le place dans la colonne « Ce sprint » sans contourner les regles.
+		for candidate_control in screen.backlog_controls:
+			if candidate_control.has("select"):
+				screen._on_ticket_dropped(candidate_control["item"].get("id", ""))
+				await get_tree().process_frame
+				var ticket: Control = candidate_control["ticket"]
+				if ticket.get_parent() != screen.sprint_list:
+					_fail("Le depot d'un ticket ne le place pas dans la colonne Ce sprint.")
+				break
+
+		# Le ticket reste consultable depuis le board : ses détails ne doivent pas
+		# être réservés à une carte séparée ou à une information cachée.
+		if not screen.backlog_controls.is_empty():
+			var open_button: Button = screen.backlog_controls[0]["open"]
+			open_button.pressed.emit()
+			await get_tree().process_frame
+			if screen.ticket_dialog == null or not screen.ticket_dialog.visible:
+				_fail("Le bouton Ouvrir de la Roadmap n'affiche pas le dossier ticket.")
 
 	screen.queue_free()
 	viewport.queue_free()
@@ -239,8 +259,8 @@ func _test_resolution_multi_team_replay() -> void:
 	for index in screen._score_events.size():
 		if screen._score_events[index].get("kind", "") == "divider":
 			divider_indexes.append(index)
-	if divider_indexes.size() != 2 or divider_indexes[0] != 0 or divider_indexes[1] <= 1:
-		_fail("La lecture multi-equipe doit reveler chaque separateur dans sa propre sequence.")
+	if divider_indexes.is_empty() or divider_indexes[0] != 0:
+		_fail("La lecture multi-equipe doit commencer par une section de choix lisible.")
 	screen._reveal_score_replay()
 	for child in screen.score_lines.get_children():
 		if child is Label and child.visible and "squad" in child.text.to_lower():

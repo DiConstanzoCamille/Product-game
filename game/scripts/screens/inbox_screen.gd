@@ -33,6 +33,7 @@ func _ready() -> void:
 
 	sprint_label.text = "Sprint %d — Phase 1 : Inbox" % SprintState.sprint_number
 	side_panel = UIHelpers.attach_side_panel(self)
+	UIHelpers.attach_decision_workspace(self, NodePath("Margin/VBox"))
 	_load_event()
 
 
@@ -47,17 +48,16 @@ func _load_event() -> void:
 	var sender: String = event.get("from", "")
 	channel_label.text = "💬 %s" % event.get("channel", DEFAULT_CHANNEL)
 	channel_meta_label.text = "Sprint %d · %s" % [SprintState.sprint_number, _timestamp()]
-	_append_incoming_message(sender, event.get("subject", ""), event.get("text", ""))
+	_append_incoming_message(sender, event.get("subject", ""), event.get("text", ""), event.get("status", ""))
 	_append_reply_drafts(event.get("choices", []))
 
 
-func _append_incoming_message(sender: String, subject: String, body: String) -> void:
+func _append_incoming_message(sender: String, subject: String, body: String, status: String) -> void:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 10)
 	messages_container.add_child(row)
 
-	var first_name := sender.split(",")[0].strip_edges()
-	var avatar := UIHelpers.make_avatar(first_name, 38)
+	var avatar := UIHelpers.make_sender_badge(sender, 38)
 	avatar.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	row.add_child(avatar)
 
@@ -81,11 +81,18 @@ func _append_incoming_message(sender: String, subject: String, body: String) -> 
 	copy.add_theme_constant_override("separation", 6)
 	bubble.add_child(copy)
 
+	var subject_row := HBoxContainer.new()
+	subject_row.add_theme_constant_override("separation", 10)
+	copy.add_child(subject_row)
+
 	var subject_label := Label.new()
 	subject_label.text = subject
 	subject_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	subject_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	UIHelpers.apply_heading(subject_label, 18, 600.0)
-	copy.add_child(subject_label)
+	subject_row.add_child(subject_label)
+	if status.to_lower() == "urgent":
+		subject_row.add_child(UIHelpers.make_stamp("urgent", 78))
 
 	var body_label := Label.new()
 	body_label.text = body
@@ -190,8 +197,7 @@ func _append_consequence_message(text: String) -> void:
 	row.add_theme_constant_override("separation", 10)
 	messages_container.add_child(row)
 
-	var avatar := UIHelpers.make_avatar("system", 30)
-	avatar.modulate = Color(UIHelpers.COLOR_SHELF.r, UIHelpers.COLOR_SHELF.g, UIHelpers.COLOR_SHELF.b, 0.65)
+	var avatar := UIHelpers.make_person_badge("Mise à jour", 30, UIHelpers.COLOR_SHELF)
 	avatar.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	row.add_child(avatar)
 
@@ -211,12 +217,17 @@ func _append_consequence_message(text: String) -> void:
 	bubble.add_theme_stylebox_override("panel", _bubble_style(Color("fff7db"), UIHelpers.COLOR_AMBER, 7))
 	column.add_child(bubble)
 
+	var header := HBoxContainer.new()
+	header.add_theme_constant_override("separation", 8)
+	bubble.add_child(header)
 	var label := Label.new()
 	label.text = text
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	label.add_theme_color_override("font_color", UIHelpers.COLOR_FLAVOR)
 	label.add_theme_font_size_override("font_size", 15)
-	bubble.add_child(label)
+	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	header.add_child(label)
+	header.add_child(UIHelpers.make_stamp("validated", 82))
 
 
 func _append_system_note(text: String) -> void:

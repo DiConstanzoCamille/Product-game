@@ -27,16 +27,10 @@ SprintState="*res://scripts/autoload/sprint_state.gd"
 
 [display]
 
-; La mise en page travaille sur une surface logique 1280x720, puis Godot la
-; rend dans une fenêtre 1600x900. Le facteur 1,25 garde les textes 11-16 px
-; lisibles sur les écrans Retina sans agrandir chaque composant séparément.
-; `canvas_items` préserve aussi cette échelle en plein écran et au
-; redimensionnement ; `expand` laisse les grilles responsives utiliser l'espace
-; supplémentaire au lieu d'ajouter des bandes noires.
-window/size/viewport_width=1280
-window/size/viewport_height=720
-window/size/window_width_override=1600
-window/size/window_height_override=900
+window/size/viewport_width=1600
+window/size/viewport_height=900
+window/size/window_width_override=1920
+window/size/window_height_override=1080
 window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
 

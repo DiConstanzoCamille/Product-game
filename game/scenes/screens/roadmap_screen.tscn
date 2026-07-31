@@ -1,7 +1,8 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://scripts/screens/roadmap_screen.gd" id="1"]
 [ext_resource type="ShaderMaterial" path="res://resources/shaders/grid_background_material.tres" id="2"]
+[ext_resource type="Script" path="res://scripts/components/roadmap_sprint_drop_zone.gd" id="3"]
 
 [node name="RoadmapScreen" type="Control"]
 anchors_preset=15
@@ -60,14 +61,72 @@ theme_override_colors/font_color=Color(0.827451, 0.329412, 0.247059, 1)
 text="⚠️ Surchauffe — capacité dépassée : 🧱 Dette et 🎭 Cynisme vont grimper ce sprint."
 autowrap_mode=2
 
-[node name="Scroll" type="ScrollContainer" parent="Margin/VBox"]
+[node name="Board" type="HBoxContainer" parent="Margin/VBox"]
 size_flags_vertical=3
+clip_contents=true
+theme_override_constants/separation=16
 
-[node name="FeatureGrid" type="GridContainer" parent="Margin/VBox/Scroll"]
+[node name="BacklogPanel" type="PanelContainer" parent="Margin/VBox/Board"]
+custom_minimum_size=Vector2(330, 0)
 size_flags_horizontal=3
-columns=2
-theme_override_constants/h_separation=14
-theme_override_constants/v_separation=14
+clip_contents=true
+
+[node name="Margin" type="MarginContainer" parent="Margin/VBox/Board/BacklogPanel"]
+theme_override_constants/margin_left=16
+theme_override_constants/margin_top=14
+theme_override_constants/margin_right=16
+theme_override_constants/margin_bottom=14
+
+[node name="VBox" type="VBoxContainer" parent="Margin/VBox/Board/BacklogPanel/Margin"]
+theme_override_constants/separation=10
+
+[node name="Title" type="Label" parent="Margin/VBox/Board/BacklogPanel/Margin/VBox"]
+text="BACKLOG"
+
+[node name="Subtitle" type="Label" parent="Margin/VBox/Board/BacklogPanel/Margin/VBox"]
+text="Propositions tirées ce sprint"
+
+[node name="Scroll" type="ScrollContainer" parent="Margin/VBox/Board/BacklogPanel/Margin/VBox"]
+size_flags_vertical=3
+horizontal_scroll_mode=0
+
+[node name="BacklogList" type="VBoxContainer" parent="Margin/VBox/Board/BacklogPanel/Margin/VBox/Scroll"]
+size_flags_horizontal=3
+theme_override_constants/separation=10
+
+[node name="SprintDropZone" type="PanelContainer" parent="Margin/VBox/Board"]
+custom_minimum_size=Vector2(330, 0)
+size_flags_horizontal=3
+clip_contents=true
+script=ExtResource("3")
+
+[node name="Margin" type="MarginContainer" parent="Margin/VBox/Board/SprintDropZone"]
+theme_override_constants/margin_left=16
+theme_override_constants/margin_top=14
+theme_override_constants/margin_right=16
+theme_override_constants/margin_bottom=14
+
+[node name="VBox" type="VBoxContainer" parent="Margin/VBox/Board/SprintDropZone/Margin"]
+theme_override_constants/separation=10
+
+[node name="Title" type="Label" parent="Margin/VBox/Board/SprintDropZone/Margin/VBox"]
+text="CE SPRINT"
+
+[node name="Subtitle" type="Label" parent="Margin/VBox/Board/SprintDropZone/Margin/VBox"]
+text="Déposez les tickets ici"
+
+[node name="PlanScroll" type="ScrollContainer" parent="Margin/VBox/Board/SprintDropZone/Margin/VBox"]
+size_flags_vertical=3
+horizontal_scroll_mode=0
+
+[node name="SprintList" type="VBoxContainer" parent="Margin/VBox/Board/SprintDropZone/Margin/VBox/PlanScroll"]
+size_flags_horizontal=3
+theme_override_constants/separation=10
+
+[node name="EmptyHint" type="Label" parent="Margin/VBox/Board/SprintDropZone/Margin/VBox/PlanScroll/SprintList"]
+text="Glissez un ticket du backlog\nou utilisez « Ajouter au sprint »."
+horizontal_alignment=1
+autowrap_mode=2
 
 [node name="BottomBar" type="HBoxContainer" parent="Margin/VBox"]
 

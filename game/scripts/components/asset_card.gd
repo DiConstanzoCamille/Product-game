@@ -230,10 +230,24 @@ func _build_decorations() -> void:
 func _build_stamp() -> void:
 	_stamp = null
 	var text: String = _descriptor.get("stamp", "")
-	if text == "":
+	var status_stamp: String = _descriptor.get("status_stamp", "")
+	if text == "" and status_stamp == "":
 		return
 
 	var layer: Control = get_node("Decorations")
+	if status_stamp != "" and text == "":
+		var blocked := UIHelpers.make_stamp(status_stamp, 132)
+		blocked.modulate = Color(1, 1, 1, 0.82)
+		layer.add_child(blocked)
+		var place_blocked := func():
+			blocked.size = blocked.get_combined_minimum_size()
+			blocked.pivot_offset = blocked.size / 2.0
+			blocked.position = ((layer.size - blocked.size) / 2.0).round()
+			blocked.rotation_degrees = STAMP_ANGLE
+		place_blocked.call()
+		layer.resized.connect(place_blocked)
+		return
+
 	var stamp := PanelContainer.new()
 	stamp.mouse_filter = Control.MOUSE_FILTER_IGNORE
 

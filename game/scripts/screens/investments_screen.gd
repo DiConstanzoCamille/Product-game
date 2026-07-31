@@ -54,6 +54,7 @@ func _ready() -> void:
 	sprint_label.text = "Sprint %d — Phase 3 : Investissements" % SprintState.sprint_number
 
 	side_panel = UIHelpers.attach_side_panel(self)
+	UIHelpers.attach_decision_workspace(self, NodePath("Margin/VBox"))
 	# Un 1:1, un licenciement ou une embauche faits depuis le panneau changent ce
 	# que les cartes affichent (Énergie, effectif, traits révélés) et le profil
 	# d'effet des décisions — mais le panneau, lui, s'est déjà rafraîchi : on ne
