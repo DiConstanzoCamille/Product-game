@@ -62,6 +62,10 @@ const VALUE_PUNCH_DURATION := 0.22
 const PIECES_ROLL_DURATION := 0.35
 const SLIDE_IN_DURATION := 0.25
 
+## Distance de départ du slide-in d'une nouvelle ligne de roster (§5.2) — pas
+## une durée, mais une géométrie de présentation pure au même titre : groupée ici.
+const ROSTER_SLIDE_OFFSET := 28.0
+
 var collapsed := false
 
 var _dossier: Control = null
@@ -472,14 +476,21 @@ func _gauge(icon: String, name: String, resource_id: String, base_value: float, 
 	vbox.add_child(bar)
 
 	if should_animate:
-		var ratio_tween := create_tween()
+		# Créés sur le nœud animé, pas sur `self` (le panneau, qui survit à la
+		# jauge) : `_build()` reconstruit tout à chaque refresh(), et un tween
+		# créé sur `self` continuerait à tourner après que `fill`/`value_wrap`
+		# aient été libérés par `UIHelpers.clear_children()` — la fermeture de
+		# `tween_method` appellerait alors une méthode sur un objet mort.
+		# `Node.create_tween()` tue automatiquement le tween quand le nœud sur
+		# lequel il a été créé est libéré.
+		var ratio_tween := fill.create_tween()
 		ratio_tween.tween_method(func(r: float):
 			fill.set_meta("ratio", r)
 			layout.call()
 		, float(fill.get_meta("ratio")), engaged_ratio, GAUGE_TWEEN_DURATION).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 
 		value_wrap.pivot_offset = value_wrap.size / 2.0
-		var punch_tween := create_tween()
+		var punch_tween := value_wrap.create_tween()
 		punch_tween.tween_property(value_wrap, "scale", Vector2(1.35, 1.35), VALUE_PUNCH_DURATION * 0.4) \
 			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 		punch_tween.tween_property(value_wrap, "scale", Vector2.ONE, VALUE_PUNCH_DURATION * 0.6) \
@@ -535,7 +546,11 @@ func _blinking_chip(text: String, color: Color) -> Control:
 	var label := _label(text, 12, color)
 	label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var tween := create_tween().set_loops()
+	# Créé sur `label`, pas sur `self` : la boucle est infinie
+	# (`set_loops()` sans argument), et `self` (le panneau) survit à ce chip
+	# le temps que dure la preview — sans ce nœud comme point d'ancrage, le
+	# tween tournerait indéfiniment pour rien une fois le chip libéré.
+	var tween := label.create_tween().set_loops()
 	tween.tween_property(label, "modulate:a", 0.25, 0.55).set_trans(Tween.TRANS_SINE)
 	tween.tween_property(label, "modulate:a", 1.0, 0.55).set_trans(Tween.TRANS_SINE)
 	return label
@@ -587,7 +602,11 @@ func _pieces_row() -> Control:
 	_pieces_node = row
 
 	if should_animate:
-		var tween := create_tween()
+		# Sur `value`, pas sur `self` — même raison qu'en `_gauge()` : sans ça,
+		# le tween survivrait au `_build()` suivant et sa fermeture appellerait
+		# `.text =` sur un Label déjà libéré (observé au smoke test UI, qui
+		# enchaîne les refresh() sans laisser les animations finir).
+		var tween := value.create_tween()
 		tween.tween_method(func(v: int): value.text = "%d" % v, animate_from, current, PIECES_ROLL_DURATION) \
 			.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 
@@ -613,13 +632,30 @@ func _build_team(vbox: VBoxContainer) -> void:
 
 	if roster.is_empty():
 		vbox.add_child(_label("Plus personne. Une organisation parfaitement silencieuse.", 10, UIHelpers.PANEL_MUTED, true))
+		_last_roster_ids = []
+		_roster_initialized = true
 		return
 
+	# Embauche (§5.2) : « la ligne apparaît dans le roster du panneau en
+	# slide-in ». Détectée comme l'engagement des jauges — en comparant le
+	# roster de ce `_build()` à celui du précédent — plutôt qu'un signal que
+	# l'écran hôte devrait déclencher. `_roster_initialized` évite de faire
+	# glisser tout le monde au premier affichage du panneau.
+	var roster_ids: Array = []
+	var new_ids: Array = []
 	for employee in roster:
-		vbox.add_child(_team_row(employee))
+		var employee_id: String = employee.get("id", "")
+		roster_ids.append(employee_id)
+		if _roster_initialized and not _last_roster_ids.has(employee_id):
+			new_ids.append(employee_id)
+	_last_roster_ids = roster_ids
+	_roster_initialized = true
+
+	for employee in roster:
+		vbox.add_child(_team_row(employee, new_ids.has(employee.get("id", ""))))
 
 
-func _team_row(employee: Dictionary) -> Control:
+func _team_row(employee: Dictionary, slide_in: bool = false) -> Control:
 	var roles: Dictionary = GameData.balance.get("roles", {})
 	var role_conf: Dictionary = roles.get(employee.get("role", ""), {})
 	var revealed: bool = employee.get("hiddenRevealed", false)
@@ -645,7 +681,19 @@ func _team_row(employee: Dictionary) -> Control:
 	role_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(role_label)
 
-	return _spaced(row, 3, 3)
+	var spaced := _spaced(row, 3, 3)
+	if not slide_in:
+		return spaced
+
+	# Le geste déjà généralisé par UIHelpers.wrap_animatable() (punch de valeur
+	# de jauge) : extraire la ligne de son VBoxContainer pour lui laisser une
+	# `position` que le tri du conteneur ne réécrasera pas.
+	var wrap := UIHelpers.wrap_animatable(spaced)
+	spaced.position = Vector2(-ROSTER_SLIDE_OFFSET, 0.0)
+	var tween := spaced.create_tween().set_parallel(true)
+	tween.tween_property(spaced, "position:x", 0.0, SLIDE_IN_DURATION).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	UIHelpers.fade_in(spaced, SLIDE_IN_DURATION)
+	return wrap
 
 
 func _hidden_trait_icon(employee: Dictionary) -> String:
