@@ -66,6 +66,11 @@ var quarter_result: Dictionary = {}
 var quarter_exit_choice_pending: bool = false
 var long_mandate: bool = false
 var quarter_forced_strategy_id: String = ""
+var career_level: String = "pm"        # index dans balance.json → toolSlots.careerLevels (une seule ligne remplie avant le lot 5)
+var tool_slots_purchased: int = 0      # +1/+2 achetés au Comité, à prix croissant (spec §7.1.1)
+var swap_count: int = 0                # bascules d'outil déjà faites ce mandat (spec §7.1.2) — chaque nouvelle coûte plus de Cynisme
+var chosen_strategy_ids: Array = []    # décisions stratégiques choisies ce mandat — permanentes, 1 par trimestre (spec §7.2)
+var quarter_strategy_chosen: bool = false  # une décision stratégique a déjà été prise ce trimestre (imposée ou volontaire)
 var current_shop_offer: Dictionary = {}     # {sprint, candidates:[...], practices:[ids], decisions:[ids], leased:[ids], rerolls} — tirage des Investissements
 var reserved_assets: Array = []             # 📌 [{kind, id, data, sprint, paid}] — punaisés, réinjectés dans l'offre suivante
 var leased_decisions: Dictionary = {}       # 🔒 card_id -> sprint d'expiration du bail d'une carte à prérequis
@@ -135,6 +140,11 @@ func reset_run(chosen_era_id: String = "", chosen_company_id: String = "") -> vo
 	quarter_exit_choice_pending = false
 	long_mandate = false
 	quarter_forced_strategy_id = ""
+	career_level = "pm"
+	tool_slots_purchased = 0
+	swap_count = 0
+	chosen_strategy_ids.clear()
+	quarter_strategy_chosen = false
 	_quarter_requirement_bag.clear()
 	_last_quarter_requirement_id = ""
 	current_shop_offer.clear()
@@ -146,6 +156,18 @@ func reset_run(chosen_era_id: String = "", chosen_company_id: String = "") -> vo
 
 	var company: Dictionary = get_company()
 	pieces = int(company.get("startingPieces", 0))
+
+	# 🎁 Outillage hérité (spec §7.1.3) : l'entreprise arrive avec 1-2 outils
+	# déjà installés par quelqu'un d'autre, qui occupent un slot dès le
+	# premier sprint. Aucune branche par entreprise ici — inheritedTools[]
+	# est une donnée de companies.json, le mécanisme est générique.
+	for tool_id in company.get("inheritedTools", []):
+		var inherited_card: String = str(tool_id)
+		if find_card(inherited_card).is_empty() or activated_cards.has(inherited_card):
+			continue
+		activated_cards.append(inherited_card)
+		activated_card_sprints[inherited_card] = 0
+
 	var primary_roster: Array = []
 	var salaries: Dictionary = GameData.balance.get("salaries", {})
 	for member in company.get("startingRoster", []):
@@ -327,6 +349,7 @@ func _prepare_quarter(next_quarter: int) -> void:
 	quarter_impact = 0
 	quarter_sprint = 0
 	quarter_forced_strategy_id = ""
+	quarter_strategy_chosen = false
 	var long_conf: Dictionary = GameData.quotas.get("longMandate", {})
 	var accumulate := quarter_index >= int(long_conf.get("fromQuarter", 5)) and bool(long_conf.get("requirementsAccumulate", true))
 	var requirement_id := _draw_quarter_requirement_id(quarter_requirement_ids if accumulate else [])
@@ -380,12 +403,71 @@ func _normalize_quarter_effects(raw: Dictionary) -> Dictionary:
 	return result
 
 
+## 🗣️ Injonction du board (spec §7.2, §11.2) : le trimestre impose une
+## décision stratégique sans laisser le choix. Elle consomme l'unique
+## décision stratégique du trimestre, comme un choix volontaire l'aurait
+## fait — d'où l'appel à choose_strategy() plutôt qu'une simple affectation.
 func _assign_forced_strategy() -> void:
-	var pool: Array = _active_quarter_effects().get("forcedStrategyPool", [])
-	if pool.is_empty():
+	if quarter_strategy_chosen:
 		return
+	var pool: Array = _active_quarter_effects().get("forcedStrategyPool", [])
+	var available: Array = []
+	for strategy_id in pool:
+		if not chosen_strategy_ids.has(str(strategy_id)):
+			available.append(str(strategy_id))
+	if available.is_empty():
+		return
+	available.shuffle()
+	var candidate: String = available[0]
+	if choose_strategy(candidate) == "":
+		quarter_forced_strategy_id = candidate
+
+
+# --- 🧭 Décisions stratégiques — la 4e famille (spec §7.2) ---
+## Elles ne touchent pas l'équipe : elles redéfinissent ce que le produit est
+## pour le marché. Une par trimestre, irréversible. Le Comité qui les
+## présente est le Lot 4 (écran non construit) ; ces fonctions sont le point
+## d'entrée qu'il appellera, branché ici sur la fin de trimestre déjà
+## existante (_prepare_quarter / _record_quarter_resolution).
+
+## Catalogue proposé ce trimestre — tout ce qui n'a pas déjà été choisi.
+## Vide si une décision a déjà été prise ce trimestre (imposée ou non).
+func get_strategy_options(count: int = 3) -> Array:
+	if quarter_strategy_chosen:
+		return []
+	var pool: Array = []
+	for strategy in GameData.strategy.get("strategies", []):
+		var strategy_id: String = strategy.get("id", "")
+		if strategy_id != "" and not chosen_strategy_ids.has(strategy_id):
+			pool.append(strategy)
 	pool.shuffle()
-	quarter_forced_strategy_id = str(pool[0])
+	return pool.slice(0, min(count, pool.size()))
+
+
+func find_strategy(strategy_id: String) -> Dictionary:
+	for strategy in GameData.strategy.get("strategies", []):
+		if strategy.get("id", "") == strategy_id:
+			return strategy
+	return {}
+
+
+## Choix volontaire (ou forcé, via _assign_forced_strategy) d'une décision
+## stratégique — irréversible pour le reste du mandat. Retourne "" si le
+## choix a eu lieu, sinon la raison du refus.
+func choose_strategy(strategy_id: String) -> String:
+	if quarter_strategy_chosen:
+		return "deja-choisie-ce-trimestre"
+	if chosen_strategy_ids.has(strategy_id):
+		return "deja-active"
+	var strategy := find_strategy(strategy_id)
+	if strategy.is_empty():
+		return "introuvable"
+	chosen_strategy_ids.append(strategy_id)
+	quarter_strategy_chosen = true
+	pending_journal_lines.append("🧭 Décision stratégique : %s %s adoptée — irréversible pour le reste du mandat." % [
+		strategy.get("icon", ""), strategy.get("name", strategy_id)
+	])
+	return ""
 
 
 func get_companies_for_era(target_era_id: String) -> Array:
@@ -1123,6 +1205,79 @@ func decision_cost(card_id: String) -> int:
 	return int(find_card(card_id).get("costPieces", 0))
 
 
+# --- 🔧 Les slots d'outillage — la vraie limite de fin de mandat (spec §7.1.1) ---
+
+## Base de slots du kit de départ, indexée par niveau de carrière — table à
+## une seule ligne remplie avant le lot 5 (contrat d'architecture, CLAUDE.md).
+func get_tool_slot_base() -> int:
+	var levels: Dictionary = GameData.balance.get("toolSlots", {}).get("careerLevels", {})
+	var level: Dictionary = levels.get(career_level, levels.get("pm", {}))
+	return int(level.get("base", 3))
+
+
+## Les outils cumulatifs rendent leur place (`slotBonus`, §7.1.1.b) : sans
+## ça, un outil qu'on ne peut jamais retirer gèlerait un tiers d'un build de PM.
+func get_tool_slot_bonus() -> int:
+	var bonus := 0
+	for card_id in activated_cards:
+		bonus += int(find_card(card_id).get("slotBonus", 0))
+	return bonus
+
+
+func get_tool_slot_capacity() -> int:
+	return get_tool_slot_base() + tool_slots_purchased + get_tool_slot_bonus()
+
+
+## Prix du prochain slot supplémentaire (12 puis 20 💶, §7.1.1) ; -1 une fois
+## le plafond de +2 atteint.
+func tool_slot_purchase_cost() -> int:
+	var costs: Array = GameData.balance.get("toolSlots", {}).get("extraSlotCosts", [])
+	if tool_slots_purchased >= costs.size():
+		return -1
+	return int(costs[tool_slots_purchased])
+
+
+## Achète un slot supplémentaire au Comité. Retourne "" si l'achat a eu lieu,
+## sinon la raison du refus ("plafond" ou "pieces").
+func buy_tool_slot() -> String:
+	var cost := tool_slot_purchase_cost()
+	if cost < 0:
+		return "plafond"
+	if pieces < cost:
+		return "pieces"
+	pieces -= cost
+	tool_slots_purchased += 1
+	pending_journal_lines.append("🔧 Slot d'outillage supplémentaire acheté (%d 🪙) — %d/%d." % [
+		cost, get_tool_slot_capacity(), get_tool_slot_capacity()
+	])
+	return ""
+
+
+## 🎭 Le coût de bascule (spec §7.1.2, carnet §7 jamais implémenté avant ce
+## lot) : Cynisme +4, +3 par bascule déjà faite ce mandat.
+func swap_cynisme_penalty() -> int:
+	var conf: Dictionary = GameData.balance.get("toolSlots", {}).get("swap", {})
+	return int(conf.get("cynisme", 4)) + int(conf.get("cynismePerPreviousSwap", 3)) * swap_count
+
+
+## Libère le slot d'un outil actif : son Levier disparaît immédiatement, son
+## compteur cumulatif (Sprint rétro) repart de zéro s'il est un jour
+## rechoisi, et la carte retourne au pool de tirage. Retourne "" si la
+## bascule a eu lieu, sinon la raison du refus.
+func release_tool_slot(card_id: String) -> String:
+	if not activated_cards.has(card_id):
+		return "pas-active"
+	var card := find_card(card_id)
+	var penalty := swap_cynisme_penalty()
+	add_pending({"cynisme": float(penalty)}, "🔁 %s libéré : Levier perdu immédiatement, 🎭 Cynisme +%d (bascule n°%d ce mandat)." % [
+		card.get("name", card_id), penalty, swap_count + 1
+	])
+	activated_cards.erase(card_id)
+	activated_card_sprints.erase(card_id)
+	swap_count += 1
+	return ""
+
+
 ## Active une grande décision : les pièces tombent immédiatement, ses effets
 ## rejoignent le panier du sprint, elle devient une Fondation et quitte
 ## définitivement l'offre. Retourne "" si l'activation a eu lieu, sinon la
@@ -1130,7 +1285,7 @@ func decision_cost(card_id: String) -> int:
 func activate_decision(card_id: String) -> String:
 	if activated_cards.has(card_id):
 		return "deja-activee"
-	if activated_cards.size() >= int(GameData.balance.get("structuralDecisionMaxActivations", 4)):
+	if activated_cards.size() >= get_tool_slot_capacity():
 		return "plus-de-slot"
 	var card := find_card(card_id)
 	if card.is_empty():
@@ -1521,6 +1676,7 @@ func apply_pending_and_check() -> String:
 	last_score_report = ScoreResolver.resolve(_build_score_snapshot(), {
 		"scoring": GameData.scoring,
 		"hidden_traits": GameData.hidden_traits,
+		"cards": GameData.cards,
 	})
 	_apply_payroll()
 	_apply_score_conversion()
@@ -1656,11 +1812,11 @@ func _build_score_snapshot() -> Dictionary:
 	}
 
 
+## Les décisions stratégiques sont permanentes une fois choisies (spec §7.2)
+## — à distinguer des outils (`activated_cards`), qui restent une famille à
+## part et peuvent être libérés (§7.1.2).
 func _score_strategy_ids() -> Array:
-	var strategy_ids := activated_cards.duplicate()
-	if quarter_forced_strategy_id != "" and not strategy_ids.has(quarter_forced_strategy_id):
-		strategy_ids.append(quarter_forced_strategy_id)
-	return strategy_ids
+	return chosen_strategy_ids.duplicate()
 
 
 func _active_tool_entries() -> Array:

@@ -1,5 +1,6 @@
 {
   "version": 1,
+  "_comment": "Source de vérité de Traction × Levier = Impact (docs/spec-scoring-sprint.md). Depuis le Lot 3, le Levier par outil (perEmployee/eligibility/refractory/adoptionCondition/cumulative/flatModifiers) ne vit plus ici : il est déclaré sur la carte elle-même dans cards.json, pour que ScoreResolver et l'écran d'Investissements lisent la même donnée sans la dupliquer. global.strategies reste ici — data/strategy.json n'est que le catalogue affiché au Comité, ScoreResolver ne connaît que cette table.",
   "traction": {
     "feature": { "pointsMultiplier": 4, "clientImpactMultiplier": 3 },
     "epic": { "pointsMultiplier": 6 },
@@ -41,14 +42,6 @@
       "segmentation-clients": { "lever": 0.05, "icon": "💼", "label": "Segmentation clients" },
       "okr": { "lever": 0.05, "icon": "🎯", "label": "OKR" },
       "retros-sinceres": { "lever": 0.1, "icon": "🫶", "label": "Rétrospectives sincères" }
-    },
-    "tools": {
-      "notion": { "icon": "📓", "label": "Notion", "perEligible": 0.08, "perRefractory": -0.05, "eligible": { "anyOf": [{ "seniority": "junior" }, { "hiredWithinSprints": 4 }] }, "refractory": { "seniority": "senior", "hiredBeforeSprints": 8 }, "adoption": { "multiplier": 2, "condition": { "noMatch": { "seniority": "senior", "hiredBeforeSprints": 8 } } } },
-      "jira": { "icon": "🗂️", "label": "Jira", "perEligible": 0.05, "eligible": {}, "flatConditions": [{ "when": { "rosterMaximum": 4 }, "lever": -0.15 }], "adoption": { "multiplier": 2, "condition": { "rosterMinimum": 8 } } },
-      "rice": { "icon": "🧮", "label": "RICE Scoring", "perEligible": 0.08, "eligible": { "roles": ["pm", "designer"] }, "adoption": { "multiplier": 2, "condition": { "rejectedFeaturesMinimum": 3 } } },
-      "daily-standup": { "icon": "🔁", "label": "Sprint planning", "perEligible": 0.06, "eligible": { "roles": ["dev", "pm"] }, "adoption": { "multiplier": 2, "condition": { "previousPerfectSprint": true } } },
-      "sprint-retro": { "icon": "🪞", "label": "Sprint rétro", "cumulativePerSprint": 0.05, "adoption": { "multiplier": 2, "condition": { "resourceMaximum": { "cynisme": 30 } } } },
-      "shape-up": { "icon": "🤝", "label": "Pair programming", "perEligible": 0.08, "eligible": { "roles": ["dev"], "seniority": "junior" }, "adoption": { "multiplier": 2, "condition": { "roleSeniorityMinimum": { "role": "dev", "seniority": "junior", "minimum": 2 } } } }
     },
     "strategies": {
       "open-source": { "tractionMultiplier": 1.4, "mrrMultiplier": 0.5, "icon": "🔓", "label": "Open source" },

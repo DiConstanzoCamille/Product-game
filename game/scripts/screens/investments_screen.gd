@@ -155,7 +155,7 @@ func _refresh_shelf_head() -> void:
 	UIHelpers.clear_children(shelf_head)
 
 	var used: int = SprintState.activated_cards.size()
-	var maximum := int(GameData.balance.get("structuralDecisionMaxActivations", 4))
+	var maximum := SprintState.get_tool_slot_capacity()
 	var parts: Array = []
 	if int(offer.get("rerolls", 0)) > 0:
 		parts.append("re-tiré %d fois ce sprint" % int(offer.get("rerolls", 0)))

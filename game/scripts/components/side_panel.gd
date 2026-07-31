@@ -506,7 +506,7 @@ func _build_assets(vbox: VBoxContainer) -> void:
 	vbox.add_child(_spaced(_rule(), 10, 0))
 	vbox.add_child(_group_label("Actifs"))
 
-	var max_activations := int(GameData.balance.get("structuralDecisionMaxActivations", 4))
+	var max_activations := SprintState.get_tool_slot_capacity()
 	var names: Array = []
 	for card_id in SprintState.activated_cards:
 		for card in GameData.cards.get("cards", []):

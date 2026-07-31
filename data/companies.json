@@ -12,6 +12,7 @@
       "teamProfile": "senior",
       "teamCap": 7,
       "startingPieces": 5,
+      "inheritedTools": ["jira"],
       "startingRoster": [
         { "id": "herve-pm", "name": "Hervé", "role": "pm", "seniority": "senior", "trait": "Connaît tous les raccourcis politiques de la maison", "visible_trait_id": "political-shortcuts" },
         { "id": "danielle-dev", "name": "Danielle", "role": "dev", "seniority": "senior", "trait": "Maintient seule un module que personne n'ose ouvrir", "visible_trait_id": "module-fragile" },
@@ -37,6 +38,7 @@
       "teamProfile": "junior",
       "teamCap": 6,
       "startingPieces": 4,
+      "inheritedTools": ["notion"],
       "startingRoster": [
         { "id": "jade-pm", "name": "Jade", "role": "pm", "seniority": "junior", "trait": "Gère le backlog dans un tableur nommé « FINAL_v7 »", "visible_trait_id": "spreadsheet-backlog" },
         { "id": "bilal-dev", "name": "Bilal", "role": "dev", "seniority": "junior", "trait": "Déploie le vendredi soir, par optimisme", "visible_trait_id": "friday-deployer" },

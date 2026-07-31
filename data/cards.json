@@ -1,4 +1,5 @@
 {
+  "_comment": "Grandes décisions structurelles (spec scoring §7.1/§7.1.1/§7.1.2). Les axes/effects historiques restent le feedback immédiat sur les jauges à l'activation (par teamProfile). Depuis le Lot 3, un outil (family outil-process/methodologie-orga) peut en plus déclarer perEmployee/eligibility/refractory/adoptionCondition/flatModifiers/cumulative/slotBonus : le Levier continu que ScoreResolver applique chaque sprint tant que la carte reste active, calculé sur le roster réel — jamais une valeur figée par entreprise. slotBonus n'existe que sur les outils cumulatifs (ils rendent leur place, §7.1.1.b). Une carte sans ces champs (Shape Up) ne produit aucun Levier par employé, seulement ses effets de jauge et sa place dans les combos de composition.",
   "axes": [
     { "id": "humain", "label": "Coût humain" },
     { "id": "financier", "label": "Coût financier" },
@@ -18,7 +19,11 @@
       "category": "Module priorisation",
       "rarity": "commune",
       "name": "RICE Scoring",
+      "icon": "🧮",
       "tagline": "Reach × Impact × Confidence ÷ Effort. La science contre le petit doigt mouillé.",
+      "perEmployee": 0.08,
+      "eligibility": { "roles": ["pm", "designer"] },
+      "adoptionCondition": { "multiplier": 2, "condition": { "rejectedFeaturesMinimum": 3 } },
       "effects": {
         "junior": {
           "humain": { "value": 25, "note": "Cadre qui rassure une équipe qui manque encore de repères." },
@@ -42,7 +47,12 @@
       "category": "Module documentation",
       "rarity": "commune",
       "name": "Notion",
+      "icon": "📓",
       "tagline": "Un espace blanc infini. Tout y est possible, y compris s'y perdre.",
+      "perEmployee": 0.08,
+      "eligibility": { "anyOf": [{ "seniority": "junior" }, { "hiredWithinSprints": 4 }] },
+      "refractory": { "condition": { "seniority": "senior", "hiredBeforeSprints": 8 }, "perEmployee": -0.05 },
+      "adoptionCondition": { "multiplier": 2, "condition": { "noMatch": { "seniority": "senior", "hiredBeforeSprints": 8 } } },
       "effects": {
         "junior": {
           "humain": { "value": 30, "note": "Équipe conquise par la liberté de mise en page." },
@@ -67,7 +77,12 @@
       "rarity": "notable",
       "eraWeights": { "agile-transformation": 2.0 },
       "name": "Jira",
+      "icon": "🗂️",
       "tagline": "Chaque ticket a un statut. Chaque statut a un mensonge.",
+      "perEmployee": 0.05,
+      "eligibility": {},
+      "flatModifiers": [{ "when": { "rosterMaximum": 4 }, "value": -0.15 }],
+      "adoptionCondition": { "multiplier": 2, "condition": { "rosterMinimum": 8 } },
       "effects": {
         "junior": {
           "humain": { "value": -30, "note": "Vécu comme une mise sous surveillance d'une équipe de six personnes." },
@@ -91,8 +106,13 @@
       "category": "Rituel quotidien",
       "rarity": "commune",
       "name": "Daily Standup",
+      "icon": "🔁",
+      "leverLabel": "Sprint planning",
       "tagline": "Quinze minutes debout, en théorie. La réalité dépend beaucoup de qui parle en premier.",
       "eras": ["agile-transformation"],
+      "perEmployee": 0.06,
+      "eligibility": { "roles": ["dev", "pm"] },
+      "adoptionCondition": { "multiplier": 2, "condition": { "previousPerfectSprint": true } },
       "effects": {
         "junior": {
           "humain": { "value": 20, "note": "Un repère quotidien qui rassure une équipe qui manque encore de rythme." },
@@ -116,8 +136,12 @@
       "category": "Rituel de fin de sprint",
       "rarity": "notable",
       "name": "Sprint Rétro",
+      "icon": "🪞",
       "tagline": "Le seul moment où on a le droit de dire que ça ne va pas — encore faut-il que quelqu'un ose.",
       "eras": ["agile-transformation"],
+      "cumulative": { "perSprint": 0.05 },
+      "slotBonus": 1,
+      "adoptionCondition": { "multiplier": 2, "condition": { "resourceMaximum": { "cynisme": 30 } } },
       "effects": {
         "junior": {
           "humain": { "value": 15, "note": "Premier espace où la parole circule sans hiérarchie." },

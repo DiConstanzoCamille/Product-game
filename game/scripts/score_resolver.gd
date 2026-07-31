@@ -7,6 +7,7 @@ extends RefCounted
 static func resolve(snapshot: Dictionary, tables: Dictionary = {}) -> Dictionary:
 	var rules: Dictionary = tables.get("scoring", snapshot.get("scoring", {}))
 	var hidden_traits: Dictionary = tables.get("hidden_traits", snapshot.get("hidden_traits", {}))
+	var cards: Dictionary = tables.get("cards", snapshot.get("cards", {}))
 	var resources: Dictionary = snapshot.get("resources", snapshot.get("resource_values", {}))
 	var squads: Array = snapshot.get("squads", [])
 	if squads.is_empty():
@@ -45,13 +46,13 @@ static func resolve(snapshot: Dictionary, tables: Dictionary = {}) -> Dictionary
 	var active_tools := _active_tool_entries(snapshot)
 	for tool_entry in active_tools:
 		var tool_id: String = tool_entry.get("id", "")
-		var tool: Dictionary = global_rules.get("tools", {}).get(tool_id, {})
-		if tool.is_empty():
+		var card := _find_card(cards, tool_id)
+		if not _card_has_lever(card):
 			continue
-		var tool_value := _tool_lever(tool, tool_entry, all_roster, snapshot, resources, hidden_traits)
+		var tool_value := _tool_lever(card, tool_entry, all_roster, snapshot, resources, hidden_traits)
 		var tool_before := global_lever
 		global_lever += tool_value
-		global_lines.append(_line(step, "global", tool.get("icon", "🛠️"), _tool_label(tool, tool_entry, all_roster, snapshot, hidden_traits), "lever_add", tool_value, tool_before, global_lever))
+		global_lines.append(_line(step, "global", card.get("icon", "🛠️"), _tool_label(card, tool_entry, all_roster, snapshot, hidden_traits), "lever_add", tool_value, tool_before, global_lever))
 
 	step = 5
 	for strategy_id in strategy_ids:
@@ -472,28 +473,53 @@ static func _ids_from(source: Variant) -> Array:
 	return ids.filter(func(id): return id != "")
 
 
-static func _tool_lever(tool: Dictionary, entry: Dictionary, roster: Array, snapshot: Dictionary, resources: Dictionary, hidden_traits: Dictionary) -> float:
-	var eligible := _matching_employee_count(roster, tool.get("eligible", {}), snapshot, hidden_traits)
-	var refractory := _matching_employee_count(roster, tool.get("refractory", {}), snapshot, hidden_traits)
-	var result := eligible * float(tool.get("perEligible", 0.0)) + refractory * float(tool.get("perRefractory", 0.0))
-	if tool.has("cumulativePerSprint"):
-		result += float(entry.get("active_sprints", entry.get("activeSprints", 0))) * float(tool.get("cumulativePerSprint", 0.0))
-	for condition in tool.get("flatConditions", []):
-		if _matches_global_condition(condition.get("when", {}), roster, snapshot, resources, hidden_traits):
-			result += float(condition.get("lever", 0.0))
-	var adoption: Dictionary = tool.get("adoption", {})
+## Un outil (family outil-process/methodologie-orga de cards.json) décrit son
+## propre Levier — spec §7.1. Une carte sans aucun de ces champs (Shape Up)
+## n'a pas de Levier par employé : elle ne pèse que via les combos de
+## composition (local.organizationCombos). C'est la même carte, junior ou
+## senior, tirée sur n'importe quelle entreprise : rien ici ne branche sur
+## un id d'entreprise, seul le roster réel change le résultat (§7.1, "Notion
+## sur Karavel / Notion sur Meridia").
+static func _card_has_lever(card: Dictionary) -> bool:
+	return card.has("perEmployee") or card.has("cumulative")
+
+
+static func _tool_lever(card: Dictionary, entry: Dictionary, roster: Array, snapshot: Dictionary, resources: Dictionary, hidden_traits: Dictionary) -> float:
+	var eligible := _matching_employee_count(roster, card.get("eligibility", {}), snapshot, hidden_traits)
+	var result := eligible * float(card.get("perEmployee", 0.0))
+	var refractory_rule: Dictionary = card.get("refractory", {})
+	if not refractory_rule.is_empty():
+		var refractory := _matching_employee_count(roster, refractory_rule.get("condition", {}), snapshot, hidden_traits)
+		result += refractory * float(refractory_rule.get("perEmployee", 0.0))
+	var cumulative: Dictionary = card.get("cumulative", {})
+	if not cumulative.is_empty():
+		result += float(entry.get("active_sprints", entry.get("activeSprints", 0))) * float(cumulative.get("perSprint", 0.0))
+	for modifier in card.get("flatModifiers", []):
+		if _matches_global_condition(modifier.get("when", {}), roster, snapshot, resources, hidden_traits):
+			result += float(modifier.get("value", 0.0))
+	var adoption: Dictionary = card.get("adoptionCondition", {})
 	if not adoption.is_empty() and _matches_global_condition(adoption.get("condition", {}), roster, snapshot, resources, hidden_traits):
 		result *= float(adoption.get("multiplier", 1.0))
 	return result
 
 
-static func _tool_label(tool: Dictionary, entry: Dictionary, roster: Array, snapshot: Dictionary, hidden_traits: Dictionary) -> String:
-	if tool.has("cumulativePerSprint"):
+static func _tool_label(card: Dictionary, entry: Dictionary, roster: Array, snapshot: Dictionary, hidden_traits: Dictionary) -> String:
+	var name: String = card.get("leverLabel", card.get("name", "Outil"))
+	if card.has("cumulative"):
 		var active_sprints := int(entry.get("active_sprints", entry.get("activeSprints", 0)))
-		return "%s · %d sprint%s actif%s" % [tool.get("label", "Outil"), active_sprints, "s" if active_sprints > 1 else "", "s" if active_sprints > 1 else ""]
-	var eligible := _matching_employee_count(roster, tool.get("eligible", {}), snapshot, hidden_traits)
-	var refractory := _matching_employee_count(roster, tool.get("refractory", {}), snapshot, hidden_traits)
-	return "%s · %s éligibles, %s réfractaires" % [tool.get("label", "Outil"), _count_label(eligible), _count_label(refractory)]
+		return "%s · %d sprint%s actif%s" % [name, active_sprints, "s" if active_sprints > 1 else "", "s" if active_sprints > 1 else ""]
+	var eligible := _matching_employee_count(roster, card.get("eligibility", {}), snapshot, hidden_traits)
+	var refractory := 0.0
+	if card.has("refractory"):
+		refractory = _matching_employee_count(roster, card.get("refractory", {}).get("condition", {}), snapshot, hidden_traits)
+	return "%s · %s éligibles, %s réfractaires" % [name, _count_label(eligible), _count_label(refractory)]
+
+
+static func _find_card(cards: Dictionary, card_id: String) -> Dictionary:
+	for card in cards.get("cards", []):
+		if card.get("id", "") == card_id:
+			return card
+	return {}
 
 
 static func _matching_employee_count(roster: Array, condition: Dictionary, snapshot: Dictionary, hidden_traits: Dictionary = {}) -> float:
