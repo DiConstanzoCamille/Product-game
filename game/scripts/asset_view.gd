@@ -71,7 +71,7 @@ const PRACTICE_UNLOCK_LABELS := {
 static func for_decision(card: Dictionary) -> Dictionary:
 	var card_id: String = card.get("id", "")
 	var activated: bool = SprintState.activated_cards.has(card_id)
-	var max_activations := int(GameData.balance.get("structuralDecisionMaxActivations", 4))
+	var max_activations := SprintState.get_tool_slot_capacity()
 	var used: int = SprintState.activated_cards.size()
 
 	var impacts: Array = []

@@ -39,6 +39,7 @@ func _ready() -> void:
 	_test_backlog_rules()
 	_test_investment_draw_rules()
 	_test_score_resolution_integration()
+	_test_tool_families_and_strategy_lot3()
 	_test_quarter_runtime()
 
 	for strategy in ["stress", "greedy", "careful"]:
@@ -243,6 +244,111 @@ func _test_score_resolution_integration() -> void:
 		_fail("Le snapshot doit transmettre active_sprints pour les outils cumulatifs.")
 
 
+## Levier par employé de la ligne de score dont le libellé commence par
+## `label_prefix` (ex. "Notion") — 0.0 si l'outil n'a laissé aucune ligne.
+func _tool_lever_value(report: Dictionary, label_prefix: String) -> float:
+	for line in report.get("global", {}).get("lines", []):
+		if line.get("type", "") == "lever_add" and String(line.get("label", "")).begins_with(label_prefix):
+			return float(line.get("value", 0.0))
+	return 0.0
+
+
+## Lot 3 : Levier par employé (§7.1), slots d'outillage (§7.1.1/§7.1.2),
+## outillage hérité (§7.1.3) et décisions stratégiques (§7.2). Critère de
+## recette de l'issue #16 : la MÊME carte Notion doit donner un Levier
+## positif chez Karavel et négatif chez Meridia sans qu'aucune ligne du
+## moteur ne teste un `company_id` — seul le roster réel change le résultat.
+func _test_tool_families_and_strategy_lot3() -> void:
+	print("=== SMOKE TEST LOGIQUE — LOT 3 : FAMILLES DE DECISIONS ===")
+
+	SprintState.reset_run("agile-transformation", "karavel-scaleup")
+	if not SprintState.activated_cards.has("notion"):
+		_fail("Karavel doit hériter de Notion dès reset_run (companies.json → inheritedTools).")
+	SprintState.sprint_number = 10
+	var karavel_report := ScoreResolver.resolve(SprintState._build_score_snapshot(), {
+		"scoring": GameData.scoring, "hidden_traits": GameData.hidden_traits, "cards": GameData.cards,
+	})
+	var karavel_notion := _tool_lever_value(karavel_report, "Notion")
+	if karavel_notion <= 0.0:
+		_fail("Notion doit rester un Levier positif chez Karavel, équipe junior (obtenu %s)." % karavel_notion)
+
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+	if not SprintState.activated_cards.has("jira"):
+		_fail("Meridia doit hériter de Jira dès reset_run.")
+	if SprintState.activated_cards.has("notion"):
+		_fail("Meridia ne doit pas hériter de Notion.")
+	SprintState.activated_cards.append("notion")
+	SprintState.activated_card_sprints["notion"] = 1
+	SprintState.sprint_number = 10
+	var meridia_report := ScoreResolver.resolve(SprintState._build_score_snapshot(), {
+		"scoring": GameData.scoring, "hidden_traits": GameData.hidden_traits, "cards": GameData.cards,
+	})
+	var meridia_notion := _tool_lever_value(meridia_report, "Notion")
+	if meridia_notion >= 0.0:
+		_fail("Notion doit devenir un Levier négatif chez Meridia, équipe senior ancienne (obtenu %s)." % meridia_notion)
+
+	# Les slots : la base vient du niveau de carrière, +2 achetables à prix croissant.
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+	if SprintState.get_tool_slot_base() != 3:
+		_fail("La base de slots au niveau PM doit être 3 (spec §7.1.1).")
+	if SprintState.activated_cards.size() != 1 or SprintState.get_tool_slot_capacity() != 3:
+		_fail("Un run de PM démarre avec l'outillage hérité (1 slot pris) sur une base de 3.")
+	SprintState.pieces = 100
+	if SprintState.buy_tool_slot() != "" or SprintState.get_tool_slot_capacity() != 4:
+		_fail("Le premier slot supplémentaire doit coûter 12 💶 et porter la capacité à 4.")
+	if SprintState.buy_tool_slot() != "" or SprintState.get_tool_slot_capacity() != 5:
+		_fail("Le second slot supplémentaire doit coûter 20 💶 et porter la capacité à 5.")
+	if SprintState.buy_tool_slot() != "plafond":
+		_fail("Un troisième achat de slot doit être refusé (plafond de +2, spec §7.1.1).")
+
+	# Le coût de bascule (§7.1.2) : Cynisme +4 puis +7, Levier perdu tout de
+	# suite, compteur cumulatif remis à zéro, carte de retour dans le pool.
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+	SprintState.activated_cards.append("sprint-retro")
+	SprintState.activated_card_sprints["sprint-retro"] = 1
+	SprintState.sprint_number = 5
+	SprintState.resource_values["cynisme"] = 0.0
+	if SprintState.release_tool_slot("sprint-retro") != "":
+		_fail("La bascule sur un outil actif doit être acceptée.")
+	if SprintState.activated_cards.has("sprint-retro") or SprintState.activated_card_sprints.has("sprint-retro"):
+		_fail("Un outil libéré doit quitter activated_cards et perdre son compteur cumulatif.")
+	if int(SprintState.pending_deltas.get("cynisme", 0.0)) != 4:
+		_fail("La première bascule du mandat doit coûter 4 de Cynisme.")
+	SprintState.pending_deltas.clear()
+	if SprintState.release_tool_slot("jira") != "":
+		_fail("Libérer l'outillage hérité doit être une bascule comme une autre.")
+	if int(SprintState.pending_deltas.get("cynisme", 0.0)) != 7:
+		_fail("La deuxième bascule du mandat doit coûter 4 + 3 = 7 de Cynisme.")
+	if SprintState.swap_count != 2:
+		_fail("Le compteur de bascules doit suivre chaque libération de slot.")
+	if not GameData.cards.get("cards", []).map(func(c): return c.get("id", "")).has("sprint-retro") \
+			or SprintState.activated_cards.has("sprint-retro"):
+		_fail("Une carte libérée doit rester dans le catalogue et pouvoir revenir au tirage.")
+
+	# Décisions stratégiques (§7.2) : 1 par trimestre, permanente, jamais
+	# mélangée aux outils.
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+	var options := SprintState.get_strategy_options(3)
+	if options.is_empty():
+		_fail("Le premier trimestre doit proposer au moins une décision stratégique.")
+	var first_id: String = options[0].get("id", "")
+	if SprintState.choose_strategy(first_id) != "":
+		_fail("Le premier choix stratégique du trimestre doit être accepté.")
+	if not SprintState.chosen_strategy_ids.has(first_id) or SprintState.activated_cards.has(first_id):
+		_fail("Une décision stratégique doit rejoindre chosen_strategy_ids, jamais activated_cards.")
+	var second_id: String = options[1].get("id", "") if options.size() > 1 else first_id
+	if SprintState.choose_strategy(second_id) == "":
+		_fail("Une deuxième décision stratégique ne doit pas être acceptée dans le même trimestre.")
+	# Simule le passage au trimestre suivant sans dépendre du tirage aléatoire
+	# d'exigence (board-injunction en forcerait une seconde et rendrait le test friable).
+	SprintState.quarter_strategy_chosen = false
+	if not SprintState.chosen_strategy_ids.has(first_id):
+		_fail("Une décision stratégique choisie doit rester active au trimestre suivant (irréversible).")
+	var expected_remaining: int = GameData.strategy.get("strategies", []).size() - SprintState.chosen_strategy_ids.size()
+	if SprintState.get_strategy_options(10).size() != expected_remaining:
+		_fail("Le trimestre suivant doit reproposer tout le catalogue sauf ce qui est déjà choisi.")
+
+
 func _test_quarter_runtime() -> void:
 	print("=== SMOKE TEST LOGIQUE — QUOTAS TRIMESTRIELS ===")
 	# T1 : le compteur progresse une fois par Resolution et un run qui livre
@@ -381,6 +487,11 @@ func _test_investment_draw_rules() -> void:
 	var base_cost := int(reroll_conf.get("baseCost", 1))
 	var increment := int(reroll_conf.get("costIncrement", 1))
 	SprintState.reset_run("agile-transformation", "meridia-corp")
+	# Isole les activations de décision du tirage aléatoire d'exigence (§21) —
+	# sinon un "Outillage gelé" tiré par malchance refuse toute activation et
+	# rend ce test friable, comme _test_score_resolution_integration le fait déjà.
+	SprintState.quarter_requirement_ids = ["hiring-freeze"]
+	SprintState.quarter_requirement_id = "hiring-freeze"
 
 	var offer := SprintState.get_shop_offer()
 	var decisions: Array = offer.get("decisions", [])
@@ -500,7 +611,10 @@ func _test_mixed_shelf() -> void:
 ## qu'une `commune`, et le coefficient d'époque doit peser. Test statistique —
 ## la marge est large exprès, il vérifie un ordre de grandeur, pas une valeur.
 func _test_rarity_weights() -> void:
-	SprintState.reset_run("agile-transformation", "meridia-corp")
+	# Karavel (pas Meridia) : Meridia hérite de Jira dès le départ (§7.1.3),
+	# qui ne rejoint donc plus jamais le tirage — ce test mesure justement la
+	# fréquence de sortie de Jira, il lui faut une entreprise qui ne l'a pas déjà.
+	SprintState.reset_run("agile-transformation", "karavel-scaleup")
 	var weights: Dictionary = GameData.balance.get("shopDraw", {}).get("rarityWeights", {})
 
 	var counts: Dictionary = {}

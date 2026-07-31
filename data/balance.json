@@ -57,7 +57,14 @@
     "productivite": { "resource": "dette-organisationnelle", "invert": true }
   },
 
-  "structuralDecisionMaxActivations": 4,
+  "toolSlots": {
+    "_comment": "Spec §7.1.1. Base indexee par niveau de carriere - une seule ligne remplie avant le lot 5 (contrat d'architecture, CLAUDE.md). Le plafond arbitraire structuralDecisionMaxActivations:4 disparait : la capacite se gagne (carriere) ou s'achete (extraSlotCosts), elle n'est plus une constante unique.",
+    "careerLevels": {
+      "pm": { "base": 3 }
+    },
+    "extraSlotCosts": [12, 20],
+    "swap": { "cynisme": 4, "cynismePerPreviousSwap": 3 }
+  },
 
   "playableEras": ["agile-transformation"],
 
