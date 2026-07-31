@@ -103,15 +103,19 @@ func _add_card(kind: String, asset_id: String, data: Dictionary) -> void:
 	var entry := {"kind": kind, "id": asset_id, "data": data, "placement": placement}
 	var card := AssetCard.create(_descriptor(entry))
 	card.pin_pressed.connect(_on_pin_pressed.bind(kind, asset_id, data))
+	# Preview d'impact au survol (Lot 3 §5.1) : la carte relaie, le Panneau de
+	# bord affiche — cet écran ne fait que les mettre en contact.
+	card.preview_requested.connect(side_panel.show_preview)
+	card.preview_cleared.connect(side_panel.clear_preview)
 
 	match kind:
 		"candidate":
-			card.primary_pressed.connect(_on_hire_pressed.bind(data))
+			card.primary_pressed.connect(_on_hire_pressed.bind(data, card))
 			card.secondary_pressed.connect(_on_one_on_one_pressed.bind(data))
 		"practice":
-			card.primary_pressed.connect(_on_buy_practice_pressed.bind(asset_id))
+			card.primary_pressed.connect(_on_buy_practice_pressed.bind(asset_id, card))
 		"decision":
-			card.primary_pressed.connect(_on_card_activate.bind(asset_id))
+			card.primary_pressed.connect(_on_card_activate.bind(asset_id, card))
 
 	entry["node"] = card
 	shelf_grid.add_child(card)
@@ -229,8 +233,13 @@ func _fit_columns() -> void:
 
 
 # ── Gestes ────────────────────────────────────────────────────────────────
-func _on_hire_pressed(candidate: Dictionary) -> void:
-	SprintState.hire_candidate(candidate)
+func _on_hire_pressed(candidate: Dictionary, card: AssetCard) -> void:
+	# Capturé **avant** l'embauche : une fois `hired`, le descripteur n'a plus
+	# de preview à offrir (AssetView.for_candidate() n'en pose que sur ce qui
+	# reste à acquérir).
+	var preview: Dictionary = AssetView.for_candidate(candidate).get("preview", {})
+	if SprintState.hire_candidate(candidate) == "":
+		_fly_purchase_chips(card, preview)
 	_refresh_all()
 
 
@@ -239,15 +248,47 @@ func _on_one_on_one_pressed(candidate: Dictionary) -> void:
 	_refresh_all()
 
 
-func _on_buy_practice_pressed(practice_id: String) -> void:
-	SprintState.buy_practice(practice_id)
+func _on_buy_practice_pressed(practice_id: String, card: AssetCard) -> void:
+	var preview: Dictionary = AssetView.for_practice(SprintState.find_practice(practice_id)).get("preview", {})
+	if SprintState.buy_practice(practice_id) == "":
+		_fly_purchase_chips(card, preview)
 	_refresh_all()
 
 
-func _on_card_activate(card_id: String) -> void:
+func _on_card_activate(card_id: String, card: AssetCard) -> void:
+	var preview: Dictionary = AssetView.for_decision(SprintState.find_card(card_id)).get("preview", {})
 	if SprintState.activate_decision(card_id) != "":
 		return
+	_fly_purchase_chips(card, preview)
 	_refresh_all()
+
+
+## Impulsion à l'achat (§5.2) : une chip de delta s'envole de la carte vers la
+## jauge qu'elle va bouger — une par ressource touchée, plus une pour le coût
+## en 🪙. `preview` est le même dictionnaire que celui consommé par le Panneau
+## de bord au survol (AssetView, resource_deltas/pieces_cost) : aucun calcul
+## n'est refait ici, seulement la trajectoire.
+func _fly_purchase_chips(card: AssetCard, preview: Dictionary) -> void:
+	if side_panel == null or preview.is_empty():
+		return
+	var origin: Vector2 = card.get_global_rect().get_center()
+
+	var resource_deltas: Dictionary = preview.get("resource_deltas", {})
+	for resource_id in resource_deltas.keys():
+		var delta := float(resource_deltas[resource_id])
+		if is_zero_approx(delta):
+			continue
+		var target: Rect2 = side_panel.gauge_global_rect(resource_id)
+		if target == Rect2():
+			continue
+		var color := UIHelpers.PANEL_GOOD if EffectResolver.delta_is_good(resource_id, delta) else UIHelpers.PANEL_DANGER
+		UIHelpers.fly_chip(self, "%s%d" % ["+" if delta >= 0.0 else "−", int(round(absf(delta)))], color, origin, target.get_center())
+
+	var cost := float(preview.get("pieces_cost", 0.0))
+	if not is_zero_approx(cost):
+		var pieces_target: Rect2 = side_panel.pieces_global_rect()
+		if pieces_target != Rect2():
+			UIHelpers.fly_chip(self, "−%d" % int(round(cost)), UIHelpers.PANEL_DANGER, origin, pieces_target.get_center())
 
 
 ## 📌 Réserver / décoller : l'état vit dans SprintState, la carte se relit.
