@@ -474,12 +474,14 @@ static func _ids_from(source: Variant) -> Array:
 
 
 ## Un outil (family outil-process/methodologie-orga de cards.json) décrit son
-## propre Levier — spec §7.1. Une carte sans aucun de ces champs (Shape Up)
+## propre Levier — spec §7.1. Une carte sans `perEmployee` ni `cumulative`
 ## n'a pas de Levier par employé : elle ne pèse que via les combos de
-## composition (local.organizationCombos). C'est la même carte, junior ou
-## senior, tirée sur n'importe quelle entreprise : rien ici ne branche sur
-## un id d'entreprise, seul le roster réel change le résultat (§7.1, "Notion
-## sur Karavel / Notion sur Meridia").
+## composition (local.organizationCombos) — un cas prévu par le moteur pour
+## une carte future, mais qu'aucune carte du catalogue actuel n'utilise
+## (score_resolver_cases.gd → _test_every_tool_card_has_a_lever le garantit).
+## C'est la même carte, junior ou senior, tirée sur n'importe quelle
+## entreprise : rien ici ne branche sur un id d'entreprise, seul le roster
+## réel change le résultat (§7.1, "Notion sur Karavel / Notion sur Meridia").
 static func _card_has_lever(card: Dictionary) -> bool:
 	return card.has("perEmployee") or card.has("cumulative")
 

@@ -872,13 +872,24 @@ tiré. Ce lot ferme ces deux trous plutôt que d'en ouvrir un troisième.
 carte qui décrit ce qu'elle fait, pas une table à part qu'il fallait deviner
 en la recoupant avec l'id. `ScoreResolver.resolve()` reçoit une troisième
 table (`cards`, en plus de `scoring` et `hidden_traits`) et y cherche le
-Levier de chaque outil actif ; une carte qui ne déclare ni `perEmployee` ni
-`cumulative` (Passage en Shape Up) n'a simplement aucun Levier par employé —
-elle continue de peser via les combos de composition, comme avant. Au
-passage, l'entrée `shape-up` de `scoring.json` qui portait, hors contenu, un
-Levier de « Pair programming » sans carte pour l'incarner a été supprimée :
-mieux vaut une carte qui ne fait rien de plus qu'avant qu'une règle qui
-n'existe nulle part ailleurs que dans les données.
+Levier de chaque outil actif ; une carte qui ne déclarerait ni `perEmployee`
+ni `cumulative` n'aurait aucun Levier par employé et continuerait de peser
+uniquement via les combos de composition — un cas que le moteur sait gérer,
+mais qu'aucune carte du catalogue actuel n'utilise en pratique : une carte
+`outil-process`/`methodologie-orga` coûte des pièces *et* un slot, en
+laisser une sans contrepartie de Levier en ferait un piège pur, jamais un
+choix. `score_resolver_cases.gd → _test_every_tool_card_has_a_lever` le
+garde vrai à l'avenir. **Passage en Shape Up** a bien failli devenir ce
+piège : la migration l'avait d'abord laissée sans Levier, sur la lecture
+(fausse) que l'entrée `shape-up` de `scoring.json` — qui portait un Levier
+« 🤝 Pair programming » sur les devs juniors en binôme — était un vestige
+sans carte réelle pour l'incarner. Elle en a une, rare, à 5 🪙 et un
+prérequis de 2 seniors ; le Levier lui a donc été reporté tel quel, sous son
+vrai nom cette fois (la ligne de score affichait « Pair programming », plus
+« Passage en Shape Up »). Le mélange détonne — la carte demande des seniors
+pour s'activer mais récompense les devs juniors en binôme — mais c'est le
+réglage hérité du Lot 1, pas un arbitrage de ce lot : le corriger changerait
+un chiffre de gameplay, ce que ce lot n'a pas mandat de faire seul.
 
 **Le critère de recette se vérifie sans écrire une seule valeur par
 entreprise.** Notion déclare `eligibility` (juniors, ou recrues de moins de

@@ -23,6 +23,8 @@ func _initialize() -> void:
 	_test_quick_wins_are_one_hand_bonus()
 	_test_recent_hires_and_notion()
 	_test_notion_lever_by_company_roster()
+	_test_shape_up_lever()
+	_test_every_tool_card_has_a_lever()
 	_test_streak_and_friction_rules()
 	_test_quarter_visible_board_and_technical_audit()
 	_test_moral_cap_and_ops_snapshot()
@@ -142,6 +144,40 @@ func _company_roster(company_id: String) -> Array:
 				})
 			return roster
 	return []
+
+
+## « Passage en Shape Up » est une carte réelle (rare, prérequis 2 seniors) :
+## sa suppression du Levier lors de la migration depuis scoring.json en
+## aurait fait la seule carte payante et slottée du catalogue à ne rendre
+## aucun Levier — un piège pur. Le Levier hérité de scoring.json (juniors en
+## binôme) est reporté tel quel sur la carte, sous son vrai nom cette fois
+## (scoring.json l'étiquetait à tort « Pair programming »).
+func _test_shape_up_lever() -> void:
+	var feature := _traction_feature(1)
+	var two_junior_devs := [
+		{"id": "a", "role": "dev", "seniority": "junior", "hiredSprint": 0},
+		{"id": "b", "role": "dev", "seniority": "junior", "hiredSprint": 0},
+	]
+	var report := _resolve([_squad("a", [feature], two_junior_devs)], {"active_tools": ["shape-up"]}, _rules_without_streak())
+	_assert_equal(float(report.get("global", {}).get("lever", 0.0)), 1.32, "Shape Up doit valoir 2 x 0.08 x 2 (adoption) = 0.32 de Levier avec deux devs juniors.")
+	_assert_true(_has_label_prefix(report.get("global", {}).get("lines", []), "Passage en Shape Up"), "La ligne de score doit porter le vrai nom de la carte, pas « Pair programming ».")
+
+	var one_senior_dev := [{"id": "c", "role": "dev", "seniority": "senior", "hiredSprint": 0}]
+	report = _resolve([_squad("a", [feature], one_senior_dev)], {"active_tools": ["shape-up"]}, _rules_without_streak())
+	_assert_equal(float(report.get("global", {}).get("lever", 0.0)), 1.0, "Shape Up ne doit rien apporter sans dev junior au binôme.")
+
+
+## Garde-fou générique : toute carte outil-process/methodologie-orga coûte
+## des pièces et un slot (§7.1.1). Sans Levier par employé déclaré
+## (perEmployee ou cumulative), elle serait un piège pur — l'incident corrigé
+## ci-dessus sur Shape Up ne doit plus pouvoir se reproduire silencieusement.
+func _test_every_tool_card_has_a_lever() -> void:
+	for card in cards_data.get("cards", []):
+		if card.get("family", "") in ["outil-process", "methodologie-orga"]:
+			_assert_true(
+				card.has("perEmployee") or card.has("cumulative"),
+				"La carte « %s » (%s) coûte des pièces et un slot mais ne déclare ni perEmployee ni cumulative." % [card.get("id", ""), card.get("name", "")]
+			)
 
 
 func _test_streak_and_friction_rules() -> void:

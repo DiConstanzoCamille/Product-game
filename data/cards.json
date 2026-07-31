@@ -1,5 +1,5 @@
 {
-  "_comment": "Grandes décisions structurelles (spec scoring §7.1/§7.1.1/§7.1.2). Les axes/effects historiques restent le feedback immédiat sur les jauges à l'activation (par teamProfile). Depuis le Lot 3, un outil (family outil-process/methodologie-orga) peut en plus déclarer perEmployee/eligibility/refractory/adoptionCondition/flatModifiers/cumulative/slotBonus : le Levier continu que ScoreResolver applique chaque sprint tant que la carte reste active, calculé sur le roster réel — jamais une valeur figée par entreprise. slotBonus n'existe que sur les outils cumulatifs (ils rendent leur place, §7.1.1.b). Une carte sans ces champs (Shape Up) ne produit aucun Levier par employé, seulement ses effets de jauge et sa place dans les combos de composition.",
+  "_comment": "Grandes décisions structurelles (spec scoring §7.1/§7.1.1/§7.1.2). Les axes/effects historiques restent le feedback immédiat sur les jauges à l'activation (par teamProfile). Depuis le Lot 3, un outil (family outil-process/methodologie-orga) déclare en plus perEmployee/eligibility/refractory/adoptionCondition/flatModifiers/cumulative/slotBonus : le Levier continu que ScoreResolver applique chaque sprint tant que la carte reste active, calculé sur le roster réel — jamais une valeur figée par entreprise. slotBonus n'existe que sur les outils cumulatifs (ils rendent leur place, §7.1.1.b). Chaque carte outil-process/methodologie-orga du catalogue déclare perEmployee ou cumulative (une carte payante et slottée sans aucun des deux serait un piège pur) ; score_resolver_cases.gd → _test_every_tool_card_has_a_lever le vérifie.",
   "axes": [
     { "id": "humain", "label": "Coût humain" },
     { "id": "financier", "label": "Coût financier" },
@@ -165,6 +165,7 @@
       "category": "Refonte du cycle produit",
       "rarity": "rare",
       "name": "Passage en Shape Up",
+      "icon": "🤝",
       "tagline": "Six semaines, un appétit, personne qui vient demander où on en est le mardi.",
       "requires": {
         "type": "roster-seniority-min",
@@ -172,6 +173,9 @@
         "value": 2,
         "label": "2 profils seniors dans l'équipe pour tenir un cycle sans chef de projet"
       },
+      "perEmployee": 0.08,
+      "eligibility": { "roles": ["dev"], "seniority": "junior" },
+      "adoptionCondition": { "multiplier": 2, "condition": { "roleSeniorityMinimum": { "role": "dev", "seniority": "junior", "minimum": 2 } } },
       "effects": {
         "junior": {
           "humain": { "value": -20, "note": "Trop d'autonomie d'un coup pour une équipe qui cherche encore ses repères." },
