@@ -25,6 +25,16 @@ config/icon="res://icon.svg"
 GameData="*res://scripts/autoload/game_data.gd"
 SprintState="*res://scripts/autoload/sprint_state.gd"
 
+[display]
+
+; 1152x648 était la valeur par défaut de Godot. Depuis que le Panneau de bord
+; prend 320 px à droite et que les Investissements empilent deux rayons dans un
+; même scroll, il ne restait plus la largeur de deux cartes : la fenêtre part
+; désormais assez grande pour un rayon de 4 cartes. Elle reste redimensionnable,
+; et le nombre de colonnes des rayons suit la largeur réelle.
+window/size/viewport_width=1600
+window/size/viewport_height=900
+
 [gui]
 
 theme/custom="res://resources/theme/main_theme.tres"

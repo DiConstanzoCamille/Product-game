@@ -162,6 +162,13 @@ scène.
 
 ### 3.2 Structure de l'écran « Investissements »
 
+> **Implémenté autrement (voir carnet §21).** Les deux rayons décrits ci-dessous
+> ont été fondus en **un seul**, où candidats, pratiques et grandes décisions se
+> partagent 6 emplacements tirés dans un pool commun. Deux rayons séparés
+> garantissaient encore à chaque type sa place, donc supprimaient la question
+> « qu'est-ce que ce sprint m'a proposé ? ». Le raisonnement du paragraphe
+> suivant reste valable — il a juste été poussé d'un cran.
+
 Pas d'onglets : **deux rayons empilés dans un seul scroll**, parce que tout
 l'intérêt de la fusion est de mettre les investissements en concurrence dans
 le même champ de vision (« cette pièce, je la garde pour Lina ou je prends

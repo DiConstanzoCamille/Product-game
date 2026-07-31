@@ -31,14 +31,19 @@ signal state_changed
 
 const BAR_HEIGHT := 8
 
+## Largeur du **rail replié** : de quoi garder les six jauges lisibles en
+## vignette et rendre 260 px à l'écran de phase. Sur les Investissements, qui
+## empilent deux rayons, ça vaut une colonne de cartes entière.
+const RAIL_WIDTH := 62
+
+var collapsed := false
+
 var _dossier: Control = null
 var _fire_dialog: ConfirmationDialog = null
 var _pending_fire_id: String = ""
 
 
 func _ready() -> void:
-	custom_minimum_size = Vector2(UIHelpers.SIDE_PANEL_WIDTH, 0)
-
 	var style := StyleBoxFlat.new()
 	style.bg_color = UIHelpers.PANEL_BG
 	style.border_color = UIHelpers.COLOR_INK
@@ -49,6 +54,27 @@ func _ready() -> void:
 	if host is Control:
 		_dossier = UIHelpers.instantiate_company_dossier(host)
 
+	_apply_width()
+	_build()
+
+
+## Le panneau est ancré à droite : sa largeur vient de son `offset_left`, pas
+## d'un conteneur. `attach_side_panel()` recale la marge de l'écran hôte sur
+## `resized`, donc la place rendue par le rail est immédiatement rendue aux
+## cartes.
+func _apply_width() -> void:
+	var width := RAIL_WIDTH if collapsed else UIHelpers.SIDE_PANEL_WIDTH
+	custom_minimum_size = Vector2(width, 0)
+	offset_left = -float(width)
+
+	var margin: MarginContainer = get_node("Margin")
+	for side in ["left", "right"]:
+		margin.add_theme_constant_override("margin_" + side, 8 if collapsed else 16)
+
+
+func _toggle_collapsed() -> void:
+	collapsed = not collapsed
+	_apply_width()
 	_build()
 
 
@@ -63,9 +89,15 @@ func refresh() -> void:
 
 func _build() -> void:
 	var vbox: VBoxContainer = get_node("Margin/Scroll/VBox")
-	for child in vbox.get_children():
-		child.free()
+	# Le panneau se reconstruit depuis ses propres boutons (roster, repli,
+	# dossier) : voir UIHelpers.clear_children() pour pourquoi pas de `free()`.
+	UIHelpers.clear_children(vbox)
 
+	if collapsed:
+		_build_rail(vbox)
+		return
+
+	vbox.add_child(_collapse_button("◂  Replier", "Replier le panneau en rail : les six jauges restent lisibles et l'écran récupère %d px." % (UIHelpers.SIDE_PANEL_WIDTH - RAIL_WIDTH)))
 	_build_header(vbox)
 	vbox.add_child(_rule())
 
@@ -100,6 +132,86 @@ func _build() -> void:
 	dossier_button.add_theme_font_size_override("font_size", 13)
 	dossier_button.pressed.connect(_on_dossier_pressed)
 	vbox.add_child(_spaced(dossier_button, 12, 0))
+
+
+# ── Le rail replié ───────────────────────────────────────────────────────
+## Ce qui survit au repli : les six jauges en vignette (barre + valeur, pas de
+## libellé — l'icône suffit une fois qu'on les connaît), les pièces et
+## l'Énergie. Tout le reste — roster, actifs, revue de board — se retrouve en
+## dépliant. Les tooltips restent complets : le rail n'enlève pas
+## l'information, il enlève la place qu'elle prend.
+func _build_rail(vbox: VBoxContainer) -> void:
+	vbox.add_child(_collapse_button("▸", "Déplier le Panneau de bord"))
+
+	var sprint := _label("%d" % SprintState.sprint_number, 10, UIHelpers.PANEL_MUTED)
+	UIHelpers.apply_mono(sprint, 10)
+	sprint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(_spaced(sprint, 2, 6))
+
+	for resource in GameData.resources:
+		var resource_id: String = resource.get("id", "")
+		var value: float = SprintState.resource_values.get(resource_id, 0.0)
+		var state := EffectResolver.gauge_state(resource_id, value)
+		vbox.add_child(_rail_gauge(
+			resource.get("icon", "•"), value, 100.0,
+			UIHelpers.panel_state_color(state), UIHelpers.resource_tooltip(resource)
+		))
+
+	vbox.add_child(_spaced(_rule(), 6, 6))
+	vbox.add_child(_rail_gauge("⚡", float(SprintState.energy), float(SprintState.get_energy_max()),
+		UIHelpers.panel_state_color(EffectResolver.gauge_state("", float(SprintState.energy))),
+		UIHelpers.energy_tooltip()))
+
+	var pieces := _label("🪙\n%d" % SprintState.pieces, 12, UIHelpers.PANEL_FG)
+	pieces.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	pieces.tooltip_text = "🪙 Pièces — le budget d'action que le board vous accorde."
+	pieces.mouse_filter = Control.MOUSE_FILTER_STOP
+	vbox.add_child(_spaced(pieces, 8, 0))
+
+
+func _rail_gauge(icon: String, value: float, maximum: float, color: Color, tooltip: String) -> Control:
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 1)
+	box.mouse_filter = Control.MOUSE_FILTER_STOP
+	box.tooltip_text = tooltip
+
+	var head := _label("%s %d" % [icon, int(round(value))], 10, UIHelpers.PANEL_FG)
+	head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(head)
+
+	var bar := Control.new()
+	bar.custom_minimum_size = Vector2(0, 5)
+	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var track := Panel.new()
+	track.add_theme_stylebox_override("panel", _flat(Color(1, 1, 1, 0.09), 3))
+	bar.add_child(track)
+	var fill := Panel.new()
+	fill.add_theme_stylebox_override("panel", _flat(color, 3))
+	bar.add_child(fill)
+	var ratio: float = clampf(value / maxf(maximum, 1.0), 0.0, 1.0)
+	var layout := func():
+		track.position = Vector2.ZERO
+		track.size = Vector2(bar.size.x, 5)
+		fill.position = Vector2.ZERO
+		fill.size = Vector2(round(bar.size.x * ratio), 5)
+	layout.call()
+	bar.resized.connect(layout)
+	box.add_child(bar)
+
+	return _spaced(box, 3, 3)
+
+
+func _collapse_button(text: String, tooltip: String) -> Control:
+	var button := Button.new()
+	button.text = text
+	button.tooltip_text = tooltip
+	button.flat = true
+	button.focus_mode = Control.FOCUS_NONE
+	button.add_theme_font_size_override("font_size", 11)
+	button.add_theme_color_override("font_color", UIHelpers.PANEL_MUTED)
+	button.add_theme_color_override("font_hover_color", UIHelpers.PANEL_ACCENT)
+	button.pressed.connect(_toggle_collapsed)
+	return button
 
 
 # ── En-tête : qui joue, où on en est ─────────────────────────────────────

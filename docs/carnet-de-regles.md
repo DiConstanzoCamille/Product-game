@@ -39,13 +39,14 @@ Trois échelles imbriquées :
 
 ## 3. Anatomie d'un sprint
 
-Cinq phases, dans l'ordre :
+Quatre phases, dans l'ordre :
 
 1. **Inbox** — un événement aléatoire tombe (le "chaos humain") et force un choix avant toute planification.
 2. **Roadmap** — 2 à 4 features proposées, sélection limitée par la **capacité** de l'équipe. Dépasser sa capacité déclenche une surchauffe (dette + cynisme en hausse).
-3. **Grandes décisions** — activation optionnelle d'une décision structurelle (voir §6.2). Pas systématique à chaque sprint.
-4. **Recrutement** — accès optionnel au shop.
-5. **Résolution** — application des effets, delta affiché (voir maquette HUD dans la landing page).
+3. **Investissements** — tout ce que l'organisation acquiert, en deux rayons d'un même écran : l'**étal du sprint** (2 candidats + 2 pratiques tirés pour ce sprint, voir §9) puis les **grandes décisions** (catalogue permanent, activation optionnelle, voir §6.2). Les deux sont facultatifs ; l'arbitrage du tour est de choisir *où* passe la pièce.
+4. **Résolution** — application des effets, delta affiché (voir maquette HUD dans la landing page).
+
+> Les grandes décisions ont eu leur propre phase jusqu'au Lot 2 de la refonte UI (§20) : n'étant activées que 3-4 fois par mandat, elle n'était qu'un péage à cliquer 8 à 9 sprints sur 12.
 
 ---
 
@@ -79,7 +80,7 @@ Six jauges. Aucune ne s'optimise seule.
 Une main piochée chaque sprint dans un deck — arbitrages du quotidien (priorisation ponctuelle, réponse à un incident, micro-ajustement). C'est la couche aléatoire, façon deckbuilder.
 
 ### 6.2 Grandes décisions structurelles
-Pas de pioche : un menu permanent, activé quand le joueur le décide. Limité à 3-4 activations par mandat, avec un vrai coût de bascule. Reflète le fait qu'une organisation ne change pas d'outil toutes les deux semaines. Trois familles, qui ne se comportent pas pareil dans le temps (détail en §7) :
+Limitées à 3-4 activations par mandat, et payées en 🪙 comme le reste du rayon (§21) : un coût court (l'argent) et un coût long (le slot). Reflète le fait qu'une organisation ne change pas d'outil toutes les deux semaines. Elles sont **tirées** au rayon des Investissements, comme les candidats et les pratiques (§21 — c'était un menu permanent jusqu'au Lot 2 de la refonte UI) : ce qui n'est pas activé aujourd'hui n'est pas garanti de revenir. Trois familles, qui ne se comportent pas pareil dans le temps (détail en §7) :
 - **Outils/process** (RICE, Notion, Jira) — effet direct sur les jauges
 - **Stack technique/produit** (ex. React) — effet sur le shop de recrutement, pas sur les jauges
 - **Méthodologie d'orga** (ex. Shape Up) — gatée par prérequis, n'apporte rien tant que les bonnes conditions ne sont pas réunies
@@ -494,7 +495,7 @@ Implémentation du deuxième lot de la
 Premier lot de la [proposition UI](proposition-ui-interface.md), en réponse aux
 cinq retours post-Phase B. **Aucune règle ni aucun flux ne change** : les
 mêmes données, les mêmes effets, les mêmes phases — seule la façon de les
-présenter change. Le lot suivant fusionnera les écrans Grandes décisions et
+présenter change. Le lot suivant (§20) fusionne les écrans Grandes décisions et
 Marché en « Investissements » ; celui d'après ajoutera la preview d'impact.
 
 - **Le thème passe en clair.** `resources/theme/main_theme.tres` inverse la
@@ -559,3 +560,218 @@ Marché en « Investissements » ; celui d'après ajoutera la preview d'impact.
   validé — il n'y a plus deux faces à retourner.
 - **Recette.** Les deux smoke tests headless passent sans modification, plus un
   run visuel des 11 écrans (thème clair, cartes, panneau, dossier).
+
+---
+
+## 20. Refonte UI — Lot 2 : les Investissements (5 → 4 phases)
+
+Deuxième lot de la [proposition UI](proposition-ui-interface.md) (§3). Le
+premier lot avait donné aux trois types d'Actif la même carte ; celui-ci leur
+donne le même écran. Le découpage du tour change, pas les coûts ni les effets —
+la seule règle de simulation touchée est le passage des grandes décisions au
+tirage, qui a sa propre section (§21).
+
+```
+Avant :  Inbox → Roadmap → Grandes décisions → Marché → Résolution
+Après :  Inbox → Roadmap → Investissements ─────────→ Résolution
+```
+
+- **Une phase disparaît, pas un contenu.** Les grandes décisions ne sont
+  activées que 3-4 fois par mandat : leur consacrer un écran plein *à chaque
+  sprint* donnait 8 à 9 passages où l'écran n'était qu'un péage à cliquer. Elles
+  deviennent un **rayon permanent** de l'écran d'acquisition. Un rayon qu'on
+  longe sans s'arrêter coûte zéro clic ; un écran qu'on traverse en coûte un,
+  plus un chargement de scène.
+- **Un seul rayon, pas d'onglets.** L'intérêt de la fusion est précisément de
+  mettre les investissements **en concurrence dans le même champ de vision** :
+  « cette pièce, je la garde pour Lina ou je prends Discovery — ou est-ce que ce
+  sprint est celui où j'active Jira ? ». Des onglets auraient reconstruit la
+  cloison qu'on vient d'abattre. Le premier jet gardait deux rayons empilés
+  (l'étal périssable au-dessus, le catalogue de décisions en dessous) ; l'étape
+  suivante les a fondus en un seul, où les trois types se mélangent dans le même
+  tirage — voir §21.
+- **L'écran s'appelle « Investissements ».** Question ouverte du §7 de la
+  proposition, tranchée : « Marché » ne couvrait que la moitié de ce qu'on y
+  fait — on n'achète pas une méthodologie d'organisation sur un étal. Le mot
+  couvre les trois types d'Actif et porte la bonne idée (ça coûte maintenant,
+  ça rapporte — ou pas — plus tard). Le rayon périssable, lui, garde le nom
+  d'« étal du sprint ». `recruitment_screen` et `decisions_screen` deviennent
+  un seul `investments_screen`.
+- **Les activées passent en fin de rayon.** Le catalogue met en avant ce qu'il
+  reste à décider ; une carte activée reste visible (tamponnée, grisée) mais
+  cesse d'occuper la tête de rayon. Elle ne se déplace que le sprint où on
+  l'active, et garde son angle : c'est le même objet, posé ailleurs.
+- **Le compteur de slots vit dans le titre du rayon** (« 1 activée · 3 slots
+  restants sur 4 »), et une seconde fois dans la section Actifs du Panneau de
+  bord. Le badge de profil d'équipe 🌱/🏛️, lui, avait déjà migré dans
+  l'en-tête du panneau au Lot 1 : c'est un trait de la run, pas de la phase.
+- **Les colonnes suivent la fenêtre, et la fenêtre grandit.** Les deux rayons
+  partagent un nombre de colonnes calculé sur la largeur disponible (carte de
+  236 px mini, 4 colonnes au plus) au lieu d'un compte fixe : avec le Panneau
+  de bord qui prend 320 px, une grille à 4 colonnes fixes sortait une barre de
+  défilement horizontale — supportable sur un rayon, absurde sur deux qui se
+  répondent. Et la fenêtre par défaut passe de 1152×648 (la valeur d'usine de
+  Godot) à **1600×900** : à 1152, il ne restait la place que de deux cartes de
+  front, soit quatre écrans de défilement vertical pour lire les deux rayons —
+  exactement ce que la fusion cherchait à éviter.
+- **La Résolution devient la phase 4** ; les libellés de sprint, les
+  enchaînements `NEXT_SCENE` et `data/structure.json` suivent.
+- **Recette.** Les deux smoke tests headless (dont `smoke_test_ui`, qui passe
+  de 10 à 9 écrans) plus un mandat complet joué à la main.
+
+---
+
+## 21. Le tirage des Investissements — hasard assumé, punaise et bail
+
+Changement de **règle**, pas de présentation, arrivé avec le Lot 2 : mettre les
+grandes décisions dans le même écran que l'étal a rendu criante l'asymétrie
+entre les deux rayons. À gauche du même scroll, une offre périssable qui crée
+de l'envie ; à droite, un catalogue permanent qui n'en crée aucune — une carte
+qu'on peut activer *n'importe quand* ne se décide jamais maintenant.
+
+- **Les décisions sont tirées comme le reste.** Une carte **activée sort du
+  tirage définitivement** (elle ne peut de toute façon plus resservir).
+- **Et elles se paient comme le reste.** Une grande décision coûte des 🪙
+  (`cards.json` → `costPieces`, de 2 pour un rituel à 6 pour Jira et ses
+  licences), en **plus** du slot de mandat. Sans ça, la mise en concurrence du
+  rayon unique était fausse : « je garde ma pièce pour Lina ou j'active Jira ? »
+  n'était pas une question tant que Jira ne coûtait pas de pièce. C'est aussi ce
+  qui rend les décisions arbitrables quand elles deviendront le moteur de
+  certains builds — un levier de scaling doit avoir un prix.
+  - **Deux coûts, deux raretés.** Les 🪙 sont le budget d'**action** du sprint :
+    ce qu'il faut dépenser maintenant, en concurrence directe avec une embauche.
+    Le slot est la capacité d'encaissement de l'organisation sur tout le mandat
+    (4 bascules, §6.2) : une boîte ne change pas d'outil toutes les deux
+    semaines, même riche. L'argent est la contrainte courte, le slot la longue.
+  - **Ni l'un ni l'autre n'est l'axe `financier` de la carte**, qui frappe la
+    Trésorerie sprint après sprint : le prix d'achat n'est pas le coût
+    d'exploitation. Les prix suivent quand même la fiction de cet axe — Daily
+    Standup à 2 🪙 (« quasi nul »), Jira à 6 (« licences qui pèsent lourd »).
+- **Un seul rayon, trois types mélangés.** Deux rayons séparés garantissaient
+  encore à chaque type sa place, donc supprimaient la question « qu'est-ce que
+  ce sprint m'a proposé ? ». Les trois types se partagent désormais
+  `shopDraw.slotsPerSprint` emplacements (6) tirés dans un pool commun, dans un
+  ordre d'affichage **mélangé** — un rayon trié par type redeviendrait trois
+  rayons. Certains sprints proposent trois décisions et un seul candidat,
+  d'autres l'inverse. C'est là que la concurrence devient réelle : la pièce
+  gardée pour Lina est celle qui paierait Discovery, et le slot dépensé sur Jira
+  est celui qu'on n'aura pas pour Shape Up.
+  - **Garde-fous.** `guaranteedPerSprint` impose un minimum par type (1
+    candidat, 1 décision) : le hasard peut décevoir, il ne doit pas produire un
+    tour vide. C'est la seule entorse au hasard pur.
+  - **`typeWeights`** répartit les emplacements restants entre types — et non la
+    taille des pools : sans ça, les 12 candidats écraseraient les 6 décisions
+    par simple effet de nombre.
+- **Des taux d'apparition, pas un sac.** Le premier jet utilisait une pioche
+  « sac » (on vide avant de reconstituer) pour les décisions comme pour les
+  candidats. C'était un faux hasard : un sac se compte, et « j'ai vu 4 cartes
+  sur 5, la dernière arrive » n'est plus un pari, c'est de la mémoire. Les
+  trois rayons tirent donc **au poids, sans mémoire d'un sprint à l'autre** —
+  une carte peut revenir deux sprints de suite ou manquer six sprints.
+  - Chaque Actif déclare une **rareté** (`commune` / `notable` / `rare`), dont
+    le poids vit dans `balance.json` → `shopDraw.rarityWeights`. Le même
+    vocabulaire sert aux trois rayons — un seul mot à apprendre.
+  - Un Actif peut **peser plus dans un scénario** via `eraWeights` : Jira sort
+    deux fois plus souvent en pleine Transformation agile. C'est là que
+    l'époque colore l'offre au lieu de seulement filtrer ce qui est disponible
+    (`eras`, qui reste un filtre binaire).
+  - La rareté ne s'affiche **que** quand elle sort de l'ordinaire (`◆ NOTABLE`,
+    `◆◆ RARE`) : un marquage porté par toutes les cartes ne marque plus rien.
+  - Seul un candidat déjà **embauché** et une pratique déjà **possédée**
+    quittent leur pool : le marché du travail ne se vide pas parce qu'on a
+    regardé une annonce.
+- **Ce que ça achète, côté joueur.** La question devient « ça me coûte un slot
+  sur quatre, mais est-ce que je la reverrai ? » au lieu de « je verrai plus
+  tard ». Le regret est la moitié du sel d'un roguelike ; un menu permanent ne
+  produit aucun regret.
+- **Ce que ça coûte.** Le hasard peut servir trois sprints sans rien
+  d'intéressant. D'où le contrepoids :
+- **🎲 Re-tirer l'offre**, un bouton qui re-tire les **deux** rayons d'un coup
+  contre des pièces. Le prix part de 1 🪙 et monte de 1 à chaque usage **dans le
+  sprint** (`shopDraw.reroll`), puis repart à sa base au sprint suivant. Deux
+  raisons de le faire monter : la première relance doit être accessible avec
+  une allocation de board (2 🪙/sprint), et s'acharner doit coûter l'embauche
+  qu'on aurait pu payer. Re-tirer les deux rayons ensemble et non un seul est
+  volontaire : renoncer à un bon candidat pour aller chercher une décision fait
+  partie du pari.
+- **📌 Réserver**, l'autre réponse au hasard — une punaise dans le coin de la
+  carte, pas un troisième bouton (deux boutons empilés suffisent déjà à la
+  hauteur d'une carte, et « garder pour plus tard » est un geste de
+  manipulation d'objet, pas une décision). Elle coûte 1 🪙, garantit l'Actif
+  dans l'offre du **sprint suivant**, et **résiste au re-tirage** : payer pour
+  garder doit tenir face au hasard qu'on paie pour rejouer. Le bail est d'un
+  sprint — sinon une pièce annulerait toute la rareté qu'on vient de créer.
+  Décoller la punaise dans le même sprint rembourse.
+  - Les deux outils se répondent : 🎲 pour **chercher**, 📌 pour **garder**.
+    Le combo « je punaise Lina, puis je re-tire le reste » est voulu.
+- **🔒 Les cartes à prérequis et leur bail.** Une carte peut déclarer un
+  `requires` (même grammaire de conditions que les objectifs de board, §8.2) :
+  elle s'affiche complète, lisible, mais reste inactivable tant que la
+  condition est fausse. Sa condition occupe une **ligne d'impact**, au même
+  endroit que les deltas : un prérequis est une donnée de la décision, pas un
+  message d'erreur.
+  - Comme les cartes tournent à chaque sprint, une carte gatée tirée au mauvais
+    moment serait une carte perdue. Elle prend donc un **bail** dès qu'elle
+    sort : elle reste punaisée sur le rayon pendant un trimestre
+    (`shopDraw.lockedLeaseSprints`, 6 sprints), **en plus** du tirage — le
+    temps de réunir la condition. Un objectif à moyen terme apparaît au milieu
+    du hasard, ce qui donne au rayon une deuxième vitesse de lecture.
+  - Première carte du genre : **Passage en Shape Up** (`rare`, demande 2
+    profils seniors). Sur Meridia — équipe senior héritée — la condition est
+    déjà vraie et la carte n'est qu'un tirage rare de plus ; sur Karavel —
+    équipe 100 % junior — c'est un vrai programme de recrutement. La même carte
+    ne raconte pas la même chose selon la boîte.
+- **Le tampon, et rien qui bouge.** À l'achat, la carte est **tamponnée sur
+  place** — « ADOPTÉE », « EMBAUCHÉ·E », « ACTIVÉE » en travers, à l'encre rouge
+  d'un tampon administratif : le tampon tombe de haut, s'écrase net et se
+  redresse d'un rien (proposition UI §5.2, où il est le feedback d'acquisition
+  commun aux quatre pistes de DA).
+  - Un premier jet reléguait en fin de rayon ce qui venait d'être acquis, pour
+    mettre en avant ce qu'il restait à décider. Mauvais échange : la carte qu'on
+    vient d'acheter est précisément celle qu'on regarde, et la voir sauter
+    ailleurs au moment du clic casse le lien entre le geste et son effet — on
+    cherche des yeux ce qu'on tenait. **Une carte gagne sa place au tirage et la
+    garde tout le sprint.** Le feedback est la marque, pas le déplacement.
+  - La carte reste visible, tamponnée et grisée, jusqu'à la fin du tour, puis
+    disparaît au sprint suivant : ce qu'on possède se relit dans le Panneau de
+    bord et sur le plateau des Fondations, pas sur l'étal.
+  - C'est la carte qui détecte l'acquisition (son descripteur *gagne* un tampon
+    qu'il n'avait pas), pas l'écran qui déclenche une animation. Revenir sur
+    l'écran ne re-tamponne donc pas ce qu'on avait déjà acheté.
+- **Le rail replié du Panneau de bord**, resté sur l'établi depuis le Lot 1, est
+  fait : un clic replie la colonne en un rail de 62 px qui garde les six jauges
+  en vignette (barre + valeur, tooltips complets) et rend 260 px aux cartes. Sur
+  un écran qui empile deux rayons, c'est une colonne de cartes entière.
+- **Contenu.** Le catalogue ne compte que 6 cartes de décision : à 2 tirées par
+  sprint, la rareté se sentira surtout quand il en comptera 10-15. C'est du
+  contenu à écrire, pas une mécanique à revoir — les poids sont déjà en place et
+  se règlent dans `balance.json` sans toucher au code.
+- **Recette.** `smoke_test_logic` gagne un bloc déterministe
+  (`_test_investment_draw_rules`) : offre sans doublon, stabilité du tirage dans
+  le sprint, prix du re-tirage croissant puis remis à zéro, refus à sec,
+  décision activée qui ne ressort jamais sur 30 sprints, **taux d'apparition
+  vérifiés sur 600 sprints** (une `rare` doit sortir nettement moins qu'une
+  `commune`, et `eraWeights` doit peser), **minimums garantis tenus sur 200
+  sprints** avec au moins 4 dosages de rayon différents (sinon le « hasard entre
+  types » n'en est pas un), punaise qui survit à un re-tirage puis tombe au bout
+  d'un sprint, et bail complet d'une carte gatée (verrouillée, activable une
+  fois la condition réunie, expirée à l'échéance).
+  - `smoke_test_ui` ne se contente plus d'instancier les écrans : il **clique
+    les vrais boutons** des Investissements (adopter, embaucher, activer,
+    punaiser, replier). C'est ce qui a fait tomber le bug ci-dessous.
+- **Un bug de fond, trouvé en jouant.** Tous les composants se reconstruisent
+  de zéro à chaque changement d'état, et cette reconstruction est presque
+  toujours déclenchée par le clic d'un bouton… qui vit dans le conteneur qu'on
+  vide. Le `free()` direct détruisait donc le bouton **pendant l'émission de son
+  signal** — « Object was freed or unreferenced while a signal is being emitted
+  from it », à chaque embauche, chaque achat de pratique et chaque rallonge
+  négociée. `UIHelpers.clear_children()` détache d'abord (`remove_child`, pour
+  que l'ancien nœud ne se fasse pas mettre en page à côté de son remplaçant) et
+  libère ensuite (`queue_free`). Le défaut datait du Lot 1 et touchait la carte
+  d'Actif, le Panneau de bord et le Dossier entreprise.
+  - La stratégie `stress` a dû être réécrite : elle activait « la première carte
+    du catalogue » et comptait sur le −35 Moral de RICE pour amorcer la spirale
+    du burn-out. Ce n'est plus possible — elle prend maintenant **la pire carte
+    pour le Moral parmi celles tirées**, et ré-essaie chaque sprint. Le critère
+    de recette (« la spirale burn-out reste atteignable ») tient toujours, mais
+    il fallait que l'IA de test apprenne à jouer avec l'offre, comme un joueur.

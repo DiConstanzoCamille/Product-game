@@ -19,6 +19,11 @@ const COLOR_RULE := Color("#d4d9df")       # filets pointillés des cartes
 const COLOR_AMBER := Color("#8a6d00")      # eyebrows, catégories, coûts
 const COLOR_SHELF := Color("#23408e")      # titres de rayon
 
+## L'encre du tampon d'acquisition (« ADOPTÉE », « EMBAUCHÉ·E », « ACTIVÉE ») —
+## le rouge de tampon administratif, volontairement hors palette : c'est la
+## seule marque qui dise « c'est fait, et ça ne se défait pas ».
+const COLOR_STAMP := Color("#c0392b")
+
 const COLOR_GOOD := Color("#2f9e63")
 const COLOR_WARN := Color("#b3801a")
 const COLOR_DANGER := Color("#d3543f")
@@ -119,6 +124,27 @@ class WavyRule extends Control:
 			x += 1.5
 		if points.size() > 1:
 			draw_polyline(points, rule_color, 2.0)
+
+
+## Vide un conteneur qu'on va reconstruire — **détacher d'abord, libérer
+## ensuite**.
+##
+## Tous les composants de l'UI se reconstruisent de zéro à chaque changement
+## d'état, et cette reconstruction est presque toujours déclenchée par le clic
+## d'un bouton… qui vit dans le conteneur qu'on vide. Un `free()` direct détruit
+## donc le bouton **pendant que son signal `pressed` est en cours d'émission** :
+## Godot log « Object was freed or unreferenced while a signal is being emitted
+## from it » et prévient du risque de crash. Symptôme observé à chaque embauche,
+## chaque achat de pratique et chaque rallonge négociée.
+##
+## `queue_free()` seul ne suffit pas : le nœud resterait dans l'arbre jusqu'à la
+## fin de la frame et se ferait mettre en page **à côté** de son remplaçant.
+## D'où les deux temps — `remove_child()` sort le nœud du layout tout de suite,
+## `queue_free()` le détruit quand plus personne ne s'en sert.
+static func clear_children(container: Node) -> void:
+	for child in container.get_children():
+		container.remove_child(child)
+		child.queue_free()
 
 
 ## En-tête de rayon : titre souligné au feutre + mention de la règle du rayon
@@ -387,9 +413,11 @@ static func attach_side_panel(screen: Control) -> Control:
 	if margin is MarginContainer:
 		# La marge suit la largeur *réelle* du panneau : un contenu qui impose sa
 		# taille minimale (nom d'entreprise long, roster large) ne doit jamais
-		# finir par recouvrir le contenu de la phase.
+		# finir par recouvrir le contenu de la phase — et le rail replié doit
+		# rendre sa place aux cartes, pas la garder pour rien.
 		var keep_clear := func():
-			margin.add_theme_constant_override("margin_right", int(max(panel.size.x, SIDE_PANEL_WIDTH)) + 28)
+			margin.add_theme_constant_override("margin_right",
+				int(max(panel.size.x, panel.get_combined_minimum_size().x)) + 28)
 		keep_clear.call()
 		panel.resized.connect(keep_clear)
 	return panel

@@ -5,7 +5,7 @@ extends PanelContainer
 ## (docs/proposition-ui-interface.md §2.2). Six zones fixes, toujours à la même
 ## place, quel que soit le type :
 ##
-##   ① pastille de type + référence de formulaire
+##   ① pastille de type + rareté + référence de formulaire + punaise 📌
 ##   ② identité : portrait/pastille d'initiale (candidat) ou icône d'objet
 ##   ③ accroche (tagline, trait, description) + badges
 ##   ④ IMPACT — lignes « ressource + delta + note », dont les inconnues 🔒/❓
@@ -24,6 +24,7 @@ extends PanelContainer
 
 signal primary_pressed
 signal secondary_pressed
+signal pin_pressed
 
 const MIN_WIDTH := 236
 
@@ -32,10 +33,18 @@ const MIN_WIDTH := 236
 ## UIHelpers.SHADOW_* pour pourquoi la géométrie ne bouge pas côté boutons.
 const HOVER_TWEEN := 0.14
 
+## Le tampon d'acquisition : durée de la frappe, angle de pose et échelle de
+## départ. Il « tombe » de haut — d'où l'échelle initiale — et s'écrase net.
+const STAMP_PUNCH := 0.24
+const STAMP_ANGLE := -12.0
+const STAMP_START_SCALE := 2.8
+
 var _descriptor: Dictionary = {}
 var _tilt_degrees: float = 0.0
 var _hovered: bool = false
 var _paper: StyleBoxFlat = null
+var _stamp: Control = null
+var _stamp_should_punch: bool = false
 
 
 ## Fabrique : instancie la scène et lui donne son descripteur. La carte se
@@ -48,9 +57,16 @@ static func create(descriptor: Dictionary) -> AssetCard:
 	return card
 
 
+## La carte détecte elle-même l'acquisition : si le descripteur **gagne** un
+## tampon qu'il n'avait pas, c'est que l'Actif vient d'être acquis et le tampon
+## se joue. L'écran n'a rien à déclencher — il change l'état, la carte réagit.
+## Rien ne se joue au premier descripteur (carte construite hors de l'arbre) :
+## revenir sur l'écran ne re-tamponne pas ce qu'on a acheté au sprint dernier.
 func set_descriptor(descriptor: Dictionary) -> void:
+	var had_stamp: bool = _descriptor.get("stamp", "") != ""
 	_descriptor = descriptor
 	if is_inside_tree():
+		_stamp_should_punch = not had_stamp and descriptor.get("stamp", "") != ""
 		_rebuild()
 
 
@@ -118,14 +134,16 @@ func _set_hovered(entered: bool) -> void:
 
 func _rebuild() -> void:
 	var vbox: VBoxContainer = get_node("Margin/VBox")
-	for child in vbox.get_children():
-		child.free()
+	# La carte se reconstruit depuis le clic d'un de ses propres boutons : voir
+	# UIHelpers.clear_children() pour pourquoi on ne peut pas les `free()` ici.
+	UIHelpers.clear_children(vbox)
 
 	_tilt_degrees = float(_descriptor.get("tilt", 0.0))
 
 	_apply_paper_style()
 	_apply_tilt()
 	_build_decorations()
+	_build_stamp()
 
 	_zone_type(vbox)
 	_zone_identity(vbox)
@@ -166,8 +184,7 @@ func _apply_paper_style() -> void:
 ## contrairement au `top_level` du spike.
 func _build_decorations() -> void:
 	var layer: Control = get_node("Decorations")
-	for child in layer.get_children():
-		child.free()
+	UIHelpers.clear_children(layer)
 	# La carte se reconstruit à chaque changement d'état : sans ça, le callable
 	# de placement de la décoration précédente reste branché sur `resized` et
 	# référence un nœud déjà libéré.
@@ -200,9 +217,81 @@ func _build_decorations() -> void:
 	layer.resized.connect(place)
 
 
-# ── ① Type + référence ────────────────────────────────────────────────────
+## Le **tampon d'acquisition** (proposition UI §5.2) : « ADOPTÉE »,
+## « EMBAUCHÉ·E », « ACTIVÉE » en travers de la carte. C'est le feedback de
+## l'acte — la carte ne bouge pas de sa place dans le rayon, elle porte
+## simplement la marque de ce qui vient d'être fait.
+##
+## Il vit dans le calque "Decorations" comme le scotch : un PanelContainer
+## étirerait un enfant direct sur toute la carte et le tampon recouvrirait le
+## contenu. Le calque, lui, est un Control nu — il ne remet donc pas à zéro la
+## rotation ni l'échelle du tampon, ce qu'un Container ferait à chaque passe de
+## layout (le piège déjà rencontré sur l'inclinaison des cartes).
+func _build_stamp() -> void:
+	_stamp = null
+	var text: String = _descriptor.get("stamp", "")
+	if text == "":
+		return
+
+	var layer: Control = get_node("Decorations")
+	var stamp := PanelContainer.new()
+	stamp.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(UIHelpers.COLOR_STAMP.r, UIHelpers.COLOR_STAMP.g, UIHelpers.COLOR_STAMP.b, 0.07)
+	style.border_color = UIHelpers.COLOR_STAMP
+	style.set_border_width_all(3)
+	style.set_corner_radius_all(6)
+	style.content_margin_left = 14
+	style.content_margin_right = 14
+	style.content_margin_top = 5
+	style.content_margin_bottom = 5
+	stamp.add_theme_stylebox_override("panel", style)
+
+	var label := Label.new()
+	label.text = text
+	UIHelpers.apply_heading(label, 21, 700.0)
+	label.add_theme_color_override("font_color", UIHelpers.COLOR_STAMP)
+	stamp.add_child(label)
+	layer.add_child(stamp)
+	_stamp = stamp
+
+	# Le calque est positionné à la main : sans conteneur pour le faire, le
+	# tampon doit se donner sa taille et se recentrer à chaque redimensionnement.
+	var place := func():
+		stamp.size = stamp.get_combined_minimum_size()
+		stamp.pivot_offset = stamp.size / 2.0
+		stamp.position = ((layer.size - stamp.size) / 2.0).round()
+	place.call()
+	layer.resized.connect(place)
+
+	if _stamp_should_punch:
+		_stamp_should_punch = false
+		_punch_stamp()
+	else:
+		stamp.rotation_degrees = STAMP_ANGLE
+
+
+## La frappe : le tampon tombe de haut (grande échelle), s'écrase net et se
+## redresse d'un rien — l'« impact franc » demandé par le §5.2. Pas de
+## déplacement de la carte : le geste doit se lire sans que le rayon bouge.
+func _punch_stamp() -> void:
+	_stamp.scale = Vector2(STAMP_START_SCALE, STAMP_START_SCALE)
+	_stamp.rotation_degrees = STAMP_ANGLE - 9.0
+	_stamp.modulate.a = 0.0
+
+	var tween := create_tween().set_parallel(true)
+	tween.tween_property(_stamp, "scale", Vector2.ONE, STAMP_PUNCH) \
+		.set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
+	tween.tween_property(_stamp, "rotation_degrees", STAMP_ANGLE, STAMP_PUNCH) \
+		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tween.tween_property(_stamp, "modulate:a", 1.0, STAMP_PUNCH * 0.45)
+
+
+# ── ① Type + rareté + référence + punaise ─────────────────────────────────
 func _zone_type(vbox: VBoxContainer) -> void:
 	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 6)
 	vbox.add_child(row)
 
 	var pill_color: Color = _descriptor.get("pill_color", UIHelpers.PILL_DECISION)
@@ -220,12 +309,38 @@ func _zone_type(vbox: VBoxContainer) -> void:
 	pill.add_child(_label(_descriptor.get("pill_text", "").to_upper(), 9, pill_color))
 	row.add_child(pill)
 
+	# La rareté ne s'affiche que quand elle sort de l'ordinaire (voir
+	# AssetView.RARITY_LABELS) : un marquage porté par toutes les cartes ne
+	# marquerait plus rien.
+	if _descriptor.get("rarity_label", "") != "":
+		var rarity := _label(_descriptor.get("rarity_label", ""), 9, _descriptor.get("rarity_color", UIHelpers.COLOR_SOFT_TEXT))
+		UIHelpers.apply_mono(rarity, 9, true)
+		rarity.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		row.add_child(rarity)
+
 	row.add_child(_spacer_h())
 
 	var ref_label := _label(_descriptor.get("ref", ""), 10, UIHelpers.COLOR_SOFT_TEXT)
 	UIHelpers.apply_mono(ref_label, 10)
 	ref_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(ref_label)
+
+	# 📌 La punaise est un autocollant sur la carte, pas un troisième bouton :
+	# deux boutons empilés suffisent déjà à la hauteur d'une carte, et « garder
+	# pour plus tard » est un geste de manipulation d'objet, pas une décision.
+	var pin: Dictionary = _descriptor.get("pin", {})
+	if not pin.is_empty():
+		var pin_button := Button.new()
+		pin_button.text = pin.get("text", "📍")
+		pin_button.tooltip_text = pin.get("tooltip", "")
+		pin_button.disabled = pin.get("disabled", false)
+		pin_button.flat = not pin.get("active", false)
+		pin_button.focus_mode = Control.FOCUS_NONE
+		pin_button.add_theme_font_size_override("font_size", 12)
+		pin_button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		if not pin_button.disabled:
+			pin_button.pressed.connect(func(): pin_pressed.emit())
+		row.add_child(pin_button)
 
 
 # ── ② Identité ───────────────────────────────────────────────────────────

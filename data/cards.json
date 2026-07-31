@@ -12,9 +12,11 @@
   "cards": [
     {
       "id": "rice",
+      "costPieces": 3,
       "refId": "PRD-014",
       "family": "outil-process",
       "category": "Module priorisation",
+      "rarity": "commune",
       "name": "RICE Scoring",
       "tagline": "Reach × Impact × Confidence ÷ Effort. La science contre le petit doigt mouillé.",
       "effects": {
@@ -34,9 +36,11 @@
     },
     {
       "id": "notion",
+      "costPieces": 4,
       "refId": "DOC-002",
       "family": "outil-process",
       "category": "Module documentation",
+      "rarity": "commune",
       "name": "Notion",
       "tagline": "Un espace blanc infini. Tout y est possible, y compris s'y perdre.",
       "effects": {
@@ -56,9 +60,12 @@
     },
     {
       "id": "jira",
+      "costPieces": 6,
       "refId": "DOC-003",
       "family": "outil-process",
       "category": "Module suivi & doc",
+      "rarity": "notable",
+      "eraWeights": { "agile-transformation": 2.0 },
       "name": "Jira",
       "tagline": "Chaque ticket a un statut. Chaque statut a un mensonge.",
       "effects": {
@@ -78,9 +85,11 @@
     },
     {
       "id": "daily-standup",
+      "costPieces": 2,
       "refId": "RIT-001",
       "family": "methodologie-orga",
       "category": "Rituel quotidien",
+      "rarity": "commune",
       "name": "Daily Standup",
       "tagline": "Quinze minutes debout, en théorie. La réalité dépend beaucoup de qui parle en premier.",
       "eras": ["agile-transformation"],
@@ -101,9 +110,11 @@
     },
     {
       "id": "sprint-retro",
+      "costPieces": 2,
       "refId": "RIT-002",
       "family": "methodologie-orga",
       "category": "Rituel de fin de sprint",
+      "rarity": "notable",
       "name": "Sprint Rétro",
       "tagline": "Le seul moment où on a le droit de dire que ça ne va pas — encore faut-il que quelqu'un ose.",
       "eras": ["agile-transformation"],
@@ -119,6 +130,36 @@
           "financier": { "value": -2, "note": "Quasi nul." },
           "ttm": { "value": -5, "note": "Coût récurrent mais prévisible." },
           "productivite": { "value": 20, "note": "Vraie amélioration continue chez une équipe déjà mature." }
+        }
+      }
+    },
+    {
+      "id": "shape-up",
+      "costPieces": 5,
+      "refId": "ORG-021",
+      "family": "methodologie-orga",
+      "category": "Refonte du cycle produit",
+      "rarity": "rare",
+      "name": "Passage en Shape Up",
+      "tagline": "Six semaines, un appétit, personne qui vient demander où on en est le mardi.",
+      "requires": {
+        "type": "roster-seniority-min",
+        "seniority": "senior",
+        "value": 2,
+        "label": "2 profils seniors dans l'équipe pour tenir un cycle sans chef de projet"
+      },
+      "effects": {
+        "junior": {
+          "humain": { "value": -20, "note": "Trop d'autonomie d'un coup pour une équipe qui cherche encore ses repères." },
+          "financier": { "value": -5, "note": "Rien à acheter, tout à réapprendre." },
+          "ttm": { "value": -25, "note": "Deux cycles perdus avant que le rythme s'installe." },
+          "productivite": { "value": 20, "note": "Vrai gain une fois le premier cycle bouclé — s'il l'est." }
+        },
+        "senior": {
+          "humain": { "value": 30, "note": "On rend enfin le cycle à ceux qui le vivent ; le soulagement est net." },
+          "financier": { "value": -5, "note": "Rien à acheter." },
+          "ttm": { "value": -10, "note": "Un cycle d'adaptation, pas plus." },
+          "productivite": { "value": 40, "note": "L'équipe arrête d'être interrompue et livre par appétits entiers." }
         }
       }
     }

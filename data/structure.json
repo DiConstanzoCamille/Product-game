@@ -7,9 +7,8 @@
   "sprintPhases": [
     { "order": 1, "id": "inbox", "name": "Inbox", "description": "Un événement aléatoire tombe (le « chaos humain ») et force un choix avant toute planification." },
     { "order": 2, "id": "roadmap", "name": "Roadmap", "description": "2 à 4 features proposées, sélection limitée par la capacité de l'équipe. Dépasser sa capacité déclenche une surchauffe (dette + cynisme en hausse)." },
-    { "order": 3, "id": "grandes-decisions", "name": "Grandes décisions", "description": "Activation optionnelle d'une décision structurelle. Pas systématique à chaque sprint." },
-    { "order": 4, "id": "recrutement", "name": "Recrutement", "description": "Accès optionnel au shop." },
-    { "order": 5, "id": "resolution", "name": "Résolution", "description": "Application des effets, delta affiché." }
+    { "order": 3, "id": "investissements", "name": "Investissements", "description": "Un seul écran, un seul rayon : 6 emplacements tirés une fois par sprint dans un pool commun aux trois types d'Actif (candidats, pratiques, grandes décisions), avec un minimum garanti par type. Tout est optionnel — mettre les acquisitions en concurrence dans le même champ de vision, avec la même pièce et le même tour, est l'arbitrage du tour. On peut payer pour rejouer l'offre (re-tirage) ou pour en garder une carte (punaise)." },
+    { "order": 4, "id": "resolution", "name": "Résolution", "description": "Application des effets, delta affiché." }
   ],
   "cardSystem": {
     "tactical": {
@@ -18,7 +17,7 @@
     },
     "structural": {
       "id": "grandes-decisions-structurelles",
-      "description": "Pas de pioche : un menu permanent, activé quand le joueur le décide. Limité à 3-4 activations par mandat, avec un vrai coût de bascule.",
+      "description": "Tirées au rayon des Investissements comme le reste de l'offre (2 par sprint, tirage pondéré par la rareté et le scénario, sans mémoire d'un sprint à l'autre ; une carte activée sort du tirage définitivement), et limitées à 3-4 activations par mandat, avec un vrai coût de bascule. Passer son tour sur une carte, c'est parier qu'elle reviendra — on peut payer pour la garder (punaise) ou pour rejouer l'offre (re-tirage). Une carte à prérequis reste affichée un trimestre, verrouillée tant que sa condition est fausse.",
       "families": [
         { "id": "outil-process", "label": "Outils / process", "example": "RICE, Notion, Jira", "affects": "Effet direct sur les jauges" },
         { "id": "stack-technique", "label": "Stack technique / produit", "example": "React", "affects": "Effet sur le shop de recrutement, pas sur les jauges" },
