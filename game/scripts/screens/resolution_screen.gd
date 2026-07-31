@@ -22,6 +22,12 @@ const MANDATE_END_SCENE := "res://scenes/screens/mandate_end_screen.tscn"
 @onready var score_title: Label = $Margin/VBox/Scroll/Content/ScoreReplay/ScoreHeader/ScoreTitle
 @onready var score_status: Label = $Margin/VBox/Scroll/Content/ScoreReplay/ScoreHeader/ScoreStatus
 @onready var score_lines: VBoxContainer = $Margin/VBox/Scroll/Content/ScoreReplay/ScoreLines
+@onready var quota_replay: VBoxContainer = $Margin/VBox/Scroll/Content/QuotaReplay
+@onready var quota_title: Label = $Margin/VBox/Scroll/Content/QuotaReplay/QuotaHeader/QuotaTitle
+@onready var quota_status: Label = $Margin/VBox/Scroll/Content/QuotaReplay/QuotaHeader/QuotaStatus
+@onready var quota_progress: ProgressBar = $Margin/VBox/Scroll/Content/QuotaReplay/QuotaProgress
+@onready var quota_label: Label = $Margin/VBox/Scroll/Content/QuotaReplay/QuotaLabel
+@onready var quota_verdict: Label = $Margin/VBox/Scroll/Content/QuotaReplay/QuotaVerdict
 @onready var gauges_grid: GridContainer = $Margin/VBox/Scroll/Content/GaugesGrid
 @onready var journal_title: Label = $Margin/VBox/Scroll/Content/JournalTitle
 @onready var journal_container: VBoxContainer = $Margin/VBox/Scroll/Content/JournalContainer
@@ -41,6 +47,12 @@ var _score_finished := false
 var _score_tone_stream: AudioStreamWAV
 var _score_last_audio_step := -1
 var _score_audio_step_ticks := 0
+var _quota_data: Dictionary = {}
+var _quota_before := 0
+var _quota_started := false
+var _quota_finished := false
+var _quota_replay_token := 0
+var _quota_tween: Tween
 
 
 func _ready() -> void:
@@ -58,14 +70,13 @@ func _ready() -> void:
 	_load_hud(old_values)
 	_setup_next_button()
 	_setup_breather_button()
+	_setup_quota_replay()
 	_setup_score_replay()
-
-	if int(SprintState.board_review_result.get("sprint", -1)) == SprintState.sprint_number:
-		_show_board_review_overlay()
 
 
 func _exit_tree() -> void:
 	_score_replay_token += 1
+	_quota_replay_token += 1
 	_score_finished = true
 	if is_instance_valid(score_audio):
 		score_audio.stop()
@@ -116,6 +127,7 @@ func _setup_score_replay() -> void:
 	var report: Dictionary = SprintState.last_score_report
 	if report.is_empty():
 		score_replay.visible = false
+		_finish_score_replay()
 		return
 	score_replay.visible = true
 	score_title.text = "Traction × Levier = Impact"
@@ -132,7 +144,7 @@ func _setup_score_replay() -> void:
 
 	if _score_events.is_empty():
 		score_status.text = "Aucun score ce sprint"
-		_score_finished = true
+		_finish_score_replay()
 		return
 	_setup_score_audio()
 	_score_replay_token += 1
@@ -330,7 +342,12 @@ func _accelerate_score_replay() -> void:
 	if _score_finished:
 		return
 	_score_replay_speed = 4.0
-	score_status.text = "Rythme rapide"
+	if _quota_started:
+		quota_status.text = "Rythme rapide"
+		if is_instance_valid(_quota_tween):
+			_quota_tween.set_speed_scale(_score_replay_speed)
+	else:
+		score_status.text = "Rythme rapide"
 
 
 func _reveal_score_replay() -> void:
@@ -339,14 +356,112 @@ func _reveal_score_replay() -> void:
 	_score_replay_token += 1
 	while _score_event_index < _score_events.size():
 		_reveal_next_score_event()
+	if _quota_started:
+		_reveal_quota_replay()
+		return
 	_finish_score_replay()
+	if _quota_started and not _quota_finished:
+		_reveal_quota_replay()
 
 
 func _finish_score_replay() -> void:
 	if _score_finished:
 		return
+	if not _quota_started and not _quota_data.is_empty():
+		_start_quota_replay()
+		return
 	_score_finished = true
 	score_status.text = "Score final"
+
+
+## Le quota est volontairement hors de la sequence ScoreResolver : le score
+## explique le sprint, puis son Impact vient s'inscrire dans la course du
+## trimestre. C'est le dernier temps du replay, y compris lors de la
+## revelation instantanee au second clic.
+func _setup_quota_replay() -> void:
+	quota_replay.visible = false
+	quota_verdict.text = ""
+	_quota_started = false
+	_quota_finished = false
+	var result: Dictionary = SprintState.quarter_result
+	if int(result.get("sprint", -1)) == SprintState.sprint_number:
+		_quota_data = result.duplicate(true)
+	else:
+		_quota_data = SprintState.get_quarter_progress()
+	var impact := int(_quota_data.get("impact", 0))
+	var sprint_impact := int(SprintState.last_score_report.get("global", {}).get("impact", 0))
+	_quota_before = max(0, impact - sprint_impact)
+	quota_title.text = "Impact trimestriel · T%d" % int(_quota_data.get("quarter", SprintState.quarter_index))
+	quota_progress.max_value = max(1, int(_quota_data.get("quota", 1)))
+	quota_progress.value = _quota_before
+	quota_progress.show_percentage = false
+	quota_progress.add_theme_stylebox_override("fill", UIHelpers.make_bar_fill_style(UIHelpers.COLOR_AMBER))
+	quota_progress.add_theme_stylebox_override("background", UIHelpers.make_bar_background_style())
+
+
+func _start_quota_replay() -> void:
+	_quota_started = true
+	quota_replay.visible = true
+	quota_status.text = "Impact du sprint"
+	var token := _quota_replay_token + 1
+	_quota_replay_token = token
+	var target := int(_quota_data.get("impact", 0))
+	if _score_replay_clicks >= 2:
+		_reveal_quota_replay()
+		return
+	_quota_tween = create_tween()
+	_quota_tween.tween_method(func(value: float):
+		if token == _quota_replay_token and is_instance_valid(quota_progress):
+			_set_quota_display(int(round(value)), false)
+	, float(_quota_before), float(target), 0.65 / _score_replay_speed).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	_quota_tween.tween_callback(func():
+		if token == _quota_replay_token:
+			_finish_quota_replay()
+	)
+
+
+func _set_quota_display(value: int, final: bool) -> void:
+	var quota := int(_quota_data.get("quota", 0))
+	quota_progress.value = clampi(value, 0, max(1, quota))
+	quota_label.text = "Impact brut %d / %d" % [value, quota]
+	if final and _quota_data.has("passed"):
+		var passed := bool(_quota_data.get("passed", false))
+		quota_status.text = "Quota atteint" if passed else "Quota manqué"
+		quota_verdict.text = _quota_verdict_text(_quota_data)
+		quota_verdict.add_theme_color_override("font_color", UIHelpers.COLOR_GOOD if passed else UIHelpers.COLOR_DANGER)
+	else:
+		quota_status.text = "Impact du sprint"
+
+
+func _reveal_quota_replay() -> void:
+	if _quota_data.is_empty():
+		_finish_quota_replay()
+		return
+	_quota_replay_token += 1
+	if is_instance_valid(_quota_tween):
+		_quota_tween.kill()
+	quota_replay.visible = true
+	_set_quota_display(int(_quota_data.get("impact", 0)), true)
+	_finish_quota_replay()
+
+
+func _finish_quota_replay() -> void:
+	if _quota_finished:
+		return
+	_quota_finished = true
+	_quota_tween = null
+	_set_quota_display(int(_quota_data.get("impact", 0)), true)
+	_score_finished = true
+	score_status.text = "Score final"
+	if _quota_data.has("passed"):
+		_show_quarter_verdict_overlay.call_deferred()
+
+
+func _quota_verdict_text(result: Dictionary) -> String:
+	var bonus := int(result.get("qualitativeBonus", 0))
+	if bool(result.get("passed", false)):
+		return "Quota atteint.%s" % (" Objectifs qualitatifs tenus : +%d Budget." % bonus if bonus > 0 else " Les objectifs qualitatifs restent un bonus de +8 Budget.")
+	return "Quota non atteint : la mission s'arrête ici."
 
 
 ## Bloc "Revenus" mis en avant, séparé des coûts — répond au besoin de rendre
@@ -476,13 +591,16 @@ func _setup_breather_button() -> void:
 	bottom_bar.move_child(breather_btn, 1)
 
 
-## Overlay de verdict de la revue de board (spec profondeur §8.2) — affiché
-## à la Résolution du sprint de mi-mandat, par-dessus le HUD.
-func _show_board_review_overlay() -> void:
-	var result: Dictionary = SprintState.board_review_result
-	var passed: bool = result.get("passed", false)
+## Le verdict trimestriel ferme le replay. Il ne mélange jamais le quota et les
+## objectifs qualitatifs : ces derniers ne peuvent donner qu'un bonus Budget.
+func _show_quarter_verdict_overlay() -> void:
+	if int(_quota_data.get("sprint", -1)) != SprintState.sprint_number:
+		return
+	var result: Dictionary = _quota_data
+	var passed: bool = bool(result.get("passed", false))
 
 	var dim := ColorRect.new()
+	dim.name = "QuarterVerdictOverlay"
 	dim.color = Color(0, 0, 0, 0.55)
 	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(dim)
@@ -500,43 +618,80 @@ func _show_board_review_overlay() -> void:
 	panel.add_child(vbox)
 
 	var eyebrow := Label.new()
-	eyebrow.text = "SPRINT %d — LA REVUE DE BOARD" % int(result.get("sprint", 0))
+	eyebrow.text = "TRIMESTRE %d — VERDICT DU QUOTA" % int(result.get("quarter", 0))
 	UIHelpers.apply_mono(eyebrow, 12, true)
 	eyebrow.add_theme_color_override("font_color", UIHelpers.COLOR_AMBER)
 	vbox.add_child(eyebrow)
 
 	var title := Label.new()
-	title.text = result.get("title", "")
+	title.text = "Quota atteint" if passed else "Quota manqué"
 	UIHelpers.apply_heading(title, 24, 700.0)
 	title.autowrap_mode = TextServer.AUTOWRAP_WORD
 	vbox.add_child(title)
 
-	for condition in result.get("conditions", []):
+	var impact := Label.new()
+	impact.text = "Impact brut %d / %d" % [int(result.get("impact", 0)), int(result.get("quota", 0))]
+	impact.add_theme_font_size_override("font_size", 18)
+	vbox.add_child(impact)
+
+	for condition in result.get("objectives", []):
 		var line := Label.new()
-		line.text = "%s  %s" % ["✅" if condition.get("ok", false) else "❌", condition.get("label", "")]
+		line.text = "%s  %s" % ["✓" if condition.get("ok", false) else "○", condition.get("label", "")]
 		line.autowrap_mode = TextServer.AUTOWRAP_WORD
 		vbox.add_child(line)
 
 	var verdict := Label.new()
-	var review_conf: Dictionary = GameData.balance.get("pressure", {}).get("boardReview", {})
 	if passed:
-		verdict.text = "Le comité applaudit poliment. +%d 🪙 de Budget d'investissement, 🎯 Capital politique +%d." % [
-			int(review_conf.get("successPieces", 5)), int(review_conf.get("successCapitalPolitique", 8))
-		]
+		var bonus := int(result.get("qualitativeBonus", 0))
+		verdict.text = "Le quota porte le trimestre. %s" % ("Les objectifs qualitatifs ajoutent +%d Budget." % bonus if bonus > 0 else "Les objectifs qualitatifs sont un bonus, jamais une condition de passage.")
 		verdict.add_theme_color_override("font_color", UIHelpers.COLOR_GOOD)
 	else:
-		verdict.text = "Le comité « prend note ». 🎯 Capital politique %d, et l'allocation plancher tombe à %d 🪙/sprint pour le reste du mandat." % [
-			int(review_conf.get("failCapitalPolitique", -12)),
-			int(GameData.scoring.get("conversion", {}).get("budget", {}).get("failedReviewAllocation", 1))
-		]
+		verdict.text = "Le quota n'est pas atteint. Le mandat se termine."
 		verdict.add_theme_color_override("font_color", UIHelpers.COLOR_DANGER)
 	verdict.autowrap_mode = TextServer.AUTOWRAP_WORD
 	vbox.add_child(verdict)
+
+	if not passed:
+		var end_btn := Button.new()
+		end_btn.text = "Voir le résultat du mandat →"
+		UIHelpers.style_primary_button(end_btn)
+		end_btn.pressed.connect(func(): get_tree().change_scene_to_file(MANDATE_END_SCENE))
+		vbox.add_child(end_btn)
+		return
+
+	if SprintState.quarter_exit_choice_pending:
+		var exit_btn := Button.new()
+		exit_btn.name = "ExitMandateButton"
+		exit_btn.text = "Quitter sur cette victoire"
+		exit_btn.pressed.connect(_on_exit_mandate_pressed)
+		vbox.add_child(exit_btn)
+		var stay_btn := Button.new()
+		stay_btn.name = "StayLongMandateButton"
+		stay_btn.text = "Rester pour le mandat long"
+		UIHelpers.style_primary_button(stay_btn)
+		stay_btn.pressed.connect(_on_stay_long_mandate_pressed.bind(dim))
+		vbox.add_child(stay_btn)
+		return
 
 	var close_btn := Button.new()
 	close_btn.text = "Reprendre le sprint →"
 	close_btn.pressed.connect(func(): dim.queue_free())
 	vbox.add_child(close_btn)
+
+
+func _on_exit_mandate_pressed() -> void:
+	SprintState.choose_mandate_path(false)
+	get_tree().change_scene_to_file(MANDATE_END_SCENE)
+
+
+func _on_stay_long_mandate_pressed(dim: Control) -> void:
+	if SprintState.choose_mandate_path(true) != "":
+		return
+	if is_instance_valid(dim):
+		dim.queue_free()
+	next_sprint_button.disabled = false
+	next_sprint_button.text = "Sprint suivant →"
+	next_sprint_button.pressed.connect(_on_next_sprint_pressed)
 
 
 func _build_gauge(resource: Dictionary, old_values: Dictionary, index: int) -> Control:
@@ -629,6 +784,9 @@ func _setup_next_button() -> void:
 	if mandate_ending != "":
 		next_sprint_button.text = "Voir le résultat du mandat →"
 		next_sprint_button.pressed.connect(func(): get_tree().change_scene_to_file(MANDATE_END_SCENE))
+	elif SprintState.quarter_exit_choice_pending:
+		next_sprint_button.text = "Choisissez la suite du mandat"
+		next_sprint_button.disabled = true
 	else:
 		next_sprint_button.text = "Sprint suivant →"
 		next_sprint_button.pressed.connect(_on_next_sprint_pressed)

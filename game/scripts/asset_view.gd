@@ -104,12 +104,20 @@ static func for_decision(card: Dictionary) -> Dictionary:
 		})
 
 	var cost := SprintState.decision_cost(card_id)
+	var tool_frozen: bool = SprintState.is_quarter_requirement_active("toolsFrozen") \
+		and card.get("family", "") in ["outil-process", "methodologie-orga"]
 
 	var primary: Dictionary = {}
 	if activated:
 		primary = {
 			"text": "Activée ✓ (sprint %d)" % int(SprintState.activated_card_sprints.get(card_id, 0)),
 			"disabled": true,
+		}
+	elif tool_frozen:
+		primary = {
+			"text": "🔒 Outillage gelé ce trimestre",
+			"disabled": true,
+			"tooltip": "Exigence active : %s" % SprintState.get_quarter_requirement_text(),
 		}
 	elif requirement.get("gated", false) and not requirement.get("ok", false):
 		primary = {
@@ -175,6 +183,12 @@ static func for_candidate(candidate: Dictionary) -> Dictionary:
 	var primary: Dictionary = {}
 	if hired:
 		primary = {"text": "Embauché·e ✓", "disabled": true}
+	elif SprintState.is_quarter_requirement_active("hiringFrozen"):
+		primary = {
+			"text": "🧊 Embauches gelées ce trimestre",
+			"disabled": true,
+			"tooltip": "Exigence active : %s" % SprintState.get_quarter_requirement_text(),
+		}
 	elif headcount >= cap:
 		primary = {"text": "Cap d'effectif atteint (%d/%d)" % [headcount, cap], "disabled": true}
 	elif SprintState.pieces < cost:

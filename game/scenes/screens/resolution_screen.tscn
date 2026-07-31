@@ -84,6 +84,34 @@ text=""
 [node name="ScoreLines" type="VBoxContainer" parent="Margin/VBox/Scroll/Content/ScoreReplay"]
 theme_override_constants/separation=4
 
+[node name="QuotaReplay" type="VBoxContainer" parent="Margin/VBox/Scroll/Content"]
+visible=false
+theme_override_constants/separation=6
+
+[node name="QuotaHeader" type="HBoxContainer" parent="Margin/VBox/Scroll/Content/QuotaReplay"]
+theme_override_constants/separation=12
+
+[node name="QuotaTitle" type="Label" parent="Margin/VBox/Scroll/Content/QuotaReplay/QuotaHeader"]
+size_flags_horizontal=3
+theme_override_font_sizes/font_size=18
+text="Impact trimestriel"
+
+[node name="QuotaStatus" type="Label" parent="Margin/VBox/Scroll/Content/QuotaReplay/QuotaHeader"]
+theme_override_colors/font_color=Color(0.47451, 0.501961, 0.552941, 1)
+text=""
+
+[node name="QuotaProgress" type="ProgressBar" parent="Margin/VBox/Scroll/Content/QuotaReplay"]
+custom_minimum_size=Vector2(0, 14)
+show_percentage=false
+
+[node name="QuotaLabel" type="Label" parent="Margin/VBox/Scroll/Content/QuotaReplay"]
+theme_override_font_sizes/font_size=15
+text=""
+
+[node name="QuotaVerdict" type="Label" parent="Margin/VBox/Scroll/Content/QuotaReplay"]
+autowrap_mode=2
+text=""
+
 [node name="GaugesGrid" type="GridContainer" parent="Margin/VBox/Scroll/Content"]
 columns=2
 theme_override_constants/h_separation=24

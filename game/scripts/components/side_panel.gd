@@ -15,8 +15,8 @@ extends PanelContainer
 ##     segment fantôme ;
 ##  2. le roster est lisible d'un coup d'œil et **actionnable en un clic**
 ##     (🤝 1:1 · licencier, avec confirmation) ;
-##  3. la revue de board est **évaluée en direct** — comprendre ce qu'il faut
-##     prioriser ne demande plus d'attendre le sprint de mi-mandat.
+##  3. le quota et son bonus qualitatif sont **évalués en direct** — la cible
+##     et les arbitrages du trimestre restent lisibles à chaque décision.
 ##
 ## Aucun état ne vit ici : tout est relu dans SprintState à chaque refresh().
 ## L'écran hôte appelle refresh() quand il modifie l'état, et écoute
@@ -119,7 +119,7 @@ func _build() -> void:
 
 	_build_team(vbox)
 	_build_assets(vbox)
-	_build_board_review(vbox)
+	_build_quota(vbox)
 
 	var filler := Control.new()
 	filler.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -137,16 +137,25 @@ func _build() -> void:
 # ── Le rail replié ───────────────────────────────────────────────────────
 ## Ce qui survit au repli : les six jauges en vignette (barre + valeur, pas de
 ## libellé — l'icône suffit une fois qu'on les connaît), les pièces et
-## l'Énergie. Tout le reste — roster, actifs, revue de board — se retrouve en
+## l'Énergie. Tout le reste — roster, actifs, détail du quota — se retrouve en
 ## dépliant. Les tooltips restent complets : le rail n'enlève pas
 ## l'information, il enlève la place qu'elle prend.
 func _build_rail(vbox: VBoxContainer) -> void:
 	vbox.add_child(_collapse_button("▸", "Déplier le Panneau de bord"))
 
-	var sprint := _label("%d" % SprintState.sprint_number, 10, UIHelpers.PANEL_MUTED)
+	var sprint := _label("S%d\nT%d" % [SprintState.sprint_number, SprintState.quarter_index], 10, UIHelpers.PANEL_MUTED)
 	UIHelpers.apply_mono(sprint, 10)
 	sprint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	sprint.tooltip_text = _quota_tooltip()
 	vbox.add_child(_spaced(sprint, 2, 6))
+
+	var quota := SprintState.get_quarter_progress()
+	var quota_label := _label("%d/%d" % [int(quota.get("impact", 0)), int(quota.get("quota", 0))], 9, UIHelpers.PANEL_ACCENT)
+	quota_label.name = "QuotaRail"
+	quota_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	quota_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	quota_label.tooltip_text = _quota_tooltip()
+	vbox.add_child(_spaced(quota_label, 0, 4))
 
 	for resource in GameData.resources:
 		var resource_id: String = resource.get("id", "")
@@ -231,8 +240,9 @@ func _build_header(vbox: VBoxContainer) -> void:
 	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	UIHelpers.apply_heading(name_label, 15, 600.0)
 	top.add_child(name_label)
-	var sprint_label := _label("SPRINT %d/%d" % [
-		SprintState.sprint_number, int(GameData.balance.get("mandateLengthSprints", 12))
+	var sprint_label := _label("SPRINT %d · T%d · %d/%d" % [
+		SprintState.sprint_number, SprintState.quarter_index,
+		SprintState.quarter_sprint + 1, SprintState.get_quarter_length()
 	], 11, UIHelpers.PANEL_MUTED)
 	UIHelpers.apply_mono(sprint_label, 11)
 	sprint_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
@@ -524,34 +534,55 @@ func _build_assets(vbox: VBoxContainer) -> void:
 	vbox.add_child(practices_label)
 
 
-# ── Revue de board, évaluée en direct ────────────────────────────────────
-func _build_board_review(vbox: VBoxContainer) -> void:
-	var conditions := SprintState.evaluate_board_objectives()
-	if conditions.is_empty():
-		return
+# ── Quota trimestriel, évalué en direct ──────────────────────────────────
+func _build_quota(vbox: VBoxContainer) -> void:
+	var quota: Dictionary = SprintState.get_quarter_progress()
+	var impact := int(quota.get("impact", 0))
+	var target: int = max(1, int(quota.get("quota", 1)))
 
 	vbox.add_child(_spaced(_rule(), 10, 0))
-	vbox.add_child(_group_label("Revue de board — sprint %d" % int(GameData.balance.get("trimesterLengthSprints", 6))))
+	var section := VBoxContainer.new()
+	section.name = "QuotaSection"
+	section.add_theme_constant_override("separation", 5)
+	vbox.add_child(section)
+	section.add_child(_group_label("Quota trimestriel · T%d" % int(quota.get("quarter", SprintState.quarter_index))))
+	section.add_child(_label("Sprint %d/%d · Impact brut %d / %d" % [
+		int(quota.get("sprint", 0)) + 1, int(quota.get("length", 3)), impact, target
+	], 11, UIHelpers.PANEL_FG, true))
 
-	for condition in conditions:
-		var row := HBoxContainer.new()
-		var label := _label(condition.get("label", ""), 11, UIHelpers.PANEL_FG, true)
-		label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		row.add_child(label)
+	var bar := ProgressBar.new()
+	bar.name = "QuotaProgress"
+	bar.custom_minimum_size = Vector2(0, BAR_HEIGHT)
+	bar.max_value = target
+	bar.value = clampi(impact, 0, target)
+	bar.show_percentage = false
+	bar.tooltip_text = _quota_tooltip()
+	bar.add_theme_stylebox_override("fill", _flat(UIHelpers.PANEL_ACCENT, 3))
+	bar.add_theme_stylebox_override("background", _flat(Color(1, 1, 1, 0.10), 3))
+	section.add_child(bar)
 
-		var ok: bool = condition.get("ok", false)
-		var current: String = condition.get("current", "")
-		var verdict := _label("✓" if ok else "✗ (%s)" % current, 11,
-			UIHelpers.PANEL_GOOD if ok else UIHelpers.PANEL_DANGER)
-		verdict.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		row.add_child(verdict)
-		vbox.add_child(_spaced(row, 2, 2))
+	for requirement in SprintState.get_active_quarter_requirements():
+		var requirement_label := _label("%s %s\n%s" % [
+			requirement.get("icon", "!"), requirement.get("name", "Exigence"), requirement.get("description", "")
+		], 10, UIHelpers.PANEL_FG, true)
+		requirement_label.tooltip_text = "Exigence active ce trimestre"
+		section.add_child(requirement_label)
 
-	match SprintState.board_review_state:
-		"passed":
-			vbox.add_child(_label("✅ Revue passée — budget d'investissement débloqué.", 10, UIHelpers.PANEL_GOOD, true))
-		"failed":
-			vbox.add_child(_label("❌ Revue ratée — budget d'investissement réduit jusqu'à la fin du mandat.", 10, UIHelpers.PANEL_DANGER, true))
+	var objectives := SprintState.evaluate_board_objectives()
+	if not objectives.is_empty():
+		section.add_child(_label("Objectifs qualitatifs : bonus +8 Budget", 10, UIHelpers.PANEL_ACCENT, true))
+		for objective in objectives:
+			var ok: bool = bool(objective.get("ok", false))
+			section.add_child(_label("%s %s" % ["✓" if ok else "○", objective.get("label", "")], 10,
+				UIHelpers.PANEL_GOOD if ok else UIHelpers.PANEL_MUTED, true))
+
+
+func _quota_tooltip() -> String:
+	var quota := SprintState.get_quarter_progress()
+	return "T%d · sprint %d/%d\nImpact brut : %d / %d\n%s" % [
+		int(quota.get("quarter", 1)), int(quota.get("sprint", 0)) + 1, int(quota.get("length", 3)),
+		int(quota.get("impact", 0)), int(quota.get("quota", 0)), SprintState.get_quarter_requirement_text()
+	]
 
 
 # ── Petits constructeurs ─────────────────────────────────────────────────

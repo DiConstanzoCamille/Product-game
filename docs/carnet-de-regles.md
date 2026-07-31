@@ -32,8 +32,8 @@ Trois échelles imbriquées :
 | Échelle | Durée fictive | Rôle |
 |---|---|---|
 | **Sprint** | ~2 semaines | Unité de jeu de base — un tour complet |
-| **Trimestre** | ~6 sprints | Point de contrôle : revue de board, événement "boss" |
-| **Mandat** | Variable | Le run entier, de la nomination à la sortie |
+| **Trimestre** | 3 sprints | Quota d'Impact et exigence du board, événement "boss" |
+| **Mandat** | 4 trimestres, puis optionnellement sans limite | Le run entier, de la nomination à la sortie ou au mandat long |
 
 ---
 
@@ -253,10 +253,10 @@ les rééquilibrer ne demande aucune modification de script.
   fondateur·rice, Cynisme à 100 → Remplacé·e par l'IA. Les seuils sont
   découverts par le joueur en jouant (pas annoncés à l'avance) — répond à la
   question de lisibilité du §13, dans le sens le plus proche du thème du jeu.
-- **Longueur de mandat et fins positives.** Un mandat dure 12 sprints
-  (`mandateLengthSprints`). S'il se termine sans fin négative, le score final
-  est la moyenne de Valeur perçue et Capital politique : ≥ 60 → IPO, sinon →
-  Rachat. Valeur arbitraire de calibrage MVP, à ajuster en playtest.
+- **Longueur de mandat et fins positives.** Le premier arc dure 4 trimestres.
+  Après le succès de T4, le joueur choisit sa sortie (IPO ou Rachat selon la
+  moyenne de Valeur perçue et Capital politique) ou un mandat long sans limite,
+  aux quotas multipliés par 2,2 et aux exigences cumulatives.
 - **Époques : portée des effets systémiques.** Pour le MVP, chaque époque ne
   modifie que ce qui est mesurable simplement : les années garage relèvent le
   seuil de fin par Cynisme (plus tolérant), la Transformation agile
@@ -432,15 +432,11 @@ le chiffrage vit dans `data/balance.json` ; les pools de contenu dans
   supplémentaire dans le mandat (`fired_count`).
 - **La pression.** Valeur perçue −2/sprint (le marché avance), tandis que le
   churn rogne séparément le stock de MRR. Le couperet « Valeur perçue ≤ 0 =
-  fin » disparaît, la mort passe par la spirale économique. La **revue de
-  board** tombe à la fin
-  du sprint 6 : objectifs par entreprise (visibles dès l'offre d'emploi),
-  overlay de verdict en Résolution, +5 🪙/+8 Capital politique en cas de
-  succès, −12 Capital politique et allocation réduite sinon.
-- **Recette.** Les smoke tests pilotent ces systèmes ; critère impératif :
-  la stratégie `careful` (ne rien livrer, ne rien acheter, ne rien recruter)
-  perd avant la fin du mandat — vérifié en faillite vers les sprints 7-11
-  sur les deux entreprises.
+  fin » disparaît, la mort passe par la spirale économique. La revue unique du
+  sprint 6 est remplacée par les quotas trimestriels détaillés au §27.
+- **Recette.** Les smoke tests pilotent ces systèmes ; la stratégie `careful`
+  (ne rien livrer, ne rien acheter, ne rien recruter) manque désormais son
+  premier quota, tandis que la spirale de burn-out reste atteignable.
 
 ## 18. Phase B — l'économie du joueur : Énergie et actions personnelles
 
@@ -530,18 +526,18 @@ Marché en « Investissements » ; celui d'après ajoutera la preview d'impact.
   `scenes/components/side_panel.tscn` est une colonne fixe à droite des 4
   écrans de phase : jauges en **barres** (et non en pourcentages — il faut une
   géométrie sur laquelle projeter la preview du lot 3), pièces, bloc « Vous »,
-  roster condensé, actifs possédés, revue de board. Il est sombre dans un monde
+  roster condensé, actifs possédés, quota et bonus qualitatif. Il est sombre dans un monde
   clair : diégétiquement l'écran TV du standup, et pratiquement la garantie que
   les chiffres restent lisibles là où le post-it échouerait.
 - **Le roster est actionnable en un clic.** Un clic sur une ligne du panneau
   ouvre le menu 🤝 1:1 / 🚪 Licencier — plus besoin d'ouvrir un overlay puis de
   scroller. Le licenciement gagne une vraie confirmation (il est irréversible et
   coûte du Moral).
-- **La revue de board est évaluée en direct.** `SprintState.evaluate_board_objectives()`
-  confronte les conditions de `companies.json` à l'état courant sans rien
-  modifier ; le panneau les affiche cochées avec la valeur lue (« ✗ (47) »), et
-  `_run_board_review()` s'en sert au sprint 6 pour son verdict — une seule
-  implémentation des conditions, deux usages.
+- **Les objectifs qualitatifs sont évalués en direct.**
+  `SprintState.evaluate_board_objectives()` confronte les conditions de
+  `companies.json` à l'état courant. Le panneau les affiche avec leur valeur
+  lue ; depuis le lot quota (§27), ils débloquent un bonus et ne décident plus
+  de la survie du mandat.
 - **Le panneau Entreprise devient le « Dossier entreprise ».** Il garde ce
   qu'on lit une fois par mandat (contexte RP, modèle économique détaillé,
   objectifs commentés, roster détaillé, Pilotage, rallonge) et cède au panneau
@@ -838,3 +834,19 @@ Chaque ligne du rapport conserve son étape, sa portée, son icône, son libell�
 son type, sa valeur et ses bornes `before/after`. Les cas headless verrouillent
 les scores exacts, le contrat N=2, la série, les freins, le churn, les traits
 et l'absence de double comptage économique.
+
+## 27. Quotas trimestriels (Lot 2)
+
+`data/quotas.json` transforme le score en pression de carrière. L'Impact brut
+de chaque Résolution est accumulé pendant un trimestre de 3 sprints, puis
+comparé aux quotas PM : **120, 270, 560, 1050**. Un quota manqué déclenche la
+fin `remercie`; les objectifs qualitatifs de l'entreprise accordent seulement
+un bonus de **8 Budget** lorsqu'ils sont tous tenus en plus du quota.
+
+Chaque trimestre tire une exigence : gel des embauches, masse salariale ×2,
+livraisons internes sans Traction, frein de Dette doublé, trimestre court de
+2 sprints pour 75 % du quota, stratégie imposée, pratiques à +4 Cynisme ou gel
+des outils. Après T4, le joueur choisit une sortie positive ou un mandat long :
+T5 demande 2310 Impact, puis chaque quota est multiplié par 2,2 et les exigences
+s'accumulent. Le panneau garde cette cible visible en permanence; la Résolution
+anime sa progression après le replay du score, comme dernier verdict du sprint.

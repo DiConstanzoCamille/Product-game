@@ -1,0 +1,95 @@
+{
+  "version": 1,
+  "_comment": "Quotas trimestriels et exigences du board. Les valeurs sont indexees par niveau de carriere, meme si seul PM est jouable avant le lot 5.",
+
+  "careerLevels": {
+    "pm": {
+      "quarterQuotas": [120, 270, 560, 1050]
+    }
+  },
+
+  "longMandate": {
+    "quotaMultiplier": 2.2,
+    "requirementsAccumulate": true
+  },
+
+  "qualitativeBonusBudget": 8,
+
+  "requirements": [
+    {
+      "id": "hiring-freeze",
+      "icon": "🧊",
+      "name": "Gel des embauches",
+      "description": "Aucun recrutement ne passe pendant ce trimestre.",
+      "effects": { "hiringFrozen": true }
+    },
+    {
+      "id": "finance-watch",
+      "icon": "💼",
+      "name": "Le DAF regarde",
+      "description": "La masse salariale compte double jusqu'a la revue suivante.",
+      "effects": { "payrollMultiplier": 2.0 }
+    },
+    {
+      "id": "visibility-mandate",
+      "icon": "🎪",
+      "name": "Le board veut du visible",
+      "description": "Les livraisons sans impact client positif ne produisent aucune Traction.",
+      "effects": { "minimumClientImpactForTraction": 1 }
+    },
+    {
+      "id": "technical-audit",
+      "icon": "🏚️",
+      "name": "Audit technique",
+      "description": "La Dette organisationnelle freine deux fois plus fort ce trimestre.",
+      "effects": { "debtFrictionScale": 2.0 }
+    },
+    {
+      "id": "short-quarter",
+      "icon": "📉",
+      "name": "Trimestre court",
+      "description": "Vous n'avez que deux sprints, pour un quota reduit de 25 % seulement.",
+      "effects": { "quarterLength": 2, "quotaMultiplier": 0.75 }
+    },
+    {
+      "id": "board-injunction",
+      "icon": "🗣️",
+      "name": "Injonction du board",
+      "description": "Une strategie vous est imposee pour ce trimestre.",
+      "effects": {
+        "forcedStrategyPool": [
+          "open-source",
+          "freemium",
+          "enterprise-first",
+          "plateforme-api-publique",
+          "expansion-internationale",
+          "arreter-de-communiquer",
+          "annee-de-consolidation"
+        ]
+      }
+    },
+    {
+      "id": "steering-committee",
+      "icon": "🕵️",
+      "name": "Comite de pilotage",
+      "description": "Chaque pratique achetee ajoute 4 de Cynisme au lieu de 2.",
+      "effects": { "practiceCynisme": 4 }
+    },
+    {
+      "id": "tool-freeze",
+      "icon": "🔒",
+      "name": "Outillage gele",
+      "description": "Aucun outil interne ne peut etre achete pendant ce trimestre.",
+      "effects": { "toolsFrozen": true }
+    }
+  ],
+
+  "qualitativeBonus": {
+    "condition": "all-company-objectives-met",
+    "description": "Les objectifs qualitatifs de l'entreprise, tenus en plus du quota, accordent un paquet de Budget au Comite.",
+    "longMandate": {
+      "enabled": true,
+      "accumulates": false
+    }
+  }
+}

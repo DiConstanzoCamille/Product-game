@@ -1,5 +1,5 @@
 {
-  "_comment": "Offres d'emploi — le cadre RP de chaque run (§16 du carnet de règles, spec profondeur §4.1 et §8.2). Chaque entrée est liée à un scénario (era), fixe le profil d'équipe hérité, le roster de départ, le cap d'effectif, le budget d'action initial (pièces) et les objectifs de la revue de board — visibles dès le choix du poste. Consommé uniquement par game/. Les salaires du roster suivent data/balance.json → salaries.",
+  "_comment": "Offres d'emploi — le cadre RP de chaque run (§16 du carnet de règles, spec profondeur §4.1 et §8.2). Chaque entrée est liée à un scénario (era), fixe le profil d'équipe hérité, le roster de départ, le cap d'effectif, le budget d'action initial (pièces) et les objectifs qualitatifs qui peuvent bonifier chaque quota — visibles dès le choix du poste. Consommé uniquement par game/. Les salaires du roster suivent data/balance.json → salaries.",
 
   "companies": [
     {

@@ -21,6 +21,7 @@ func _initialize() -> void:
 	_test_quick_wins_are_one_hand_bonus()
 	_test_recent_hires_and_notion()
 	_test_streak_and_friction_rules()
+	_test_quarter_visible_board_and_technical_audit()
 	_test_moral_cap_and_ops_snapshot()
 	_test_conversion_and_recurring_roi()
 	_test_multi_squad_contract()
@@ -121,6 +122,18 @@ func _test_streak_and_friction_rules() -> void:
 	_assert_equal(int(report.get("global", {}).get("impact", -1)), 60, "Dette 70 et Cynisme 70 doivent faire 100 x 0.8 x 0.75 = 60.")
 	report = _resolve([_squad("a", [feature], [], 20, 21)], {"resources": {"cynisme": 70, "dette-organisationnelle": 70, "moral": 60}}, rules)
 	_assert_equal(int(report.get("global", {}).get("impact", -1)), 36, "La surchauffe doit ensuite multiplier l'Impact par 0.6.")
+
+
+func _test_quarter_visible_board_and_technical_audit() -> void:
+	var rules := _rules_without_streak()
+	var invisible_feature := {"id": "internal-cleanup", "name": "Nettoyage interne", "costPoints": 10, "clientImpact": 0, "risk": 0, "quickWin": false, "tags": ["tech"]}
+	var epic := {"id": "epic-visible", "name": "Epic utile", "epic": true, "costPoints": 10, "risk": 0}
+	var report := _resolve([_squad("a", [invisible_feature, epic])], {"minimum_client_impact_for_traction": 1}, rules)
+	_assert_equal(float(report.get("squads", [])[0].get("traction", -1.0)), 60.0, "Le board visible doit annuler la Traction des features sans impact client, jamais celle des epics.")
+
+	var feature := _traction_feature(25)
+	report = _resolve([_squad("a", [feature])], {"resources": {"cynisme": 0, "dette-organisationnelle": 70, "moral": 60}, "debt_friction_scale": 2.0}, rules)
+	_assert_equal(int(report.get("global", {}).get("impact", -1)), 60, "L'audit technique doit doubler la pente de Dette : 100 x (1 - 2 x 30 / 150) = 60.")
 
 
 func _test_moral_cap_and_ops_snapshot() -> void:
