@@ -17,7 +17,8 @@ Le système de cartes structurelles calibrées (§6.2) : RICE, Notion, Jira.
 
 - `axes[]` — les 4 axes affichés sur le dos d'une carte (`id`, `label`) : coût humain, coût financier, time-to-market, productivité.
 - `teamProfiles[]` — les 2 profils d'équipe possibles (`id`, `label`, `shortLabel`) utilisés pour recalibrer les cartes.
-- `cards[]` — `id`, `costPieces` (prix d'activation en 🪙 — une décision se paie comme une embauche, §21 ; distinct de l'axe `financier`, qui est le coût d'exploitation), `refId` (identifiant façon ticket), `family` (`outil-process` / `stack-technique` / `methodologie-orga`, voir §6.2), `category`, `name`, `tagline`, `effects.junior` / `effects.senior` (un objet par axe avec `value` signé et `note` explicative), `eras[]` optionnel (§15 — réserve la carte aux scénarios listés ; absent = disponible partout), `rarity` et `eraWeights` optionnels (voir *Rareté et tirage* plus bas), et `requires` optionnel.
+- `cards[]` — `id`, `costPieces` (prix d'activation en 🪙 — une décision se paie comme une embauche, §21 ; distinct de l'axe `financier`, qui est le coût d'exploitation), `refId` (identifiant façon ticket), `family` (`outil-process` / `stack-technique` / `methodologie-orga`, voir §6.2), `category`, `name`, `tagline`, `effects.junior` / `effects.senior` (un objet par axe avec `value` signé et `note` explicative — le feedback immédiat sur les jauges à l'activation), `eras[]` optionnel (§15 — réserve la carte aux scénarios listés ; absent = disponible partout), `rarity` et `eraWeights` optionnels (voir *Rareté et tirage* plus bas), et `requires` optionnel.
+- **Le Levier par employé (spec scoring §7.1, Lot 3).** Un outil (`family` `outil-process` ou `methodologie-orga`) peut déclarer `icon` et tout ou partie de : `perEmployee` (bonus par employé éligible), `eligibility` (condition de matching sur le roster — même grammaire que `refractory.condition` et `adoptionCondition.condition` ci-dessous ; `{}` vide = tout le roster), `refractory` (`{condition, perEmployee}` — un malus par employé qui matche `condition`), `flatModifiers[]` (`{when, value}` — un bonus/malus fixe si `when` est vrai, ex. Jira sous 5 personnes), `cumulative` (`{perSprint}` — l'outil grandit tout seul depuis son activation, indépendamment du roster), `adoptionCondition` (`{condition, multiplier}` — un multiplicateur si l'équipe remplit un critère), `slotBonus` (l'outil rend un slot en s'installant, réservé aux outils cumulatifs, §7.1.1.b), `leverLabel` optionnel (nom affiché sur la ligne de score si différent de `name`, ex. Daily Standup → « Sprint planning »). Une carte sans `perEmployee` ni `cumulative` (Shape Up) ne produit aucun Levier par employé. `ScoreResolver` lit ces champs directement sur la carte (table `cards` passée à `ScoreResolver.resolve()`) — `scoring.json` ne les duplique plus, pour respecter la règle « un seul calcul » (CLAUDE.md). Le comportement par entreprise (Notion excellent chez Karavel, mauvais chez Meridia) émerge de la confrontation entre ces conditions et le roster réel : aucune branche par `company_id` nulle part.
 - `requires` — le prérequis d'activation d'une carte gatée (§21), dans la **même grammaire de conditions** que `boardObjectives` de `companies.json` : `type` (`resource-min` / `resource-max` / `decisions-min` / `revenue-min` / `roster-seniority-min` / `practice-owned`), la clé qui va avec (`resource`, `seniority`, `practice`), `value` et `label` (la phrase montrée sur la carte). Une carte qui déclare `requires` prend automatiquement un bail de `shopDraw.lockedLeaseSprints` sprints quand elle est tirée.
 
 ## `eras.json`
@@ -36,6 +37,10 @@ Le contrat du boss trimestriel (spec scoring §11), consommé par `SprintState` 
 - `longMandate` — `quotaMultiplier` (multiplicateur appliqué à chaque trimestre T5+) et `requirementsAccumulate` (les exigences tirées restent actives dans ce mode).
 - `requirements[]` — pool à tirage aléatoire, avec `id` stable, `icon`, `name`, `description` joueur et `effects` plat. Les clefs supportées sont `hiringFrozen`, `payrollMultiplier`, `minimumClientImpactForTraction`, `debtFrictionScale`, `quarterLength`, `quotaMultiplier`, `forcedStrategyPool` (tableau d'IDs de `scoring.json`), `practiceCynisme` et `toolsFrozen`.
 - `qualitativeBonusBudget` — récompense en Budget si tous les objectifs qualitatifs de `companies.json` sont tenus en plus du quota. Le montant initial est volontairement conservateur : `8` par trimestre, à ajuster en playtest. `qualitativeBonus` documente sa condition, son texte et ses paramètres de mode long (`enabled`, `accumulates`).
+
+## `strategy.json`
+
+La 4e famille de décisions (spec scoring §7.2, Lot 3) — la seule qui n'existait pas avant ce lot. `strategies[]` — `id` (partagé avec `scoring.json` → `global.strategies`, seule table qui porte les multiplicateurs), `icon`, `name`, `tagline`, `description` (texte joueur expliquant l'effet mécanique). Ce fichier est un catalogue d'affichage, pas une table de calcul : `ScoreResolver` ne lit que `scoring.json`. Choisie au Comité de fin de trimestre (écran du lot 4, pas encore construit), 1 par trimestre, irréversible — `SprintState.choose_strategy()` / `get_strategy_options()` / `find_strategy()` sont le point d'entrée que cet écran appellera ; en attendant, l'exigence trimestrielle `board-injunction` (`quotas.json`) est la seule à en choisir une, automatiquement.
 
 ## `foundations.json`
 
@@ -109,7 +114,7 @@ Toutes les valeurs numériques nécessaires à la simulation persistante du MVP 
 - `endingThresholds[]` — seuil par ressource déclenchant une fin négative (`resource`, `comparison`: `lte`/`gte`, `value`, `ending`) ; `endingThresholdOverrides` — ajustement de ces seuils par époque. La Valeur perçue n'y figure plus : elle reste une pression de marché, sans couper artificiellement le MRR. Depuis la Phase B, la pseudo-ressource `energie` y est acceptée (elle lit `SprintState.energy`, pas une jauge de `resources.json`) : le burn-out fondateur·rice se déclenche sur Énergie ≤ 0 (spec profondeur §8.3).
 - `goodEnding` — comment calculer la fin positive (IPO vs Rachat) quand le mandat va à son terme sans fin négative.
 - `cardAxisResourceMap` — comment les 4 axes de `cards.json` se convertissent en deltas sur les 6 ressources (`resource`, `invert`).
-- `structuralDecisionMaxActivations` — limite de grandes décisions activées par mandat.
+- `toolSlots` — capacité d'outillage (spec §7.1.1, Lot 3), qui remplace l'ancien plafond fixe `structuralDecisionMaxActivations` : `careerLevels` (table indexée par niveau de carrière, une seule ligne `pm.base` remplie avant le lot 5), `extraSlotCosts[]` (prix croissant des slots achetables au Comité, plafonnés à `.size()`), `swap` (`cynisme`/`cynismePerPreviousSwap` — le coût de bascule pour libérer un slot occupé, §7.1.2). La capacité effective (`SprintState.get_tool_slot_capacity()`) additionne la base, les achats et le `slotBonus` des outils cumulatifs actifs.
 - `eraCardEffectMultipliers` — multiplicateurs par époque sur les deltas produits par l'activation d'une grande décision.
 - `salaries` — salaire par sprint selon la séniorité (`junior`/`senior`), prélevé en Trésorerie à chaque Résolution (ligne "masse salariale").
 - `roles` — production et pénalités par rôle (spec profondeur §4.2) : `label`, `icon`, `capacityPerEmployee` (points par séniorité), `fullYieldCount`/`extraYieldFactor` (rendements décroissants au-delà du cap de cumul), et les spécificités : PM `overloadReductionPerPm`/`overloadReductionMax` (modulation de la surchauffe), Designer `valeurPerFeatureDelivered`/`valeurPerFeatureDeliveredMax`/`valeurEffectsDivisorIfAbsent`, Ops `dettePerOps`/`detteReliefMax`/`dettePerSprintIfAbsent`.
@@ -128,16 +133,19 @@ Toutes les valeurs numériques nécessaires à la simulation persistante du MVP 
 ## `scoring.json`
 
 Source de vérité de Traction × Levier = Impact : formules des features et
-epics, bonus de main, série, rôles, huit combos d'organisation, outils,
-stratégies, pratiques, traits visibles, freins et conversion vers MRR, Budget
+epics, bonus de main, série, rôles, huit combos d'organisation, stratégies,
+pratiques, traits visibles, freins et conversion vers MRR, Budget
 d'investissement, Valeur perçue et Capital politique. `ScoreResolver` lit cette
-table sans accéder aux autoloads.
+table sans accéder aux autoloads. Depuis le Lot 3, le Levier par outil ne vit
+plus ici : il est déclaré directement sur la carte dans `cards.json` (voir
+plus haut) — `ScoreResolver.resolve()` reçoit désormais une table `cards` en
+plus de `scoring` et `hidden_traits`.
 
 ## `companies.json`
 
 Les "offres d'emploi" (§16, enrichies en §17) — le cadre RP d'une run, choisi sur `company_select_screen` après le scénario :
 
-- `companies[]` — `id`, `era` (scénario auquel l'entreprise est rattachée), `icon`, `name`, `tagline` (accroche façon offre d'emploi), `description` (contexte de la boîte), `teamProfile` (`junior`/`senior` — fixe `SprintState.team_profile` pour tout le mandat, ce n'est plus un réglage modifiable en jeu), `teamCap` (cap d'effectif), `startingPieces` (budget d'action initial), `startingRoster[]` (`id`, `name`, `role`, `seniority`, `trait` — l'équipe héritée, salaires dérivés de `balance.json` → `salaries`, pas de trait caché : sa période d'essai est derrière elle), `boardObjectives` (`title` + `conditions[]` — `type`: `resource-max`/`resource-min`/`decisions-min`/`revenue-min`, `value`, `resource` éventuel, `label` affiché au joueur dès le choix du poste).
+- `companies[]` — `id`, `era` (scénario auquel l'entreprise est rattachée), `icon`, `name`, `tagline` (accroche façon offre d'emploi), `description` (contexte de la boîte), `teamProfile` (`junior`/`senior` — fixe `SprintState.team_profile` pour tout le mandat, ce n'est plus un réglage modifiable en jeu), `teamCap` (cap d'effectif), `startingPieces` (budget d'action initial), `inheritedTools[]` optionnel (ids de `cards.json` — outillage déjà installé par quelqu'un d'autre, activé dès `reset_run` et occupant un slot dès le premier sprint, spec §7.1.3), `startingRoster[]` (`id`, `name`, `role`, `seniority`, `trait` — l'équipe héritée, salaires dérivés de `balance.json` → `salaries`, pas de trait caché : sa période d'essai est derrière elle), `boardObjectives` (`title` + `conditions[]` — `type`: `resource-max`/`resource-min`/`decisions-min`/`revenue-min`, `value`, `resource` éventuel, `label` affiché au joueur dès le choix du poste).
 
 ## Ce qui reste hors JSON
 
@@ -153,3 +161,9 @@ squads ; les mutations de l'expérience PM actuelle ciblent le roster de la
 squad principale. `last_score_report` est le rapport immuable appliqué puis
 rejoué par la Résolution ; `mrr` est un stock et `streak` mémorise les sprints
 livrés sans surchauffe.
+
+Depuis le Lot 3 : `career_level` (index dans `balance.json` → `toolSlots.careerLevels`,
+`"pm"` avant le lot 5), `tool_slots_purchased` et `swap_count` (bascules
+d'outil déjà faites ce mandat, spec §7.1.2), `chosen_strategy_ids[]`
+(décisions stratégiques permanentes du mandat) et `quarter_strategy_chosen`
+(une seule par trimestre, imposée ou volontaire).

@@ -850,3 +850,107 @@ des outils. Après T4, le joueur choisit une sortie positive ou un mandat long :
 T5 demande 2310 Impact, puis chaque quota est multiplié par 2,2 et les exigences
 s'accumulent. Le panneau garde cette cible visible en permanence; la Résolution
 anime sa progression après le replay du score, comme dernier verdict du sprint.
+
+## 28. Les familles de décisions (Lot 3)
+
+Le Lot 1 avait déjà posé, sans le dire, la moitié de ce que ce lot devait
+livrer : `ScoreResolver` savait déjà lire un `active_tools[]`, appliquer un
+Levier par employé éligible et un malus par réfractaire, et `scoring.json`
+portait déjà les sept décisions stratégiques (`open-source`, `freemium`…)
+avec leurs multiplicateurs. Ce que le Lot 1 avait anticipé mécaniquement,
+mais jamais branché sur du contenu réel : les nombres du Levier vivaient dans
+`scoring.json → global.tools`, une table parallèle à `cards.json` que rien
+n'obligeait à rester synchrone, et les stratégies n'avaient ni catalogue ni
+point d'entrée pour être choisies — seule l'injonction du board pouvait en
+tirer une, et même là, l'effet ne survivait qu'au trimestre où il avait été
+tiré. Ce lot ferme ces deux trous plutôt que d'en ouvrir un troisième.
+
+**Le Levier déménage sur la carte.** `perEmployee`, `eligibility`,
+`refractory` (`{condition, perEmployee}`), `adoptionCondition`,
+`flatModifiers`, `cumulative` et `slotBonus` sont maintenant des champs de
+`cards.json`, au même endroit que le prix et la rareté — parce que c'est la
+carte qui décrit ce qu'elle fait, pas une table à part qu'il fallait deviner
+en la recoupant avec l'id. `ScoreResolver.resolve()` reçoit une troisième
+table (`cards`, en plus de `scoring` et `hidden_traits`) et y cherche le
+Levier de chaque outil actif ; une carte qui ne déclare ni `perEmployee` ni
+`cumulative` (Passage en Shape Up) n'a simplement aucun Levier par employé —
+elle continue de peser via les combos de composition, comme avant. Au
+passage, l'entrée `shape-up` de `scoring.json` qui portait, hors contenu, un
+Levier de « Pair programming » sans carte pour l'incarner a été supprimée :
+mieux vaut une carte qui ne fait rien de plus qu'avant qu'une règle qui
+n'existe nulle part ailleurs que dans les données.
+
+**Le critère de recette se vérifie sans écrire une seule valeur par
+entreprise.** Notion déclare `eligibility` (juniors, ou recrues de moins de
+4 sprints) et `refractory` (seniors présents depuis plus de 8 sprints), rien
+d'autre. Confronté au roster réel de Karavel (cinq juniors, aucun senior
+ancien), il vaut +0,08 par personne × 2 d'adoption ; confronté à celui de
+Meridia une fois l'équipe héritée en poste depuis 8 sprints ou plus, les
+cinq seniors basculent en réfractaires et le même calcul rend −0,05 par
+personne, adoption perdue. Aucune ligne du moteur ne teste `company_id` :
+le comportement est une conséquence du roster, pas une branche. C'est
+maintenant asserté deux fois — `score_resolver_cases.gd` le vérifie sur les
+rosters de départ réels des deux entreprises (`_test_notion_lever_by_company_roster`),
+`smoke_test_logic.gd` le rejoue à l'échelle du mandat en passant par
+`reset_run` (`_test_tool_families_and_strategy_lot3`).
+
+**Les slots : d'un plafond arbitraire à une capacité qui se gagne.**
+`structuralDecisionMaxActivations: 4` disparaît. `balance.json → toolSlots`
+porte désormais une base indexée par niveau de carrière (`careerLevels.pm.base
+= 3`, une seule ligne remplie — les niveaux au-dessus attendent le lot 5),
+`extraSlotCosts: [12, 20]` pour les deux slots achetables au Comité, et
+`swap` pour le coût de bascule. `SprintState.get_tool_slot_capacity()`
+additionne la base, les achats (`buy_tool_slot()`, qui refuse "plafond" au
+troisième essai) et le `slotBonus` des outils cumulatifs actifs — 🪞 Sprint
+Rétro en porte un, ce qui rend son coût net en place nul et transforme sa
+question en « l'ai-je pris assez tôt ? » plutôt qu'en « lui donné-je un
+slot ? », comme prévu par la spec. **Libérer un slot** (`release_tool_slot()`)
+coûte enfin le prix promis depuis le carnet §7 et jamais posé : 🎭 Cynisme +4,
++3 par bascule déjà faite ce mandat (`swap_count`), le Levier de l'outil
+retiré disparaît immédiatement, son compteur cumulatif est perdu (pas
+remboursé s'il revient), et la carte réintègre le pool de tirage puisqu'elle
+quitte `activated_cards`.
+
+**L'outillage hérité fait le premier arbitrage du run à la place du joueur.**
+`companies.json → inheritedTools[]` pré-active un outil dès `reset_run`, avant
+même le premier sprint : Meridia hérite de 🗂️ Jira (l'équipe fait 5
+personnes — le malus « effectif ≤ 4 » est évité de peu, mais l'adoption ×2 à
+8 personnes reste hors d'atteinte au départ, l'outil est tiède), Karavel
+hérite de 📓 Notion (équipe 100 % junior, un cadeau immédiat). Les deux
+consomment un slot dès le sprint 1 : un run de PM démarre avec 2 slots
+réellement libres sur 3, pas 3. Effet de bord qu'il fallait vérifier :
+l'outil hérité d'une entreprise n'entre plus jamais dans le tirage du rayon
+tant qu'il reste actif (il est déjà dans `activated_cards`) — le test de
+taux d'apparition par rareté, qui mesurait spécifiquement l'`eraWeights` de
+Jira, tournait donc sur Meridia et comptait zéro sortie. Il tourne maintenant
+sur Karavel, qui n'hérite pas de Jira.
+
+**La quatrième famille existe enfin : `data/strategy.json`.** Sept décisions
+stratégiques (catalogue affiché : id, icône, nom, description) dont les
+multiplicateurs restent dans `scoring.json → global.strategies`, sous les
+mêmes ids — deux fichiers, un seul calcul, la même séparation catalogue /
+moteur que `cards.json` / `scoring.json`. `SprintState` gagne
+`chosen_strategy_ids[]` (permanent, une décision n'est jamais retirée),
+`quarter_strategy_chosen` (le verrou du « 1 par trimestre »),
+`get_strategy_options()`, `find_strategy()` et `choose_strategy()`. La spec
+place ce choix « au Comité de fin de trimestre », qui est le lot 4 et
+n'existe pas encore : ces fonctions sont le point d'entrée que l'écran du
+Comité appellera, branchées dès maintenant sur `_prepare_quarter()` — le
+même point d'entrée de fin de trimestre que les quotas du Lot 2 utilisent
+déjà. `committee_screen` n'a pas été construit ; c'est un choix
+d'orchestration assumé, pas un oubli. En attendant cet écran, la seule
+porte d'entrée jouable reste l'exigence 🗣️ Injonction du board, qui appelle
+maintenant `choose_strategy()` au lieu d'écrire directement
+`quarter_forced_strategy_id` — et c'est ce qui corrige, en passant, un bug
+du Lot 2 : une stratégie imposée ne survivait avant ce lot qu'au trimestre
+où elle avait été tirée (`quarter_forced_strategy_id` était réinitialisé à
+chaque `_prepare_quarter`), alors que la spec les veut permanentes et
+irréversibles pour tout le reste du mandat.
+
+**Recette.** `score_resolver_cases.gd` (`godot --headless --path game -s
+res://tests/score_resolver_cases.gd`) : `ScoreResolver: tous les cas sont
+passes.` Les deux smoke tests headless : `=== SMOKE TEST LOGIQUE : OK ===`
+et `=== SMOKE TEST UI : OK — 9 écrans instanciés, gestes
+Roadmap/Investissements joués ===`. Les critères permanents (`careful` perd
+avant la fin du mandat, `stress` atteint le burn-out) restent asserté dans
+le test lui-même.
