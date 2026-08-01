@@ -1,10 +1,22 @@
 {
   "version": 1,
-  "_comment": "Quotas trimestriels et exigences du board. Les valeurs sont indexees par niveau de carriere, meme si seul PM est jouable avant le lot 5.",
+  "_comment": "Quotas trimestriels et exigences du board. Les valeurs sont indexees par niveau de carriere (careers.json). Chaque niveau recalibre grossierement sa table T1->T4 sur son nombre de squads moyen (careers.json -> squadsMin/squadsMax) : un Director ne joue pas avec les chiffres d'un PM (spec §13.4). Premier jet, a affiner en jeu comme le reste de l'equilibrage.",
 
   "careerLevels": {
     "pm": {
       "quarterQuotas": [120, 270, 560, 1050]
+    },
+    "lead-pm": {
+      "quarterQuotas": [300, 700, 1400, 2600]
+    },
+    "director": {
+      "quarterQuotas": [750, 1650, 3400, 6300]
+    },
+    "cpo": {
+      "quarterQuotas": [1300, 3000, 6200, 11500]
+    },
+    "ceo": {
+      "quarterQuotas": [2900, 6500, 13500, 25200]
     }
   },
 

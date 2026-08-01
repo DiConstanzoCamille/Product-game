@@ -25,6 +25,7 @@ extends Node
 const SAVE_PATH := "user://player_profile.cfg"
 const SECTION_COMBOS := "combos"
 const SECTION_VALUES := "values"
+const KEY_UNLOCKED_CAREER_LEVELS := "unlocked_career_levels"
 
 var _discovered_combo_ids: Dictionary = {}  # combo_id -> true
 var _values: Dictionary = {}               # espace générique clé/valeur, réservé au Lot 5
@@ -150,3 +151,37 @@ func _mark_if_matching(line: Dictionary, lookup: Dictionary) -> bool:
 		return false
 	_discovered_combo_ids[combo_id] = true
 	return true
+
+
+## --- Progression de carriere (Lot 5, spec §13.4) ---------------------------
+## Reutilise l'espace generique cle/valeur ci-dessus : aucun second mecanisme
+## de sauvegarde. "pm" est toujours considere debloque (niveau de depart),
+## meme absent du fichier de sauvegarde — un profil tout neuf doit pouvoir
+## lancer un run sans jamais avoir ecrit sur le disque.
+
+## Tous les niveaux debloques par ce profil, "pm" toujours inclus en premier.
+func get_unlocked_career_levels() -> Array:
+	var stored: Variant = get_value(KEY_UNLOCKED_CAREER_LEVELS, [])
+	var unlocked: Array = ["pm"]
+	if stored is Array:
+		for level_id in stored:
+			var id_str := str(level_id)
+			if id_str != "" and not unlocked.has(id_str):
+				unlocked.append(id_str)
+	return unlocked
+
+
+func is_career_level_unlocked(career_level_id: String) -> bool:
+	return get_unlocked_career_levels().has(career_level_id)
+
+
+## Deblocage strict (CLAUDE.md, spec §13.4) : jamais appele pour contourner
+## une victoire, uniquement depuis SprintState quand un mandat complet est
+## franchi au niveau precedent. Idempotent — rejouer un niveau deja debloque
+## ne fait rien de plus.
+func unlock_career_level(career_level_id: String) -> void:
+	if career_level_id == "" or is_career_level_unlocked(career_level_id):
+		return
+	var unlocked := get_unlocked_career_levels()
+	unlocked.append(career_level_id)
+	set_value(KEY_UNLOCKED_CAREER_LEVELS, unlocked)

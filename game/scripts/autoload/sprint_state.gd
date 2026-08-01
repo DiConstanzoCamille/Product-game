@@ -22,6 +22,7 @@ var era_id: String = ""
 var business_model_id: String = ""
 var company_id: String = ""
 var pending_era_id: String = ""  # étape transitoire entre scenario_screen et company_select_screen
+var pending_career_level: String = "pm"  # étape transitoire entre career_select_screen et scenario_screen
 
 var resource_values: Dictionary = {}   # resource_id -> float (0..100)
 var activated_cards: Array = []        # ids des grandes décisions activées ce mandat
@@ -66,7 +67,8 @@ var quarter_result: Dictionary = {}
 var quarter_exit_choice_pending: bool = false
 var long_mandate: bool = false
 var quarter_forced_strategy_id: String = ""
-var career_level: String = "pm"        # index dans balance.json → toolSlots.careerLevels (une seule ligne remplie avant le lot 5)
+var career_level: String = "pm"        # index dans careers.json / balance.json → toolSlots.careerLevels / quotas.json → careerLevels
+var newly_unlocked_career_level: String = ""  # non vide juste après le sprint où un niveau vient de tomber (spec §13.4) — lu une fois par mandate_end_screen
 var tool_slots_purchased: int = 0      # +1/+2 achetés au Comité, à prix croissant (spec §7.1.1)
 var swap_count: int = 0                # bascules d'outil déjà faites ce mandat (spec §7.1.2) — chaque nouvelle coûte plus de Cynisme
 var chosen_strategy_ids: Array = []    # décisions stratégiques choisies ce mandat — permanentes, 1 par trimestre (spec §7.2)
@@ -100,10 +102,13 @@ var _quarter_requirement_bag: Array = []
 var _last_quarter_requirement_id: String = ""
 
 
-## À appeler au lancement d'un nouveau mandat, une fois le scénario et
-## l'entreprise choisis (scenario_screen puis company_select_screen). Vide =
-## tirage aléatoire parmi les options jouables (utile pour les tests headless).
-func reset_run(chosen_era_id: String = "", chosen_company_id: String = "") -> void:
+## À appeler au lancement d'un nouveau mandat, une fois le niveau de carrière,
+## le scénario et l'entreprise choisis (career_select_screen, scenario_screen
+## puis company_select_screen). era/company vides = tirage aléatoire parmi
+## les options jouables (utile pour les tests headless). `chosen_career_level`
+## vide ou non débloqué retombe silencieusement sur "pm" — le déblocage
+## strict (spec §13.4) se garantit ici, pas seulement dans l'écran de choix.
+func reset_run(chosen_era_id: String = "", chosen_company_id: String = "", chosen_career_level: String = "") -> void:
 	sprint_number = 1
 	era_id = chosen_era_id if chosen_era_id != "" else _pick_random_playable_era()
 	company_id = chosen_company_id if chosen_company_id != "" else _pick_random_company(era_id)
@@ -150,7 +155,8 @@ func reset_run(chosen_era_id: String = "", chosen_company_id: String = "") -> vo
 	quarter_exit_choice_pending = false
 	long_mandate = false
 	quarter_forced_strategy_id = ""
-	career_level = "pm"
+	career_level = chosen_career_level if PlayerProfile.is_career_level_unlocked(chosen_career_level) else "pm"
+	newly_unlocked_career_level = ""
 	tool_slots_purchased = 0
 	swap_count = 0
 	chosen_strategy_ids.clear()
@@ -215,6 +221,15 @@ func reset_run(chosen_era_id: String = "", chosen_company_id: String = "") -> vo
 		"delivered": [],
 		"epic_progress": {},
 	}]
+	# 👥 Lot 5 (spec §13.4) : au-dessus de PM, le kit de carrière ajoute des
+	# équipes neuves — à staffer par recrutement, l'équipe héritée de
+	# l'entreprise reste seule à démarrer garnie. squadsMin est déterministe
+	# (pas de tirage) : deux runs du même niveau démarrent avec le même nombre
+	# d'équipes, seule leur composition varie.
+	var level_conf: Dictionary = GameData.careers.get("levels", {}).get(career_level, {})
+	var extra_squad_count: int = max(0, int(level_conf.get("squadsMin", 1)) - 1)
+	for extra_index in range(extra_squad_count):
+		squads.append(_new_empty_squad(extra_index + 2))
 
 	resource_values.clear()
 	var starting: Dictionary = GameData.balance.get("startingResources", {})
@@ -224,6 +239,23 @@ func reset_run(chosen_era_id: String = "", chosen_company_id: String = "") -> vo
 		resource_values[resource_id] = float(overrides.get(resource_id, starting.get(resource_id, 50)))
 	_prepare_quarter(1)
 	get_effective_capacity()
+
+
+## Équipe neuve du kit de carrière (Lead PM et au-delà) : aucun héritage,
+## roster vide, à staffer par recrutement (spec §13.3-13.4). `display_index`
+## sert uniquement au nom affiché ("Équipe B", "Équipe C"...) — jamais le mot
+## "squad" dans une chaîne visible (CLAUDE.md, contrat d'architecture §4).
+func _new_empty_squad(display_index: int) -> Dictionary:
+	return {
+		"id": "squad-%d" % display_index,
+		"name": "Équipe %s" % char(64 + display_index),  # 2 -> "B", 3 -> "C"...
+		"roster": [],
+		"backlog_draw": {},
+		"capacity": 0,
+		"delivered": [],
+		"epic_progress": {},
+		"spent_points": 0,
+	}
 
 
 func _pick_random_playable_era() -> String:
@@ -261,7 +293,8 @@ func get_company() -> Dictionary:
 ## premiere version du JSON, afin que les sauvegardes de developpement ne
 ## dependent pas de la migration de donnees.
 func get_current_quota() -> int:
-	var level: Dictionary = GameData.quotas.get("careerLevels", {}).get("pm", {})
+	var levels: Dictionary = GameData.quotas.get("careerLevels", {})
+	var level: Dictionary = levels.get(career_level, levels.get("pm", {}))
 	var configured: Variant = level.get("quarterQuotas", [])
 	var base_quota := 0.0
 	if configured is Array and quarter_index <= configured.size():
@@ -766,6 +799,24 @@ func get_primary_squad() -> Dictionary:
 
 func _get_primary_roster() -> Array:
 	return get_primary_squad().get("roster", [])
+
+
+## Roster où faire atterrir une recrue (spec §13.2). `squad_id` explicite en
+## priorité ; à N=1 il n'y a de toute façon qu'un roster possible. Au-delà,
+## sans squad précisée, l'équipe la moins fournie — jamais un tirage, pour
+## rester déterministe et lisible.
+func _target_roster(squad_id: String) -> Array:
+	if squad_id != "":
+		for squad in squads:
+			if squad.get("id", "") == squad_id:
+				return squad.get("roster", [])
+	if squads.size() <= 1:
+		return _get_primary_roster()
+	var smallest: Dictionary = squads[0]
+	for squad in squads:
+		if squad.get("roster", []).size() < smallest.get("roster", []).size():
+			smallest = squad
+	return smallest.get("roster", [])
 
 ## Cap d'effectif : figé par l'entreprise à l'origine (companies.json →
 ## teamCap), désormais un objet de jeu — 🪑 Ouvrir un poste au Comité
@@ -1801,9 +1852,14 @@ func _roll_hidden_trait() -> String:
 	return pool[randi() % pool.size()]
 
 
-## Embauche un candidat de l'offre du sprint. Retourne "" si l'embauche a eu
-## lieu, sinon la raison du refus ("pieces" ou "cap").
-func hire_candidate(candidate: Dictionary) -> String:
+## Embauche un candidat de l'offre du sprint, dans `target_squad_id` s'il est
+## fourni et existe, sinon dans l'équipe principale (comportement historique,
+## inchangé à N=1). Au-delà de PM et sans équipe précisée (aucun sélecteur
+## dédié pour l'instant, spec §13.2 — voir carnet §30), la recrue rejoint
+## l'équipe la moins fournie : un équilibrage simple plutôt qu'un empilement
+## systématique sur l'équipe historique. Retourne "" si l'embauche a eu lieu,
+## sinon la raison du refus ("pieces" ou "cap").
+func hire_candidate(candidate: Dictionary, target_squad_id: String = "") -> String:
 	if is_quarter_requirement_active("hiringFrozen"):
 		return "quarter-requirement"
 	if get_roster().size() >= get_team_cap():
@@ -1818,7 +1874,7 @@ func hire_candidate(candidate: Dictionary) -> String:
 		discount_note = " (réseau : −%d 🪙)" % next_hire_discount
 		next_hire_discount = 0
 
-	_get_primary_roster().append({
+	_target_roster(target_squad_id).append({
 		"id": candidate.get("id", ""),
 		"name": candidate.get("name", ""),
 		"role": candidate.get("role", ""),
@@ -2253,9 +2309,28 @@ func _record_quarter_resolution() -> String:
 		return ending_id
 	if quarter_index == 4 and not long_mandate:
 		quarter_exit_choice_pending = true
+		_unlock_next_career_level()
 		return ""
 	_prepare_quarter(quarter_index + 1)
 	return ""
+
+
+## Déblocage strict (spec §13.4) : "gagner un niveau" = franchir son 4e
+## trimestre, quel que soit le choix fait ensuite (rester en mandat long ou
+## sortir) — la spec parle explicitement d'un mandat "complet" en 4
+## trimestres, avant même la question de la sortie. Idempotent par
+## construction (PlayerProfile.unlock_career_level l'est) : rejouer plusieurs
+## mandats au même niveau ne redéclenche rien après le premier.
+func _unlock_next_career_level() -> void:
+	var order: Array = GameData.careers.get("order", [])
+	var current_index := order.find(career_level)
+	if current_index == -1 or current_index + 1 >= order.size():
+		return
+	var next_level: String = order[current_index + 1]
+	if PlayerProfile.is_career_level_unlocked(next_level):
+		return
+	PlayerProfile.unlock_career_level(next_level)
+	newly_unlocked_career_level = next_level
 
 
 ## Flux d'Énergie de la Résolution (§7.1) : régénération modulée par le

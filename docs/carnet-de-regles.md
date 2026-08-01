@@ -1198,3 +1198,85 @@ dépend) règle la même classe de bug que le premier flaky, avec la même
 cause profonde — le hasard d'une injonction de board tirée à T1, que tout
 test touchant au premier trimestre doit désormais neutraliser
 explicitement plutôt que d'espérer qu'il ne tombe pas dessus.
+
+## 30. L'échelle — multi-squad, attention, progression de carrière (Lot 5)
+
+Ce lot ferme le chantier scoring (#12) : le socle multi-squad était déjà
+câblé depuis le Lot 1 (`ScoreResolver` itère sur `squads[]`, distingue
+`local`/`global`, calcule déjà les deux combos inter-squads) — il restait à
+lui donner du contenu et une carrière pour y accéder. Le lot se découpe en
+paliers, livrés et poussés séparément ; ce qui suit documente le palier 1
+(la carrière visible), complété au fil des paliers suivants dans cette même
+section.
+
+**Palier 1 — la carrière visible.** `data/careers.json` est la nouvelle
+table qui décrit ce qui est propre à la carrière (ordre de déblocage,
+nombre d'équipes par niveau, texte affiché) — les slots d'outillage
+(`balance.json → toolSlots.careerLevels`) et les quotas (`quotas.json →
+careerLevels`) restent dans leurs tables historiques, simplement complétées
+des 4 lignes manquantes (`lead-pm`, `director`, `cpo`, `ceo`), sans aucune
+duplication de valeur entre les trois fichiers. Le déblocage est strict et
+vit dans `SprintState._unlock_next_career_level()` : "gagner" un niveau,
+c'est franchir son 4e trimestre (`quarter_exit_choice_pending` devient vrai
+pour la première fois à ce niveau) — la spec dit explicitement un mandat
+"complet" en 4 trimestres, avant même la question de sortir ou de
+continuer en mandat long. Le déblocage est donc acquis dès l'atteinte de T4,
+qu'on choisisse ensuite de partir ou de rester.
+
+**Pourquoi la persistance ne recalcule jamais la règle de déblocage.**
+`PlayerProfile.unlock_career_level()` ne fait qu'enregistrer un fait acquis
+(le niveau a été gagné) ; c'est `SprintState`, seul à connaître l'état du
+mandat en cours, qui décide *quand* l'appeler. Aucun écran ne recalcule la
+condition de déblocage : `career_select_screen` et `mandate_end_screen` se
+contentent de lire `PlayerProfile.is_career_level_unlocked()` — même
+principe que le Compendium du Lot 4 (`record_score_report()` scanne un
+rapport déjà tranché, il ne rejoue aucune condition).
+
+**Le menu de démarrage réutilise le pattern `playableEras`, au pixel près.**
+`career_select_screen.gd` est une copie quasi littérale de
+`scenario_screen.gd` : mêmes cartes, même `modulate` atténué sur les niveaux
+non débloqués, même bouton désactivé portant le texte de la condition
+manquante (`unlockLabel`). Le flux de lancement gagne une étape :
+accueil → **niveau de carrière** → scénario → entreprise, chaque écran
+gardant son bouton retour vers le précédent (`career_select_screen` est
+maintenant la destination du retour de `scenario_screen`, plus l'accueil).
+
+**`reset_run()` retombe sur "pm" si le niveau demandé n'est pas débloqué.**
+Le garde-fou n'est pas seulement dans l'écran de sélection (qui désactive
+déjà le bouton) : `reset_run(era, company, chosen_career_level)` revérifie
+lui-même `PlayerProfile.is_career_level_unlocked()` avant d'adopter le
+niveau demandé. Un appel sans 3e argument (tous les tests existants, et tout
+code qui ne connaît pas encore la carrière) retombe donc silencieusement sur
+"pm" avec une seule équipe — c'est ce qui garantit qu'un run de niveau PM
+reste strictement identique à avant ce lot, sans qu'aucun test n'ait eu
+besoin d'être réécrit pour ça.
+
+**Les équipes du kit de carrière démarrent vides, pas héritées.**
+Au-delà de PM, `squads[]` gagne `careers.json → squadsMin - 1` entrées via
+`_new_empty_squad()` : aucun roster, à staffer par recrutement. Alternative
+envisagée et écartée : générer un roster de départ par équipe supplémentaire
+aurait demandé d'étendre `companies.json` pour un contenu multi-squad par
+entreprise, alors qu'aucune entreprise n'est encore jouable au-delà de PM
+niveau récit (une seule époque jouable). Le choix retenu ne coûte aucune
+donnée supplémentaire et raconte la même histoire que la promotion réelle :
+on hérite d'une équipe déjà montée, on construit les autres soi-même. Nom
+affiché : "Équipe B", "Équipe C"... jamais le mot "squad", y compris dans ce
+contexte à N>1 — la règle de masquage ne vaut qu'à N=1, mais autant rester
+cohérent partout où un humain lit l'écran.
+
+**Le recrutement au-delà de PM équilibre plutôt que de choisir, pour
+l'instant.** `hire_candidate()` gagne un paramètre optionnel
+`target_squad_id` (défaut "", donc l'équipe principale — comportement
+historique inchangé). Sans sélecteur dédié dans `investments_screen` (coupé
+faute de temps à ce palier, voir PR), une recrue sans équipe précisée
+rejoint l'équipe la moins fournie. C'est un choix de design assumé, pas un
+oubli : préférer un équilibrage simple et déterministe à un empilement
+systématique sur l'équipe héritée, en attendant l'écran de sélection.
+
+**Fin de mandat : annoncer, ou rappeler ce qui manque.**
+`mandate_end_screen._load_career_progress()` lit
+`SprintState.newly_unlocked_career_level` (non vide seulement le sprint où
+le déblocage vient de tomber) pour l'annonce festive, et sinon calcule le
+prochain niveau non débloqué dans `careers.json → order` pour rappeler sa
+condition en clair — sans jamais recalculer si elle est remplie, seule
+`PlayerProfile` sait répondre à ça.

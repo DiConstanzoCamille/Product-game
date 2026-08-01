@@ -1,7 +1,7 @@
 extends Control
 ## Écran d'accueil. Point d'entrée du jeu (run/main_scene dans project.godot).
 
-const SCENARIO_SCENE := "res://scenes/screens/scenario_screen.tscn"
+const CAREER_SELECT_SCENE := "res://scenes/screens/career_select_screen.tscn"
 
 @onready var new_game_button: Button = $CenterContainer/VBoxContainer/MenuButtons/NewGameButton
 @onready var rules_button: Button = $CenterContainer/VBoxContainer/MenuButtons/RulesButton
@@ -36,7 +36,7 @@ func _ready() -> void:
 
 
 func _on_new_game_pressed() -> void:
-	get_tree().change_scene_to_file(SCENARIO_SCENE)
+	get_tree().change_scene_to_file(CAREER_SELECT_SCENE)
 
 
 func _on_rules_pressed() -> void:

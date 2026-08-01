@@ -19,6 +19,7 @@ extends Node
 
 const SCREENS := [
 	"res://scenes/screens/start_screen.tscn",
+	"res://scenes/screens/career_select_screen.tscn",
 	"res://scenes/screens/scenario_screen.tscn",
 	"res://scenes/screens/company_select_screen.tscn",
 	"res://scenes/screens/inbox_screen.tscn",

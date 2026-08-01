@@ -13,6 +13,7 @@ const GOOD_ENDINGS := ["ipo", "rachat"]
 @onready var note_label: Label = $CenterContainer/VBox/NoteLabel
 @onready var summary_grid: GridContainer = $CenterContainer/VBox/SummaryGrid
 @onready var meta_label: Label = $CenterContainer/VBox/MetaLabel
+@onready var career_label: Label = $CenterContainer/VBox/CareerLabel
 @onready var replay_button: Button = $CenterContainer/VBox/Buttons/ReplayButton
 @onready var home_button: Button = $CenterContainer/VBox/Buttons/HomeButton
 
@@ -45,6 +46,39 @@ func _load_ending() -> void:
 	var era: Dictionary = SprintState.get_era()
 	meta_label.text = "Époque : %s %s · Profil d'équipe : %s" % [
 		era.get("icon", ""), era.get("name", ""), SprintState.team_profile.capitalize()
+	]
+	_load_career_progress()
+
+
+## Annonce le déblocage de carrière quand ce mandat vient de le déclencher
+## (spec §13.4, issue #18 critère 2), ou rappelle la condition manquante pour
+## le niveau suivant — jamais un calcul ici, juste la lecture de
+## careers.json et de SprintState.newly_unlocked_career_level.
+func _load_career_progress() -> void:
+	var order: Array = GameData.careers.get("order", [])
+	var levels: Dictionary = GameData.careers.get("levels", {})
+	var current_conf: Dictionary = levels.get(SprintState.career_level, {})
+	var current_label := "%s %s" % [current_conf.get("icon", ""), current_conf.get("label", SprintState.career_level)]
+
+	if SprintState.newly_unlocked_career_level != "":
+		var unlocked_conf: Dictionary = levels.get(SprintState.newly_unlocked_career_level, {})
+		career_label.text = "🎉 Niveau débloqué : %s %s — jouable dès le prochain mandat." % [
+			unlocked_conf.get("icon", ""), unlocked_conf.get("label", SprintState.newly_unlocked_career_level)
+		]
+		career_label.add_theme_color_override("font_color", UIHelpers.COLOR_GOOD)
+		return
+
+	var current_index := order.find(SprintState.career_level)
+	if current_index == -1 or current_index + 1 >= order.size():
+		career_label.text = "Mandat joué en %s." % current_label
+		return
+	var next_id: String = order[current_index + 1]
+	if PlayerProfile.is_career_level_unlocked(next_id):
+		career_label.text = "Mandat joué en %s." % current_label
+		return
+	var next_conf: Dictionary = levels.get(next_id, {})
+	career_label.text = "Mandat joué en %s. Pas encore débloqué : 🔒 %s — %s" % [
+		current_label, next_conf.get("label", next_id), next_conf.get("unlockLabel", "")
 	]
 
 

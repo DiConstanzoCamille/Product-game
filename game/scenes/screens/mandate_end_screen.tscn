@@ -71,6 +71,12 @@ text="Époque · Profil d'équipe"
 horizontal_alignment=1
 autowrap_mode=2
 
+[node name="CareerLabel" type="Label" parent="CenterContainer/VBox"]
+theme_override_font_sizes/font_size=13
+text=""
+horizontal_alignment=1
+autowrap_mode=2
+
 [node name="Spacer2" type="Control" parent="CenterContainer/VBox"]
 custom_minimum_size=Vector2(0, 12)
 

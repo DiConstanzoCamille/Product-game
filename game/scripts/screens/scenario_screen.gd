@@ -6,7 +6,7 @@ extends Control
 ## → playableEras) ; les 2 autres scénarios s'affichent en "Bientôt disponible".
 
 const COMPANY_SELECT_SCENE := "res://scenes/screens/company_select_screen.tscn"
-const START_SCREEN_SCENE := "res://scenes/screens/start_screen.tscn"
+const CAREER_SELECT_SCENE := "res://scenes/screens/career_select_screen.tscn"
 
 @onready var back_button: Button = $Margin/VBox/TopBar/BackButton
 @onready var eyebrow_label: Label = $Margin/VBox/Eyebrow
@@ -16,7 +16,7 @@ const START_SCREEN_SCENE := "res://scenes/screens/start_screen.tscn"
 
 
 func _ready() -> void:
-	back_button.pressed.connect(func(): get_tree().change_scene_to_file(START_SCREEN_SCENE))
+	back_button.pressed.connect(func(): get_tree().change_scene_to_file(CAREER_SELECT_SCENE))
 	UIHelpers.apply_mono(eyebrow_label, 13, true)
 	UIHelpers.apply_heading(title_label, 32, 700.0)
 	UIHelpers.fade_in(self)

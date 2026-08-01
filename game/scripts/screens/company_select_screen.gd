@@ -133,5 +133,5 @@ func _build_company_card(company: Dictionary) -> Control:
 
 
 func _on_company_selected(company_id: String) -> void:
-	SprintState.reset_run(SprintState.pending_era_id, company_id)
+	SprintState.reset_run(SprintState.pending_era_id, company_id, SprintState.pending_career_level)
 	get_tree().change_scene_to_file(INBOX_SCENE)

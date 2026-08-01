@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "_comment": "Lot 5 (spec scoring §13.4, issue #18). Progression de carriere - le 'stake' Balatro. Les slots d'outillage (balance.json -> toolSlots.careerLevels) et les quotas (quotas.json -> careerLevels) restent dans leurs tables existantes, indexees par le meme id de niveau ; ce fichier ne decrit que ce qui est propre a la carriere : l'ordre de deblocage, le nombre de squads et le texte affiche au joueur. Deblocage strict (aucun contournement) : `unlock` pointe vers le niveau qu'il faut avoir gagne, sauf pour le tout premier ('start').",
+
+  "order": ["pm", "lead-pm", "director", "cpo", "ceo"],
+
+  "levels": {
+    "pm": {
+      "icon": "👤",
+      "label": "PM",
+      "squadsMin": 1,
+      "squadsMax": 1,
+      "unlock": { "type": "start" },
+      "unlockLabel": "Niveau de depart",
+      "appears": "Le jeu tel que vous le connaissez : une seule equipe, un seul backlog."
+    },
+    "lead-pm": {
+      "icon": "👥",
+      "label": "Lead PM",
+      "squadsMin": 2,
+      "squadsMax": 3,
+      "unlock": { "type": "win-career-level", "careerLevel": "pm" },
+      "unlockLabel": "Gagnez un mandat complet en PM (4 trimestres franchis)",
+      "appears": "Attention limitee, PM locaux, backlogs separes."
+    },
+    "director": {
+      "icon": "🏢",
+      "label": "Director",
+      "squadsMin": 5,
+      "squadsMax": 7,
+      "unlock": { "type": "win-career-level", "careerLevel": "lead-pm" },
+      "unlockLabel": "Gagnez un mandat complet en Lead PM",
+      "appears": "Combos inter-squads, equipes subies determinantes, tribus."
+    },
+    "cpo": {
+      "icon": "🎩",
+      "label": "CPO",
+      "squadsMin": 10,
+      "squadsMax": 12,
+      "unlock": { "type": "win-career-level", "careerLevel": "director" },
+      "unlockLabel": "Gagnez un mandat complet en Director",
+      "appears": "Decisions strategiques majeures, board hostile."
+    },
+    "ceo": {
+      "icon": "👑",
+      "label": "CEO",
+      "squadsMin": 24,
+      "squadsMax": 24,
+      "unlock": { "type": "win-career-level", "careerLevel": "cpo" },
+      "unlockLabel": "Gagnez un mandat complet en CPO",
+      "appears": "On gere des Directors, pas des squads - la formule remonte d'un cran (3 x 8 domaines)."
+    }
+  }
+}

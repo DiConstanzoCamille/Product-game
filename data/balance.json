@@ -58,9 +58,13 @@
   },
 
   "toolSlots": {
-    "_comment": "Spec §7.1.1. Base indexee par niveau de carriere - une seule ligne remplie avant le lot 5 (contrat d'architecture, CLAUDE.md). Le plafond arbitraire structuralDecisionMaxActivations:4 disparait : la capacite se gagne (carriere) ou s'achete (extraSlotCosts), elle n'est plus une constante unique.",
+    "_comment": "Spec §7.1.1 et §13.4 (Lot 5). Base indexee par niveau de carriere - les 4 lignes ajoutees par le Lot 5 suivent la table de careers.json (3 -> 4 -> 5 -> 6 -> 7). Le plafond arbitraire structuralDecisionMaxActivations:4 disparait : la capacite se gagne (carriere) ou s'achete (extraSlotCosts), elle n'est plus une constante unique.",
     "careerLevels": {
-      "pm": { "base": 3 }
+      "pm": { "base": 3 },
+      "lead-pm": { "base": 4 },
+      "director": { "base": 5 },
+      "cpo": { "base": 6 },
+      "ceo": { "base": 7 }
     },
     "extraSlotCosts": [12, 20],
     "swap": { "cynisme": 4, "cynismePerPreviousSwap": 3 }
