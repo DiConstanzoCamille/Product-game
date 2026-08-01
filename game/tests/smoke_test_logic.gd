@@ -41,6 +41,8 @@ func _ready() -> void:
 	_test_score_resolution_integration()
 	_test_tool_families_and_strategy_lot3()
 	_test_quarter_runtime()
+	_test_committee_lot4()
+	_test_support_teams_and_compendium_lot4()
 
 	for strategy in ["stress", "greedy", "careful"]:
 		print("\n=== SMOKE TEST LOGIQUE — %s ===" % strategy.to_upper())
@@ -483,6 +485,263 @@ func _test_quarter_runtime() -> void:
 	SprintState.ending_reached.disconnect(on_ending)
 	if quota_ending != "remercie" or SprintState.ending_id != "remercie" or endings != ["remercie"]:
 		_fail("Un echec de quota concurrent d'un seuil fatal doit emettre une seule fin 'remercie'.")
+
+
+## Lot 4 (spec scoring §12) : chaque poste du Comité — achat accepté avec
+## budget, refus 'pieces' à sec, plafonds des tables de prix. `committee_screen`
+## ne fait que lire ces fonctions ; c'est donc ici, pas dans un test UI, que
+## la logique doit être couverte.
+func _test_committee_lot4() -> void:
+	print("=== SMOKE TEST LOGIQUE — LOT 4 : COMITE D'INVESTISSEMENT ===")
+
+	# 🧭 Décision stratégique payante : refus à sec, achat au prix affiché,
+	# une seule par trimestre. On neutralise une éventuelle injonction du
+	# board tirée à T1 (déjà couverte ailleurs) pour rester déterministe.
+	SprintState.reset_run("agile-transformation", "karavel-scaleup")
+	SprintState.chosen_strategy_ids.clear()
+	SprintState.quarter_strategy_chosen = false
+	var strategy_options := SprintState.get_strategy_options(3)
+	if strategy_options.is_empty():
+		_fail("Un trimestre sans décision déjà choisie doit proposer un catalogue non vide.")
+	else:
+		var strategy_id: String = strategy_options[0].get("id", "")
+		SprintState.pieces = 0
+		if SprintState.buy_strategy(strategy_id) != "pieces":
+			_fail("Sans budget, buy_strategy() doit refuser 'pieces'.")
+		SprintState.pieces = 100
+		var strategy_cost := SprintState.strategy_purchase_cost()
+		if SprintState.buy_strategy(strategy_id) != "":
+			_fail("Avec assez de budget, buy_strategy() doit accepter.")
+		if SprintState.pieces != 100 - strategy_cost:
+			_fail("buy_strategy() doit prélever exactement le coût affiché (%d)." % strategy_cost)
+		var second_id: String = strategy_options[1].get("id", "") if strategy_options.size() > 1 else strategy_id
+		if SprintState.buy_strategy(second_id) == "":
+			_fail("Une deuxième décision stratégique ne doit pas être acceptée au Comité dans le même trimestre.")
+
+	# 🪑 Ouvrir un poste : échelle de prix (investments.json → open-seat),
+	# plafond une fois la table épuisée.
+	SprintState.reset_run("agile-transformation", "karavel-scaleup")
+	var base_cap := SprintState.get_team_cap()
+	SprintState.pieces = 0
+	if SprintState.buy_team_cap_seat() != "pieces":
+		_fail("Sans budget, l'ouverture d'un poste doit refuser 'pieces'.")
+	SprintState.pieces = 1000
+	var seat_costs: Array = SprintState.find_investment_item("open-seat").get("costs", [])
+	for i in seat_costs.size():
+		if SprintState.buy_team_cap_seat() != "":
+			_fail("L'achat du poste n°%d doit être accepté avec assez de budget." % (i + 1))
+	if SprintState.get_team_cap() != base_cap + seat_costs.size():
+		_fail("Le cap d'effectif doit avoir gagné %d poste(s)." % seat_costs.size())
+	if SprintState.buy_team_cap_seat() != "plafond":
+		_fail("Au-delà de la table de prix, l'ouverture d'un poste doit refuser 'plafond'.")
+
+	# 📈 Promotion : refus 'introuvable' / 'deja-senior' / 'pieces', effet réel
+	# sur la séniorité et le salaire.
+	SprintState.reset_run("agile-transformation", "karavel-scaleup")
+	var junior_id := ""
+	for employee in SprintState.get_roster():
+		if employee.get("seniority", "junior") == "junior":
+			junior_id = employee.get("id", "")
+			break
+	if junior_id == "":
+		_fail("Le roster de départ de Karavel doit compter au moins un junior à promouvoir.")
+	SprintState.pieces = 0
+	if SprintState.promote_employee(junior_id) != "pieces":
+		_fail("Sans budget, promote_employee() doit refuser 'pieces'.")
+	SprintState.pieces = 100
+	if SprintState.promote_employee(junior_id) != "":
+		_fail("Avec budget, promote_employee() doit accepter un junior existant.")
+	var promoted := SprintState.find_employee(junior_id)
+	var senior_salary := int(GameData.balance.get("salaries", {}).get("senior", 2))
+	if promoted.get("seniority", "") != "senior" or int(promoted.get("salary", 0)) != senior_salary:
+		_fail("Une promotion doit passer la personne senior et aligner son salaire sur balance.json → salaries.senior.")
+	if SprintState.promote_employee(junior_id) != "deja-senior":
+		_fail("Promouvoir une personne déjà senior doit être refusé ('deja-senior').")
+	if SprintState.promote_employee("introuvable-xyz") != "introuvable":
+		_fail("Promouvoir un id inconnu doit être refusé ('introuvable').")
+
+	# 🚀 Palier de produit : échelle de prix, plafond, +1 feature proposée
+	# par sprint et par palier (_draw_backlog_offer).
+	SprintState.reset_run("agile-transformation", "karavel-scaleup")
+	SprintState.pieces = 0
+	if SprintState.buy_product_tier() != "pieces":
+		_fail("Sans budget, le palier de produit doit refuser 'pieces'.")
+	SprintState.pieces = 1000
+	var tier_costs: Array = SprintState.find_investment_item("product-tier").get("costs", [])
+	for i in tier_costs.size():
+		if SprintState.buy_product_tier() != "":
+			_fail("L'achat du palier n°%d doit être accepté avec assez de budget." % (i + 1))
+	if SprintState.product_tier != tier_costs.size():
+		_fail("product_tier doit valoir %d après avoir acheté tous les paliers." % tier_costs.size())
+	if SprintState.buy_product_tier() != "plafond":
+		_fail("Au-delà de la table de prix, le palier de produit doit refuser 'plafond'.")
+
+	# 🏝️ Séminaire d'équipe : Cynisme -15 posé en attente de Résolution.
+	SprintState.reset_run("agile-transformation", "karavel-scaleup")
+	SprintState.pieces = 0
+	if SprintState.buy_team_seminar() != "pieces":
+		_fail("Sans budget, le séminaire d'équipe doit refuser 'pieces'.")
+	SprintState.pieces = 100
+	if SprintState.buy_team_seminar() != "":
+		_fail("Avec budget, le séminaire d'équipe doit être accepté.")
+	if int(SprintState.pending_deltas.get("cynisme", 0.0)) != -15:
+		_fail("Le séminaire d'équipe doit poser -15 de Cynisme en attente de Résolution.")
+
+	# 🧹 Sprint de remise à plat : Dette -20 en attente, 0 Traction à la
+	# Résolution qui suit — même si le roster livre réellement quelque chose.
+	SprintState.reset_run("agile-transformation", "karavel-scaleup")
+	SprintState.pieces = 100
+	if SprintState.buy_cleanup_sprint() != "":
+		_fail("Avec budget, le sprint de remise à plat doit être accepté.")
+	if int(SprintState.pending_deltas.get("dette-organisationnelle", 0.0)) != -20:
+		_fail("Le sprint de remise à plat doit poser -20 de Dette en attente de Résolution.")
+	if not SprintState.cleanup_sprint_pending:
+		_fail("cleanup_sprint_pending doit rester vrai jusqu'à la prochaine Résolution.")
+	var feature: Dictionary = GameData.backlog.get("features", [])[0]
+	SprintState.last_roadmap_report = {
+		"sprint": SprintState.sprint_number,
+		"plannedPoints": int(feature.get("costPoints", 1)),
+		"capacity": int(feature.get("costPoints", 1)),
+		"delivered": [feature],
+	}
+	SprintState.apply_pending_and_check()
+	if int(SprintState.last_score_report.get("global", {}).get("impact", -1)) != 0:
+		_fail("Le sprint de remise à plat doit neutraliser toute Traction, même avec une livraison réelle.")
+	if SprintState.cleanup_sprint_pending:
+		_fail("cleanup_sprint_pending doit être consommé après la Résolution qui suit l'achat.")
+
+	# 🤝 Rachat d'un concurrent : +12 MRR immédiat, +1 employé immédiat,
+	# +8 Dette en attente de Résolution.
+	SprintState.reset_run("agile-transformation", "karavel-scaleup")
+	var roster_before := SprintState.get_roster().size()
+	var mrr_before := SprintState.mrr
+	SprintState.pieces = 0
+	if SprintState.buy_competitor_acquisition() != "pieces":
+		_fail("Sans budget, le rachat d'un concurrent doit refuser 'pieces'.")
+	SprintState.pieces = 100
+	if SprintState.buy_competitor_acquisition() != "":
+		_fail("Avec budget, le rachat d'un concurrent doit être accepté.")
+	if not is_equal_approx(SprintState.mrr, mrr_before + 12.0):
+		_fail("Le rachat d'un concurrent doit ajouter 12 MRR immédiatement (stock, pas un flux).")
+	if SprintState.get_roster().size() != roster_before + 1:
+		_fail("Le rachat d'un concurrent doit ajouter un employé au roster immédiatement.")
+	if int(SprintState.pending_deltas.get("dette-organisationnelle", 0.0)) != 8:
+		_fail("Le rachat d'un concurrent doit poser +8 de Dette en attente de Résolution.")
+
+	# 🎯 Chasseur de têtes : le prochain étal force au moins 4 candidats,
+	# traits cachés révélés — puis se consomme.
+	SprintState.reset_run("agile-transformation", "karavel-scaleup")
+	SprintState.pieces = 0
+	if SprintState.buy_headhunter() != "pieces":
+		_fail("Sans budget, le chasseur de têtes doit refuser 'pieces'.")
+	SprintState.pieces = 100
+	if SprintState.buy_headhunter() != "":
+		_fail("Avec budget, le chasseur de têtes doit être accepté.")
+	var offer := SprintState.get_shop_offer()
+	var forced_candidates: Array = offer.get("candidates", [])
+	if forced_candidates.size() < 4:
+		_fail("Le chasseur de têtes doit forcer au moins 4 candidats au prochain étal (obtenu %d)." % forced_candidates.size())
+	for candidate in forced_candidates:
+		if not bool(candidate.get("hiddenRevealed", false)):
+			_fail("Le chasseur de têtes doit révéler le trait caché de chaque candidat forcé.")
+	if SprintState.headhunter_pending:
+		_fail("Le pari du chasseur de têtes doit se consommer dès le premier tirage d'étal.")
+
+	# 🏛️ Plan de redressement : rattrapage automatique d'un quota manqué,
+	# consommé une seule fois.
+	SprintState.reset_run("agile-transformation", "karavel-scaleup")
+	SprintState.pieces = 0
+	if SprintState.buy_turnaround_plan() != "pieces":
+		_fail("Sans budget, le plan de redressement doit refuser 'pieces'.")
+	SprintState.pieces = 100
+	if SprintState.buy_turnaround_plan() != "":
+		_fail("Avec budget, le plan de redressement doit être accepté.")
+	SprintState.quarter_sprint = SprintState.get_quarter_length() - 1
+	SprintState.quarter_impact = 0
+	SprintState.last_score_report = {"global": {"impact": 0}}
+	SprintState._record_quarter_resolution()
+	if not bool(SprintState.quarter_result.get("passed", false)) or not bool(SprintState.quarter_result.get("turnaroundUsed", false)):
+		_fail("Un plan de redressement acheté doit rattraper automatiquement un quota manqué (0 très sous le quota T1).")
+	if SprintState.turnaround_plans_available != 0:
+		_fail("Le plan de redressement doit être consommé après avoir servi.")
+
+	# 🎲 Avance sur trimestre : +10 budget immédiat, débit direct sur le
+	# cumul trimestriel — jamais clampé à zéro ici (lot dédié à venir).
+	SprintState.reset_run("agile-transformation", "karavel-scaleup")
+	SprintState.pieces = 0
+	SprintState.quarter_impact = 10
+	SprintState.buy_quarter_advance()
+	if SprintState.pieces != 10:
+		_fail("L'avance sur trimestre doit donner +10 de budget immédiatement.")
+	if SprintState.quarter_impact != -70:
+		_fail("L'avance sur trimestre doit débiter 80 sur le cumul trimestriel, y compris sous zéro (10 - 80 = -70).")
+
+
+## Lot 4 (spec §9.4) : les équipes subies sont fixées par l'entreprise,
+## jamais pilotables, transmises au score et à l'éligibilité des événements
+## Inbox ; plus le Compendium des synergies (spec §12.1), qui ne fait que
+## lire un rapport déjà résolu.
+func _test_support_teams_and_compendium_lot4() -> void:
+	print("=== SMOKE TEST LOGIQUE — LOT 4 : EQUIPES SUBIES ET COMPENDIUM ===")
+
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+	if SprintState.support_teams != {"sales": 4.0, "pmm": 2.0, "csm": 3.0}:
+		_fail("Meridia doit démarrer avec les équipes subies Sales 4 / PMM 2 / CSM 3.")
+	var meridia_snapshot := SprintState._build_score_snapshot()
+	if meridia_snapshot.get("support_teams", {}) != SprintState.support_teams:
+		_fail("Le snapshot de score doit transmettre support_teams tel quel — c'est ce qui débloquait le critère de recette de l'issue #17.")
+
+	SprintState.reset_run("agile-transformation", "karavel-scaleup")
+	if SprintState.support_teams != {"sales": 2.0, "pmm": 4.0, "csm": 1.0}:
+		_fail("Karavel doit démarrer avec les équipes subies Sales 2 / PMM 4 / CSM 1.")
+
+	# Un niveau bas génère des crises, un niveau haut de la pression — jamais
+	# l'inverse (spec §9.4). On force les deux extrêmes sans passer par une
+	# entreprise réelle, pour ne dépendre d'aucun tirage.
+	SprintState.support_teams["sales"] = 0
+	var low_sales_ids: Array = []
+	for event in SprintState._eligible_inbox_events():
+		low_sales_ids.append(event.get("id", ""))
+	if not low_sales_ids.has("sales-deal-bloque") or low_sales_ids.has("sales-survente"):
+		_fail("Sales niveau 0 doit rendre éligible l'événement de crise, jamais celui de pression.")
+	SprintState.support_teams["sales"] = 5
+	var high_sales_ids: Array = []
+	for event in SprintState._eligible_inbox_events():
+		high_sales_ids.append(event.get("id", ""))
+	if not high_sales_ids.has("sales-survente") or high_sales_ids.has("sales-deal-bloque"):
+		_fail("Sales niveau 5 doit rendre éligible l'événement de pression, jamais celui de crise.")
+
+	# Effet de bord déclaratif d'une décision stratégique (dernier tiers du
+	# §9.4) : Open source -> PMM +1 / Sales -1. On ne les pilote toujours
+	# pas — la décision change le monde autour d'elles.
+	SprintState.reset_run("agile-transformation", "karavel-scaleup")
+	SprintState.chosen_strategy_ids.clear()
+	SprintState.quarter_strategy_chosen = false
+	var pmm_before := int(SprintState.support_teams.get("pmm", 3))
+	var sales_before := int(SprintState.support_teams.get("sales", 3))
+	if SprintState.choose_strategy("open-source") != "":
+		_fail("La stratégie open-source doit pouvoir être choisie dans ce test isolé.")
+	if int(SprintState.support_teams.get("pmm", 3)) != pmm_before + 1:
+		_fail("Open source doit faire +1 PMM en effet de bord (spec §9.4).")
+	if int(SprintState.support_teams.get("sales", 3)) != sales_before - 1:
+		_fail("Open source doit faire -1 Sales en effet de bord (spec §9.4).")
+
+	# 🧩 Compendium des synergies : la détection lit un rapport déjà résolu,
+	# elle ne retente aucune condition.
+	PlayerProfile.clear_all()
+	var catalog := PlayerProfile.get_combo_catalog()
+	if catalog.size() != 15:
+		_fail("Le Compendium doit lister exactement 15 combos (8 composition + 5 main + 2 inter-squad), obtenu %d." % catalog.size())
+	for entry in catalog:
+		if entry.get("discovered", false):
+			_fail("Un profil vidé ne doit révéler aucun combo au départ.")
+	var fake_report := {"squads": [{"lines": [{"icon": "🔺", "label": "Trio produit"}]}], "global": {"lines": []}}
+	PlayerProfile.record_score_report(fake_report)
+	if not PlayerProfile.is_combo_discovered("trio-produit"):
+		_fail("Une ligne de rapport correspondant à un combo doit le marquer découvert dans le Compendium.")
+	if PlayerProfile.is_combo_discovered("chaos-organise"):
+		_fail("Un combo absent du rapport ne doit pas être marqué découvert.")
+	PlayerProfile.clear_all()
 
 
 func _offer_has_item(items: Array, item_id: String) -> bool:
