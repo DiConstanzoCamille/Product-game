@@ -89,14 +89,71 @@ score et de tous les écrans de phase.
   précaution.
 - `mouse_exited` se déclenche quand le curseur entre sur un **enfant** du
   nœud survolé. Vérifier la position réelle avant de replier une carte.
+- **Ne jamais libérer un nœud par `free()` direct pendant l'émission de son
+  signal** — passer par `UIHelpers.clear_children()` (`remove_child` puis
+  `queue_free`). Sinon Godot log « Object was freed or unreferenced while a
+  signal is being emitted from it », sur **stderr** et sans lever d'erreur
+  GDScript : le test passe et le bug reste (carnet §21).
+- **Les `.uid` ne sont pas générés en `--headless`.** Tout nouveau `.gd` ou
+  `.tscn` doit avoir son `.uid` versionné, mais un run headless ne le crée
+  pas : il faut un `godot --headless --path game --import` explicite, puis
+  vérifier que `git status` ne laisse rien en `??`. Oublié quatre fois sur ce
+  dépôt — c'est le piège le plus répétitif de la liste.
+- **Un cache `game/.godot` périmé ment.** Après l'ajout d'un script avec un
+  `class_name` global, des erreurs du type `Nonexistent function … in base
+  'Nil'` ou un autoload qui échoue au chargement **ressemblent** à une
+  régression alors que c'est le cache. Faire `rm -rf game/.godot` et relancer
+  (10-15 min de réimport) *avant* de conclure à une régression, jamais après
+  avoir passé une heure à lire du code sain.
 
 ## Recette — obligatoire à la fin de chaque lot
 
 1. Les **deux smoke tests headless** passent (`game/tests/smoke_test_logic.gd`
-   et `smoke_test_ui.gd`).
-2. Un **run visuel complet** de tous les écrans.
+   et `smoke_test_ui.gd`), plus `score_resolver_cases.gd`.
+2. Les **captures d'écran** sont relues (voir ci-dessous), et un **run visuel
+   complet** est fait par un humain pour ce que les captures ne couvrent pas.
 3. Le **carnet de règles est mis à jour** avec les décisions prises (les
    §14-19 documentent l'historique des arbitrages — continuer la série).
+
+### Voir le jeu sans écran
+
+`--headless` ne dessine rien, mais `xvfb` est disponible et Godot accepte le
+driver `x11` : sous un serveur X virtuel, le rendu a réellement lieu et on
+peut sauver des PNG.
+
+```
+SHOT_DIR=/chemin xvfb-run -a godot --path game --display-driver x11 \
+    --resolution 1600x900 res://tests/screenshot_screens.tscn
+```
+
+1600×900 est la résolution réelle du viewport (`project.godot`) — capturer
+plus petit invente des troncatures qui n'existent pas.
+
+Ça attrape les fautes de texte, les débordements et les troncatures ; **pas**
+les enchaînements, les transitions, ni ce qui dépend d'un état de jeu avancé,
+puisque chaque écran est instancié isolément. Quatre lots ont été livrés sans
+qu'un seul pixel soit vu ; la toute première capture a trouvé deux défauts
+dans du code déjà mergé. À lancer avant de déclarer un lot fini.
+
+### Écrire un test sur un jeu aléatoire
+
+- **Ne jamais asserter sur le résultat d'un tirage.** Asserter sur la
+  *relation* entre le tirage et la décision qui en découle. Pas « le plan
+  n'est pas vide », mais « le plan n'est vide que si rien n'était abordable ».
+  Trois tests d'affilée s'y sont fait piéger (carnet §29 et §30.4), à chaque
+  fois avec un code parfaitement sain.
+- **Un run unique ne prouve rien.** `smoke_test_logic` coûte 0,8 s : un flaky
+  à 10-20 % passe inaperçu sur un run et coûte une heure trois jours plus
+  tard. Mesurer par **boucle de 40 runs** en comptant les `OK`, et comparer à
+  la même mesure sur `main` avant de conclure qu'on a cassé quelque chose —
+  c'est ce qui distingue « ma régression » de « défaut préexistant ».
+
+### Vérifier une règle d'affichage
+
+Une interdiction qui porte sur du **texte affiché** (« le mot *squad* ne doit
+jamais apparaître dans un premier run ») se vérifie sur `.gd`, `.tscn` **et
+`data/*.json`**. Le mot a fui par les JSON, après un grep qui ne couvrait que
+les deux premiers — et n'a été vu que sur une capture d'écran.
 
 Critères de recette permanents, à ne jamais casser :
 
