@@ -27,6 +27,7 @@ const SCREENS := [
 	"res://scenes/screens/resolution_screen.tscn",
 	"res://scenes/screens/foundations_screen.tscn",
 	"res://scenes/screens/mandate_end_screen.tscn",
+	"res://scenes/screens/committee_screen.tscn",
 ]
 
 

@@ -12,6 +12,7 @@ const INBOX_SCENE := "res://scenes/screens/inbox_screen.tscn"
 const FOUNDATIONS_SCENE := "res://scenes/screens/foundations_screen.tscn"
 const START_SCREEN_SCENE := "res://scenes/screens/start_screen.tscn"
 const MANDATE_END_SCENE := "res://scenes/screens/mandate_end_screen.tscn"
+const COMMITTEE_SCENE := "res://scenes/screens/committee_screen.tscn"
 
 @onready var sprint_label: Label = $Margin/VBox/TopBar/SprintLabel
 @onready var back_button: Button = $Margin/VBox/TopBar/BackButton
@@ -221,6 +222,15 @@ func _setup_score_replay() -> void:
 			_add_score_event(line, _choice_copy_for_impact(line))
 			_impact_total = int(round(float(line.get("after", line.get("value", 0.0)))))
 
+	# 💼📣🎧 Équipes subies (spec §9.4) : leur taux de conversion, visible à
+	# l'étape ⑨ — après l'Impact, puisqu'elles convertissent l'Impact déjà
+	# résolu, jamais un levier ou une friction dessus.
+	var conversion_rate_lines := _conversion_rate_lines(report.get("global", {}).get("lines", []))
+	if not conversion_rate_lines.is_empty():
+		_add_score_divider("CONVERSION — ÉQUIPES SUBIES")
+		for line in conversion_rate_lines:
+			_add_score_event(line, _choice_copy_for_conversion_rate(line))
+
 	_set_impact_quarter_display(_quota_before, false)
 
 	if _score_events.is_empty():
@@ -318,6 +328,8 @@ func _format_score_line(line: Dictionary, current: float) -> String:
 		return "%s  %s ×%s   %s -> %s" % [icon, label, String.num(float(line.get("value", 1.0)), 2), _score_number(before), _score_number(current)]
 	if type == "total_lever_cap":
 		return "%s  %s : plafond %s" % [icon, label, _score_number(current)]
+	if type == "conversion_rate":
+		return "%s  %s  ×%s" % [icon, label, String.num(float(line.get("value", 1.0)), 2)]
 	var value := float(line.get("value", 0.0))
 	var prefix := "+" if value >= 0.0 else "-"
 	return "%s  %s  %s%s   %s -> %s" % [icon, label, prefix, _score_number(abs(value)), _score_number(before), _score_number(current)]
@@ -338,6 +350,8 @@ func _format_choice_line(line: Dictionary) -> String:
 		return "%s %s  ·  +%s budget" % [icon, label, _score_number(value)]
 	if line_type == "impact":
 		return "%s Impact final  ·  %s" % [icon, _score_number(float(line.get("after", value)))]
+	if line_type == "conversion_rate":
+		return "%s %s  ·  ×%s" % [icon, label, String.num(value, 2)]
 	return "%s %s" % [icon, label]
 
 
@@ -439,6 +453,23 @@ func _matching_role_score_line(lines: Array, role_label: String) -> Dictionary:
 		if int(line.get("step", 0)) == 3 and line.get("label", "") == role_label:
 			return line
 	return {}
+
+
+## 💼📣🎧 Équipes subies (spec §9.4) : jamais pilotables, jamais dans le
+## roster — seul leur taux de conversion, fixé par l'entreprise, se voit ici.
+func _conversion_rate_lines(lines: Array) -> Array:
+	var rates: Array = []
+	for line in lines:
+		if line.get("type", "") == "conversion_rate":
+			rates.append(line)
+	return rates
+
+
+func _choice_copy_for_conversion_rate(line: Dictionary) -> Dictionary:
+	return {
+		"display": _format_choice_line(line),
+		"detail": "Équipe subie : elle n'est pas dans votre roster et n'est pilotable d'aucune façon. Son niveau est fixé par l'entreprise au début du run.\n\nCalcul : %s" % _format_score_line(line, float(line.get("value", 1.0))),
+	}
 
 
 func _external_factor_lines(lines: Array) -> Array:
@@ -1036,7 +1067,7 @@ func _on_stay_long_mandate_pressed(dim: Control) -> void:
 	if is_instance_valid(dim):
 		dim.queue_free()
 	next_sprint_button.disabled = false
-	next_sprint_button.text = "Sprint suivant →"
+	next_sprint_button.text = "Voir le Comité d'investissement →" if _quarter_just_closed() else "Sprint suivant →"
 	next_sprint_button.pressed.connect(_on_next_sprint_pressed)
 
 
@@ -1177,10 +1208,26 @@ func _setup_next_button() -> void:
 		next_sprint_button.text = "Choisissez la suite du mandat"
 		next_sprint_button.disabled = true
 	else:
-		next_sprint_button.text = "Sprint suivant →"
+		next_sprint_button.text = "Voir le Comité d'investissement →" if _quarter_just_closed() else "Sprint suivant →"
 		next_sprint_button.pressed.connect(_on_next_sprint_pressed)
 
 
+## Un trimestre vient de se clôturer sur cette Résolution et le mandat
+## continue (quota atteint, mandat long inclus) : `quarter_result.sprint` a
+## été enregistré par SprintState._record_quarter_resolution() avec le
+## sprint_number *avant* son incrément par _on_next_sprint_pressed — c'est ce
+## qui distingue « le trimestre vient de se clore ici » de « il s'est clos il
+## y a un sprint ou plus » (voir _test_quarter_result_uses_global_sprint).
+func _quarter_just_closed() -> bool:
+	var result: Dictionary = SprintState.quarter_result
+	return int(result.get("sprint", -1)) == SprintState.sprint_number and bool(result.get("passed", false))
+
+
+## Le Comité d'investissement (spec §12, Lot 4) s'insère ici, entre la
+## Résolution qui clôture un trimestre et l'Inbox du trimestre suivant —
+## jamais quand le trimestre continue au fil de l'eau, jamais quand le
+## mandat s'arrête (mandate_ending le court-circuite plus haut).
 func _on_next_sprint_pressed() -> void:
+	var go_to_committee := _quarter_just_closed()
 	SprintState.sprint_number += 1
-	get_tree().change_scene_to_file(INBOX_SCENE)
+	get_tree().change_scene_to_file(COMMITTEE_SCENE if go_to_committee else INBOX_SCENE)

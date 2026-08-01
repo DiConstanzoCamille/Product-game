@@ -31,6 +31,7 @@ var hidden_traits: Dictionary = {}
 var scoring: Dictionary = {}
 var quotas: Dictionary = {}
 var strategy: Dictionary = {}
+var investments: Dictionary = {}
 
 var is_loaded: bool = false
 
@@ -144,7 +145,11 @@ func _load_all() -> void:
 	if strategy_data:
 		strategy = strategy_data
 
-	is_loaded = resources.size() > 0 and not cards.is_empty() and not balance.is_empty() and not quotas.is_empty() and not strategy.is_empty()
+	var investments_data = _load_json("investments.json")
+	if investments_data:
+		investments = investments_data
+
+	is_loaded = resources.size() > 0 and not cards.is_empty() and not balance.is_empty() and not quotas.is_empty() and not strategy.is_empty() and not investments.is_empty()
 
 	if is_loaded:
 		print("GameData: données chargées — %d ressources, %d cartes, %d époques, %d fins de mandat." % [
