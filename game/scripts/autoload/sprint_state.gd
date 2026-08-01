@@ -1989,6 +1989,10 @@ func apply_pending_and_check() -> String:
 	if was_cleanup_sprint:
 		cleanup_sprint_pending = false
 		pending_journal_lines.append("🧹 Sprint de remise à plat : Traction neutralisée ce sprint, quoi que le roster ait livré.")
+	# 🧩 Compendium des synergies (spec §12.1) : la persistance vit dans
+	# PlayerProfile, pas ici — un seul calcul (celui du resolver), une seule
+	# lecture (celle du rapport déjà produit).
+	PlayerProfile.record_score_report(last_score_report)
 	_apply_payroll()
 	_apply_score_conversion()
 

@@ -327,17 +327,32 @@ func _test_tool_families_and_strategy_lot3() -> void:
 
 	# Décisions stratégiques (§7.2) : 1 par trimestre, permanente, jamais
 	# mélangée aux outils.
+	#
+	# Cas à couvrir sans dépendre de la chance : le tirage d'exigence T1 peut
+	# légitimement tomber sur board-injunction (1/8 des exigences de
+	# quotas.json), qui force une décision dès reset_run() et consomme le
+	# trimestre avant qu'on ait rien choisi soi-même — get_strategy_options()
+	# renvoie alors un catalogue vide, correctement. Un catalogue vide n'est
+	# accepté QUE dans ce cas précis (injonction déjà tranchée) ; toute autre
+	# raison reste un échec de test — c'était le bug avant ce lot : le test
+	# exigeait un catalogue non vide à 100 %, alors que la spec en autorise
+	# 7/8 (voir carnet §29, "le test était faux, pas le moteur").
 	SprintState.reset_run("agile-transformation", "meridia-corp")
 	var options := SprintState.get_strategy_options(3)
+	var first_id: String
 	if options.is_empty():
-		_fail("Le premier trimestre doit proposer au moins une décision stratégique.")
-	var first_id: String = options[0].get("id", "")
-	if SprintState.choose_strategy(first_id) != "":
-		_fail("Le premier choix stratégique du trimestre doit être accepté.")
-	if not SprintState.chosen_strategy_ids.has(first_id) or SprintState.activated_cards.has(first_id):
-		_fail("Une décision stratégique doit rejoindre chosen_strategy_ids, jamais activated_cards.")
-	var second_id: String = options[1].get("id", "") if options.size() > 1 else first_id
-	if SprintState.choose_strategy(second_id) == "":
+		if not SprintState.quarter_strategy_chosen or SprintState.quarter_forced_strategy_id == "":
+			_fail("Un catalogue de décisions stratégiques vide au premier trimestre ne doit venir que d'une injonction du board déjà consommée, jamais d'autre chose.")
+		first_id = SprintState.quarter_forced_strategy_id
+		if not SprintState.chosen_strategy_ids.has(first_id):
+			_fail("Une décision imposée par injonction doit rejoindre chosen_strategy_ids comme un choix volontaire.")
+	else:
+		first_id = options[0].get("id", "")
+		if SprintState.choose_strategy(first_id) != "":
+			_fail("Le premier choix stratégique du trimestre doit être accepté.")
+		if not SprintState.chosen_strategy_ids.has(first_id) or SprintState.activated_cards.has(first_id):
+			_fail("Une décision stratégique doit rejoindre chosen_strategy_ids, jamais activated_cards.")
+	if SprintState.choose_strategy(first_id) == "":
 		_fail("Une deuxième décision stratégique ne doit pas être acceptée dans le même trimestre.")
 	# Simule le passage au trimestre suivant sans dépendre du tirage aléatoire
 	# d'exigence (board-injunction en forcerait une seconde et rendrait le test friable).

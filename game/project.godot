@@ -24,6 +24,7 @@ config/icon="res://icon.svg"
 
 GameData="*res://scripts/autoload/game_data.gd"
 SprintState="*res://scripts/autoload/sprint_state.gd"
+PlayerProfile="*res://scripts/autoload/player_profile.gd"
 
 [display]
 
