@@ -41,7 +41,11 @@ func _build_cards() -> void:
 
 func _build_level_card(level_id: String, level: Dictionary, is_unlocked: bool) -> Control:
 	var panel := PanelContainer.new()
-	panel.custom_minimum_size = Vector2(300, 0)
+	# 260 et pas 300 : les cinq niveaux doivent tenir côte à côte dans le
+	# viewport (1600 de large) sans scroll horizontal. À 300 la carte CEO
+	# débordait, et un joueur qui ne scrolle pas ne voyait jamais le dernier
+	# niveau — soit exactement l'inverse du but de cet écran.
+	panel.custom_minimum_size = Vector2(260, 0)
 	panel.modulate = Color(1, 1, 1, 1) if is_unlocked else Color(1, 1, 1, 0.55)
 
 	var vbox := VBoxContainer.new()
