@@ -1,0 +1,84 @@
+{
+  "version": 1,
+  "_comment": "Lot 5 (spec scoring §13.4, issue #18). Progression de carriere - le 'stake' Balatro. Les slots d'outillage (balance.json -> toolSlots.careerLevels) et les quotas (quotas.json -> careerLevels) restent dans leurs tables existantes, indexees par le meme id de niveau ; ce fichier ne decrit que ce qui est propre a la carriere : l'ordre de deblocage, le nombre de squads et le texte affiche au joueur. Deblocage strict (aucun contournement) : `unlock` pointe vers le niveau qu'il faut avoir gagne, sauf pour le tout premier ('start').",
+
+  "order": ["pm", "lead-pm", "director", "cpo", "ceo"],
+
+  "_comment_attention": "Lot 5 palier 3 (spec §13.3) : l'attention. `attentionSlots` est le nombre d'equipes que le joueur pilote lui-meme sur un sprint ; les autres choisissent seules, via le profil d'auto-pilotage que leur composition leur donne. A PM (1 slot, 1 equipe) rien n'est jamais auto-pilote : le jeu est strictement identique a avant le multi-equipe. L'ecart slots/equipes se creuse volontairement avec le niveau - c'est la ou le jeu cesse d'etre du micro-management et devient de la delegation.",
+
+  "attention": {
+    "_comment_slots": "L'attention croit BEAUCOUP moins vite que le nombre d'equipes : 1 sur 1 en PM, puis 1 sur 2, 2 sur 5, 3 sur 10, 4 sur 24. C'est volontaire et c'est le coeur du niveau - la capacite d'attention d'un humain ne grandit pas avec son titre, seule l'organisation grandit. Le passage PM -> Lead PM fait donc mal d'un coup (on delegue la moitie de son perimetre du jour au lendemain), ce qui est exactement le propos RP du niveau.",
+    "slotsByLevel": { "pm": 1, "lead-pm": 1, "director": 2, "cpo": 3, "ceo": 4 },
+
+    "_comment_profiles": "Profil retenu = celui du meilleur PM de l'equipe (senior > junior > aucun). `sort: backlog-order` prend les tickets dans l'ordre du tirage, sans reflechir. `sort: weighted` note chaque item par roi*w + clientImpact*w - risk*w ; `perPoint: true` divise par costPoints, c'est-a-dire que le PM raisonne en rendement plutot qu'en valeur brute. Un epic recoit `epicPointsRatio` de la capacite restante.",
+    "autoPilotProfiles": {
+      "none": {
+        "label": "sans PM",
+        "sort": "backlog-order",
+        "epicPointsRatio": 0.5
+      },
+      "junior": {
+        "label": "PM junior",
+        "sort": "weighted",
+        "weights": { "roi": 1.0, "clientImpact": 1.0, "risk": 0.0 },
+        "perPoint": false,
+        "epicPointsRatio": 0.5
+      },
+      "senior": {
+        "label": "PM senior",
+        "sort": "weighted",
+        "weights": { "roi": 1.0, "clientImpact": 1.0, "risk": 0.5 },
+        "perPoint": true,
+        "epicPointsRatio": 0.75
+      }
+    }
+  },
+
+  "levels": {
+    "pm": {
+      "icon": "👤",
+      "label": "PM",
+      "squadsMin": 1,
+      "squadsMax": 1,
+      "unlock": { "type": "start" },
+      "unlockLabel": "Niveau de depart",
+      "appears": "Le jeu tel que vous le connaissez : une seule equipe, un seul backlog."
+    },
+    "lead-pm": {
+      "icon": "👥",
+      "label": "Lead PM",
+      "squadsMin": 2,
+      "squadsMax": 3,
+      "unlock": { "type": "win-career-level", "careerLevel": "pm" },
+      "unlockLabel": "Gagnez un mandat complet en PM (4 trimestres franchis)",
+      "appears": "Attention limitee, PM locaux, backlogs separes."
+    },
+    "director": {
+      "icon": "🏢",
+      "label": "Director",
+      "squadsMin": 5,
+      "squadsMax": 7,
+      "unlock": { "type": "win-career-level", "careerLevel": "lead-pm" },
+      "unlockLabel": "Gagnez un mandat complet en Lead PM",
+      "appears": "Combos inter-squads, equipes subies determinantes, tribus."
+    },
+    "cpo": {
+      "icon": "🎩",
+      "label": "CPO",
+      "squadsMin": 10,
+      "squadsMax": 12,
+      "unlock": { "type": "win-career-level", "careerLevel": "director" },
+      "unlockLabel": "Gagnez un mandat complet en Director",
+      "appears": "Decisions strategiques majeures, board hostile."
+    },
+    "ceo": {
+      "icon": "👑",
+      "label": "CEO",
+      "squadsMin": 24,
+      "squadsMax": 24,
+      "unlock": { "type": "win-career-level", "careerLevel": "cpo" },
+      "unlockLabel": "Gagnez un mandat complet en CPO",
+      "appears": "On gere des Directors, pas des squads - la formule remonte d'un cran (3 x 8 domaines)."
+    }
+  }
+}

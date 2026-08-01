@@ -33,10 +33,19 @@ Les 9 fins de mandat (§12) : `id`, `icon`, `label`, `note`. `remercie` est la f
 
 Le contrat du boss trimestriel (spec scoring §11), consommé par `SprintState` et les écrans de board.
 
-- `version` — version du contrat ; `careerLevels` est une table indexée par identifiant de niveau de carrière. Seul `pm` est rempli avant le lot 5 ; `quarterQuotas` est le tableau ordonné des quotas d'Impact brut T1 a T4 (`[120, 270, 560, 1050]`).
+- `version` — version du contrat ; `careerLevels` est une table indexée par identifiant de niveau de carrière (`pm`, `lead-pm`, `director`, `cpo`, `ceo` depuis le Lot 5, mêmes ids que `careers.json` → `order`) ; `quarterQuotas` est le tableau ordonné des quotas d'Impact brut T1 a T4. Chaque niveau recalibre grossièrement sa table sur son nombre moyen de squads (`careers.json` → `squadsMin`/`squadsMax`) — un Director ne joue pas avec les chiffres d'un PM (spec §13.4). Premier jet non équilibré, comme le reste des tables de ce fichier.
 - `longMandate` — `quotaMultiplier` (multiplicateur appliqué à chaque trimestre T5+) et `requirementsAccumulate` (les exigences tirées restent actives dans ce mode).
 - `requirements[]` — pool à tirage aléatoire, avec `id` stable, `icon`, `name`, `description` joueur et `effects` plat. Les clefs supportées sont `hiringFrozen`, `payrollMultiplier`, `minimumClientImpactForTraction`, `debtFrictionScale`, `quarterLength`, `quotaMultiplier`, `forcedStrategyPool` (tableau d'IDs de `scoring.json`), `practiceCynisme` et `toolsFrozen`.
 - `qualitativeBonusBudget` — récompense en Budget si tous les objectifs qualitatifs de `companies.json` sont tenus en plus du quota. Le montant initial est volontairement conservateur : `8` par trimestre, à ajuster en playtest. `qualitativeBonus` documente sa condition, son texte et ses paramètres de mode long (`enabled`, `accumulates`).
+
+## `careers.json`
+
+La progression de carrière — le "stake" Balatro (spec §13.4, Lot 5, issue #18). Chargé dans `GameData.careers`, lu par `career_select_screen.gd`, `SprintState.reset_run()` et `mandate_end_screen.gd`.
+
+- `order[]` — l'ordre de déblocage strict, ids `pm` → `lead-pm` → `director` → `cpo` → `ceo`. Aucun contournement : `SprintState._unlock_next_career_level()` ne débloque jamais que `order[i+1]` quand `order[i]` vient d'être gagné.
+- `levels{}` — indexé par id : `icon`/`label` affichés, `squadsMin`/`squadsMax` (nombre d'équipes du niveau — `reset_run()` démarre toujours à `squadsMin`, déterministe, pas de tirage), `unlock` (`{type: "start"}` pour `pm`, `{type: "win-career-level", careerLevel: <id précédent>}` sinon — descriptif, la vérité du déblocage vit dans `PlayerProfile`), `unlockLabel` (le texte affiché sur la carte verrouillée, ex. *"Gagnez un mandat complet en PM (4 trimestres franchis)"*), `appears` (ce qui devient jouable à ce niveau, affiché sous la carte).
+- Les slots d'outillage de base (`balance.json` → `toolSlots.careerLevels`) et les quotas (`quotas.json` → `careerLevels`) restent dans leurs tables historiques, indexées par le même id — jamais dupliqués ici.
+- "Gagner" un niveau = franchir son 4e trimestre (`quarter_exit_choice_pending` devient vrai la première fois), qu'on choisisse ensuite de sortir ou de continuer en mandat long — la spec parle explicitement d'un mandat "complet" en 4 trimestres, avant la question de la sortie.
 
 ## `strategy.json`
 
@@ -183,11 +192,23 @@ squad principale. `last_score_report` est le rapport immuable appliqué puis
 rejoué par la Résolution ; `mrr` est un stock et `streak` mémorise les sprints
 livrés sans surchauffe.
 
-Depuis le Lot 3 : `career_level` (index dans `balance.json` → `toolSlots.careerLevels`,
-`"pm"` avant le lot 5), `tool_slots_purchased` et `swap_count` (bascules
-d'outil déjà faites ce mandat, spec §7.1.2), `chosen_strategy_ids[]`
-(décisions stratégiques permanentes du mandat) et `quarter_strategy_chosen`
-(une seule par trimestre, imposée ou volontaire).
+Depuis le Lot 3 : `career_level` (index dans `careers.json`, `balance.json` →
+`toolSlots.careerLevels` et `quotas.json` → `careerLevels` — `"pm"` par
+défaut, et systématiquement retombé sur `"pm"` par `reset_run()` si le
+niveau demandé n'est pas débloqué dans `PlayerProfile`), `tool_slots_purchased`
+et `swap_count` (bascules d'outil déjà faites ce mandat, spec §7.1.2),
+`chosen_strategy_ids[]` (décisions stratégiques permanentes du mandat) et
+`quarter_strategy_chosen` (une seule par trimestre, imposée ou volontaire).
+
+Depuis le Lot 5 : `pending_career_level` (étape transitoire entre
+`career_select_screen` et `scenario_screen`, même rôle que `pending_era_id`)
+et `newly_unlocked_career_level` (non vide uniquement le sprint où un niveau
+vient de tomber — lu une fois par `mandate_end_screen.gd` puis ignoré, jamais
+sérialisé). Au-delà de `pm`, `squads[]` contient une entrée par équipe du
+niveau (`careers.json` → `squadsMin`) : la première reprend le roster hérité
+de l'entreprise, les suivantes démarrent à vide (`_new_empty_squad()`) — à
+staffer par recrutement, sans qu'aucune donnée d'entreprise n'ait besoin de
+décrire un roster multi-équipe.
 
 Depuis le Lot 4 : `support_teams` (`{sales, pmm, csm}`, initialisé à
 `reset_run()` depuis `companies.json → supportTeams`, jamais réécrit par un
@@ -207,11 +228,32 @@ du Compendium déjà déclenchés une fois (`mark_combo_discovered()` /
 `is_combo_discovered()` / `get_combo_catalog()`, ce dernier reconstruit
 depuis `scoring.json → local.organizationCombos` + `traction.handBonuses` +
 `global.interSquadCombos`, jamais dupliqué), et un espace clé/valeur
-générique (`set_value()` / `get_value()`) volontairement vide de contenu à
-ce stade — c'est l'interface que le Lot 5 (progression de carrière)
-réutilisera sans qu'aucun autre lot n'ait besoin d'y retoucher la forme.
-`record_score_report()` est le seul point d'entrée qui écrit dans les
-combos : il scanne un rapport déjà produit par `ScoreResolver.resolve()` et
-n'y ajoute aucune condition supplémentaire. `clear_all()` est réservé aux
-tests headless (le fichier `user://` survit sinon d'une exécution à
-l'autre) — ne jamais l'appeler depuis le jeu.
+générique (`set_value()` / `get_value()`). `record_score_report()` est le
+seul point d'entrée qui écrit dans les combos : il scanne un rapport déjà
+produit par `ScoreResolver.resolve()` et n'y ajoute aucune condition
+supplémentaire. `clear_all()` est réservé aux tests headless (le fichier
+`user://` survit sinon d'une exécution à l'autre) — ne jamais l'appeler
+depuis le jeu.
+
+Depuis le Lot 5, l'espace générique porte aussi la progression de carrière
+(spec §13.4) : la clé `unlocked_career_levels` (tableau d'ids de
+`careers.json`, `"pm"` toujours considéré débloqué même absent du fichier —
+un profil neuf doit pouvoir lancer un run sans avoir jamais écrit sur le
+disque) via `get_unlocked_career_levels()` / `is_career_level_unlocked()` /
+`unlock_career_level()` — ce dernier idempotent et appelé uniquement par
+`SprintState._unlock_next_career_level()`, jamais par un écran.
+
+### `careers.json` → `attention` (Lot 5, palier 3)
+
+- `attention.slotsByLevel` — table indexée par id de niveau : combien d'équipes
+  le joueur pilote lui-même sur un sprint. Volontairement très inférieure au
+  nombre d'équipes du niveau (voir carnet §30.4). En l'absence d'entrée, le
+  défaut est « toutes les équipes sont pilotables », ce qui rend un fichier
+  incomplet inoffensif plutôt que bloquant.
+- `attention.autoPilotProfiles` — les trois profils de décision d'une équipe
+  non pilotée, retenus par séniorité du meilleur PM (`senior`, `junior`,
+  `none`). `sort` vaut `backlog-order` (ordre du tirage) ou `weighted` ;
+  `weights` pondère `roi`, `clientImpact` et `risk` ; `perPoint: true` divise
+  la note par `costPoints` (le PM raisonne en rendement et non en valeur
+  brute) ; `epicPointsRatio` est la part de capacité restante qu'un profil
+  investit dans un epic.

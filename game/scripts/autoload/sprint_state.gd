@@ -22,6 +22,7 @@ var era_id: String = ""
 var business_model_id: String = ""
 var company_id: String = ""
 var pending_era_id: String = ""  # étape transitoire entre scenario_screen et company_select_screen
+var pending_career_level: String = "pm"  # étape transitoire entre career_select_screen et scenario_screen
 
 var resource_values: Dictionary = {}   # resource_id -> float (0..100)
 var activated_cards: Array = []        # ids des grandes décisions activées ce mandat
@@ -46,6 +47,7 @@ var streak: int = 0                    # sprints livrés consécutifs, réservé
 # --- Phase A : l'entreprise ---
 var pieces: int = 0                    # 🪙 budget d'action de l'entreprise (jamais négatif)
 var squads: Array = []                 # [{id, name, roster, backlog_draw, capacity, delivered, epic_progress}]
+var piloted_squads: Dictionary = {}    # 🎯 {sprint, ids} — les équipes pilotées ce sprint (Lot 5 §13.3) ; les autres jouent seules
 var owned_practices: Array = []        # ids de pratiques achetées (permanentes pour le mandat)
 var fired_count: int = 0               # licenciements prononcés ce mandat (le cynisme monte à partir du 2e)
 var next_hire_discount: int = 0        # remise 🪙 sur le prochain recrutement (trait caché Réseau)
@@ -66,7 +68,8 @@ var quarter_result: Dictionary = {}
 var quarter_exit_choice_pending: bool = false
 var long_mandate: bool = false
 var quarter_forced_strategy_id: String = ""
-var career_level: String = "pm"        # index dans balance.json → toolSlots.careerLevels (une seule ligne remplie avant le lot 5)
+var career_level: String = "pm"        # index dans careers.json / balance.json → toolSlots.careerLevels / quotas.json → careerLevels
+var newly_unlocked_career_level: String = ""  # non vide juste après le sprint où un niveau vient de tomber (spec §13.4) — lu une fois par mandate_end_screen
 var tool_slots_purchased: int = 0      # +1/+2 achetés au Comité, à prix croissant (spec §7.1.1)
 var swap_count: int = 0                # bascules d'outil déjà faites ce mandat (spec §7.1.2) — chaque nouvelle coûte plus de Cynisme
 var chosen_strategy_ids: Array = []    # décisions stratégiques choisies ce mandat — permanentes, 1 par trimestre (spec §7.2)
@@ -100,10 +103,13 @@ var _quarter_requirement_bag: Array = []
 var _last_quarter_requirement_id: String = ""
 
 
-## À appeler au lancement d'un nouveau mandat, une fois le scénario et
-## l'entreprise choisis (scenario_screen puis company_select_screen). Vide =
-## tirage aléatoire parmi les options jouables (utile pour les tests headless).
-func reset_run(chosen_era_id: String = "", chosen_company_id: String = "") -> void:
+## À appeler au lancement d'un nouveau mandat, une fois le niveau de carrière,
+## le scénario et l'entreprise choisis (career_select_screen, scenario_screen
+## puis company_select_screen). era/company vides = tirage aléatoire parmi
+## les options jouables (utile pour les tests headless). `chosen_career_level`
+## vide ou non débloqué retombe silencieusement sur "pm" — le déblocage
+## strict (spec §13.4) se garantit ici, pas seulement dans l'écran de choix.
+func reset_run(chosen_era_id: String = "", chosen_company_id: String = "", chosen_career_level: String = "") -> void:
 	sprint_number = 1
 	era_id = chosen_era_id if chosen_era_id != "" else _pick_random_playable_era()
 	company_id = chosen_company_id if chosen_company_id != "" else _pick_random_company(era_id)
@@ -150,7 +156,8 @@ func reset_run(chosen_era_id: String = "", chosen_company_id: String = "") -> vo
 	quarter_exit_choice_pending = false
 	long_mandate = false
 	quarter_forced_strategy_id = ""
-	career_level = "pm"
+	career_level = chosen_career_level if PlayerProfile.is_career_level_unlocked(chosen_career_level) else "pm"
+	newly_unlocked_career_level = ""
 	tool_slots_purchased = 0
 	swap_count = 0
 	chosen_strategy_ids.clear()
@@ -206,6 +213,7 @@ func reset_run(chosen_era_id: String = "", chosen_company_id: String = "") -> vo
 			"hiddenRevealed": true,  # l'équipe héritée a déjà fait sa période d'essai
 			"hiredSprint": 0,
 		})
+	piloted_squads = {}
 	squads = [{
 		"id": "squad-principale",
 		"name": "Equipe produit",
@@ -215,6 +223,15 @@ func reset_run(chosen_era_id: String = "", chosen_company_id: String = "") -> vo
 		"delivered": [],
 		"epic_progress": {},
 	}]
+	# 👥 Lot 5 (spec §13.4) : au-dessus de PM, le kit de carrière ajoute des
+	# équipes neuves — à staffer par recrutement, l'équipe héritée de
+	# l'entreprise reste seule à démarrer garnie. squadsMin est déterministe
+	# (pas de tirage) : deux runs du même niveau démarrent avec le même nombre
+	# d'équipes, seule leur composition varie.
+	var level_conf: Dictionary = GameData.careers.get("levels", {}).get(career_level, {})
+	var extra_squad_count: int = max(0, int(level_conf.get("squadsMin", 1)) - 1)
+	for extra_index in range(extra_squad_count):
+		squads.append(_new_empty_squad(extra_index + 2))
 
 	resource_values.clear()
 	var starting: Dictionary = GameData.balance.get("startingResources", {})
@@ -224,6 +241,25 @@ func reset_run(chosen_era_id: String = "", chosen_company_id: String = "") -> vo
 		resource_values[resource_id] = float(overrides.get(resource_id, starting.get(resource_id, 50)))
 	_prepare_quarter(1)
 	get_effective_capacity()
+
+
+## Équipe neuve du kit de carrière (Lead PM et au-delà) : aucun héritage,
+## roster vide, à staffer par recrutement (spec §13.3-13.4). `display_index`
+## sert uniquement au nom affiché ("Équipe B", "Équipe C"...) — jamais le mot
+## "squad" dans une chaîne visible (CLAUDE.md, contrat d'architecture §4).
+func _new_empty_squad(display_index: int) -> Dictionary:
+	return {
+		"id": "squad-%d" % display_index,
+		"name": "Équipe %s" % char(64 + display_index),  # 2 -> "B", 3 -> "C"...
+		"roster": [],
+		"backlog_draw": {},
+		"capacity": 0,
+		"delivered": [],
+		"epic_progress": {},
+		"spent_points": 0,
+		"bag": [],
+		"completed_ids": [],
+	}
 
 
 func _pick_random_playable_era() -> String:
@@ -261,7 +297,8 @@ func get_company() -> Dictionary:
 ## premiere version du JSON, afin que les sauvegardes de developpement ne
 ## dependent pas de la migration de donnees.
 func get_current_quota() -> int:
-	var level: Dictionary = GameData.quotas.get("careerLevels", {}).get("pm", {})
+	var levels: Dictionary = GameData.quotas.get("careerLevels", {})
+	var level: Dictionary = levels.get(career_level, levels.get("pm", {}))
 	var configured: Variant = level.get("quarterQuotas", [])
 	var base_quota := 0.0
 	if configured is Array and quarter_index <= configured.size():
@@ -767,6 +804,24 @@ func get_primary_squad() -> Dictionary:
 func _get_primary_roster() -> Array:
 	return get_primary_squad().get("roster", [])
 
+
+## Roster où faire atterrir une recrue (spec §13.2). `squad_id` explicite en
+## priorité ; à N=1 il n'y a de toute façon qu'un roster possible. Au-delà,
+## sans squad précisée, l'équipe la moins fournie — jamais un tirage, pour
+## rester déterministe et lisible.
+func _target_roster(squad_id: String) -> Array:
+	if squad_id != "":
+		for squad in squads:
+			if squad.get("id", "") == squad_id:
+				return squad.get("roster", [])
+	if squads.size() <= 1:
+		return _get_primary_roster()
+	var smallest: Dictionary = squads[0]
+	for squad in squads:
+		if squad.get("roster", []).size() < smallest.get("roster", []).size():
+			smallest = squad
+	return smallest.get("roster", [])
+
 ## Cap d'effectif : figé par l'entreprise à l'origine (companies.json →
 ## teamCap), désormais un objet de jeu — 🪑 Ouvrir un poste au Comité
 ## l'augmente (spec §12) sans jamais réécrire la donnée de départ.
@@ -808,8 +863,12 @@ func employee_contribution_factor(employee: Dictionary) -> float:
 ## Poids effectif d'un rôle dans le roster (nombre d'employés pondéré par
 ## leur facteur de contribution) — sert aux pénalités d'absence et aux caps.
 func get_role_weight(role_id: String) -> float:
+	return _role_weight_in(get_roster(), role_id)
+
+
+func _role_weight_in(roster: Array, role_id: String) -> float:
 	var total := 0.0
-	for employee in get_roster():
+	for employee in roster:
 		if employee.get("role", "") == role_id:
 			total += employee_contribution_factor(employee)
 	return total
@@ -864,9 +923,16 @@ func get_payroll() -> int:
 ## Contexte de roster passé à EffectResolver.resolve_backlog() — poids des
 ## rôles qui modulent les effets de la Roadmap (PM, Designer).
 func get_roster_context() -> Dictionary:
+	return get_roster_context_for(get_roster())
+
+
+## Même contexte, mais scopé à un roster précis (spec §13.2) : le backlog
+## d'une équipe additionnelle n'est modulé que par sa propre composition,
+## pas par celle du reste de l'organisation.
+func get_roster_context_for(roster: Array) -> Dictionary:
 	return {
-		"pm_weight": get_role_weight("pm"),
-		"designer_weight": get_role_weight("designer"),
+		"pm_weight": _role_weight_in(roster, "pm"),
+		"designer_weight": _role_weight_in(roster, "designer"),
 	}
 
 
@@ -1231,6 +1297,328 @@ func _backlog_offer_contains(item_id: String) -> bool:
 		if item.get("id", "") == item_id:
 			return true
 	return false
+
+
+# --- Backlog des équipes additionnelles (Lot 5, palier 2, spec §13.2) ---
+# L'équipe historique garde intact le chemin ci-dessus (current_backlog_draw,
+# epic_progress, completed_backlog_ids, _backlog_bag) : zéro risque de
+# régression sur un run PM, qui ne passe jamais par ces fonctions (le seul
+# appelant, roadmap_screen, redirige l'équipe principale vers get_backlog_offer()
+# / commit_backlog_plan() ci-dessus). Les équipes ajoutées par la carrière
+# portent leur propre sac (squad["bag"]), leur propre progression d'epics
+# (squad["epic_progress"]) et leur propre liste de tickets déjà livrés
+# (squad["completed_ids"]) — jamais de transfert de points entre équipes.
+
+func _find_squad(squad_id: String) -> Dictionary:
+	for squad in squads:
+		if squad.get("id", "") == squad_id:
+			return squad
+	return {}
+
+
+## Capacité de roadmap d'une équipe précise — s'assure d'abord que
+## get_effective_capacity() a tourné (elle écrit squad["capacity"] pour
+## toutes les équipes au passage), puis relit la valeur de celle-ci.
+func get_squad_capacity(squad_id: String) -> int:
+	get_effective_capacity()
+	return int(_find_squad(squad_id).get("capacity", 0))
+
+
+func get_backlog_offer_for_squad(squad_id: String) -> Dictionary:
+	if squad_id == get_primary_squad().get("id", ""):
+		return get_backlog_offer()
+	var squad := _find_squad(squad_id)
+	if squad.is_empty():
+		return {"sprint": sprint_number, "items": []}
+	var draw: Dictionary = squad.get("backlog_draw", {})
+	if int(draw.get("sprint", -1)) == sprint_number:
+		return draw
+	draw = _draw_squad_backlog_offer(squad)
+	squad["backlog_draw"] = draw
+	return draw
+
+
+func _draw_squad_backlog_offer(squad: Dictionary) -> Dictionary:
+	var conf: Dictionary = GameData.balance.get("backlogDraw", {})
+	var minimum := int(conf.get("itemsPerSprintMin", 0))
+	var maximum: int = max(minimum, int(conf.get("itemsPerSprintMax", minimum))) + product_tier
+	var items: Array = _active_squad_epic_items(squad)
+	var target_total: int = randi_range(minimum, maximum)
+	var regular_count: int = max(0, target_total - items.size())
+	var bag: Array = squad.get("bag", [])
+	var completed_ids: Array = squad.get("completed_ids", [])
+	while regular_count > 0 and items.size() < maximum:
+		var item := _draw_squad_backlog_item(items, bag, completed_ids)
+		if item.is_empty():
+			break
+		items.append(item)
+		regular_count -= 1
+	squad["bag"] = bag
+	return {"sprint": sprint_number, "items": items}
+
+
+func _active_squad_epic_items(squad: Dictionary) -> Array:
+	var result: Array = []
+	var epic_progress_table: Dictionary = squad.get("epic_progress", {})
+	for item_id in epic_progress_table.keys():
+		var item := find_backlog_item(item_id)
+		if not item.is_empty() and _squad_epic_remaining(squad, item_id) > 0:
+			result.append(item)
+	return result
+
+
+func _squad_epic_remaining(squad: Dictionary, item_id: String) -> int:
+	var item := find_backlog_item(item_id)
+	var epic_progress_table: Dictionary = squad.get("epic_progress", {})
+	var invested := int(epic_progress_table.get(item_id, {}).get("invested", 0))
+	return max(0, int(item.get("costPoints", 0)) - invested)
+
+
+func _draw_squad_backlog_item(already_drawn: Array, bag: Array, completed_ids: Array) -> Dictionary:
+	var excluded: Dictionary = {}
+	for item in already_drawn:
+		excluded[item.get("id", "")] = true
+	var attempts := 0
+	var max_attempts: int = max(1, GameData.backlog.get("features", []).size() + GameData.backlog.get("epics", []).size()) * 2
+	while attempts < max_attempts:
+		if bag.is_empty():
+			_refill_squad_backlog_bag(bag, completed_ids)
+		if bag.is_empty():
+			return {}
+		var item_id: String = bag.pop_back()
+		var item := find_backlog_item(item_id)
+		attempts += 1
+		if item.is_empty() or excluded.has(item_id) or completed_ids.has(item_id):
+			continue
+		return item
+	return {}
+
+
+func _refill_squad_backlog_bag(bag: Array, completed_ids: Array) -> void:
+	for feature in GameData.backlog.get("features", []):
+		if _available_for_era(feature) and not completed_ids.has(feature.get("id", "")):
+			bag.append(feature.get("id", ""))
+	for epic in GameData.backlog.get("epics", []):
+		if _available_for_era(epic) and not completed_ids.has(epic.get("id", "")):
+			bag.append(epic.get("id", ""))
+	bag.shuffle()
+
+
+## Symétrique de commit_backlog_plan() pour une équipe additionnelle — même
+## algorithme (consommer les points, faire avancer les epics, ne révéler les
+## attributs réels qu'à la livraison), mais lu et écrit uniquement sur l'état
+## propre à cette équipe. Les effets de bord globaux (deltas de ressources,
+## ROI récurrent) restent appliqués tels quels : la spec ne les scope pas par
+## équipe, seuls le backlog et la capacité le sont (§13.2).
+func commit_backlog_plan_for_squad(squad_id: String, plan: Array) -> Dictionary:
+	if squad_id == get_primary_squad().get("id", ""):
+		return commit_backlog_plan(plan)
+	var squad := _find_squad(squad_id)
+	if squad.is_empty():
+		return {}
+	var offer := get_backlog_offer_for_squad(squad_id)
+	var available: Dictionary = {}
+	for item in offer.get("items", []):
+		available[item.get("id", "")] = item
+
+	var epic_progress_table: Dictionary = squad.get("epic_progress", {})
+	var completed_ids: Array = squad.get("completed_ids", [])
+	var spent := 0
+	var delivered: Array = []
+	var epic_updates: Array = []
+	var seen: Dictionary = {}
+	for entry in plan:
+		var item_id: String = entry.get("id", "")
+		if seen.has(item_id) or completed_ids.has(item_id) or not available.has(item_id):
+			continue
+		seen[item_id] = true
+		var item: Dictionary = available[item_id]
+		if is_backlog_epic(item):
+			var invested: int = min(max(0, int(entry.get("points", 0))), _squad_epic_remaining(squad, item_id))
+			if invested <= 0:
+				continue
+			var progress: Dictionary = epic_progress_table.get(item_id, {"invested": 0, "startedSprint": sprint_number})
+			progress["invested"] = int(progress.get("invested", 0)) + invested
+			epic_progress_table[item_id] = progress
+			spent += invested
+			if int(progress["invested"]) >= int(item.get("costPoints", 0)):
+				epic_progress_table.erase(item_id)
+				completed_ids.append(item_id)
+				delivered.append(item)
+				epic_updates.append({"item": item, "invested": invested, "completed": true})
+			else:
+				epic_updates.append({"item": item, "invested": invested, "completed": false})
+		else:
+			var cost := int(item.get("costPoints", 0))
+			if cost <= 0:
+				continue
+			spent += cost
+			delivered.append(item)
+			completed_ids.append(item_id)
+
+	squad["epic_progress"] = epic_progress_table
+	squad["completed_ids"] = completed_ids
+	var capacity := get_squad_capacity(squad_id)
+	var deltas := EffectResolver.resolve_backlog(delivered, spent, capacity, get_roster_context_for(squad.get("roster", [])), has_practice("okr"))
+	var roi_gain := 0
+	for item in delivered:
+		roi_gain += int(item.get("roi", 0))
+	recurring_roi += roi_gain
+	if not deltas.is_empty():
+		add_pending(deltas)
+
+	var report := {
+		"sprint": sprint_number,
+		"plannedPoints": spent,
+		"capacity": capacity,
+		"delivered": delivered,
+		"epicUpdates": epic_updates,
+		"roiGain": roi_gain,
+		"deltas": deltas,
+	}
+	squad["delivered"] = delivered
+	squad["spent_points"] = spent
+	squad["last_report"] = report
+	pending_journal_lines.append("Roadmap (%s) : %d pts / %d capacité%s" % [
+		squad.get("name", "Équipe"), spent, capacity, " · %d livraison(s)" % delivered.size() if not delivered.is_empty() else ""
+	])
+	return report
+
+
+# --- 🎯 L'attention : on ne pilote pas tout (Lot 5 palier 3, spec §13.3) ---
+
+## Nombre d'équipes que le joueur pilote lui-même sur un sprint. Table indexée
+## par niveau de carrière (`careers.json → attention.slotsByLevel`), jamais un
+## `if career_level == ...`. Le défaut retombe sur « tout est pilotable », ce
+## qui rend l'absence de la table inoffensive plutôt que bloquante.
+func get_attention_slots() -> int:
+	var slots: Dictionary = GameData.careers.get("attention", {}).get("slotsByLevel", {})
+	return int(slots.get(career_level, squads.size()))
+
+
+## Les équipes pilotées ce sprint. Le choix vit dans `piloted_squads`, validé
+## par numéro de sprint comme `backlog_draw` — pas d'état à réinitialiser à la
+## main quand le sprint avance. Par défaut, les premières équipes de la liste.
+func get_piloted_squad_ids() -> Array:
+	var slots := get_attention_slots()
+	if slots >= squads.size():
+		var everything: Array = []
+		for squad in squads:
+			everything.append(squad.get("id", ""))
+		return everything
+	if int(piloted_squads.get("sprint", -1)) == sprint_number:
+		return piloted_squads.get("ids", [])
+	var defaults: Array = []
+	for squad in squads:
+		if defaults.size() >= slots:
+			break
+		defaults.append(squad.get("id", ""))
+	piloted_squads = {"sprint": sprint_number, "ids": defaults}
+	return defaults
+
+
+## Retourne "" si le choix est accepté, sinon un code de refus rejoué tel quel
+## par l'UI — même contrat que `buy_strategy()` et le reste du Comité.
+func set_piloted_squads(ids: Array) -> String:
+	var slots := get_attention_slots()
+	if ids.size() > slots:
+		return "slots"
+	for squad_id in ids:
+		if _find_squad(squad_id).is_empty():
+			return "inconnue"
+	piloted_squads = {"sprint": sprint_number, "ids": ids.duplicate()}
+	return ""
+
+
+func is_squad_piloted(squad_id: String) -> bool:
+	return get_piloted_squad_ids().has(squad_id)
+
+
+## Le profil d'auto-pilotage d'une équipe = son meilleur PM. Un PM senior
+## raisonne en rendement, un junior en valeur brute, personne ne réfléchit du
+## tout sans PM — c'est la traduction mécanique de « pondérée par la
+## composition » (issue #18).
+func auto_pilot_profile_id(squad: Dictionary) -> String:
+	var best := "none"
+	for member in squad.get("roster", []):
+		if member.get("role", "") != "pm":
+			continue
+		if member.get("seniority", "junior") == "senior":
+			return "senior"
+		best = "junior"
+	return best
+
+
+## Le plan qu'une équipe non pilotée se donne toute seule. **Affiché et
+## appliqué par cette seule fonction** (CLAUDE.md : un seul calcul, deux
+## usages) — l'écran prévisualise exactement ce qui sera joué.
+func build_auto_plan_for_squad(squad_id: String) -> Array:
+	var squad := _find_squad(squad_id)
+	if squad.is_empty():
+		return []
+	var profile_id := auto_pilot_profile_id(squad)
+	var profiles: Dictionary = GameData.careers.get("attention", {}).get("autoPilotProfiles", {})
+	var profile: Dictionary = profiles.get(profile_id, {})
+	var offer := get_backlog_offer_for_squad(squad_id)
+	var items: Array = (offer.get("items", []) as Array).duplicate()
+
+	if profile.get("sort", "backlog-order") == "weighted":
+		var weights: Dictionary = profile.get("weights", {})
+		var per_point: bool = bool(profile.get("perPoint", false))
+		var scored: Array = []
+		for item in items:
+			var score := float(item.get("roi", 0)) * float(weights.get("roi", 0.0))
+			score += float(item.get("clientImpact", 0)) * float(weights.get("clientImpact", 0.0))
+			score -= float(item.get("risk", 0)) * float(weights.get("risk", 0.0))
+			if per_point:
+				score /= max(1.0, float(item.get("costPoints", 1)))
+			scored.append({"item": item, "score": score})
+		scored.sort_custom(func(a, b): return a["score"] > b["score"])
+		items = []
+		for entry in scored:
+			items.append(entry["item"])
+
+	var remaining := get_squad_capacity(squad_id)
+	var epic_ratio: float = float(profile.get("epicPointsRatio", 0.5))
+	var plan: Array = []
+	for item in items:
+		if remaining <= 0:
+			break
+		var item_id: String = item.get("id", "")
+		if is_backlog_epic(item):
+			var invested: int = min(int(round(remaining * epic_ratio)), _squad_epic_remaining(squad, item_id))
+			if invested <= 0:
+				continue
+			plan.append({"id": item_id, "points": invested})
+			remaining -= invested
+		else:
+			var cost := int(item.get("costPoints", 0))
+			if cost <= 0 or cost > remaining:
+				continue
+			# Même format que `roadmap_screen._current_plan()` — `points` est
+			# toujours renseigné, ce qui rend `backlog_plan_points()` utilisable
+			# tel quel pour prévisualiser le panier d'une équipe auto-pilotée.
+			plan.append({"id": item_id, "points": cost})
+			remaining -= cost
+	return plan
+
+
+## Joue le sprint des équipes que le joueur n'a pas pilotées. À N=1 la boucle
+## ne trouve jamais rien (1 équipe, 1 slot) : le déroulé d'un run PM est
+## strictement celui d'avant le multi-équipe.
+func resolve_unpiloted_squads() -> Array:
+	var piloted := get_piloted_squad_ids()
+	var reports: Array = []
+	for squad in squads:
+		var squad_id: String = squad.get("id", "")
+		if piloted.has(squad_id):
+			continue
+		var report := commit_backlog_plan_for_squad(squad_id, build_auto_plan_for_squad(squad_id))
+		if not report.is_empty():
+			report["autoPiloted"] = true
+			report["autoPilotProfile"] = auto_pilot_profile_id(squad)
+			reports.append(report)
+	return reports
 
 
 # --- Les Investissements : tirage du sprint (spec profondeur §5) ---
@@ -1801,9 +2189,14 @@ func _roll_hidden_trait() -> String:
 	return pool[randi() % pool.size()]
 
 
-## Embauche un candidat de l'offre du sprint. Retourne "" si l'embauche a eu
-## lieu, sinon la raison du refus ("pieces" ou "cap").
-func hire_candidate(candidate: Dictionary) -> String:
+## Embauche un candidat de l'offre du sprint, dans `target_squad_id` s'il est
+## fourni et existe, sinon dans l'équipe principale (comportement historique,
+## inchangé à N=1). Au-delà de PM et sans équipe précisée (aucun sélecteur
+## dédié pour l'instant, spec §13.2 — voir carnet §30), la recrue rejoint
+## l'équipe la moins fournie : un équilibrage simple plutôt qu'un empilement
+## systématique sur l'équipe historique. Retourne "" si l'embauche a eu lieu,
+## sinon la raison du refus ("pieces" ou "cap").
+func hire_candidate(candidate: Dictionary, target_squad_id: String = "") -> String:
 	if is_quarter_requirement_active("hiringFrozen"):
 		return "quarter-requirement"
 	if get_roster().size() >= get_team_cap():
@@ -1818,7 +2211,7 @@ func hire_candidate(candidate: Dictionary) -> String:
 		discount_note = " (réseau : −%d 🪙)" % next_hire_discount
 		next_hire_discount = 0
 
-	_get_primary_roster().append({
+	_target_roster(target_squad_id).append({
 		"id": candidate.get("id", ""),
 		"name": candidate.get("name", ""),
 		"role": candidate.get("role", ""),
@@ -2253,9 +2646,28 @@ func _record_quarter_resolution() -> String:
 		return ending_id
 	if quarter_index == 4 and not long_mandate:
 		quarter_exit_choice_pending = true
+		_unlock_next_career_level()
 		return ""
 	_prepare_quarter(quarter_index + 1)
 	return ""
+
+
+## Déblocage strict (spec §13.4) : "gagner un niveau" = franchir son 4e
+## trimestre, quel que soit le choix fait ensuite (rester en mandat long ou
+## sortir) — la spec parle explicitement d'un mandat "complet" en 4
+## trimestres, avant même la question de la sortie. Idempotent par
+## construction (PlayerProfile.unlock_career_level l'est) : rejouer plusieurs
+## mandats au même niveau ne redéclenche rien après le premier.
+func _unlock_next_career_level() -> void:
+	var order: Array = GameData.careers.get("order", [])
+	var current_index := order.find(career_level)
+	if current_index == -1 or current_index + 1 >= order.size():
+		return
+	var next_level: String = order[current_index + 1]
+	if PlayerProfile.is_career_level_unlocked(next_level):
+		return
+	PlayerProfile.unlock_career_level(next_level)
+	newly_unlocked_career_level = next_level
 
 
 ## Flux d'Énergie de la Résolution (§7.1) : régénération modulée par le

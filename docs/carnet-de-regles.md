@@ -1198,3 +1198,144 @@ dépend) règle la même classe de bug que le premier flaky, avec la même
 cause profonde — le hasard d'une injonction de board tirée à T1, que tout
 test touchant au premier trimestre doit désormais neutraliser
 explicitement plutôt que d'espérer qu'il ne tombe pas dessus.
+
+## 30. L'échelle — multi-squad, attention, progression de carrière (Lot 5)
+
+Ce lot ferme le chantier scoring (#12) : le socle multi-squad était déjà
+câblé depuis le Lot 1 (`ScoreResolver` itère sur `squads[]`, distingue
+`local`/`global`, calcule déjà les deux combos inter-squads) — il restait à
+lui donner du contenu et une carrière pour y accéder. Le lot se découpe en
+paliers, livrés et poussés séparément ; ce qui suit documente le palier 1
+(la carrière visible), complété au fil des paliers suivants dans cette même
+section.
+
+**Palier 1 — la carrière visible.** `data/careers.json` est la nouvelle
+table qui décrit ce qui est propre à la carrière (ordre de déblocage,
+nombre d'équipes par niveau, texte affiché) — les slots d'outillage
+(`balance.json → toolSlots.careerLevels`) et les quotas (`quotas.json →
+careerLevels`) restent dans leurs tables historiques, simplement complétées
+des 4 lignes manquantes (`lead-pm`, `director`, `cpo`, `ceo`), sans aucune
+duplication de valeur entre les trois fichiers. Le déblocage est strict et
+vit dans `SprintState._unlock_next_career_level()` : "gagner" un niveau,
+c'est franchir son 4e trimestre (`quarter_exit_choice_pending` devient vrai
+pour la première fois à ce niveau) — la spec dit explicitement un mandat
+"complet" en 4 trimestres, avant même la question de sortir ou de
+continuer en mandat long. Le déblocage est donc acquis dès l'atteinte de T4,
+qu'on choisisse ensuite de partir ou de rester.
+
+**Pourquoi la persistance ne recalcule jamais la règle de déblocage.**
+`PlayerProfile.unlock_career_level()` ne fait qu'enregistrer un fait acquis
+(le niveau a été gagné) ; c'est `SprintState`, seul à connaître l'état du
+mandat en cours, qui décide *quand* l'appeler. Aucun écran ne recalcule la
+condition de déblocage : `career_select_screen` et `mandate_end_screen` se
+contentent de lire `PlayerProfile.is_career_level_unlocked()` — même
+principe que le Compendium du Lot 4 (`record_score_report()` scanne un
+rapport déjà tranché, il ne rejoue aucune condition).
+
+**Le menu de démarrage réutilise le pattern `playableEras`, au pixel près.**
+`career_select_screen.gd` est une copie quasi littérale de
+`scenario_screen.gd` : mêmes cartes, même `modulate` atténué sur les niveaux
+non débloqués, même bouton désactivé portant le texte de la condition
+manquante (`unlockLabel`). Le flux de lancement gagne une étape :
+accueil → **niveau de carrière** → scénario → entreprise, chaque écran
+gardant son bouton retour vers le précédent (`career_select_screen` est
+maintenant la destination du retour de `scenario_screen`, plus l'accueil).
+
+**`reset_run()` retombe sur "pm" si le niveau demandé n'est pas débloqué.**
+Le garde-fou n'est pas seulement dans l'écran de sélection (qui désactive
+déjà le bouton) : `reset_run(era, company, chosen_career_level)` revérifie
+lui-même `PlayerProfile.is_career_level_unlocked()` avant d'adopter le
+niveau demandé. Un appel sans 3e argument (tous les tests existants, et tout
+code qui ne connaît pas encore la carrière) retombe donc silencieusement sur
+"pm" avec une seule équipe — c'est ce qui garantit qu'un run de niveau PM
+reste strictement identique à avant ce lot, sans qu'aucun test n'ait eu
+besoin d'être réécrit pour ça.
+
+**Les équipes du kit de carrière démarrent vides, pas héritées.**
+Au-delà de PM, `squads[]` gagne `careers.json → squadsMin - 1` entrées via
+`_new_empty_squad()` : aucun roster, à staffer par recrutement. Alternative
+envisagée et écartée : générer un roster de départ par équipe supplémentaire
+aurait demandé d'étendre `companies.json` pour un contenu multi-squad par
+entreprise, alors qu'aucune entreprise n'est encore jouable au-delà de PM
+niveau récit (une seule époque jouable). Le choix retenu ne coûte aucune
+donnée supplémentaire et raconte la même histoire que la promotion réelle :
+on hérite d'une équipe déjà montée, on construit les autres soi-même. Nom
+affiché : "Équipe B", "Équipe C"... jamais le mot "squad", y compris dans ce
+contexte à N>1 — la règle de masquage ne vaut qu'à N=1, mais autant rester
+cohérent partout où un humain lit l'écran.
+
+**Le recrutement au-delà de PM équilibre plutôt que de choisir, pour
+l'instant.** `hire_candidate()` gagne un paramètre optionnel
+`target_squad_id` (défaut "", donc l'équipe principale — comportement
+historique inchangé). Sans sélecteur dédié dans `investments_screen` (coupé
+faute de temps à ce palier, voir PR), une recrue sans équipe précisée
+rejoint l'équipe la moins fournie. C'est un choix de design assumé, pas un
+oubli : préférer un équilibrage simple et déterministe à un empilement
+systématique sur l'équipe héritée, en attendant l'écran de sélection.
+
+**Fin de mandat : annoncer, ou rappeler ce qui manque.**
+`mandate_end_screen._load_career_progress()` lit
+`SprintState.newly_unlocked_career_level` (non vide seulement le sprint où
+le déblocage vient de tomber) pour l'annonce festive, et sinon calcule le
+prochain niveau non débloqué dans `careers.json → order` pour rappeler sa
+condition en clair — sans jamais recalculer si elle est remplie, seule
+`PlayerProfile` sait répondre à ça.
+
+### 30.4 L'attention : on ne pilote pas tout (palier 3)
+
+Le multi-équipe ne devient un sujet de jeu que le jour où l'on ne peut plus
+tout regarder. C'est le rôle de `careers.json → attention`.
+
+`slotsByLevel` dit combien d'équipes le joueur pilote lui-même sur un sprint,
+et cette table monte **beaucoup** moins vite que le nombre d'équipes : 1 sur 1
+en PM, puis 1 sur 2, 2 sur 5, 3 sur 10, 4 sur 24. Le choix est délibéré et il
+est le propos du chantier : la capacité d'attention d'un humain ne grandit pas
+avec son titre, seule l'organisation grandit. Le passage PM → Lead PM fait donc
+mal d'un seul coup — on délègue la moitié de son périmètre du jour au
+lendemain, sans transition. C'est voulu, et c'est aussi ce qui rend le niveau
+suivant désirable plutôt que confortable.
+
+À N=1 la table donne 1 slot pour 1 équipe : `resolve_unpiloted_squads()` ne
+trouve jamais rien à faire et le déroulé d'un run PM est **exactement** celui
+d'avant le multi-équipe. Ce n'est pas une précaution de test, c'est la
+propriété qui autorisait à livrer tout ce lot sans toucher au jeu existant, et
+elle est assertée comme telle.
+
+Une équipe non pilotée joue quand même son sprint : elle se donne un plan
+toute seule, dont la qualité est **celle de son meilleur PM**. Trois profils
+dans `autoPilotProfiles`, choisis par `auto_pilot_profile_id()` :
+sans PM on prend les tickets dans l'ordre du tirage, sans réfléchir ; un PM
+junior trie par valeur brute (`roi + clientImpact`) en ignorant le risque ; un
+PM senior trie par **rendement** (`perPoint`, donc divisé par le coût) et pèse
+le risque. C'est la traduction mécanique de « pondérée par la composition » :
+une équipe sans PM n'est pas punie par un malus arbitraire, elle est punie
+parce qu'elle choisit mal, ce qui se lit dans ce qu'elle livre.
+
+`build_auto_plan_for_squad()` est un **seul calcul pour deux usages** : c'est
+la fonction qui prévisualise ce qu'une équipe va faire et c'est exactement
+celle qui est rejouée pour l'appliquer. Un écran ne peut donc pas afficher
+autre chose que ce qui sera joué — le banc logique assert la stabilité entre
+deux lectures. Le plan sort au format canonique de
+`roadmap_screen._current_plan()` (`{id, points}` toujours renseigné), pour que
+`backlog_plan_points()` serve aussi bien au panier du joueur qu'à celui d'une
+équipe déléguée.
+
+Un plan vide reste une réponse légitime : une équipe de deux personnes ne se
+lance pas dans une feature qui coûte plus que sa capacité du sprint. Le banc
+teste donc la bonne propriété — un plan vide n'est un défaut *que* s'il restait
+une feature abordable sur la table. La première version de cette assertion
+exigeait naïvement un plan non vide et tombait une fois sur dix selon le
+tirage ; c'est le troisième test de la série à se faire piéger par l'aléatoire
+du backlog, après les deux du Lot 4 (§29). La règle qui se dégage, pour les
+prochains : **ne jamais asserter sur le résultat d'un tirage, toujours sur la
+relation entre le tirage et la décision qui en découle.**
+
+### 30.5 Ce que le palier 3 ne fait pas encore
+
+`roadmap_screen` ne sait piloter qu'une équipe : il déclare donc explicitement
+ne piloter que l'équipe principale (`set_piloted_squads([...])`) avant de
+résoudre les autres en auto-pilotage. Sans cette déclaration, une équipe
+« pilotée » selon la table d'attention mais absente de l'écran perdrait
+purement et simplement son sprint. Le jour où le sélecteur d'équipe arrive,
+seule cette ligne change — le moteur, lui, est complet et sait déjà refuser un
+choix qui dépasse les slots disponibles.
