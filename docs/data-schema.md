@@ -62,7 +62,7 @@ Le backlog de la Roadmap profonde (§6 de la [spec profondeur de gameplay](spec-
 
 ## `inbox-events.json`
 
-Les événements aléatoires de la phase Inbox (§3, phase 1 ; §15 pour la pioche) : `events[].id/from/sprint/status/subject/text`, `eras[]` optionnel (réserve l'événement aux scénarios listés ; absent = disponible partout), et `choices[]` (`id`, `label`, `reveal` — le texte montré après le choix, `effects` — deltas structurés sur les 6 ressources, consommés par `game/` ; `reveal` et `effects` doivent rester cohérents mais ne sont pas générés l'un depuis l'autre). `effects` accepte aussi les pseudo-ressources `pieces` (🪙, budget d'action — Phase A) et `energie` (⚡, jauge personnelle du joueur — Phase B : les crises vous suivent à la maison) ; les deux sont réglées à la Résolution, hors des bornes 0-100 des 6 jauges. `sprint` est un vestige de la démo landing (premier événement affiché) — `game/` tire désormais par pioche "sac", indépendante de ce champ.
+Les événements aléatoires de la phase Inbox (§3, phase 1 ; §15 pour la pioche) : `events[].id/from/sprint/status/subject/text`, `eras[]` optionnel (réserve l'événement aux scénarios listés ; absent = disponible partout), et `choices[]` (`id`, `label`, `reveal` — le texte montré après le choix, `effects` — deltas structurés sur les 6 ressources, consommés par `game/` ; `reveal` et `effects` doivent rester cohérents mais ne sont pas générés l'un depuis l'autre). `effects` accepte aussi les pseudo-ressources `pieces` (🪙, budget d'action — Phase A) et `energie` (⚡, jauge personnelle du joueur — Phase B : les crises vous suivent à la maison) ; les deux sont réglées à la Résolution, hors des bornes 0-100 des 6 jauges. `sprint` est un vestige de la démo landing (premier événement affiché) — `game/` tire désormais par pioche "sac", indépendante de ce champ. `supportTeam` + `levelRange` (Lot 4, spec §9.4) réservent un événement à une équipe subie (`sales`/`pmm`/`csm`) dont le niveau (`companies.json → supportTeams`) tombe dans l'intervalle `[min, max]` — filtré par `SprintState._eligible_inbox_events()` comme une troisième couche après `eras[]` ; absent = éligible à tout niveau.
 
 ## `recruitment-archetypes.json`
 
@@ -141,11 +141,32 @@ plus ici : il est déclaré directement sur la carte dans `cards.json` (voir
 plus haut) — `ScoreResolver.resolve()` reçoit désormais une table `cards` en
 plus de `scoring` et `hidden_traits`.
 
+Depuis le Lot 4 : `global.productTier.leverPerTier` vaut `0.5` (corrigé de
+`0.1`, hérité du Lot 1, pour matcher le "+0,5 Levier permanent" du Comité,
+spec §12) ; `conversion.saas-mrr.salesMultipliers/pmmMultipliers/csmMultipliers`
+(déjà là depuis le Lot 3) sont désormais réellement alimentés par
+`companies.json → supportTeams`, transmis par le snapshot ; et
+`global.strategies.*.supportTeamDeltas` (optionnel, `{sales, pmm, csm}` en
+delta signé) déclare l'effet de bord d'une décision stratégique sur les
+équipes subies (spec §9.4, dernier tiers) — appliqué par
+`SprintState._apply_strategy_support_team_deltas()`, jamais un cas
+particulier dans `ScoreResolver`.
+
 ## `companies.json`
 
 Les "offres d'emploi" (§16, enrichies en §17) — le cadre RP d'une run, choisi sur `company_select_screen` après le scénario :
 
-- `companies[]` — `id`, `era` (scénario auquel l'entreprise est rattachée), `icon`, `name`, `tagline` (accroche façon offre d'emploi), `description` (contexte de la boîte), `teamProfile` (`junior`/`senior` — fixe `SprintState.team_profile` pour tout le mandat, ce n'est plus un réglage modifiable en jeu), `teamCap` (cap d'effectif), `startingPieces` (budget d'action initial), `inheritedTools[]` optionnel (ids de `cards.json` — outillage déjà installé par quelqu'un d'autre, activé dès `reset_run` et occupant un slot dès le premier sprint, spec §7.1.3), `startingRoster[]` (`id`, `name`, `role`, `seniority`, `trait` — l'équipe héritée, salaires dérivés de `balance.json` → `salaries`, pas de trait caché : sa période d'essai est derrière elle), `boardObjectives` (`title` + `conditions[]` — `type`: `resource-max`/`resource-min`/`decisions-min`/`revenue-min`, `value`, `resource` éventuel, `label` affiché au joueur dès le choix du poste).
+- `companies[]` — `id`, `era` (scénario auquel l'entreprise est rattachée), `icon`, `name`, `tagline` (accroche façon offre d'emploi), `description` (contexte de la boîte), `teamProfile` (`junior`/`senior` — fixe `SprintState.team_profile` pour tout le mandat, ce n'est plus un réglage modifiable en jeu), `teamCap` (cap d'effectif de départ — augmenté en jeu par 🪑 Ouvrir un poste au Comité, jamais réécrit ici), `startingPieces` (budget d'action initial), `supportTeams` (Lot 4, spec §9.4 — `{sales, pmm, csm}`, niveau 0-5 des trois équipes subies ; absent = neutre 3/3/3, lu par `SprintState.support_teams` puis transmis au score, jamais pilotable en jeu), `inheritedTools[]` optionnel (ids de `cards.json` — outillage déjà installé par quelqu'un d'autre, activé dès `reset_run` et occupant un slot dès le premier sprint, spec §7.1.3), `startingRoster[]` (`id`, `name`, `role`, `seniority`, `trait` — l'équipe héritée, salaires dérivés de `balance.json` → `salaries`, pas de trait caché : sa période d'essai est derrière elle), `boardObjectives` (`title` + `conditions[]` — `type`: `resource-max`/`resource-min`/`decisions-min`/`revenue-min`, `value`, `resource` éventuel, `label` affiché au joueur dès le choix du poste).
+
+## `investments.json`
+
+Le catalogue du Comité d'investissement (spec scoring §12, Lot 4) — entre
+deux trimestres, jamais au fil de l'eau ; l'étal du sprint (`balance.json →
+shopDraw`, `cards.json`, `practices.json`) ne change pas et n'est pas
+dupliqué ici.
+
+- `items[]` — `id`, `icon`, `name`, `tagline` (accroche courte), `description` (texte joueur), `kind` (dispatche vers la fonction `SprintState` qui applique l'effet : `strategy`, `tool-slot`, `tool-slot-release`, `team-cap`, `promotion`, `product-tier`, `seminar`, `cleanup-sprint`, `acquisition`, `headhunter`, `turnaround-plan`, `quarter-advance`). Les postes à échelle de prix (`open-seat`, `product-tier`) portent `costs[]`, consommé dans l'ordre (index = achats déjà faits ce mandat) — épuisé, le poste refuse `"plafond"`. Les postes à prix plat (`promotion`, `team-seminar`, `cleanup-sprint`, `acquire-competitor`, `headhunter`, `turnaround-plan`) portent `cost`. `strategic-decision` porte `costRange` (le prix est tiré une fois par trimestre, mémorisé par `SprintState.strategy_purchase_cost()`). `quarter-advance` porte `budgetGain`/`impactPenalty` (pas de prix : c'est un pari, pas un achat). Les magnitudes d'effet (`cynismeDelta`, `detteDelta`, `mrrDelta`, `capIncrement`, `nextShopCandidates`) vivent à côté du prix — jamais dans le script.
+- Consommé uniquement par `game/` (`committee_screen.gd`) — `landing/` n'a pas de Comité.
 
 ## Ce qui reste hors JSON
 
@@ -167,3 +188,30 @@ Depuis le Lot 3 : `career_level` (index dans `balance.json` → `toolSlots.caree
 d'outil déjà faites ce mandat, spec §7.1.2), `chosen_strategy_ids[]`
 (décisions stratégiques permanentes du mandat) et `quarter_strategy_chosen`
 (une seule par trimestre, imposée ou volontaire).
+
+Depuis le Lot 4 : `support_teams` (`{sales, pmm, csm}`, initialisé à
+`reset_run()` depuis `companies.json → supportTeams`, jamais réécrit par un
+achat), `team_cap_purchased` et `product_tier` (échelles de prix du Comité,
+spec §12), `cleanup_sprint_pending` (neutralise la Traction à la prochaine
+Résolution), `headhunter_pending`/`headhunter_target_candidates` (consommés
+au prochain `get_shop_offer()`), `turnaround_plans_available` (consommé
+automatiquement par `_record_quarter_resolution()`), `current_committee_offer`
+(cache le prix de la décision stratégique du trimestre, même principe que
+le prix du re-tirage de l'étal).
+
+## Persistance hors run : `PlayerProfile`
+
+Premier et seul autoload à survivre à `reset_run()` (Lot 4, spec §12.1) —
+un `ConfigFile` en `user://player_profile.cfg`, deux sections : les combos
+du Compendium déjà déclenchés une fois (`mark_combo_discovered()` /
+`is_combo_discovered()` / `get_combo_catalog()`, ce dernier reconstruit
+depuis `scoring.json → local.organizationCombos` + `traction.handBonuses` +
+`global.interSquadCombos`, jamais dupliqué), et un espace clé/valeur
+générique (`set_value()` / `get_value()`) volontairement vide de contenu à
+ce stade — c'est l'interface que le Lot 5 (progression de carrière)
+réutilisera sans qu'aucun autre lot n'ait besoin d'y retoucher la forme.
+`record_score_report()` est le seul point d'entrée qui écrit dans les
+combos : il scanne un rapport déjà produit par `ScoreResolver.resolve()` et
+n'y ajoute aucune condition supplémentaire. `clear_all()` est réservé aux
+tests headless (le fichier `user://` survit sinon d'une exécution à
+l'autre) — ne jamais l'appeler depuis le jeu.
