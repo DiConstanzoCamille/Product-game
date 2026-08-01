@@ -43,6 +43,10 @@ func _ready() -> void:
 	_test_quarter_runtime()
 	_test_committee_lot4()
 	_test_support_teams_and_compendium_lot4()
+	_test_career_progression_lot5()
+	_test_multi_squad_backlog_isolation_lot5()
+	_test_inter_squad_combos_reachable_lot5()
+	_test_multi_squad_mandate_playthrough_lot5()
 
 	for strategy in ["stress", "greedy", "careful"]:
 		print("\n=== SMOKE TEST LOGIQUE — %s ===" % strategy.to_upper())
@@ -757,6 +761,270 @@ func _test_support_teams_and_compendium_lot4() -> void:
 	if PlayerProfile.is_combo_discovered("chaos-organise"):
 		_fail("Un combo absent du rapport ne doit pas être marqué découvert.")
 	PlayerProfile.clear_all()
+
+
+## Lot 5, palier 1 : déblocage strict (spec §13.4). Un profil neuf ne débloque
+## rien tout seul ; reset_run() retombe sur "pm" tant que le niveau demandé
+## n'est pas gagné, et les tables (slots, quotas) suivent bien career_level.
+func _test_career_progression_lot5() -> void:
+	print("=== SMOKE TEST LOGIQUE — LOT 5 : PROGRESSION DE CARRIERE ===")
+	PlayerProfile.clear_all()
+	if PlayerProfile.is_career_level_unlocked("lead-pm"):
+		_fail("Un profil neuf ne doit débloquer que 'pm'.")
+
+	SprintState.reset_run("agile-transformation", "meridia-corp", "lead-pm")
+	if SprintState.career_level != "pm" or SprintState.squads.size() != 1:
+		_fail("Un niveau non débloqué doit retomber silencieusement sur 'pm' à 1 équipe (obtenu '%s', %d équipe(s))." % [SprintState.career_level, SprintState.squads.size()])
+
+	PlayerProfile.unlock_career_level("lead-pm")
+	PlayerProfile.unlock_career_level("lead-pm")  # idempotent
+	if PlayerProfile.get_unlocked_career_levels().count("lead-pm") != 1:
+		_fail("Débloquer deux fois le même niveau ne doit pas dupliquer l'entrée.")
+
+	SprintState.reset_run("agile-transformation", "meridia-corp", "lead-pm")
+	var expected_squads := int(GameData.careers.get("levels", {}).get("lead-pm", {}).get("squadsMin", 0))
+	if SprintState.career_level != "lead-pm" or SprintState.squads.size() != expected_squads:
+		_fail("Un niveau débloqué doit être adopté par reset_run() avec le nombre d'équipes de careers.json (attendu %d, obtenu %d)." % [expected_squads, SprintState.squads.size()])
+	if SprintState.get_tool_slot_base() != int(GameData.balance.get("toolSlots", {}).get("careerLevels", {}).get("lead-pm", {}).get("base", -1)):
+		_fail("get_tool_slot_base() doit suivre career_level, pas rester bloqué sur 'pm'.")
+
+	# Neutralise l'exigence trimestrielle tirée par reset_run() : elle peut
+	# porter un quotaMultiplier/quarterLength aléatoire (ex. "trimestre
+	# court") qui rendrait cette assertion flaky — même piège que documenté
+	# au carnet §29.
+	SprintState.quarter_requirement_ids = []
+	SprintState.quarter_requirement_id = ""
+	var expected_quota := int(GameData.quotas.get("careerLevels", {}).get("lead-pm", {}).get("quarterQuotas", [])[0])
+	if SprintState.get_current_quota() != expected_quota:
+		_fail("get_current_quota() doit lire la table 'lead-pm' de quotas.json (attendu %d, obtenu %d)." % [expected_quota, SprintState.get_current_quota()])
+
+	# Franchir le 4e trimestre débloque le niveau suivant, quel que soit le
+	# choix ensuite (spec §13.4 : "un mandat complet en 4 trimestres").
+	SprintState.quarter_index = 4
+	SprintState.long_mandate = false
+	SprintState.quarter_impact = SprintState.get_current_quota()
+	SprintState.quarter_sprint = SprintState.get_quarter_length() - 1
+	SprintState._record_quarter_resolution()
+	if not SprintState.quarter_exit_choice_pending:
+		_fail("Un T4 réussi doit ouvrir le choix de sortie/mandat long.")
+	if SprintState.newly_unlocked_career_level != "director" or not PlayerProfile.is_career_level_unlocked("director"):
+		_fail("Franchir le T4 en 'lead-pm' doit débloquer 'director'.")
+
+	PlayerProfile.clear_all()
+
+
+## Lot 5, palier 2 : backlog et capacité séparés par équipe (spec §13.2) —
+## aucun transfert de points, et le recrutement sans équipe explicite
+## équilibre plutôt que d'empiler sur l'équipe historique.
+func _test_multi_squad_backlog_isolation_lot5() -> void:
+	print("=== SMOKE TEST LOGIQUE — LOT 5 : BACKLOG PAR EQUIPE ===")
+	PlayerProfile.clear_all()
+	PlayerProfile.unlock_career_level("lead-pm")
+	SprintState.reset_run("agile-transformation", "meridia-corp", "lead-pm")
+	if SprintState.squads.size() < 2:
+		_fail("Ce test suppose au moins 2 équipes (niveau lead-pm).")
+		return
+	# Neutralise l'exigence trimestrielle tirée par reset_run() : "Gel des
+	# embauches" (1/8) refuserait les deux embauches ci-dessous une fois sur
+	# huit — même piège de flaky documenté au carnet §29.
+	SprintState.quarter_requirement_ids = []
+	SprintState.quarter_requirement_id = ""
+
+	var primary_id: String = SprintState.get_primary_squad().get("id", "")
+	var squad_b_id: String = SprintState.squads[1].get("id", "")
+	var primary_count_before: int = SprintState.get_primary_squad().get("roster", []).size()
+
+	var candidate: Dictionary = GameData.candidates[0].duplicate()
+	candidate["id"] = "test-lot5-squad-b-hire"
+	SprintState.pieces = 100
+	if SprintState.hire_candidate(candidate, squad_b_id) != "":
+		_fail("L'embauche ciblée sur une équipe précise a été refusée.")
+	if SprintState.squads[1].get("roster", []).size() != 1 or SprintState.get_primary_squad().get("roster", []).size() != primary_count_before:
+		_fail("hire_candidate(target_squad_id) doit faire atterrir la recrue dans l'équipe ciblée, sans toucher aux autres.")
+
+	var candidate2: Dictionary = GameData.candidates[1].duplicate() if GameData.candidates.size() > 1 else GameData.candidates[0].duplicate()
+	candidate2["id"] = "test-lot5-auto-balance-hire"
+	SprintState.hire_candidate(candidate2)  # sans cible : doit rejoindre l'équipe la moins fournie
+	if SprintState.get_primary_squad().get("roster", []).size() != primary_count_before:
+		_fail("Une embauche sans équipe ciblée ne doit jamais atterrir sur l'équipe historique tant qu'une autre équipe est moins fournie.")
+
+	# Isolation du backlog : un ticket livré par l'équipe B ne doit apparaître
+	# ni dans les compteurs globaux de l'équipe historique, ni bloquer un
+	# futur tirage de celle-ci sur le même id.
+	var squad_b: Dictionary = SprintState._find_squad(squad_b_id)
+	squad_b["roster"] = [{
+		"id": "test-lot5-dev-b", "name": "Dev Test B", "role": "dev", "seniority": "junior",
+		"salary": 1, "trait": "", "hidden_trait": "", "hiddenRevealed": true, "hiredSprint": 1,
+	}]
+	# Le tirage mélange features et epics ; ne trouver aucune feature simple
+	# parmi 4-5 tickets tirés sur 18 features + 4 epics est possible mais
+	# infinitésimal (~1/8000) — quelques retirages (nouveau sprint, donc
+	# nouveau tirage) éliminent ce risque de flaky sans jamais fausser le test.
+	var feature_b: Dictionary = {}
+	var draw_attempts := 0
+	while feature_b.is_empty() and draw_attempts < 5:
+		draw_attempts += 1
+		SprintState.sprint_number = draw_attempts
+		squad_b["backlog_draw"] = {}
+		var offer_b := SprintState.get_backlog_offer_for_squad(squad_b_id)
+		for item in offer_b.get("items", []):
+			if not SprintState.is_backlog_epic(item):
+				feature_b = item
+				break
+	if feature_b.is_empty():
+		_fail("Le tirage de l'équipe B n'a proposé aucune feature simple à livrer après plusieurs essais.")
+		return
+	var report_b := SprintState.commit_backlog_plan_for_squad(squad_b_id, [{"id": feature_b.get("id", ""), "points": feature_b.get("costPoints", 0)}])
+	if report_b.get("delivered", []).is_empty():
+		_fail("commit_backlog_plan_for_squad() doit livrer la feature planifiée.")
+	if SprintState.completed_backlog_ids.has(feature_b.get("id", "")):
+		_fail("Une livraison de l'équipe B ne doit jamais toucher completed_backlog_ids (le compteur de l'équipe historique).")
+	if not squad_b.get("completed_ids", []).has(feature_b.get("id", "")):
+		_fail("L'équipe B doit garder trace de sa propre livraison dans son completed_ids propre.")
+
+	var total_capacity := SprintState.get_effective_capacity()
+	var summed_capacity := 0
+	for squad in SprintState.squads:
+		summed_capacity += int(squad.get("capacity", 0))
+	if total_capacity != summed_capacity:
+		_fail("get_effective_capacity() doit rester la somme exacte des capacités par équipe (%d != %d)." % [total_capacity, summed_capacity])
+
+	PlayerProfile.clear_all()
+
+
+## Lot 5, palier 2 : les deux combos inter-squads n'existent qu'à N >= 3 et
+## doivent être réellement atteignables — composition forcée pour ne dépendre
+## d'aucun tirage (même principe que _test_multi_squad_roster : on fabrique
+## le roster à la main plutôt que de jouer un recrutement aléatoire).
+func _test_inter_squad_combos_reachable_lot5() -> void:
+	print("=== SMOKE TEST LOGIQUE — LOT 5 : COMBOS INTER-SQUADS ===")
+	PlayerProfile.clear_all()
+	PlayerProfile.unlock_career_level("lead-pm")
+	PlayerProfile.unlock_career_level("director")
+	SprintState.reset_run("agile-transformation", "meridia-corp", "director")
+	if SprintState.squads.size() < 5:
+		_fail("Ce test suppose au moins 5 équipes (niveau director).")
+		return
+
+	# 🏛️ Standardisation : 3 équipes partagent la même composition (1 dev).
+	for squad_index in range(3):
+		SprintState.squads[squad_index]["roster"] = [{
+			"id": "test-lot5-std-%d" % squad_index, "name": "Standard %d" % squad_index, "role": "dev",
+			"seniority": "junior", "salary": 1, "trait": "", "hidden_trait": "", "hiddenRevealed": true, "hiredSprint": 1,
+		}]
+	for squad_index in range(3, SprintState.squads.size()):
+		SprintState.squads[squad_index]["roster"] = [{
+			"id": "test-lot5-diff-%d" % squad_index, "name": "Autre %d" % squad_index, "role": "designer",
+			"seniority": "junior", "salary": 1, "trait": "", "hidden_trait": "", "hiddenRevealed": true, "hiredSprint": 1,
+		}]
+	var standard_report := ScoreResolver.resolve(SprintState._build_score_snapshot(), {
+		"scoring": GameData.scoring, "hidden_traits": GameData.hidden_traits, "cards": GameData.cards,
+	})
+	if not _has_global_line(standard_report, "Standardisation"):
+		_fail("3 équipes de même composition doivent déclencher 🏛️ Standardisation au niveau global.")
+
+	# 🌀 Chaos organisé : les 5 équipes ont chacune une composition différente.
+	var roles := ["dev", "designer", "pm", "ops"]
+	for squad_index in range(SprintState.squads.size()):
+		var role_id: String = roles[squad_index % roles.size()]
+		var count: int = 1 + (squad_index / roles.size())
+		var roster: Array = []
+		for member_index in range(count):
+			roster.append({
+				"id": "test-lot5-chaos-%d-%d" % [squad_index, member_index], "name": "Chaos %d.%d" % [squad_index, member_index],
+				"role": role_id, "seniority": "junior", "salary": 1, "trait": "", "hidden_trait": "", "hiddenRevealed": true, "hiredSprint": 1,
+			})
+		SprintState.squads[squad_index]["roster"] = roster
+	SprintState.activated_cards.clear()
+	var chaos_report := ScoreResolver.resolve(SprintState._build_score_snapshot(), {
+		"scoring": GameData.scoring, "hidden_traits": GameData.hidden_traits, "cards": GameData.cards,
+	})
+	if not _has_global_line(chaos_report, "Chaos organisé"):
+		_fail("5 équipes de composition toutes différentes doivent déclencher 🌀 Chaos organisé au niveau global.")
+
+	PlayerProfile.clear_all()
+
+
+func _has_global_line(report: Dictionary, label_prefix: String) -> bool:
+	for line in report.get("global", {}).get("lines", []):
+		if String(line.get("label", "")).begins_with(label_prefix):
+			return true
+	return false
+
+
+## Le run à N>1 explicitement demandé par l'issue #18 : un mandat complet
+## joué à N=2 (lead-pm), chaque équipe planifiant et livrant sur son propre
+## backlog, résolu par le même apply_pending_and_check() qu'à N=1.
+func _test_multi_squad_mandate_playthrough_lot5() -> void:
+	print("=== SMOKE TEST LOGIQUE — LOT 5 : MANDAT A N>1 (LEAD-PM) ===")
+	PlayerProfile.clear_all()
+	PlayerProfile.unlock_career_level("lead-pm")
+	SprintState.reset_run("agile-transformation", "karavel-scaleup", "lead-pm")
+	if SprintState.squads.size() < 2:
+		_fail("Ce test suppose au moins 2 équipes (niveau lead-pm).")
+		return
+
+	var squad_b: Dictionary = SprintState.squads[1]
+	squad_b["roster"] = [
+		{"id": "test-lot5-mandate-dev-1", "name": "Dev Mandat 1", "role": "dev", "seniority": "junior", "salary": 1, "trait": "", "hidden_trait": "", "hiddenRevealed": true, "hiredSprint": 1},
+		{"id": "test-lot5-mandate-dev-2", "name": "Dev Mandat 2", "role": "dev", "seniority": "junior", "salary": 1, "trait": "", "hidden_trait": "", "hiddenRevealed": true, "hiredSprint": 1},
+	]
+	var squad_ids: Array = []
+	for squad in SprintState.squads:
+		squad_ids.append(squad.get("id", ""))
+
+	var sprint_count := 0
+	while not SprintState.is_mandate_over and sprint_count < 30:
+		sprint_count += 1
+		for squad_id in squad_ids:
+			_commit_greedy_plan_for_squad_lot5(squad_id)
+		var ending := SprintState.apply_pending_and_check()
+		if SprintState.quarter_exit_choice_pending:
+			SprintState.choose_mandate_path(false)
+		if ending == "":
+			SprintState.sprint_number += 1
+
+	if not SprintState.is_mandate_over:
+		_fail("Le mandat multi-équipe (lead-pm) n'a jamais atteint de fin après 30 sprints.")
+
+	for resource_id in SprintState.resource_values.keys():
+		var value: float = SprintState.resource_values[resource_id]
+		if value < -0.001 or value > 100.001:
+			_fail("Ressource %s hors bornes en mandat multi-équipe : %f" % [resource_id, value])
+
+	if SprintState.last_score_report.get("squads", []).size() != SprintState.squads.size():
+		_fail("Le rapport de score doit produire un sous-total par équipe même à N>1 (obtenu %d sous-totaux pour %d équipes)." % [
+			SprintState.last_score_report.get("squads", []).size(), SprintState.squads.size()
+		])
+	print("  → mandat lead-pm terminé au sprint %d, fin='%s'%s" % [
+		SprintState.sprint_number, SprintState.ending_id,
+		" — director débloqué" if PlayerProfile.is_career_level_unlocked("director") else ""
+	])
+
+	PlayerProfile.clear_all()
+
+
+## Planification gourmande minimale pour un test à N>1 : remplit la capacité
+## de l'équipe sans la dépasser, uniquement des features simples (pas
+## d'epic — hors du périmètre de ce test). Équipe historique = chemin
+## historique inchangé ; les autres passent par le chemin par équipe.
+func _commit_greedy_plan_for_squad_lot5(squad_id: String) -> void:
+	var capacity := SprintState.get_squad_capacity(squad_id)
+	var is_primary: bool = squad_id == SprintState.get_primary_squad().get("id", "")
+	var offer: Dictionary = SprintState.get_backlog_offer() if is_primary else SprintState.get_backlog_offer_for_squad(squad_id)
+	var plan: Array = []
+	var used := 0
+	for item in offer.get("items", []):
+		if SprintState.is_backlog_epic(item):
+			continue
+		var points: int = int(item.get("costPoints", 0))
+		if used + points <= capacity:
+			plan.append({"id": item.get("id", ""), "points": points})
+			used += points
+	if is_primary:
+		SprintState.commit_backlog_plan(plan)
+	else:
+		SprintState.commit_backlog_plan_for_squad(squad_id, plan)
 
 
 func _offer_has_item(items: Array, item_id: String) -> bool:

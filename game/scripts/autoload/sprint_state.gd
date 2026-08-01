@@ -255,6 +255,8 @@ func _new_empty_squad(display_index: int) -> Dictionary:
 		"delivered": [],
 		"epic_progress": {},
 		"spent_points": 0,
+		"bag": [],
+		"completed_ids": [],
 	}
 
 
@@ -859,8 +861,12 @@ func employee_contribution_factor(employee: Dictionary) -> float:
 ## Poids effectif d'un rôle dans le roster (nombre d'employés pondéré par
 ## leur facteur de contribution) — sert aux pénalités d'absence et aux caps.
 func get_role_weight(role_id: String) -> float:
+	return _role_weight_in(get_roster(), role_id)
+
+
+func _role_weight_in(roster: Array, role_id: String) -> float:
 	var total := 0.0
-	for employee in get_roster():
+	for employee in roster:
 		if employee.get("role", "") == role_id:
 			total += employee_contribution_factor(employee)
 	return total
@@ -915,9 +921,16 @@ func get_payroll() -> int:
 ## Contexte de roster passé à EffectResolver.resolve_backlog() — poids des
 ## rôles qui modulent les effets de la Roadmap (PM, Designer).
 func get_roster_context() -> Dictionary:
+	return get_roster_context_for(get_roster())
+
+
+## Même contexte, mais scopé à un roster précis (spec §13.2) : le backlog
+## d'une équipe additionnelle n'est modulé que par sa propre composition,
+## pas par celle du reste de l'organisation.
+func get_roster_context_for(roster: Array) -> Dictionary:
 	return {
-		"pm_weight": get_role_weight("pm"),
-		"designer_weight": get_role_weight("designer"),
+		"pm_weight": _role_weight_in(roster, "pm"),
+		"designer_weight": _role_weight_in(roster, "designer"),
 	}
 
 
@@ -1282,6 +1295,192 @@ func _backlog_offer_contains(item_id: String) -> bool:
 		if item.get("id", "") == item_id:
 			return true
 	return false
+
+
+# --- Backlog des équipes additionnelles (Lot 5, palier 2, spec §13.2) ---
+# L'équipe historique garde intact le chemin ci-dessus (current_backlog_draw,
+# epic_progress, completed_backlog_ids, _backlog_bag) : zéro risque de
+# régression sur un run PM, qui ne passe jamais par ces fonctions (le seul
+# appelant, roadmap_screen, redirige l'équipe principale vers get_backlog_offer()
+# / commit_backlog_plan() ci-dessus). Les équipes ajoutées par la carrière
+# portent leur propre sac (squad["bag"]), leur propre progression d'epics
+# (squad["epic_progress"]) et leur propre liste de tickets déjà livrés
+# (squad["completed_ids"]) — jamais de transfert de points entre équipes.
+
+func _find_squad(squad_id: String) -> Dictionary:
+	for squad in squads:
+		if squad.get("id", "") == squad_id:
+			return squad
+	return {}
+
+
+## Capacité de roadmap d'une équipe précise — s'assure d'abord que
+## get_effective_capacity() a tourné (elle écrit squad["capacity"] pour
+## toutes les équipes au passage), puis relit la valeur de celle-ci.
+func get_squad_capacity(squad_id: String) -> int:
+	get_effective_capacity()
+	return int(_find_squad(squad_id).get("capacity", 0))
+
+
+func get_backlog_offer_for_squad(squad_id: String) -> Dictionary:
+	if squad_id == get_primary_squad().get("id", ""):
+		return get_backlog_offer()
+	var squad := _find_squad(squad_id)
+	if squad.is_empty():
+		return {"sprint": sprint_number, "items": []}
+	var draw: Dictionary = squad.get("backlog_draw", {})
+	if int(draw.get("sprint", -1)) == sprint_number:
+		return draw
+	draw = _draw_squad_backlog_offer(squad)
+	squad["backlog_draw"] = draw
+	return draw
+
+
+func _draw_squad_backlog_offer(squad: Dictionary) -> Dictionary:
+	var conf: Dictionary = GameData.balance.get("backlogDraw", {})
+	var minimum := int(conf.get("itemsPerSprintMin", 0))
+	var maximum: int = max(minimum, int(conf.get("itemsPerSprintMax", minimum))) + product_tier
+	var items: Array = _active_squad_epic_items(squad)
+	var target_total: int = randi_range(minimum, maximum)
+	var regular_count: int = max(0, target_total - items.size())
+	var bag: Array = squad.get("bag", [])
+	var completed_ids: Array = squad.get("completed_ids", [])
+	while regular_count > 0 and items.size() < maximum:
+		var item := _draw_squad_backlog_item(items, bag, completed_ids)
+		if item.is_empty():
+			break
+		items.append(item)
+		regular_count -= 1
+	squad["bag"] = bag
+	return {"sprint": sprint_number, "items": items}
+
+
+func _active_squad_epic_items(squad: Dictionary) -> Array:
+	var result: Array = []
+	var epic_progress_table: Dictionary = squad.get("epic_progress", {})
+	for item_id in epic_progress_table.keys():
+		var item := find_backlog_item(item_id)
+		if not item.is_empty() and _squad_epic_remaining(squad, item_id) > 0:
+			result.append(item)
+	return result
+
+
+func _squad_epic_remaining(squad: Dictionary, item_id: String) -> int:
+	var item := find_backlog_item(item_id)
+	var epic_progress_table: Dictionary = squad.get("epic_progress", {})
+	var invested := int(epic_progress_table.get(item_id, {}).get("invested", 0))
+	return max(0, int(item.get("costPoints", 0)) - invested)
+
+
+func _draw_squad_backlog_item(already_drawn: Array, bag: Array, completed_ids: Array) -> Dictionary:
+	var excluded: Dictionary = {}
+	for item in already_drawn:
+		excluded[item.get("id", "")] = true
+	var attempts := 0
+	var max_attempts: int = max(1, GameData.backlog.get("features", []).size() + GameData.backlog.get("epics", []).size()) * 2
+	while attempts < max_attempts:
+		if bag.is_empty():
+			_refill_squad_backlog_bag(bag, completed_ids)
+		if bag.is_empty():
+			return {}
+		var item_id: String = bag.pop_back()
+		var item := find_backlog_item(item_id)
+		attempts += 1
+		if item.is_empty() or excluded.has(item_id) or completed_ids.has(item_id):
+			continue
+		return item
+	return {}
+
+
+func _refill_squad_backlog_bag(bag: Array, completed_ids: Array) -> void:
+	for feature in GameData.backlog.get("features", []):
+		if _available_for_era(feature) and not completed_ids.has(feature.get("id", "")):
+			bag.append(feature.get("id", ""))
+	for epic in GameData.backlog.get("epics", []):
+		if _available_for_era(epic) and not completed_ids.has(epic.get("id", "")):
+			bag.append(epic.get("id", ""))
+	bag.shuffle()
+
+
+## Symétrique de commit_backlog_plan() pour une équipe additionnelle — même
+## algorithme (consommer les points, faire avancer les epics, ne révéler les
+## attributs réels qu'à la livraison), mais lu et écrit uniquement sur l'état
+## propre à cette équipe. Les effets de bord globaux (deltas de ressources,
+## ROI récurrent) restent appliqués tels quels : la spec ne les scope pas par
+## équipe, seuls le backlog et la capacité le sont (§13.2).
+func commit_backlog_plan_for_squad(squad_id: String, plan: Array) -> Dictionary:
+	if squad_id == get_primary_squad().get("id", ""):
+		return commit_backlog_plan(plan)
+	var squad := _find_squad(squad_id)
+	if squad.is_empty():
+		return {}
+	var offer := get_backlog_offer_for_squad(squad_id)
+	var available: Dictionary = {}
+	for item in offer.get("items", []):
+		available[item.get("id", "")] = item
+
+	var epic_progress_table: Dictionary = squad.get("epic_progress", {})
+	var completed_ids: Array = squad.get("completed_ids", [])
+	var spent := 0
+	var delivered: Array = []
+	var epic_updates: Array = []
+	var seen: Dictionary = {}
+	for entry in plan:
+		var item_id: String = entry.get("id", "")
+		if seen.has(item_id) or completed_ids.has(item_id) or not available.has(item_id):
+			continue
+		seen[item_id] = true
+		var item: Dictionary = available[item_id]
+		if is_backlog_epic(item):
+			var invested: int = min(max(0, int(entry.get("points", 0))), _squad_epic_remaining(squad, item_id))
+			if invested <= 0:
+				continue
+			var progress: Dictionary = epic_progress_table.get(item_id, {"invested": 0, "startedSprint": sprint_number})
+			progress["invested"] = int(progress.get("invested", 0)) + invested
+			epic_progress_table[item_id] = progress
+			spent += invested
+			if int(progress["invested"]) >= int(item.get("costPoints", 0)):
+				epic_progress_table.erase(item_id)
+				completed_ids.append(item_id)
+				delivered.append(item)
+				epic_updates.append({"item": item, "invested": invested, "completed": true})
+			else:
+				epic_updates.append({"item": item, "invested": invested, "completed": false})
+		else:
+			var cost := int(item.get("costPoints", 0))
+			if cost <= 0:
+				continue
+			spent += cost
+			delivered.append(item)
+			completed_ids.append(item_id)
+
+	squad["epic_progress"] = epic_progress_table
+	squad["completed_ids"] = completed_ids
+	var capacity := get_squad_capacity(squad_id)
+	var deltas := EffectResolver.resolve_backlog(delivered, spent, capacity, get_roster_context_for(squad.get("roster", [])), has_practice("okr"))
+	var roi_gain := 0
+	for item in delivered:
+		roi_gain += int(item.get("roi", 0))
+	recurring_roi += roi_gain
+	if not deltas.is_empty():
+		add_pending(deltas)
+
+	var report := {
+		"sprint": sprint_number,
+		"plannedPoints": spent,
+		"capacity": capacity,
+		"delivered": delivered,
+		"epicUpdates": epic_updates,
+		"roiGain": roi_gain,
+		"deltas": deltas,
+	}
+	squad["delivered"] = delivered
+	squad["spent_points"] = spent
+	squad["last_report"] = report
+	pending_journal_lines.append("Roadmap (%s) : %d pts / %d capacité%s" % [
+		squad.get("name", "Équipe"), spent, capacity, " · %d livraison(s)" % delivered.size() if not delivered.is_empty() else ""
+	])
+	return report
 
 
 # --- Les Investissements : tirage du sprint (spec profondeur §5) ---
