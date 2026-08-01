@@ -30,9 +30,19 @@ size_flags_horizontal=3
 [node name="CloseButton" type="Button" parent="VBox/TopRow"]
 text="Fermer"
 
-[node name="Scroll" type="ScrollContainer" parent="VBox"]
+[node name="Tabs" type="TabContainer" parent="VBox"]
 size_flags_vertical=3
 
-[node name="Content" type="VBoxContainer" parent="VBox/Scroll"]
+[node name="🏢 Dossier" type="ScrollContainer" parent="VBox/Tabs"]
+size_flags_vertical=3
+
+[node name="Content" type="VBoxContainer" parent="VBox/Tabs/🏢 Dossier"]
 size_flags_horizontal=3
 theme_override_constants/separation=16
+
+[node name="🧩 Compendium" type="ScrollContainer" parent="VBox/Tabs"]
+size_flags_vertical=3
+
+[node name="CompendiumContent" type="VBoxContainer" parent="VBox/Tabs/🧩 Compendium"]
+size_flags_horizontal=3
+theme_override_constants/separation=12

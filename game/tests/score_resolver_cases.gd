@@ -29,6 +29,7 @@ func _initialize() -> void:
 	_test_quarter_visible_board_and_technical_audit()
 	_test_moral_cap_and_ops_snapshot()
 	_test_conversion_and_recurring_roi()
+	_test_support_team_rates_differ_by_company()
 	_test_multi_squad_contract()
 	_test_visible_trait_integrity()
 	if failures > 0:
@@ -242,6 +243,47 @@ func _test_conversion_and_recurring_roi() -> void:
 	base["resources"] = {"moral": 20, "dette-organisationnelle": 70}
 	report = _resolve([_squad("a", [feature])], base, rules)
 	_assert_equal(float(report.get("conversion", {}).get("mrr", {}).get("churn", 0.0)), 0.15, "Moral bas et Dette haute doivent monter le churn au plafond de 15 %.")
+
+
+## Lot 4, spec §9.4 — critere de recette de l'issue #17 : deux runs sur la
+## meme entreprise produisent deux organisations differentes, et Meridia /
+## Karavel doivent diverger visiblement sur la conversion. Les taux
+## eux-memes (salesMultipliers/pmmMultipliers/csmMultipliers) existaient
+## deja avant ce lot ; ce test verifie que companies.json les alimente
+## reellement, pas seulement que ScoreResolver sait les lire.
+func _test_support_team_rates_differ_by_company() -> void:
+	var meridia := _company("meridia-corp")
+	var karavel := _company("karavel-scaleup")
+	_assert_equal(meridia.get("supportTeams", {}), {"sales": 4.0, "pmm": 2.0, "csm": 3.0},
+		"Meridia doit declarer supportTeams Sales 4 / PMM 2 / CSM 3 (spec 9.4).")
+	_assert_equal(karavel.get("supportTeams", {}), {"sales": 2.0, "pmm": 4.0, "csm": 1.0},
+		"Karavel doit declarer supportTeams Sales 2 / PMM 4 / CSM 1 (spec 9.4).")
+
+	var feature := _traction_feature(25)
+	var rules := _rules_without_streak()
+	var meridia_report := _resolve([_squad("a", [feature])], {"mrr": 100.0, "support_teams": meridia.get("supportTeams", {})}, rules)
+	var karavel_report := _resolve([_squad("a", [feature])], {"mrr": 100.0, "support_teams": karavel.get("supportTeams", {})}, rules)
+
+	var meridia_rates: Dictionary = meridia_report.get("conversion", {}).get("teamRates", {})
+	var karavel_rates: Dictionary = karavel_report.get("conversion", {}).get("teamRates", {})
+	_assert_equal(float(meridia_rates.get("sales", {}).get("multiplier", 0.0)), 1.2, "Meridia (Sales niveau 4) doit convertir l'Impact en MRR a x1.2.")
+	_assert_equal(float(karavel_rates.get("sales", {}).get("multiplier", 0.0)), 0.8, "Karavel (Sales niveau 2) doit convertir l'Impact en MRR a x0.8.")
+	_assert_equal(float(meridia_rates.get("pmm", {}).get("multiplier", 0.0)), 0.8, "Meridia (PMM niveau 2) doit convertir l'Impact en Valeur percue a x0.8.")
+	_assert_equal(float(karavel_rates.get("pmm", {}).get("multiplier", 0.0)), 1.2, "Karavel (PMM niveau 4) doit convertir l'Impact en Valeur percue a x1.2.")
+	_assert_equal(float(meridia_rates.get("csm", {}).get("multiplier", 0.0)), 1.0, "Meridia (CSM niveau 3) doit garder un churn neutre x1.0.")
+	_assert_equal(float(karavel_rates.get("csm", {}).get("multiplier", 0.0)), 1.4, "Karavel (CSM niveau 1) doit subir un churn x1.4 (support faible).")
+
+	var meridia_mrr := float(meridia_report.get("conversion", {}).get("mrr", {}).get("after", 0.0))
+	var karavel_mrr := float(karavel_report.get("conversion", {}).get("mrr", {}).get("after", 0.0))
+	_assert_true(not is_equal_approx(meridia_mrr, karavel_mrr),
+		"A Impact et MRR de depart identiques, Meridia (%s) et Karavel (%s) doivent converger differemment — c'est le critere de recette de l'issue #17." % [meridia_mrr, karavel_mrr])
+
+
+func _company(company_id: String) -> Dictionary:
+	for company in companies_data:
+		if company.get("id", "") == company_id:
+			return company
+	return {}
 
 
 func _test_multi_squad_contract() -> void:

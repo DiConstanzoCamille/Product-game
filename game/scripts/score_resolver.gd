@@ -677,7 +677,23 @@ static func _resolve_conversion(snapshot: Dictionary, rules: Dictionary, resourc
 	var perceived_delta: float = min(int(floor(float(impact) / float(perceived_rule.get("impactPerPoint", INF)))) * _team_multiplier(model.get("pmmMultipliers", {}), pmm_level), float(perceived_rule.get("maxPerSprint", 0)))
 	var capital_rule: Dictionary = conversion_rules.get("politicalCapital", {})
 	var capital_delta := int(floor(float(impact) / float(capital_rule.get("impactPerPoint", INF))))
+
+	# 💼📣🎧 Équipes subies (spec §9.4) : le taux de chaque équipe, visible à
+	# l'étape ⑨ de la Résolution comme les autres lignes de conversion —
+	# calculé une seule fois ici, jamais recalculé côté UI.
+	var sales_multiplier := _team_multiplier(model.get("salesMultipliers", {}), sales_level)
+	var pmm_multiplier := _team_multiplier(model.get("pmmMultipliers", {}), pmm_level)
+	var csm_multiplier := _team_multiplier(model.get("csmMultipliers", {}), csm_level)
+	var team_rates := {
+		"sales": {"level": sales_level, "multiplier": sales_multiplier},
+		"pmm": {"level": pmm_level, "multiplier": pmm_multiplier},
+		"csm": {"level": csm_level, "multiplier": csm_multiplier},
+	}
+
 	var lines: Array = [
+		_line(9, "global", "💼", "Sales — Impact → MRR (niveau %d)" % sales_level, "conversion_rate", sales_multiplier, 0.0, sales_multiplier),
+		_line(9, "global", "📣", "Product marketing — Impact → Valeur perçue (niveau %d)" % pmm_level, "conversion_rate", pmm_multiplier, 0.0, pmm_multiplier),
+		_line(9, "global", "🎧", "CSM / Support — churn (niveau %d)" % csm_level, "conversion_rate", csm_multiplier, 0.0, csm_multiplier),
 		_line(9, "global", "💵", "MRR", "mrr", mrr_after - mrr_before, mrr_before, mrr_after),
 		_line(9, "global", "💶", "Budget", "budget", budget_gain, budget_before, budget_before + budget_gain),
 	]
@@ -690,6 +706,7 @@ static func _resolve_conversion(snapshot: Dictionary, rules: Dictionary, resourc
 		"mrr": { "before": mrr_before, "after": mrr_after, "gain": mrr_after - mrr_before, "impact_gain": impact_mrr, "recurring_roi_gain": recurring_roi, "churn": churn },
 		"budget": { "before": budget_before, "after": budget_before + budget_gain, "gain": budget_gain, "allocation": allocation, "quick_win_bonus": quick_win_budget },
 		"resource_deltas": { "valeur-percue": perceived_delta, "capital-politique": capital_delta },
+		"teamRates": team_rates,
 	}
 
 

@@ -16,18 +16,27 @@ extends PanelContainer
 
 @onready var title_label: Label = $VBox/TopRow/TitleLabel
 @onready var close_button: Button = $VBox/TopRow/CloseButton
-@onready var content: VBoxContainer = $VBox/Scroll/Content
+@onready var content: VBoxContainer = $"VBox/Tabs/🏢 Dossier/Content"
+@onready var compendium_content: VBoxContainer = $"VBox/Tabs/🧩 Compendium/CompendiumContent"
+
+const FAMILY_LABELS := {
+	"composition": "Composition d'équipe",
+	"main": "Bonus de main",
+	"inter-squad": "Organisation multi-équipe",
+}
 
 
 func _ready() -> void:
 	close_button.pressed.connect(func(): visible = false)
 	UIHelpers.apply_heading(title_label, 22, 600.0)
 	_populate()
+	_populate_compendium()
 
 
 ## Reconstruit le dossier — appelé par le Panneau de bord quand l'état a bougé.
 func refresh() -> void:
 	_populate()
+	_populate_compendium()
 
 
 func _populate() -> void:
@@ -221,3 +230,64 @@ func _add_row(label_text: String, value_text: String, value_color: Color = UIHel
 	value_label.add_theme_color_override("font_color", value_color)
 	row.add_child(value_label)
 	content.add_child(row)
+
+
+# ── 🧩 Compendium des synergies (spec §12.1, Lot 4) ─────────────────────────
+## Liste TOUS les combos du jeu, groupés par famille : ceux déjà déclenchés
+## au moins une fois en clair, les autres en ??? avec seulement leur icône et
+## leur famille. La détection et la persistance vivent dans PlayerProfile —
+## ce panneau ne fait que lire get_combo_catalog(), comme le reste du Dossier
+## ne fait que lire SprintState.
+func _populate_compendium() -> void:
+	UIHelpers.clear_children(compendium_content)
+
+	var catalog: Array = PlayerProfile.get_combo_catalog()
+	var discovered_count := 0
+	for entry in catalog:
+		if entry.get("discovered", false):
+			discovered_count += 1
+
+	var header := Label.new()
+	header.text = "🧩 Compendium des synergies — %d / %d découverts" % [discovered_count, catalog.size()]
+	UIHelpers.apply_heading(header, 16, 600.0)
+	header.autowrap_mode = TextServer.AUTOWRAP_WORD
+	compendium_content.add_child(header)
+
+	var intro := Label.new()
+	intro.text = "Chaque combo déjà déclenché au moins une fois reste en clair pour le reste de la partie. Les autres attendent d'être découverts, dans n'importe quel run."
+	intro.autowrap_mode = TextServer.AUTOWRAP_WORD
+	intro.add_theme_font_size_override("font_size", 12)
+	intro.add_theme_color_override("font_color", UIHelpers.COLOR_SOFT_TEXT)
+	compendium_content.add_child(intro)
+
+	for family_id in ["composition", "main", "inter-squad"]:
+		var family_entries: Array = catalog.filter(func(entry): return entry.get("family", "") == family_id)
+		if family_entries.is_empty():
+			continue
+		var family_title := Label.new()
+		family_title.text = FAMILY_LABELS.get(family_id, family_id)
+		UIHelpers.apply_mono(family_title, 12, true)
+		family_title.add_theme_color_override("font_color", UIHelpers.COLOR_AMBER)
+		compendium_content.add_child(family_title)
+		for entry in family_entries:
+			compendium_content.add_child(_build_compendium_row(entry))
+
+
+func _build_compendium_row(entry: Dictionary) -> Control:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 10)
+
+	var discovered: bool = entry.get("discovered", false)
+	var icon_label := Label.new()
+	icon_label.text = entry.get("icon", "✨") if discovered else "❓"
+	icon_label.custom_minimum_size = Vector2(28, 0)
+	row.add_child(icon_label)
+
+	var name_label := Label.new()
+	name_label.text = entry.get("label", entry.get("id", "")) if discovered else "??? (%s)" % FAMILY_LABELS.get(entry.get("family", ""), entry.get("family", ""))
+	name_label.autowrap_mode = TextServer.AUTOWRAP_WORD
+	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	name_label.add_theme_color_override("font_color", UIHelpers.COLOR_INK if discovered else UIHelpers.COLOR_SOFT_TEXT)
+	row.add_child(name_label)
+
+	return row

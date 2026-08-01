@@ -75,6 +75,16 @@ var current_shop_offer: Dictionary = {}     # {sprint, candidates:[...], practic
 var reserved_assets: Array = []             # 📌 [{kind, id, data, sprint, paid}] — punaisés, réinjectés dans l'offre suivante
 var leased_decisions: Dictionary = {}       # 🔒 card_id -> sprint d'expiration du bail d'une carte à prérequis
 
+# --- 🏛️ Le Comité d'investissement (spec scoring §12, Lot 4) ---
+var support_teams: Dictionary = {}          # {sales, pmm, csm} -> niveau 0-5, fixé par companies.json → supportTeams, jamais pilotable (spec §9.4)
+var team_cap_purchased: int = 0             # postes ouverts au Comité, en plus de companies.json → teamCap
+var product_tier: int = 0                   # paliers de produit achetés (max = investments.json → product-tier.costs.size())
+var headhunter_pending: bool = false        # 🎯 Chasseur de têtes acheté : le prochain get_shop_offer() force des candidats et révèle leurs traits
+var headhunter_target_candidates: int = 0   # nombre de candidats forcés par le Chasseur de têtes en cours
+var cleanup_sprint_pending: bool = false    # 🧹 Sprint de remise à plat acheté : la prochaine Résolution neutralise la Traction
+var turnaround_plans_available: int = 0     # 🏛️ Plans de redressement achetés, consommés automatiquement au premier quota manqué
+var current_committee_offer: Dictionary = {}  # {quarter, strategy_cost} — le prix de la décision stratégique, tiré une fois par trimestre
+
 # --- Phase B : l'économie du joueur (spec profondeur §7) ---
 var energy: int = 70                   # ⚡ jauge personnelle du CPO (0..energy.max), côté jeu uniquement
 var energy_spent_this_sprint: int = 0  # ⚡ réellement dépensés en actions personnelles depuis la dernière Résolution
@@ -153,9 +163,21 @@ func reset_run(chosen_era_id: String = "", chosen_company_id: String = "") -> vo
 	self_work_capacity = 0
 	breather_planned = false
 	last_energy_report.clear()
+	team_cap_purchased = 0
+	product_tier = 0
+	headhunter_pending = false
+	headhunter_target_candidates = 0
+	cleanup_sprint_pending = false
+	turnaround_plans_available = 0
+	current_committee_offer.clear()
 
 	var company: Dictionary = get_company()
 	pieces = int(company.get("startingPieces", 0))
+	# 💼📣🎧 Équipes subies (spec §9.4) : niveau 0-5 fixé par l'entreprise,
+	# jamais pilotable en jeu. Défaut 3/3/3 (neutre) si l'entreprise ne le
+	# déclare pas — compatibilité des scénarios qui ne l'ont pas encore.
+	var default_support_teams: Dictionary = {"sales": 3, "pmm": 3, "csm": 3}
+	support_teams = company.get("supportTeams", default_support_teams).duplicate()
 
 	# 🎁 Outillage hérité (spec §7.1.3) : l'entreprise arrive avec 1-2 outils
 	# déjà installés par quelqu'un d'autre, qui occupent un slot dès le
@@ -467,6 +489,246 @@ func choose_strategy(strategy_id: String) -> String:
 	pending_journal_lines.append("🧭 Décision stratégique : %s %s adoptée — irréversible pour le reste du mandat." % [
 		strategy.get("icon", ""), strategy.get("name", strategy_id)
 	])
+	_apply_strategy_support_team_deltas(strategy_id)
+	return ""
+
+
+## Effet de bord déclaratif (spec §9.4, dernier tiers) : une décision
+## stratégique peut faire bouger une équipe subie (Open source → PMM +1,
+## Sales −1). On ne les pilote toujours pas — on change le monde autour
+## d'elles. `supportTeamDeltas` vit dans scoring.json → global.strategies,
+## jamais un cas particulier ici : sans cette clé sur la stratégie, rien ne
+## bouge.
+func _apply_strategy_support_team_deltas(strategy_id: String) -> void:
+	var rules: Dictionary = GameData.scoring.get("global", {}).get("strategies", {}).get(strategy_id, {})
+	var deltas: Dictionary = rules.get("supportTeamDeltas", {})
+	if deltas.is_empty():
+		return
+	var parts: Array = []
+	for team_id in deltas.keys():
+		var delta := int(deltas[team_id])
+		var before := int(support_teams.get(team_id, 3))
+		support_teams[team_id] = clampi(before + delta, 0, 5)
+		parts.append("%s %s%d" % [team_id, "+" if delta >= 0 else "", delta])
+	pending_journal_lines.append("↳ Effet de bord sur les équipes subies : %s (on ne les pilote pas, le monde change autour d'elles)." % ", ".join(parts))
+
+
+# --- 🏛️ Le Comité d'investissement (spec scoring §12, Lot 4) ---
+## Entre deux trimestres, jamais au fil de l'eau (l'étal du sprint ne change
+## pas). Tous les coûts et magnitudes vivent dans data/investments.json ;
+## chaque fonction lit sa propre entrée et n'écrit jamais un nombre en dur.
+## `committee_screen.gd` n'est qu'une lecture de ces fonctions.
+
+func find_investment_item(item_id: String) -> Dictionary:
+	for item in GameData.investments.get("items", []):
+		if item.get("id", "") == item_id:
+			return item
+	return {}
+
+
+## Le prix de la décision stratégique varie par trimestre (15-30, spec §12) —
+## tiré une fois et mémorisé pour ne pas changer entre deux rafraîchissements
+## du Comité, comme le tirage de l'étal du sprint.
+func strategy_purchase_cost() -> int:
+	if int(current_committee_offer.get("quarter", -1)) != quarter_index:
+		var range_conf: Array = find_investment_item("strategic-decision").get("costRange", [15, 30])
+		var low := int(range_conf[0]) if range_conf.size() > 0 else 15
+		var high := int(range_conf[1]) if range_conf.size() > 1 else 30
+		current_committee_offer = {"quarter": quarter_index, "strategy_cost": randi_range(low, high)}
+	return int(current_committee_offer.get("strategy_cost", 15))
+
+
+## Version payante de choose_strategy() — la seule que le Comité expose ;
+## _assign_forced_strategy() continue d'appeler choose_strategy() directement,
+## sans coût, puisqu'une injonction du board ne se négocie pas.
+func buy_strategy(strategy_id: String) -> String:
+	if quarter_strategy_chosen:
+		return "deja-choisie-ce-trimestre"
+	var cost := strategy_purchase_cost()
+	if pieces < cost:
+		return "pieces"
+	var refusal := choose_strategy(strategy_id)
+	if refusal != "":
+		return refusal
+	pieces -= cost
+	pending_journal_lines.append("🪙 Coût du Comité : %d." % cost)
+	return ""
+
+
+## 🪑 Ouvrir un poste : +1 au cap d'effectif, aujourd'hui figé par
+## l'entreprise (companies.json → teamCap). Échelle de prix croissante,
+## comme les slots d'outillage ; -1 une fois la table épuisée.
+func team_cap_purchase_cost() -> int:
+	var costs: Array = find_investment_item("open-seat").get("costs", [])
+	if team_cap_purchased >= costs.size():
+		return -1
+	return int(costs[team_cap_purchased])
+
+
+func buy_team_cap_seat() -> String:
+	var cost := team_cap_purchase_cost()
+	if cost < 0:
+		return "plafond"
+	if pieces < cost:
+		return "pieces"
+	pieces -= cost
+	team_cap_purchased += 1
+	pending_journal_lines.append("🪑 Poste ouvert (%d 🪙) — cap d'effectif porté à %d." % [cost, get_team_cap()])
+	return ""
+
+
+## 📈 Promotion : un junior nommé devient senior (salaire +1, contribution
+## senior). Retourne "" si la promotion a eu lieu, sinon la raison du refus.
+func promotion_cost() -> int:
+	return int(find_investment_item("promotion").get("cost", 5))
+
+
+func promote_employee(employee_id: String) -> String:
+	var owner := _find_employee_owner(employee_id)
+	if owner.is_empty():
+		return "introuvable"
+	var employee: Dictionary = owner.get("employee", {})
+	if employee.get("seniority", "junior") != "junior":
+		return "deja-senior"
+	var cost := promotion_cost()
+	if pieces < cost:
+		return "pieces"
+	pieces -= cost
+	employee["seniority"] = "senior"
+	employee["salary"] = int(GameData.balance.get("salaries", {}).get("senior", 2))
+	pending_journal_lines.append("📈 Promotion (%d 🪙) : %s passe senior." % [cost, employee.get("name", employee_id)])
+	return ""
+
+
+## 🚀 Palier de produit : +0,5 Levier permanent (scoring.json →
+## global.productTier), +1 feature proposée par sprint (_draw_backlog_offer).
+## 3 paliers maximum par run — la table de prix fait foi.
+func product_tier_purchase_cost() -> int:
+	var costs: Array = find_investment_item("product-tier").get("costs", [])
+	if product_tier >= costs.size():
+		return -1
+	return int(costs[product_tier])
+
+
+func buy_product_tier() -> String:
+	var cost := product_tier_purchase_cost()
+	if cost < 0:
+		return "plafond"
+	if pieces < cost:
+		return "pieces"
+	pieces -= cost
+	product_tier += 1
+	pending_journal_lines.append("🚀 Palier de produit %d atteint (%d 🪙)." % [product_tier, cost])
+	return ""
+
+
+## 🏝️ Séminaire d'équipe : Cynisme -15, appliqué à la prochaine Résolution
+## comme tout achat du Comité.
+func buy_team_seminar() -> String:
+	var item := find_investment_item("team-seminar")
+	var cost := int(item.get("cost", 8))
+	if pieces < cost:
+		return "pieces"
+	pieces -= cost
+	add_pending({"cynisme": float(item.get("cynismeDelta", -15))},
+		"🏝️ Séminaire d'équipe (%d 🪙) : 🎭 Cynisme %d." % [cost, int(item.get("cynismeDelta", -15))])
+	return ""
+
+
+## 🧹 Sprint de remise à plat : Dette -20, mais 0 Traction le sprint qui suit
+## (consommé dans _build_score_snapshot() / apply_pending_and_check()).
+func buy_cleanup_sprint() -> String:
+	var item := find_investment_item("cleanup-sprint")
+	var cost := int(item.get("cost", 6))
+	if pieces < cost:
+		return "pieces"
+	pieces -= cost
+	cleanup_sprint_pending = true
+	add_pending({"dette-organisationnelle": float(item.get("detteDelta", -20))},
+		"🧹 Sprint de remise à plat acheté (%d 🪙) : 🧱 Dette %d, 0 Traction au prochain sprint." % [cost, int(item.get("detteDelta", -20))])
+	return ""
+
+
+## 🤝 Rachat d'un concurrent : +12 MRR (stock, immédiat), +1 employé
+## aléatoire (rejoint le roster tout de suite, hors étal), +8 Dette (à la
+## prochaine Résolution, comme tout ce qui pèse sur les jauges).
+func buy_competitor_acquisition() -> String:
+	var item := find_investment_item("acquire-competitor")
+	var cost := int(item.get("cost", 30))
+	if pieces < cost:
+		return "pieces"
+	var recruit := _draw_candidate([])
+	pieces -= cost
+	mrr += float(item.get("mrrDelta", 12))
+	if not recruit.is_empty():
+		_get_primary_roster().append({
+			"id": recruit.get("id", "") + "-rachat-%d" % sprint_number,
+			"name": recruit.get("name", ""),
+			"role": recruit.get("role", ""),
+			"seniority": recruit.get("seniority", "junior"),
+			"salary": int(recruit.get("salary", GameData.balance.get("salaries", {}).get(recruit.get("seniority", "junior"), 1))),
+			"trait": recruit.get("trait", ""),
+			"visible_trait_id": recruit.get("visible_trait_id", ""),
+			"hidden_trait": recruit.get("hidden_trait", ""),
+			"hiddenRevealed": recruit.get("hiddenRevealed", false),
+			"hiredSprint": sprint_number,
+		})
+	add_pending({"dette-organisationnelle": float(item.get("detteDelta", 8))},
+		"🤝 Rachat d'un concurrent (%d 🪙) : +%d MRR%s, 🧱 Dette +%d." % [
+			cost, int(item.get("mrrDelta", 12)),
+			" · +1 employé (%s)" % recruit.get("name", "") if not recruit.is_empty() else "",
+			int(item.get("detteDelta", 8)),
+		])
+	return ""
+
+
+## 🎯 Chasseur de têtes : le prochain tirage de l'étal force des candidats et
+## révèle leurs traits cachés (voir get_shop_offer() / _apply_headhunter_boost()).
+func buy_headhunter() -> String:
+	var item := find_investment_item("headhunter")
+	var cost := int(item.get("cost", 8))
+	if pieces < cost:
+		return "pieces"
+	pieces -= cost
+	headhunter_pending = true
+	headhunter_target_candidates = int(item.get("nextShopCandidates", 4))
+	pending_journal_lines.append("🎯 Chasseur de têtes engagé (%d 🪙) : le prochain étal forcera %d candidats, traits révélés." % [
+		cost, headhunter_target_candidates
+	])
+	return ""
+
+
+## 🏛️ Plan de redressement : un rattrapage de quota, consommé automatiquement
+## par _record_quarter_resolution() la première fois qu'un trimestre
+## manquerait son quota. Rachetable pour empiler les rattrapages.
+func buy_turnaround_plan() -> String:
+	var item := find_investment_item("turnaround-plan")
+	var cost := int(item.get("cost", 20))
+	if pieces < cost:
+		return "pieces"
+	pieces -= cost
+	turnaround_plans_available += 1
+	pending_journal_lines.append("🏛️ Plan de redressement acheté (%d 🪙) — %d rattrapage(s) de quota en réserve." % [
+		cost, turnaround_plans_available
+	])
+	return ""
+
+
+## 🎲 Avance sur trimestre : +10 💶 immédiats contre -80 d'Impact sur le
+## cumul du trimestre qui vient. Un débit assumé sur quarter_impact, pas un
+## abaissement du quota : un cumul qui passe sous zéro est une information de
+## jeu (le pari coûte cher), jamais silencieusement remis à zéro ici — la
+## remise à zéro trimestrielle reste la seule de _prepare_quarter().
+## Répétable : chaque avance alourdit encore le trimestre en cours.
+func buy_quarter_advance() -> String:
+	var item := find_investment_item("quarter-advance")
+	var gain := int(item.get("budgetGain", 10))
+	var penalty := int(item.get("impactPenalty", 80))
+	pieces += gain
+	quarter_impact -= penalty
+	pending_journal_lines.append("🎲 Avance sur trimestre : +%d 🪙 contre −%d d'Impact sur le quota en cours (cumul désormais %d)." % [
+		gain, penalty, quarter_impact
+	])
 	return ""
 
 
@@ -505,8 +767,11 @@ func get_primary_squad() -> Dictionary:
 func _get_primary_roster() -> Array:
 	return get_primary_squad().get("roster", [])
 
+## Cap d'effectif : figé par l'entreprise à l'origine (companies.json →
+## teamCap), désormais un objet de jeu — 🪑 Ouvrir un poste au Comité
+## l'augmente (spec §12) sans jamais réécrire la donnée de départ.
 func get_team_cap() -> int:
-	return int(get_company().get("teamCap", 6))
+	return int(get_company().get("teamCap", 6)) + team_cap_purchased
 
 
 func find_employee(employee_id: String) -> Dictionary:
@@ -906,7 +1171,10 @@ func commit_backlog_plan(plan: Array) -> Dictionary:
 func _draw_backlog_offer() -> Dictionary:
 	var conf: Dictionary = GameData.balance.get("backlogDraw", {})
 	var minimum := int(conf.get("itemsPerSprintMin", 0))
-	var maximum: int = max(minimum, int(conf.get("itemsPerSprintMax", minimum)))
+	# 🚀 Palier de produit (spec §12) : +1 feature proposée par sprint et par
+	# palier acheté au Comité — un plafond de tirage plus haut, pas un minimum
+	# garanti supplémentaire.
+	var maximum: int = max(minimum, int(conf.get("itemsPerSprintMax", minimum))) + product_tier
 	var items: Array = _active_epic_items()
 	var target_total: int = randi_range(minimum, maximum)
 	var regular_count: int = max(0, target_total - items.size())
@@ -984,7 +1252,31 @@ func get_shop_offer() -> Dictionary:
 	if int(current_shop_offer.get("sprint", -1)) == sprint_number:
 		return current_shop_offer
 	current_shop_offer = _draw_shop_offer(0)
+	_apply_headhunter_boost(current_shop_offer)
 	return current_shop_offer
+
+
+## 🎯 Chasseur de têtes (spec §12) : consomme le pari acheté au Comité pour
+## forcer le prochain étal à afficher au moins N candidats, traits cachés
+## déjà révélés. Complète l'offre déjà tirée plutôt que de la refaire, pour
+## ne pas perturber ce que `_draw_shop_offer` a déjà décidé pour les deux
+## autres types.
+func _apply_headhunter_boost(offer: Dictionary) -> void:
+	if not headhunter_pending:
+		return
+	headhunter_pending = false
+	var slots: Array = offer.get("slots", [])
+	while _count_slots_of_kind(slots, "candidate") < headhunter_target_candidates:
+		var slot := _draw_slot("candidate", slots)
+		if slot.is_empty():
+			break
+		slots.append(slot)
+	offer["candidates"] = []
+	for slot in slots:
+		if slot.get("kind", "") == "candidate":
+			slot.get("data", {})["hiddenRevealed"] = true
+			offer["candidates"].append(slot.get("data", {}))
+	offer["slots"] = slots
 
 
 const ASSET_KINDS := ["candidate", "practice", "decision"]
@@ -1633,12 +1925,25 @@ func draw_inbox_event() -> Dictionary:
 	return _find_inbox_event(event_id)
 
 
+## Les événements des équipes subies (spec §9.4) se déclarent `supportTeam`
+## + `levelRange` : un niveau bas génère des crises, un niveau haut de la
+## pression — le niveau lui-même reste fixé par l'entreprise, jamais changé
+## ici. Un événement sans `supportTeam` reste éligible en toutes circonstances.
 func _eligible_inbox_events() -> Array:
 	var result: Array = []
 	for event in GameData.inbox_events:
 		var eras: Array = event.get("eras", [])
-		if eras.is_empty() or eras.has(era_id):
-			result.append(event)
+		if not (eras.is_empty() or eras.has(era_id)):
+			continue
+		var support_team: String = event.get("supportTeam", "")
+		if support_team != "":
+			var level := int(support_teams.get(support_team, 3))
+			var level_range: Array = event.get("levelRange", [0, 5])
+			var low := int(level_range[0]) if level_range.size() > 0 else 0
+			var high := int(level_range[1]) if level_range.size() > 1 else 5
+			if level < low or level > high:
+				continue
+		result.append(event)
 	return result
 
 
@@ -1673,11 +1978,21 @@ func apply_pending_and_check() -> String:
 	last_tresorerie_cost = int(round(pending_deltas.get("tresorerie", 0.0)))
 
 	_apply_per_sprint_effects()
+	var was_cleanup_sprint := cleanup_sprint_pending
 	last_score_report = ScoreResolver.resolve(_build_score_snapshot(), {
 		"scoring": GameData.scoring,
 		"hidden_traits": GameData.hidden_traits,
 		"cards": GameData.cards,
 	})
+	# 🧹 Consommé après avoir servi au snapshot : le sprint qui suit l'achat
+	# est le seul à neutraliser la Traction (spec §12).
+	if was_cleanup_sprint:
+		cleanup_sprint_pending = false
+		pending_journal_lines.append("🧹 Sprint de remise à plat : Traction neutralisée ce sprint, quoi que le roster ait livré.")
+	# 🧩 Compendium des synergies (spec §12.1) : la persistance vit dans
+	# PlayerProfile, pas ici — un seul calcul (celui du resolver), une seule
+	# lecture (celle du rapport déjà produit).
+	PlayerProfile.record_score_report(last_score_report)
 	_apply_payroll()
 	_apply_score_conversion()
 
@@ -1791,7 +2106,11 @@ func _build_score_snapshot() -> Dictionary:
 			"id": squad.get("id", "equipe-%d" % squad_index),
 			"roster": squad.get("roster", []),
 			"capacity": capacity,
-			"delivered": delivered,
+			# 🧹 Sprint de remise à plat (spec §12) : la Traction du sprint est
+			# neutralisée, quoi que le roster ait livré — `squads[]` et
+			# `last_roadmap_report` gardent la vraie livraison pour l'affichage,
+			# seule la vue lue par le score est vidée.
+			"delivered": [] if cleanup_sprint_pending else delivered,
 			"spent_points": spent_points,
 		})
 
@@ -1803,6 +2122,8 @@ func _build_score_snapshot() -> Dictionary:
 		"recurring_roi": recurring_roi,
 		"budget": pieces,
 		"business_model_id": business_model_id,
+		"support_teams": support_teams.duplicate(),
+		"product_tier": product_tier,
 		"active_tools": _active_tool_entries(),
 		"owned_practices": owned_practices,
 		"strategy_ids": _score_strategy_ids(),
@@ -1894,6 +2215,14 @@ func _record_quarter_resolution() -> String:
 		if not bool(objective.get("ok", false)):
 			qualitative_ok = false
 	var passed := quarter_impact >= get_current_quota()
+	# 🏛️ Plan de redressement (spec §12) : un rattrapage de quota consommé
+	# automatiquement, la première fois où il sert — jamais un choix manuel,
+	# sinon on ne le "raterait" jamais.
+	var turnaround_used := false
+	if not passed and turnaround_plans_available > 0:
+		turnaround_plans_available -= 1
+		passed = true
+		turnaround_used = true
 	var qualitative_bonus := 0
 	if passed and qualitative_ok:
 		qualitative_bonus = int(GameData.quotas.get("qualitativeBonusBudget", GameData.quotas.get("qualitativeBonus", {}).get("budget", 8)))
@@ -1907,6 +2236,7 @@ func _record_quarter_resolution() -> String:
 		"quota": get_current_quota(),
 		"impact": quarter_impact,
 		"passed": passed,
+		"turnaroundUsed": turnaround_used,
 		"qualitativeBonus": qualitative_bonus,
 		"objectives": objectives,
 		"requirementIds": quarter_requirement_ids.duplicate(),

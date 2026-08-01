@@ -965,3 +965,236 @@ et `=== SMOKE TEST UI : OK — 9 écrans instanciés, gestes
 Roadmap/Investissements joués ===`. Les critères permanents (`careful` perd
 avant la fin du mandat, `stress` atteint le burn-out) restent asserté dans
 le test lui-même.
+
+## 29. Le Comité d'investissement, les équipes subies, le Compendium (Lot 4)
+
+Ce lot ferme le dernier grand trou du chantier scoring : le Lot 3 avait posé
+`buy_tool_slot()`, `release_tool_slot()`, `choose_strategy()` et
+`get_strategy_options()` sans écran pour les appeler — trois mécaniques
+codées et mortes, invisibles à un joueur. `committee_screen` les branche, et
+en profite pour porter tous les autres postes que la spec §12 promettait :
+ouvrir un poste, promotion, palier de produit, séminaire, remise à plat,
+rachat d'un concurrent, chasseur de têtes, plan de redressement, avance sur
+trimestre. Onze postes, une seule règle de construction : chaque section de
+l'écran ne fait que lire une fonction de `SprintState` et rejouer son refus
+— exactement le contrat déjà en place pour l'étal des Investissements.
+
+**Où le Comité s'insère, et pourquoi cette insertion-là.** La bascule vit
+dans `resolution_screen._on_next_sprint_pressed()`, conditionnée par un test
+minuscule (`_quarter_just_closed()`) qui compare `quarter_result.sprint` au
+`sprint_number` courant *avant* son incrément — exactement le test que
+`_setup_quota_replay()` utilisait déjà pour distinguer « le trimestre vient
+de se clore ici » de « il s'est clos il y a un sprint ou plus ». Résultat :
+un seul point d'entrée gère à la fois le cas normal (trimestre franchi,
+mandat continue) et le cas T4 (après le choix « rester pour le mandat
+long », qui reconnecte le même bouton) sans dupliquer la logique de
+routage. Le Comité ne s'ouvre jamais sur un trimestre manqué (la fin de
+mandat court-circuite avant), jamais au fil de l'eau (le test est faux dans
+99 % des sprints), et jamais avant que le joueur ait tranché sortie/mandat
+long à T4.
+
+**Le prix de la décision stratégique est un tirage, pas une constante.** La
+spec donne une fourchette (15-30) plutôt qu'un chiffre : `strategy_purchase_cost()`
+tire une fois par trimestre et mémorise le résultat dans
+`current_committee_offer`, sur le même principe que le prix du re-tirage de
+l'étal — sans ce cache, rouvrir l'écran changerait le prix sous les yeux du
+joueur. `choose_strategy()` du Lot 3 reste gratuite (c'est ce que
+`_assign_forced_strategy()` continue d'appeler pour l'injonction du board,
+qui ne se négocie pas) ; `buy_strategy()` est la version payante, la seule
+que le Comité expose, et c'est elle qui prélève les pièces avant de
+déléguer à `choose_strategy()` — la logique de « une par trimestre,
+irréversible » ne bouge pas d'un octet.
+
+**Le cap d'effectif devient un objet de jeu.** `get_team_cap()` additionne
+désormais `companies.json → teamCap` et `team_cap_purchased`, acheté au
+Comité sur une échelle de prix (`investments.json → open-seat.costs`,
+6/10/16/24 — l'ellipsis de la spec tranchée en un quatrième palier plutôt
+que laissée ouverte). Comme les slots d'outillage, la table est finie et le
+Comité refuse "plafond" une fois épuisée : un cap qui grandirait sans
+limite romprait la tension entre effectif et masse salariale qui structure
+tout le jeu depuis la Phase A.
+
+**La promotion cible une personne, pas un slot abstrait.** `promote_employee()`
+prend un `employee_id` — le Comité liste tous les juniors du roster et
+laisse choisir, plutôt que de promouvoir "le premier junior trouvé" en
+silence : une promotion est une décision RP (qui, pas juste combien), et la
+carte d'employé mutée en place (GDScript passe les Dictionary par
+référence) rejoint immédiatement le calcul de capacité et de Levier sans
+repasser par aucun autre code.
+
+**Le palier de produit corrige un chiffre hérité du Lot 1.**
+`scoring.json → global.productTier.leverPerTier` valait `0.1` depuis le Lot 1,
+qui l'avait câblé mécaniquement sans jamais lui donner de point d'achat. La
+spec du Comité (§12) est explicite : *+0,5 Levier permanent* par palier.
+Ce lot corrige la valeur pour que l'achat au Comité tienne sa promesse — un
+rééquilibrage assumé, pas un vestige qu'on aurait pu laisser trainer parce
+que "personne ne l'achetait de toute façon". `_draw_backlog_offer()` ajoute
+`product_tier` au plafond de tirage (jamais au minimum garanti : un palier
+de produit élargit ce qui *peut* sortir, il ne force rien).
+
+**Le sprint de remise à plat neutralise la Traction sans mentir sur ce qui a
+été livré.** `cleanup_sprint_pending` ne vide `delivered` que dans la copie
+lue par `ScoreResolver` (`_build_score_snapshot()`), jamais dans `squads[]`
+ni `last_roadmap_report` : la Résolution continue d'afficher fidèlement ce
+que l'équipe a réellement produit ce sprint-là, seule la conversion en
+Impact est mise à zéro. Séparer "ce qui s'est passé" de "ce qui compte pour
+le score" évite d'avoir à mentir sur l'un pour faire fonctionner l'autre.
+
+**Le rachat d'un concurrent mélange volontairement deux tempos.** Le MRR et
+l'employé arrivent immédiatement (un rachat, ça se signe et ça s'intègre
+tout de suite) ; la Dette, elle, passe par `add_pending()` et n'apparaît
+qu'à la prochaine Résolution, comme tout ce qui pèse sur les six jauges. Un
+même geste d'achat a donc deux horloges différentes, et c'est un choix
+délibéré : un stock (MRR, effectif) se déplace d'un coup, un flux (Dette)
+suit le rythme du sprint.
+
+**Le chasseur de têtes complète l'offre déjà tirée plutôt que de la
+refaire.** `_apply_headhunter_boost()` s'exécute après `_draw_shop_offer()`
+et ajoute des candidats jusqu'au seuil promis, sans toucher aux décisions ni
+aux pratiques déjà tirées pour ce sprint — rejouer tout le tirage aurait
+changé des emplacements que le joueur n'a pas payé pour changer.
+
+**Le plan de redressement se consomme tout seul, jamais sur un bouton.**
+`_record_quarter_resolution()` le déclenche automatiquement la première fois
+qu'un trimestre manquerait son quota, exactement comme un filet de sécurité
+qu'on n'active pas soi-même au moment de tomber. C'est cohérent avec la
+mécanique elle-même : décider *a priori* "je veux un rattrapage" a un sens
+RP (sécuriser un trimestre difficile à l'avance), décider *a posteriori*
+"je l'utilise maintenant" n'en aurait aucun — le quota est déjà tranché au
+moment où l'écran pourrait proposer le bouton.
+
+**L'avance sur trimestre débite le cumul, elle n'abaisse pas le quota.**
+`buy_quarter_advance()` fait `quarter_impact -= 80` (ou l'inverse en signe,
+selon la lecture) sans jamais clamper le résultat à zéro : un cumul qui
+passe sous zéro est une information de jeu — le pari coûte cher, et ça doit
+se voir — pas un artefact à cacher. C'est une contrainte explicite du lot
+suivant (Impact comme ressource centrale, dépassement de quota qui compte) :
+ce lot-ci n'ajoute aucun troisième clamp à côté de celui de
+`_prepare_quarter()` (remise à zéro trimestrielle) et de celui du panneau
+latéral (jauge d'affichage bornée à `[0, quota]`) — les deux existants
+restent inchangés, et c'est un choix délibéré de ne rien construire ici qui
+leur ferait concurrence.
+
+### Les équipes subies : un champ de données qui manquait, pas un mécanisme
+
+Le taux de conversion des équipes subies (Sales/PMM/CSM) existait déjà en
+entier dans `ScoreResolver._resolve_conversion()` avant ce lot — trois
+tables de multiplicateurs dans `scoring.json`, lues et appliquées à
+l'étape ⑨. Ce qui manquait tenait en une ligne : `companies.json` ne
+déclarait `supportTeams` nulle part, et `_build_score_snapshot()` ne le
+transmettait pas. Les deux entreprises convertissaient donc identiquement,
+avec un défaut 3/3/3 codé en dur dans le resolver. Ajouter
+`supportTeams: {sales, pmm, csm}` aux deux entreprises et une ligne dans le
+snapshot suffit à débloquer le critère de recette de l'issue — un rappel
+que la donnée manquante coûte parfois plus cher à repérer qu'à corriger.
+
+Le défaut 3/3/3 reste dans `support_teams` de `SprintState` (pas
+`GameData.companies`) précisément pour ne jamais forcer une troisième
+entreprise ou un scénario futur à déclarer le champ : l'absence de
+`supportTeams` dans une entrée de `companies.json` reste un choix valide
+(niveau neutre), jamais une erreur silencieuse.
+
+**Elles ne gagnent aucun nouveau levier.** Pas d'achat, pas de slot, pas de
+niveau à monter au Comité — c'était un point de design ferme de la spec, et
+ce lot le respecte à la lettre : aucune fonction de `SprintState` ne
+modifie `support_teams` sur demande du joueur. La seule porte qui existe est
+déclarative et collatérale : `scoring.json → global.strategies.*.supportTeamDeltas`
+(Open source : PMM +1 / Sales −1 ; Arrêter de communiquer : PMM −1, cohérent
+avec la prose déjà écrite au Lot 3 avant même que le mécanisme existe) — une
+décision stratégique change le monde autour des équipes subies, elle ne les
+pilote pas. `_apply_strategy_support_team_deltas()` lit ce champ pour
+n'importe quelle stratégie qui le porterait un jour ; en ajouter une
+troisième ne demandera aucune ligne de code.
+
+**Les événements Inbox suivent le même principe : niveau bas = crise,
+niveau haut = pression, jamais l'inverse.** `supportTeam` + `levelRange`
+filtrent l'éligibilité dans `_eligible_inbox_events()`, exactement comme
+`eras[]` le fait déjà pour les scénarios — la troisième couche de filtre
+d'un mécanisme qui n'en avait besoin que de deux jusqu'ici. Six événements
+(deux par équipe subie) couvrent les trois gabarits de la spec : le deal
+bloqué sur une promesse en l'air, la survente qui force à suivre le rythme,
+le silence produit que personne ne sait raconter, la campagne qui arrive
+avant la feature, les tickets qui saturent le support, l'insight que la
+Discovery avait raté.
+
+**La visibilité à l'étape ⑨ passe par le rapport, pas par un second
+calcul.** `_resolve_conversion()` expose désormais `teamRates` (niveau +
+multiplicateur des trois équipes) et trois lignes `conversion_rate` dans le
+rapport ; `resolution_screen` les affiche dans une section dédiée
+"CONVERSION — ÉQUIPES SUBIES", après la ligne d'Impact — elles convertissent
+l'Impact déjà résolu, jamais un levier dessus, donc jamais mélangées à la
+section "LEVIERS & FRICTIONS" qui précède l'Impact. Un seul calcul (celui du
+resolver), affiché à l'endroit qui correspond à sa place réelle dans la
+chaîne Traction × Levier = Impact → conversion.
+
+### Le Compendium des synergies et `PlayerProfile`
+
+Aucune persistance entre deux runs n'existait avant ce lot — rien en
+`user://`, à part un screenshot de prototype jamais branché. Le Compendium
+en avait besoin, et le Lot 5 (progression de carrière) en aura besoin aussi
+: plutôt que de coder une persistance ad hoc pour le Compendium seul,
+`PlayerProfile` (nouvel autoload) porte une interface générique — des
+combos découverts d'un côté, un espace clé/valeur libre de l'autre, le tout
+dans un unique `ConfigFile` en `user://player_profile.cfg`. Le coût
+d'écriture est nul (quelques dizaines d'entrées au grand maximum), donc
+sauvegarder à chaque découverte plutôt que de batcher n'est pas un
+problème.
+
+**La détection lit le rapport, elle ne retente aucune condition.**
+`record_score_report()` scanne les lignes déjà produites par
+`ScoreResolver.resolve()` (`squads[].lines` + `global.lines`) et les
+confronte au catalogue de combos par la paire (icône, libellé) — unique
+pour chacun des 15 combos du jeu (8 `organizationCombos`, 5 `handBonuses`,
+2 `interSquadCombos`, vérifié en Python avant d'écrire le mécanisme).
+Réévaluer les conditions des combos ici aurait dupliqué une logique déjà
+tranchée par le resolver ; lire sa sortie ne duplique rien.
+
+**Le catalogue reste une lecture de `scoring.json`, jamais une copie.**
+`get_combo_catalog()` reconstruit la liste à chaque appel depuis les trois
+tables existantes — ajouter un seizième combo dans `scoring.json` suffira à
+le faire apparaître au Compendium, en `???` jusqu'à sa première apparition,
+sans toucher à une ligne de `player_profile.gd`.
+
+**Un piège de test à connaître : `user://` est un vrai fichier, qui survit
+d'un run headless à l'autre.** `PlayerProfile.clear_all()` existe
+uniquement pour ça — sans point d'entrée pour vider le profil, toute
+assertion "tel combo n'est pas encore découvert" deviendrait flaky après le
+premier passage du smoke test sur la machine. Ne jamais l'appeler depuis le
+jeu : `reset_run()` ne doit jamais effacer une progression méta, c'est tout
+l'intérêt de la séparer de `SprintState`.
+
+### Un test flaky préexistant, pas une régression de ce lot
+
+`smoke_test_logic.gd` échouait par intermittence (mesuré à 32/40 puis
+33/40 sur des runs répétés, taux identique avant et après ce lot) sur
+l'assertion « le premier trimestre doit proposer au moins une décision
+stratégique ». La cause, une fois tracée : l'exigence trimestrielle
+`board-injunction` (1 chance sur 8 dans `quotas.json`) force une décision
+stratégique dès `reset_run()`, via `_prepare_quarter(1)` →
+`_assign_forced_strategy()` → `choose_strategy()`, qui verrouille
+`quarter_strategy_chosen` avant que le test n'ait la main. Le test, écrit
+au Lot 3, supposait à tort qu'un catalogue vide au premier trimestre ne
+pouvait être qu'une erreur — alors que c'est exactement le comportement
+voulu une fois sur huit. Le moteur avait raison, le test avait tort :
+corrigé pour accepter un catalogue vide *seulement si* une injonction l'a
+déjà consommé (`quarter_strategy_chosen` et `quarter_forced_strategy_id`
+non vides), sinon échouer comme avant. La distinction compte : une
+assertion qui accepterait silencieusement n'importe quel catalogue vide ne
+testerait plus rien.
+
+Même piège retombé une seconde fois, cette fois dans un test écrit *pour*
+ce lot : `_test_support_teams_and_compendium_lot4()` lisait
+`SprintState.support_teams` juste après `reset_run()` en supposant qu'il
+reflétait encore `companies.json` — sans compter qu'une injonction du board
+peut, à cet instant précis, avoir déjà forcé une stratégie qui porte elle-
+même un `supportTeamDeltas` (la mécanique décrite plus haut). Pire :
+réinitialiser ensuite `chosen_strategy_ids` pour tester un choix volontaire
+d'"open-source" pouvait faire rejouer une seconde fois l'effet de bord
+d'une stratégie déjà appliquée par l'injonction, faussant la comparaison
+avant/après. Mesuré à 26/30 puis 60/60 après correctif : distinguer la
+déclaration brute (`companies.json`, jamais mutée) de l'état runtime
+(`support_teams`, réaligné explicitement avant chaque sous-test qui en
+dépend) règle la même classe de bug que le premier flaky, avec la même
+cause profonde — le hasard d'une injonction de board tirée à T1, que tout
+test touchant au premier trimestre doit désormais neutraliser
+explicitement plutôt que d'espérer qu'il ne tombe pas dessus.

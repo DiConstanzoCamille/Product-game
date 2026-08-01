@@ -349,6 +349,156 @@
           "effects": { "cynisme": 7, "moral": 4 }
         }
       ]
+    },
+    {
+      "id": "sales-deal-bloque",
+      "from": "Karim, Sales",
+      "channel": "#ventes",
+      "sprint": 4,
+      "status": "urgent",
+      "subject": "200 k€ bloqués sur une promesse en l'air",
+      "text": "Un deal à 200 k€ est bloqué sur une feature qui n'existe pas. Le commercial l'a promise au client en pleine négo, sans en parler à personne.",
+      "supportTeam": "sales",
+      "levelRange": [0, 2],
+      "choices": [
+        {
+          "id": "construire-en-urgence",
+          "label": "La construire en urgence, quoi qu'il en coûte",
+          "reveal": "🧱 Dette +6 · 🫶 Moral −3 — la capacité du sprint part sur une promesse, pas sur le backlog. Traction médiocre garantie.",
+          "effects": { "dette-organisationnelle": 6, "moral": -3 }
+        },
+        {
+          "id": "refuser-deal",
+          "label": "Refuser, le deal tombe",
+          "reveal": "🎯 Capital politique −3 · 💰 Trésorerie −3 — un commercial vexé, un client qui va voir ailleurs, et une force de vente faible qui recommencera.",
+          "effects": { "capital-politique": -3, "tresorerie": -3 }
+        }
+      ]
+    },
+    {
+      "id": "sales-survente",
+      "from": "Karim, Sales",
+      "channel": "#ventes",
+      "sprint": 7,
+      "status": "non lu",
+      "subject": "On a signé large, il va falloir suivre",
+      "text": "Le Sales a vendu trois fois ce que la roadmap prévoyait ce trimestre. Les comptes signés attendent maintenant que le produit suive.",
+      "supportTeam": "sales",
+      "levelRange": [4, 5],
+      "choices": [
+        {
+          "id": "suivre-le-rythme",
+          "label": "Suivre le rythme, sacrifier un peu de qualité",
+          "reveal": "🧱 Dette +5 · 📈 Valeur perçue +2 — les clients sont contents, l'équipe encaisse la dette qu'ils ne voient pas.",
+          "effects": { "dette-organisationnelle": 5, "valeur-percue": 2 }
+        },
+        {
+          "id": "freiner-sales",
+          "label": "Dire non, freiner la prochaine vague de ventes",
+          "reveal": "🎯 Capital politique −2 · 🎭 Cynisme +3 — le Sales n'a jamais entendu un CPO dire non à du chiffre.",
+          "effects": { "capital-politique": -2, "cynisme": 3 }
+        }
+      ]
+    },
+    {
+      "id": "pmm-personne-ne-sait-dire",
+      "from": "Anonyme, tout le monde en interne",
+      "channel": "#direction-produit",
+      "sprint": 3,
+      "status": "non lu",
+      "subject": "C'est quoi le produit, déjà ?",
+      "text": "Personne dans la boîte ne sait décrire ce que fait le produit en une phrase — pas même à l'accueil. Le Product marketing n'a jamais posé le message.",
+      "supportTeam": "pmm",
+      "levelRange": [0, 2],
+      "choices": [
+        {
+          "id": "session-cadrage",
+          "label": "Organiser une session de cadrage en urgence",
+          "reveal": "💰 Trésorerie −3 · 🎭 Cynisme −2 — un après-midi perdu en réunion, un message qui existe enfin.",
+          "effects": { "tresorerie": -3, "cynisme": -2 }
+        },
+        {
+          "id": "laisser-filer-message",
+          "label": "Laisser filer, ce n'est pas votre rôle",
+          "reveal": "📈 Valeur perçue −5 — sans personne pour raconter le produit, le marché continue de ne pas savoir qu'il existe.",
+          "effects": { "valeur-percue": -5 }
+        }
+      ]
+    },
+    {
+      "id": "pmm-campagne-en-retard",
+      "from": "Léa, Product marketing",
+      "channel": "#direction-produit",
+      "sprint": 6,
+      "status": "urgent",
+      "subject": "La campagne sort dans 2 sprints",
+      "text": "La campagne de communication est calée dans deux sprints — mais la feature qu'elle met en avant n'est pas prête.",
+      "supportTeam": "pmm",
+      "levelRange": [4, 5],
+      "choices": [
+        {
+          "id": "prioriser-pour-campagne",
+          "label": "Prioriser la feature pour tenir la date",
+          "reveal": "🧱 Dette +4 · 🫶 Moral −3 — l'équipe sprint pour une date qu'elle n'a pas choisie.",
+          "effects": { "dette-organisationnelle": 4, "moral": -3 }
+        },
+        {
+          "id": "decaler-campagne",
+          "label": "Décaler la campagne",
+          "reveal": "🎯 Capital politique −3 · 📈 Valeur perçue −2 — le Product marketing avait un calendrier, vous venez de le casser.",
+          "effects": { "capital-politique": -3, "valeur-percue": -2 }
+        }
+      ]
+    },
+    {
+      "id": "csm-tickets-en-rafale",
+      "from": "Nadia, Support client",
+      "channel": "#support",
+      "sprint": 5,
+      "status": "urgent",
+      "subject": "40 tickets, un seul bug",
+      "text": "Le support crie au secours : 40 tickets ouverts sur le même bug cette semaine, et ça continue d'arriver.",
+      "supportTeam": "csm",
+      "levelRange": [0, 2],
+      "choices": [
+        {
+          "id": "stopper-pour-corriger",
+          "label": "Tout arrêter pour corriger",
+          "reveal": "🧱 Dette −5 · 🫶 Moral −4 — le sprint saute, mais le Support cesse de porter seul le problème.",
+          "effects": { "dette-organisationnelle": -5, "moral": -4 }
+        },
+        {
+          "id": "prioriser-roadmap",
+          "label": "Ignorer, la roadmap prime",
+          "reveal": "📈 Valeur perçue −4 · 🎭 Cynisme +4 — ça rentre par la porte et ça sort par la fenêtre, ticket après ticket.",
+          "effects": { "valeur-percue": -4, "cynisme": 4 }
+        }
+      ]
+    },
+    {
+      "id": "csm-insight-remonte",
+      "from": "Nadia, Support client",
+      "channel": "#support",
+      "sprint": 9,
+      "status": "non lu",
+      "subject": "On a vu un truc que la Discovery a raté",
+      "text": "Le support a remonté un pattern client répété — un vrai insight que la Discovery n'avait jamais capté.",
+      "supportTeam": "csm",
+      "levelRange": [4, 5],
+      "choices": [
+        {
+          "id": "investiguer-immediatement",
+          "label": "Investiguer immédiatement",
+          "reveal": "⚡ Énergie −5 · 📈 Valeur perçue +3 — un vrai bon insight, payé sur votre propre temps.",
+          "effects": { "energie": -5, "valeur-percue": 3 }
+        },
+        {
+          "id": "remercier-plus-tard",
+          "label": "Merci, on regarde ça plus tard",
+          "reveal": "🎭 Cynisme +3 · 🎯 Capital politique −2 — un Support fort qui apprend à se taire, ce n'est pas un cadeau.",
+          "effects": { "cynisme": 3, "capital-politique": -2 }
+        }
+      ]
     }
   ]
 }

@@ -27,6 +27,7 @@ const SCREENS := [
 	"res://scenes/screens/resolution_screen.tscn",
 	"res://scenes/screens/foundations_screen.tscn",
 	"res://scenes/screens/mandate_end_screen.tscn",
+	"res://scenes/screens/committee_screen.tscn",
 ]
 
 
@@ -50,6 +51,8 @@ func _ready() -> void:
 	await _test_quarter_result_uses_global_sprint()
 	await _test_quota_sidebar_and_freezes()
 	await _test_t4_mandate_choice()
+	await _test_committee_screen_interactions()
+	await _test_compendium_tab()
 
 	if failures > 0:
 		print("=== SMOKE TEST UI : ÉCHEC — %d assertion(s) en erreur ===" % failures)
@@ -436,6 +439,101 @@ func _test_t4_mandate_choice() -> void:
 	var exit_ending: String = SprintState.choose_mandate_path(false)
 	if exit_ending not in ["ipo", "rachat"] or not SprintState.is_mandate_over or SprintState.ending_id != exit_ending:
 		_fail("Quitter sur la victoire T4 doit conduire a une fin positive et au routage de fin de mandat.")
+
+
+## Lot 4 : le Comité d'investissement se reconstruit entièrement à chaque
+## achat (comme l'étal des Investissements) — le vrai clic est le seul test
+## qui attrape le bug "libéré pendant l'émission de son signal" (carnet §21).
+func _test_committee_screen_interactions() -> void:
+	print("  → gestes de l'écran Comité d'investissement")
+	SprintState.reset_run("agile-transformation", "karavel-scaleup")
+	SprintState.chosen_strategy_ids.clear()
+	SprintState.quarter_strategy_chosen = false
+	SprintState.pieces = 200
+
+	var viewport := SubViewport.new()
+	viewport.size = Vector2i(1600, 900)
+	add_child(viewport)
+	var screen: Control = load("res://scenes/screens/committee_screen.tscn").instantiate()
+	viewport.add_child(screen)
+	for i in 3:
+		await get_tree().process_frame
+
+	var slots_before := SprintState.tool_slots_purchased
+	var open_slot_button := _find_action_button(screen.content, "Ouvrir un slot d'outillage")
+	if open_slot_button == null:
+		_fail("Le Comité doit afficher un poste 'Ouvrir un slot d'outillage'.")
+	else:
+		open_slot_button.pressed.emit()
+		await get_tree().process_frame
+		if SprintState.tool_slots_purchased != slots_before + 1:
+			_fail("Cliquer sur 'Ouvrir un slot d'outillage' doit appeler SprintState.buy_tool_slot().")
+
+	var seats_before := SprintState.team_cap_purchased
+	var seat_button := _find_action_button(screen.content, "Ouvrir un poste")
+	if seat_button == null:
+		_fail("Le Comité doit afficher un poste 'Ouvrir un poste'.")
+	else:
+		seat_button.pressed.emit()
+		await get_tree().process_frame
+		if SprintState.team_cap_purchased != seats_before + 1:
+			_fail("Cliquer sur 'Ouvrir un poste' doit appeler SprintState.buy_team_cap_seat().")
+
+	screen.queue_free()
+	viewport.queue_free()
+	await get_tree().process_frame
+
+
+## Cherche, dans le contenu du Comité, la ligne dont le libellé exact
+## correspond à `row_title` (structure posée par committee_screen._action_row :
+## PanelContainer > HBoxContainer[icone, VBoxContainer[nom, description],
+## coût, bouton]) et retourne son bouton d'action.
+func _find_action_button(container: Node, row_title: String) -> Button:
+	for child in container.get_children():
+		if not child is PanelContainer:
+			continue
+		var row: Node = child.get_child(0) if child.get_child_count() > 0 else null
+		if row == null:
+			continue
+		var has_title := false
+		var button: Button = null
+		for sub in row.get_children():
+			if sub is Button:
+				button = sub
+			elif sub is VBoxContainer:
+				for label in sub.get_children():
+					if label is Label and label.text == row_title:
+						has_title = true
+		if has_title and button != null:
+			return button
+	return null
+
+
+## Lot 4 (spec §12.1) : l'onglet Compendium du Dossier entreprise liste tous
+## les combos, les non-découverts en ???.
+func _test_compendium_tab() -> void:
+	print("  → onglet Compendium du Dossier entreprise")
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+	PlayerProfile.clear_all()
+
+	var viewport := SubViewport.new()
+	viewport.size = Vector2i(1600, 900)
+	add_child(viewport)
+	var screen: Control = load("res://scenes/screens/roadmap_screen.tscn").instantiate()
+	viewport.add_child(screen)
+	for i in 3:
+		await get_tree().process_frame
+
+	var dossier: Control = UIHelpers.instantiate_company_dossier(screen)
+	var compendium_content: Node = dossier.get_node_or_null("VBox/Tabs/🧩 Compendium/CompendiumContent")
+	if compendium_content == null:
+		_fail("Le Dossier entreprise doit exposer un onglet Compendium avec son conteneur de contenu.")
+	elif compendium_content.get_child_count() == 0:
+		_fail("Le Compendium doit afficher au moins un combo, découvert ou non.")
+
+	screen.queue_free()
+	viewport.queue_free()
+	await get_tree().process_frame
 
 
 func _primary_button_of(card: Control) -> Button:

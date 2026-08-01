@@ -33,7 +33,7 @@
   },
   "global": {
     "baseLever": 1.0,
-    "productTier": { "leverPerTier": 0.1, "icon": "🏗️", "label": "Palier produit" },
+    "productTier": { "leverPerTier": 0.5, "icon": "🏗️", "label": "Palier produit" },
     "practices": {
       "discovery": { "lever": 0.05, "icon": "🔍", "label": "Discovery" },
       "ux-research": { "lever": 0.05, "icon": "🎨", "label": "UX research" },
@@ -44,12 +44,12 @@
       "retros-sinceres": { "lever": 0.1, "icon": "🫶", "label": "Rétrospectives sincères" }
     },
     "strategies": {
-      "open-source": { "tractionMultiplier": 1.4, "mrrMultiplier": 0.5, "icon": "🔓", "label": "Open source" },
+      "open-source": { "tractionMultiplier": 1.4, "mrrMultiplier": 0.5, "supportTeamDeltas": { "pmm": 1, "sales": -1 }, "icon": "🔓", "label": "Open source" },
       "freemium": { "mrrMultiplier": 1.3, "churnMultiplier": 1.5, "icon": "💳", "label": "Freemium" },
       "enterprise-first": { "featureTractionMultiplier": 2, "featureCondition": { "roiMinimum": 2 }, "quickWinTractionMultiplier": 0, "icon": "🏢", "label": "Enterprise first" },
       "plateforme-api-publique": { "leverPerProductTier": 0.15, "icon": "🔌", "label": "Plateforme API publique" },
       "expansion-internationale": { "mrrStockMultiplier": 1.35, "icon": "🌍", "label": "Expansion internationale" },
-      "arreter-de-communiquer": { "lever": 0.4, "icon": "🤫", "label": "Arrêter de communiquer" },
+      "arreter-de-communiquer": { "lever": 0.4, "supportTeamDeltas": { "pmm": -1 }, "icon": "🤫", "label": "Arrêter de communiquer" },
       "annee-de-consolidation": { "tractionMultiplier": 0.7, "icon": "🧯", "label": "Année de consolidation" }
     },
     "interSquadCombos": {
