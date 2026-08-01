@@ -242,3 +242,18 @@ un profil neuf doit pouvoir lancer un run sans avoir jamais écrit sur le
 disque) via `get_unlocked_career_levels()` / `is_career_level_unlocked()` /
 `unlock_career_level()` — ce dernier idempotent et appelé uniquement par
 `SprintState._unlock_next_career_level()`, jamais par un écran.
+
+### `careers.json` → `attention` (Lot 5, palier 3)
+
+- `attention.slotsByLevel` — table indexée par id de niveau : combien d'équipes
+  le joueur pilote lui-même sur un sprint. Volontairement très inférieure au
+  nombre d'équipes du niveau (voir carnet §30.4). En l'absence d'entrée, le
+  défaut est « toutes les équipes sont pilotables », ce qui rend un fichier
+  incomplet inoffensif plutôt que bloquant.
+- `attention.autoPilotProfiles` — les trois profils de décision d'une équipe
+  non pilotée, retenus par séniorité du meilleur PM (`senior`, `junior`,
+  `none`). `sort` vaut `backlog-order` (ordre du tirage) ou `weighted` ;
+  `weights` pondère `roi`, `clientImpact` et `risk` ; `perPoint: true` divise
+  la note par `costPoints` (le PM raisonne en rendement et non en valeur
+  brute) ; `epicPointsRatio` est la part de capacité restante qu'un profil
+  investit dans un epic.

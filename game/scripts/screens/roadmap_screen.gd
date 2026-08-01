@@ -559,5 +559,11 @@ func _update_capacity() -> void:
 
 
 func _on_next_pressed() -> void:
+	# 🎯 Tant que cet écran ne sait piloter qu'une équipe, il déclare ne piloter
+	# que celle-là : toutes les autres passent en auto-pilotage plutôt que de
+	# perdre leur sprint faute d'être exposées. Le jour où le sélecteur
+	# d'équipe arrive, seule cette ligne change. À N=1 l'appel est neutre.
+	SprintState.set_piloted_squads([SprintState.get_primary_squad().get("id", "")])
 	SprintState.commit_backlog_plan(_current_plan())
+	SprintState.resolve_unpiloted_squads()
 	get_tree().change_scene_to_file(NEXT_SCENE)

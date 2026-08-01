@@ -47,6 +47,7 @@ var streak: int = 0                    # sprints livrés consécutifs, réservé
 # --- Phase A : l'entreprise ---
 var pieces: int = 0                    # 🪙 budget d'action de l'entreprise (jamais négatif)
 var squads: Array = []                 # [{id, name, roster, backlog_draw, capacity, delivered, epic_progress}]
+var piloted_squads: Dictionary = {}    # 🎯 {sprint, ids} — les équipes pilotées ce sprint (Lot 5 §13.3) ; les autres jouent seules
 var owned_practices: Array = []        # ids de pratiques achetées (permanentes pour le mandat)
 var fired_count: int = 0               # licenciements prononcés ce mandat (le cynisme monte à partir du 2e)
 var next_hire_discount: int = 0        # remise 🪙 sur le prochain recrutement (trait caché Réseau)
@@ -212,6 +213,7 @@ func reset_run(chosen_era_id: String = "", chosen_company_id: String = "", chose
 			"hiddenRevealed": true,  # l'équipe héritée a déjà fait sa période d'essai
 			"hiredSprint": 0,
 		})
+	piloted_squads = {}
 	squads = [{
 		"id": "squad-principale",
 		"name": "Equipe produit",
@@ -1481,6 +1483,142 @@ func commit_backlog_plan_for_squad(squad_id: String, plan: Array) -> Dictionary:
 		squad.get("name", "Équipe"), spent, capacity, " · %d livraison(s)" % delivered.size() if not delivered.is_empty() else ""
 	])
 	return report
+
+
+# --- 🎯 L'attention : on ne pilote pas tout (Lot 5 palier 3, spec §13.3) ---
+
+## Nombre d'équipes que le joueur pilote lui-même sur un sprint. Table indexée
+## par niveau de carrière (`careers.json → attention.slotsByLevel`), jamais un
+## `if career_level == ...`. Le défaut retombe sur « tout est pilotable », ce
+## qui rend l'absence de la table inoffensive plutôt que bloquante.
+func get_attention_slots() -> int:
+	var slots: Dictionary = GameData.careers.get("attention", {}).get("slotsByLevel", {})
+	return int(slots.get(career_level, squads.size()))
+
+
+## Les équipes pilotées ce sprint. Le choix vit dans `piloted_squads`, validé
+## par numéro de sprint comme `backlog_draw` — pas d'état à réinitialiser à la
+## main quand le sprint avance. Par défaut, les premières équipes de la liste.
+func get_piloted_squad_ids() -> Array:
+	var slots := get_attention_slots()
+	if slots >= squads.size():
+		var everything: Array = []
+		for squad in squads:
+			everything.append(squad.get("id", ""))
+		return everything
+	if int(piloted_squads.get("sprint", -1)) == sprint_number:
+		return piloted_squads.get("ids", [])
+	var defaults: Array = []
+	for squad in squads:
+		if defaults.size() >= slots:
+			break
+		defaults.append(squad.get("id", ""))
+	piloted_squads = {"sprint": sprint_number, "ids": defaults}
+	return defaults
+
+
+## Retourne "" si le choix est accepté, sinon un code de refus rejoué tel quel
+## par l'UI — même contrat que `buy_strategy()` et le reste du Comité.
+func set_piloted_squads(ids: Array) -> String:
+	var slots := get_attention_slots()
+	if ids.size() > slots:
+		return "slots"
+	for squad_id in ids:
+		if _find_squad(squad_id).is_empty():
+			return "inconnue"
+	piloted_squads = {"sprint": sprint_number, "ids": ids.duplicate()}
+	return ""
+
+
+func is_squad_piloted(squad_id: String) -> bool:
+	return get_piloted_squad_ids().has(squad_id)
+
+
+## Le profil d'auto-pilotage d'une équipe = son meilleur PM. Un PM senior
+## raisonne en rendement, un junior en valeur brute, personne ne réfléchit du
+## tout sans PM — c'est la traduction mécanique de « pondérée par la
+## composition » (issue #18).
+func auto_pilot_profile_id(squad: Dictionary) -> String:
+	var best := "none"
+	for member in squad.get("roster", []):
+		if member.get("role", "") != "pm":
+			continue
+		if member.get("seniority", "junior") == "senior":
+			return "senior"
+		best = "junior"
+	return best
+
+
+## Le plan qu'une équipe non pilotée se donne toute seule. **Affiché et
+## appliqué par cette seule fonction** (CLAUDE.md : un seul calcul, deux
+## usages) — l'écran prévisualise exactement ce qui sera joué.
+func build_auto_plan_for_squad(squad_id: String) -> Array:
+	var squad := _find_squad(squad_id)
+	if squad.is_empty():
+		return []
+	var profile_id := auto_pilot_profile_id(squad)
+	var profiles: Dictionary = GameData.careers.get("attention", {}).get("autoPilotProfiles", {})
+	var profile: Dictionary = profiles.get(profile_id, {})
+	var offer := get_backlog_offer_for_squad(squad_id)
+	var items: Array = (offer.get("items", []) as Array).duplicate()
+
+	if profile.get("sort", "backlog-order") == "weighted":
+		var weights: Dictionary = profile.get("weights", {})
+		var per_point: bool = bool(profile.get("perPoint", false))
+		var scored: Array = []
+		for item in items:
+			var score := float(item.get("roi", 0)) * float(weights.get("roi", 0.0))
+			score += float(item.get("clientImpact", 0)) * float(weights.get("clientImpact", 0.0))
+			score -= float(item.get("risk", 0)) * float(weights.get("risk", 0.0))
+			if per_point:
+				score /= max(1.0, float(item.get("costPoints", 1)))
+			scored.append({"item": item, "score": score})
+		scored.sort_custom(func(a, b): return a["score"] > b["score"])
+		items = []
+		for entry in scored:
+			items.append(entry["item"])
+
+	var remaining := get_squad_capacity(squad_id)
+	var epic_ratio: float = float(profile.get("epicPointsRatio", 0.5))
+	var plan: Array = []
+	for item in items:
+		if remaining <= 0:
+			break
+		var item_id: String = item.get("id", "")
+		if is_backlog_epic(item):
+			var invested: int = min(int(round(remaining * epic_ratio)), _squad_epic_remaining(squad, item_id))
+			if invested <= 0:
+				continue
+			plan.append({"id": item_id, "points": invested})
+			remaining -= invested
+		else:
+			var cost := int(item.get("costPoints", 0))
+			if cost <= 0 or cost > remaining:
+				continue
+			# Même format que `roadmap_screen._current_plan()` — `points` est
+			# toujours renseigné, ce qui rend `backlog_plan_points()` utilisable
+			# tel quel pour prévisualiser le panier d'une équipe auto-pilotée.
+			plan.append({"id": item_id, "points": cost})
+			remaining -= cost
+	return plan
+
+
+## Joue le sprint des équipes que le joueur n'a pas pilotées. À N=1 la boucle
+## ne trouve jamais rien (1 équipe, 1 slot) : le déroulé d'un run PM est
+## strictement celui d'avant le multi-équipe.
+func resolve_unpiloted_squads() -> Array:
+	var piloted := get_piloted_squad_ids()
+	var reports: Array = []
+	for squad in squads:
+		var squad_id: String = squad.get("id", "")
+		if piloted.has(squad_id):
+			continue
+		var report := commit_backlog_plan_for_squad(squad_id, build_auto_plan_for_squad(squad_id))
+		if not report.is_empty():
+			report["autoPiloted"] = true
+			report["autoPilotProfile"] = auto_pilot_profile_id(squad)
+			reports.append(report)
+	return reports
 
 
 # --- Les Investissements : tirage du sprint (spec profondeur §5) ---

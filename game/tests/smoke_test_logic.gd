@@ -47,6 +47,7 @@ func _ready() -> void:
 	_test_multi_squad_backlog_isolation_lot5()
 	_test_inter_squad_combos_reachable_lot5()
 	_test_multi_squad_mandate_playthrough_lot5()
+	_test_attention_and_autopilot_lot5()
 
 	for strategy in ["stress", "greedy", "careful"]:
 		print("\n=== SMOKE TEST LOGIQUE — %s ===" % strategy.to_upper())
@@ -1629,3 +1630,77 @@ func _least_costly_choice(choices: Array) -> Dictionary:
 			best_penalty = penalty
 			best = choice
 	return best
+
+
+## 🎯 L'attention (Lot 5 palier 3, spec §13.3). Deux propriétés à tenir : à
+## N=1 le jeu est exactement celui d'avant le multi-équipe (aucune équipe n'est
+## jamais auto-pilotée), et au-delà la qualité du plan qu'une équipe se donne
+## toute seule suit sa composition — un PM senior arbitre, personne n'arbitre
+## sans PM.
+func _test_attention_and_autopilot_lot5() -> void:
+	PlayerProfile.clear_all()
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+
+	if SprintState.get_attention_slots() != 1:
+		_fail("À PM, le joueur doit piloter sa seule équipe.")
+	if SprintState.get_piloted_squad_ids().size() != 1:
+		_fail("À N=1 l'unique équipe doit être pilotée.")
+	if not SprintState.resolve_unpiloted_squads().is_empty():
+		_fail("À N=1 aucune équipe ne doit jamais être auto-pilotée : un run PM doit rester strictement celui d'avant le multi-équipe.")
+
+	PlayerProfile.unlock_career_level("lead-pm")
+	SprintState.reset_run("agile-transformation", "meridia-corp", "lead-pm")
+	if SprintState.squads.size() < 2:
+		_fail("Lead PM doit démarrer avec au moins deux équipes.")
+	if SprintState.get_attention_slots() >= SprintState.squads.size():
+		_fail("Au-delà de PM, l'attention doit être strictement inférieure au nombre d'équipes — sinon la délégation n'existe jamais.")
+
+	var second: Dictionary = SprintState.squads[1]
+	var second_id: String = second.get("id", "")
+	if SprintState.is_squad_piloted(second_id):
+		_fail("Avec moins de slots que d'équipes, la seconde équipe ne doit pas être pilotée par défaut.")
+	if SprintState.set_piloted_squads([second_id, SprintState.squads[0].get("id", "")]) != "slots":
+		_fail("Piloter plus d'équipes que de slots d'attention doit être refusé.")
+
+	if SprintState.auto_pilot_profile_id(second) != "none":
+		_fail("Une équipe neuve, sans PM, doit tomber sur le profil sans PM.")
+	second["roster"].append({
+		"id": "pm-auto", "name": "PM auto", "role": "pm", "seniority": "senior",
+		"salary": 3, "trait": "", "visible_trait_id": "", "hidden_trait": "",
+		"hiddenRevealed": true, "hiredSprint": 0,
+	})
+	if SprintState.auto_pilot_profile_id(second) != "senior":
+		_fail("Un PM senior doit donner le meilleur profil d'auto-pilotage.")
+
+	var capacity := SprintState.get_squad_capacity(second_id)
+	var plan := SprintState.build_auto_plan_for_squad(second_id)
+	# Un plan vide est parfois la bonne réponse, et le tirage du backlog est
+	# aléatoire : une équipe de deux personnes ne se lance pas dans une feature
+	# qui coûte plus que sa capacité du sprint. Ce n'est un défaut que s'il
+	# restait quelque chose d'abordable sur la table — c'est cette propriété-là
+	# qu'on teste, pas « le plan est non vide ».
+	if plan.is_empty() and capacity > 0:
+		for offered in SprintState.get_backlog_offer_for_squad(second_id).get("items", []):
+			if SprintState.is_backlog_epic(offered):
+				continue
+			var offered_cost := int(offered.get("costPoints", 0))
+			if offered_cost > 0 and offered_cost <= capacity:
+				_fail("Une feature tenait dans la capacité de l'équipe : elle devait se la donner toute seule.")
+	if SprintState.backlog_plan_points(plan) > capacity:
+		_fail("Un plan auto-piloté ne doit jamais dépasser la capacité de l'équipe.")
+	# Deux appels de suite doivent donner le même plan : la prévisualisation
+	# affichée et le plan réellement joué sont un seul et même calcul.
+	if SprintState.backlog_plan_points(SprintState.build_auto_plan_for_squad(second_id)) != SprintState.backlog_plan_points(plan):
+		_fail("Le plan auto-piloté doit être stable entre deux lectures, sinon l'écran afficherait autre chose que ce qui sera joué.")
+
+	var reports := SprintState.resolve_unpiloted_squads()
+	if reports.is_empty():
+		_fail("Les équipes non pilotées doivent jouer leur sprint toutes seules.")
+	for report in reports:
+		if not bool(report.get("autoPiloted", false)):
+			_fail("Le rapport d'une équipe non pilotée doit être marqué comme auto-piloté.")
+		if int(report.get("plannedPoints", 0)) > int(report.get("capacity", 0)):
+			_fail("Une équipe auto-pilotée ne doit jamais livrer au-delà de sa capacité.")
+
+	PlayerProfile.clear_all()
+	SprintState.reset_run("agile-transformation", "meridia-corp")

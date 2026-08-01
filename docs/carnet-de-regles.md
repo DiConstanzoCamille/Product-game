@@ -1280,3 +1280,62 @@ le déblocage vient de tomber) pour l'annonce festive, et sinon calcule le
 prochain niveau non débloqué dans `careers.json → order` pour rappeler sa
 condition en clair — sans jamais recalculer si elle est remplie, seule
 `PlayerProfile` sait répondre à ça.
+
+### 30.4 L'attention : on ne pilote pas tout (palier 3)
+
+Le multi-équipe ne devient un sujet de jeu que le jour où l'on ne peut plus
+tout regarder. C'est le rôle de `careers.json → attention`.
+
+`slotsByLevel` dit combien d'équipes le joueur pilote lui-même sur un sprint,
+et cette table monte **beaucoup** moins vite que le nombre d'équipes : 1 sur 1
+en PM, puis 1 sur 2, 2 sur 5, 3 sur 10, 4 sur 24. Le choix est délibéré et il
+est le propos du chantier : la capacité d'attention d'un humain ne grandit pas
+avec son titre, seule l'organisation grandit. Le passage PM → Lead PM fait donc
+mal d'un seul coup — on délègue la moitié de son périmètre du jour au
+lendemain, sans transition. C'est voulu, et c'est aussi ce qui rend le niveau
+suivant désirable plutôt que confortable.
+
+À N=1 la table donne 1 slot pour 1 équipe : `resolve_unpiloted_squads()` ne
+trouve jamais rien à faire et le déroulé d'un run PM est **exactement** celui
+d'avant le multi-équipe. Ce n'est pas une précaution de test, c'est la
+propriété qui autorisait à livrer tout ce lot sans toucher au jeu existant, et
+elle est assertée comme telle.
+
+Une équipe non pilotée joue quand même son sprint : elle se donne un plan
+toute seule, dont la qualité est **celle de son meilleur PM**. Trois profils
+dans `autoPilotProfiles`, choisis par `auto_pilot_profile_id()` :
+sans PM on prend les tickets dans l'ordre du tirage, sans réfléchir ; un PM
+junior trie par valeur brute (`roi + clientImpact`) en ignorant le risque ; un
+PM senior trie par **rendement** (`perPoint`, donc divisé par le coût) et pèse
+le risque. C'est la traduction mécanique de « pondérée par la composition » :
+une équipe sans PM n'est pas punie par un malus arbitraire, elle est punie
+parce qu'elle choisit mal, ce qui se lit dans ce qu'elle livre.
+
+`build_auto_plan_for_squad()` est un **seul calcul pour deux usages** : c'est
+la fonction qui prévisualise ce qu'une équipe va faire et c'est exactement
+celle qui est rejouée pour l'appliquer. Un écran ne peut donc pas afficher
+autre chose que ce qui sera joué — le banc logique assert la stabilité entre
+deux lectures. Le plan sort au format canonique de
+`roadmap_screen._current_plan()` (`{id, points}` toujours renseigné), pour que
+`backlog_plan_points()` serve aussi bien au panier du joueur qu'à celui d'une
+équipe déléguée.
+
+Un plan vide reste une réponse légitime : une équipe de deux personnes ne se
+lance pas dans une feature qui coûte plus que sa capacité du sprint. Le banc
+teste donc la bonne propriété — un plan vide n'est un défaut *que* s'il restait
+une feature abordable sur la table. La première version de cette assertion
+exigeait naïvement un plan non vide et tombait une fois sur dix selon le
+tirage ; c'est le troisième test de la série à se faire piéger par l'aléatoire
+du backlog, après les deux du Lot 4 (§29). La règle qui se dégage, pour les
+prochains : **ne jamais asserter sur le résultat d'un tirage, toujours sur la
+relation entre le tirage et la décision qui en découle.**
+
+### 30.5 Ce que le palier 3 ne fait pas encore
+
+`roadmap_screen` ne sait piloter qu'une équipe : il déclare donc explicitement
+ne piloter que l'équipe principale (`set_piloted_squads([...])`) avant de
+résoudre les autres en auto-pilotage. Sans cette déclaration, une équipe
+« pilotée » selon la table d'attention mais absente de l'écran perdrait
+purement et simplement son sprint. Le jour où le sélecteur d'équipe arrive,
+seule cette ligne change — le moteur, lui, est complet et sait déjà refuser un
+choix qui dépasse les slots disponibles.
