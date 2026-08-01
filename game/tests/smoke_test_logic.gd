@@ -684,16 +684,26 @@ func _test_committee_lot4() -> void:
 func _test_support_teams_and_compendium_lot4() -> void:
 	print("=== SMOKE TEST LOGIQUE — LOT 4 : EQUIPES SUBIES ET COMPENDIUM ===")
 
+	# Comme au §29 du carnet : board-injunction (1/8 des exigences T1) peut
+	# forcer dès reset_run() une stratégie qui porte elle-même un effet de
+	# bord sur les équipes subies (ex. "arrêter de communiquer" -> PMM -1).
+	# On vérifie donc la déclaration brute de companies.json — jamais mutée
+	# en jeu — puis on réaligne SprintState.support_teams dessus avant de
+	# tester ce qui en dépend, pour ne jamais dépendre de ce tirage.
 	SprintState.reset_run("agile-transformation", "meridia-corp")
-	if SprintState.support_teams != {"sales": 4.0, "pmm": 2.0, "csm": 3.0}:
-		_fail("Meridia doit démarrer avec les équipes subies Sales 4 / PMM 2 / CSM 3.")
+	var meridia_declared: Dictionary = SprintState.get_company().get("supportTeams", {})
+	if meridia_declared != {"sales": 4.0, "pmm": 2.0, "csm": 3.0}:
+		_fail("Meridia doit déclarer les équipes subies Sales 4 / PMM 2 / CSM 3 dans companies.json.")
+	SprintState.support_teams = meridia_declared.duplicate()
 	var meridia_snapshot := SprintState._build_score_snapshot()
 	if meridia_snapshot.get("support_teams", {}) != SprintState.support_teams:
 		_fail("Le snapshot de score doit transmettre support_teams tel quel — c'est ce qui débloquait le critère de recette de l'issue #17.")
 
 	SprintState.reset_run("agile-transformation", "karavel-scaleup")
-	if SprintState.support_teams != {"sales": 2.0, "pmm": 4.0, "csm": 1.0}:
-		_fail("Karavel doit démarrer avec les équipes subies Sales 2 / PMM 4 / CSM 1.")
+	var karavel_declared: Dictionary = SprintState.get_company().get("supportTeams", {})
+	if karavel_declared != {"sales": 2.0, "pmm": 4.0, "csm": 1.0}:
+		_fail("Karavel doit déclarer les équipes subies Sales 2 / PMM 4 / CSM 1 dans companies.json.")
+	SprintState.support_teams = karavel_declared.duplicate()
 
 	# Un niveau bas génère des crises, un niveau haut de la pression — jamais
 	# l'inverse (spec §9.4). On force les deux extrêmes sans passer par une
@@ -713,8 +723,13 @@ func _test_support_teams_and_compendium_lot4() -> void:
 
 	# Effet de bord déclaratif d'une décision stratégique (dernier tiers du
 	# §9.4) : Open source -> PMM +1 / Sales -1. On ne les pilote toujours
-	# pas — la décision change le monde autour d'elles.
+	# pas — la décision change le monde autour d'elles. On repart d'un
+	# support_teams et d'un chosen_strategy_ids remis à zéro explicitement :
+	# sans ça, une injonction du board qui aurait déjà choisi (et appliqué)
+	# open-source à ce même reset_run() ferait rejouer son effet une
+	# deuxième fois et fausserait la comparaison avant/après.
 	SprintState.reset_run("agile-transformation", "karavel-scaleup")
+	SprintState.support_teams = SprintState.get_company().get("supportTeams", {}).duplicate()
 	SprintState.chosen_strategy_ids.clear()
 	SprintState.quarter_strategy_chosen = false
 	var pmm_before := int(SprintState.support_teams.get("pmm", 3))
