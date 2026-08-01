@@ -1181,3 +1181,20 @@ déjà consommé (`quarter_strategy_chosen` et `quarter_forced_strategy_id`
 non vides), sinon échouer comme avant. La distinction compte : une
 assertion qui accepterait silencieusement n'importe quel catalogue vide ne
 testerait plus rien.
+
+Même piège retombé une seconde fois, cette fois dans un test écrit *pour*
+ce lot : `_test_support_teams_and_compendium_lot4()` lisait
+`SprintState.support_teams` juste après `reset_run()` en supposant qu'il
+reflétait encore `companies.json` — sans compter qu'une injonction du board
+peut, à cet instant précis, avoir déjà forcé une stratégie qui porte elle-
+même un `supportTeamDeltas` (la mécanique décrite plus haut). Pire :
+réinitialiser ensuite `chosen_strategy_ids` pour tester un choix volontaire
+d'"open-source" pouvait faire rejouer une seconde fois l'effet de bord
+d'une stratégie déjà appliquée par l'injonction, faussant la comparaison
+avant/après. Mesuré à 26/30 puis 60/60 après correctif : distinguer la
+déclaration brute (`companies.json`, jamais mutée) de l'état runtime
+(`support_teams`, réaligné explicitement avant chaque sous-test qui en
+dépend) règle la même classe de bug que le premier flaky, avec la même
+cause profonde — le hasard d'une injonction de board tirée à T1, que tout
+test touchant au premier trimestre doit désormais neutraliser
+explicitement plutôt que d'espérer qu'il ne tombe pas dessus.
