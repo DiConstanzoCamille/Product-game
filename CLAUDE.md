@@ -79,6 +79,15 @@ score et de tous les écrans de phase.
   appliquée (les objectifs de board, l'impact d'une carte), une seule
   fonction sert les deux — voir `SprintState.evaluate_board_objectives()` et
   `EffectResolver.card_impact_lines()`.
+- **Aucune valeur dérivée ne se lit brute depuis le JSON.** Un prix, un coût,
+  un quota passent par une **fonction de résolution** (`resolved_price()`,
+  `get_current_quota()`…) — jamais `investments.json → cost` lu directement
+  par un écran. Cette fonction est le seul endroit où s'appliquent les
+  modificateurs : remise, indexation sur le trimestre, effet de carte, palier
+  de carrière. Un écran qui lit la valeur brute court-circuite silencieusement
+  tous les modificateurs, **y compris ceux qui n'existent pas encore** — et le
+  jour où on en ajoute un, il faut rouvrir tous les écrans. Le coût
+  aujourd'hui est d'une ligne ; le coût plus tard est un lot entier.
 - Commits **en français, à l'impératif** (« Ajoute… », « Corrige… »).
 
 ## Pièges Godot connus
@@ -142,6 +151,13 @@ dans du code déjà mergé. À lancer avant de déclarer un lot fini.
   n'est pas vide », mais « le plan n'est vide que si rien n'était abordable ».
   Trois tests d'affilée s'y sont fait piéger (carnet §29 et §30.4), à chaque
   fois avec un code parfaitement sain.
+- **Une règle à double conséquence se teste dans les deux sens.** Quand une
+  règle produit deux effets opposés attendus, asserter les deux — un seul des
+  deux passe aussi bien avec une implémentation fausse. Exemple : indexer les
+  prix sur l'escalade des objectifs doit faire *monter* le prix d'un item d'un
+  trimestre au suivant **et** faire *baisser* son coût relatif à l'objectif.
+  Tester seulement « le prix monte » ne distingue pas une indexation correcte
+  d'une inflation pure, qui est précisément le défaut qu'on cherche à éviter.
 - **Un run unique ne prouve rien.** `smoke_test_logic` coûte 0,8 s : un flaky
   à 10-20 % passe inaperçu sur un run et coûte une heure trois jours plus
   tard. Mesurer par **boucle de 40 runs** en comptant les `OK`, et comparer à
