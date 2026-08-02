@@ -74,6 +74,68 @@ d'Impact en plus **et une charge fixe permanente**. Recruter juste avant un gros
 objectif devient un pari, ce qui supprime la réponse « recruter est toujours
 bon » — aujourd'hui vraie, et donc ennuyeuse.
 
+### 3.1 Un prix en Impact, une charge en Revenue
+
+**L'Impact est la seule monnaie d'achat**, au shop du sprint comme au Comité.
+Le Revenue ne sert jamais de prix : faire payer certains achats en Revenue
+recréerait deux monnaies dépensables et reperdrait exactement la lisibilité
+qu'on vient de gagner.
+
+La distinction est ailleurs :
+
+> **Un achat coûte de l'Impact maintenant, et engage du Revenue pour toujours.**
+
+Recruter, c'est un prix en Impact (l'embauche) *et* un salaire en Revenue à
+chaque sprint jusqu'à la fin du mandat. Un outil, c'est un prix en Impact et une
+licence récurrente. Chaque achat pose donc **deux questions distinctes, dont
+aucune ne remplace l'autre** : ai-je les moyens de l'acheter, ai-je les moyens
+de le garder ? On peut avoir un Impact énorme et ne pas pouvoir se permettre un
+senior de plus.
+
+C'est ce qui donne au Revenue son rôle de contrainte sans en faire une seconde
+caisse à surveiller.
+
+### 3.2 Les deux temps d'achat, et leur asymétrie
+
+| | Quand | Ce qu'on y achète | Risque |
+|---|---|---|---|
+| **Shop du sprint** (Investissements) | pendant le trimestre | petits ajustements : candidats, pratiques | **Fait reculer vers l'objectif en cours** |
+| **Comité** | entre les trimestres, après le verdict | paris structurels : outils, slots, décisions | Ne menace que le trimestre suivant |
+
+Cette asymétrie n'est pas un effet de bord, c'est le rythme du jeu. Acheter au
+premier sprint d'un trimestre est confortable — il reste deux sprints pour
+reconstituer. Acheter au dernier est un pari sérieux. Le joueur découvre donc
+seul une cadence : **investir tôt dans le trimestre, sécuriser à la fin**. Des
+sprints aujourd'hui interchangeables gagnent du relief, sans qu'aucune règle
+supplémentaire soit écrite.
+
+Conséquence de dimensionnement : les prix du shop de sprint doivent rester
+**petits devant ceux du Comité**. Ajustements fréquents d'un côté, paris
+structurels de l'autre.
+
+### 3.3 Le premier sprint n'achète rien
+
+Le portefeuille démarre à zéro : on ne peut donc rien acheter au sprint 1, avant
+d'avoir produit quoi que ce soit. **C'est assumé.** Le premier sprint sert à
+livrer avec ce dont on a hérité, et la première décision d'achat arrive une fois
+qu'on a vu ce que l'équipe vaut réellement.
+
+C'est aussi un levier de variété pour plus tard : des scénarios pourront démarrer
+avec un capital d'Impact initial — l'entreprise qui a déjà levé, celle qui
+reprend un produit qui marchait. Une ligne de `companies.json`, à traiter comme
+un trait de contexte de run, pas comme une règle générale.
+
+### 3.4 Ce que ça change pour la Roadmap
+
+Si le Revenue vient des features à ROI et l'Impact de `Traction × Levier`, alors
+le choix de backlog devient un arbitrage réel : **nourrir la boîte ou nourrir la
+performance**. Livrer la feature ennuyeuse qui finance les salaires, ou celle qui
+fait décoller le score sans rien rapporter.
+
+Ce choix n'existe pas aujourd'hui — tout va dans le même pot. Il apparaît
+gratuitement avec la séparation des deux monnaies, et c'est probablement son
+meilleur effet secondaire.
+
 ---
 
 ## 4. L'objectif trimestriel porte sur le portefeuille
