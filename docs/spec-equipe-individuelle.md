@@ -53,7 +53,11 @@ Les quatre passent le test : on peut aimer son travail et ne pas croire son CPO
 Énergie basse). Ils ne bougent ni pour les mêmes raisons ni avec les mêmes
 remèdes.
 
-### 3.0 La Confiance est le troisième sommet du triangle
+**Il n'y en aura pas un cinquième.** Chaque critère ajouté multiplie le contenu
+à écrire et la surface d'affichage ; quatre est déjà le maximum lisible sur une
+ligne de roster.
+
+### 3.1 La Confiance est le troisième sommet du triangle
 
 *Décision du 02/08/2026, prise avec `spec-clients-revenue.md` §5.1.1.*
 
@@ -79,11 +83,7 @@ mesurait autre chose. Deux conséquences :
   peut vous faire confiance en livrant un produit que le marché ignore, et
   l'inverse.
 
-**Il n'y en aura pas un cinquième.** Chaque critère ajouté multiplie le contenu
-à écrire et la surface d'affichage ; quatre est déjà le maximum lisible sur une
-ligne de roster.
-
-### 3.1 Le joueur est une personne comme les autres
+### 3.2 Le joueur est une personne comme les autres
 
 Le CPO porte **les mêmes quatre niveaux**. C'est la façon élégante de ne pas
 dupliquer l'Énergie : aujourd'hui ⚡ est une jauge à part avec sa propre fin
@@ -109,8 +109,8 @@ réécriture du jeu.
 | 🧱 Dette organisationnelle | **Reste.** C'est l'état du système, pas un sentiment. |
 | 🎭 Cynisme | **Reste.** C'est la culture de l'organisation, pas d'un individu. |
 | 🎯 Capital politique | **Reste.** C'est le vôtre, face au board. |
-| 📈 Valeur perçue | **Reste.** C'est le marché. |
-| ⚡ Énergie du joueur | **Descend**, comme un critère de la ligne « Vous » (§3.1). |
+| 📈 Valeur perçue | **Reste**, mais se recentre sur le produit — c'est ce que les *utilisateurs* en pensent, jamais ce qu'on pense de vous (§3.1). |
+| ⚡ Énergie du joueur | **Descend**, comme un critère de la ligne « Vous » (§3.2). |
 
 **Une seule des cinq jauges descend.** Le reste du moteur continue de lire
 `moral` — mais à travers un point d'entrée unique (`get_team_moral()`) qui

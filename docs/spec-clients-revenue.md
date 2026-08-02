@@ -194,7 +194,7 @@ Ce sont trois grandeurs distinctes, et chacune a son propriétaire :
 |---|---|---|---|
 | Les **utilisateurs** | le produit | 📈 **Valeur perçue** | Les features livrées, le bouche-à-oreille, le Product marketing. **Jamais l'Impact.** |
 | Le **board** | le joueur | 🎯 **Capital politique** | Les quotas tenus, les promesses au board, les rallonges négociées |
-| L'**équipe** | le joueur | 🤝 **Confiance** *(spec-equipe-individuelle §3)* | Les décisions annulées, les promesses non tenues, les 1:1 |
+| L'**équipe** | le joueur | 🤝 **Confiance** *(spec-equipe-individuelle §3.1)* | Les décisions annulées, les promesses non tenues, les 1:1 |
 
 Trois conséquences immédiates :
 
