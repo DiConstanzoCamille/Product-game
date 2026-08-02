@@ -34,16 +34,16 @@ grandeur qu'on ne peut pas raconter.
 > **Le Revenue n'est pas un stock. C'est une population qui paie.**
 
 ```
-Revenue ← Revenue + (clients × prix_par_client) − charges_du_sprint
-clients ← clients − départs + arrivées
+Revenue ← Revenue + Σ(clients_segment × prix_segment) − charges_du_sprint
+clients_segment ← clients_segment − départs + arrivées ± conversions
 ```
 
 Trois nombres, dont **un seul bouge en permanence** :
 
 | | | |
 |---|---|---|
-| **`clients`** | la population | la seule variable que le joueur pilote |
-| **`prix_par_client`** | l'ARPU du modèle économique | une **constante du run**, sauf décision explicite |
+| **`clients`** | la population, répartie en 2 ou 3 segments (§4.0) | la seule variable que le joueur pilote |
+| **`prix`** | le prix d'un segment | une **constante du run**, fixée par le scénario (§4.0.1) et changée seulement par une décision explicite |
 | **`charges`** | salaires + licences par siège + coût par client | déjà en place (spec-impact-monnaie §3.6), plus le coût unitaire |
 
 ### 2.1 Pourquoi ce n'est pas un compteur de plus
@@ -111,7 +111,7 @@ formes de courbe qu'on reconnaît en jouant**.
 
 | Modèle | Population | ARPU | Churn | Ce que ça fait ressentir |
 |---|---|---|---|---|
-| **Freemium** | milliers d'utilisateurs | très bas | élevé | Beaucoup de monde, peu d'argent. Chaque point de churn coûte cher en volume. Grandir coûte en coût unitaire avant de rapporter. |
+| **Freemium** | milliers d'utilisateurs | très bas, nul sur le segment gratuit | élevé | Beaucoup de monde, peu d'argent. Chaque point de churn coûte cher en volume. Grandir coûte en coût unitaire avant de rapporter. |
 | **B2B / grands comptes** | dizaines de comptes | très haut | bas | Peu de clients, chacun énorme. Perdre **un** compte est une catastrophe lisible. Le Sales compte plus que le volume. |
 | **Vente à la version** | pas de population | — | — | Pas de récurrent : de gros paliers ponctuels à la sortie d'une version. C'est `waterfall-release`, aujourd'hui déclaré et vide. |
 
