@@ -48,10 +48,23 @@ une rente.
 | Item | Effet | Condition / prix |
 |---|---|---|
 | 🤖 **Plateforme d'automatisation** | `×1,5` Levier global | Seulement si **aucune décision stratégique n'a été prise ce trimestre**. L'automatisation demande de la stabilité — et prive le joueur d'un autre levier fort. |
-| 📐 **Design system** | `×1,4` Levier local de la squad | La squad compte **au moins 2 designers**. Récompense la spécialisation, punie ailleurs. |
 | 🧪 **Plateforme d'expérimentation** | `×1,3`, et `×1,8` si Valeur perçue > 70 | Deux paliers : il devient fort quand le produit marche déjà. Riche-devient-plus-riche assumé. |
-| 🧰 **Socle technique commun** | **`×1,08` par outil possédé** *(degré 3)* | Cher, et sans effet quand on n'a rien. Avec 8 outils : `×1,85`. C'est la pièce autour de laquelle on construit un run. |
+| 🧰 **Socle technique commun** | **`×1,15` par outil possédé** *(degré 3)* | Cher, et sans effet quand on n'a rien. Au plafond PM (5 outils) : `×2,01`. La pièce autour de laquelle se construit un run. |
 | 📚 **Documentation vivante** | `×1,05` par employé senior *(degré 3)* | Se marie avec les builds « tout senior » — qui coûtent une fortune en Revenue. |
+
+⚠️ **Un effet « par outil » se calibre sur un plafond qu'il faut connaître.**
+`balance.json → toolSlots` donne **3 slots de base au PM + 2 achetables = 5 au
+maximum** (7+2=9 au CEO). À `×1,08`, le Socle technique ne vaudrait donc que
+`×1,47` au mieux — pas de quoi justifier son prix ni parler de « casser le
+jeu ». D'où `×1,15`. Si on préfère un taux plus doux, il faut **relever le
+plafond de slots**, mais c'est alors une décision d'équilibrage à part entière
+qui touche tous les niveaux de carrière.
+
+*Retiré après relecture : un outil « 📐 Design system » (×1,4 si ≥2 designers)
+figurait ici. Un Design system existe déjà dans `spec-scoring-sprint.md` §7.1,
+même icône et même condition, avec une mécanique par employé éligible — et son
+id est référencé dans `scoring.json` (`chaos-organise.cancelledByTools`). Deux
+items homonymes aux mécaniques différentes se seraient écrasés.*
 
 ---
 
@@ -117,14 +130,40 @@ la course est de franchir l'objectif avant la faillite.
 
 ### « L'accumulateur »
 
-Socle technique commun (`×1,08` par outil) + slots d'outillage rachetés en
-priorité. Avec 10 outils : `×2,16`, et chaque outil apporte en plus son additif.
-Le run est lent à démarrer et devient absurde en fin de mandat — à condition de
-survivre aux deux premiers trimestres, où on n'a rien.
+Socle technique commun (`×1,15` par outil) + les deux slots d'outillage
+achetables pris en priorité. **Au plafond PM, 5 outils : `×2,01`**, et chaque
+outil apporte en plus son additif. Le run est lent à démarrer et devient absurde
+en fin de mandat — à condition de survivre aux deux premiers trimestres, où on
+n'a rien.
 
 Ces deux lignes doivent être **jouables mais pas évidentes**, et surtout **pas
 les meilleures à tous les coups** : c'est le rôle du banc de trajectoires
 (spec §7) de vérifier qu'aucune ne domine.
+
+### Le déséquilibre à corriger avant d'écrire les données
+
+Relecture faite, **ce catalogue penche lourdement vers un seul archétype.**
+Comptons les pièces qui récompensent une équipe senior : Staff Engineer (`×1,5`,
+aucun junior), Documentation vivante (`×1,05` par senior), Squad 100 % senior
+(`×1,4`), L'ancien CTO devenu IC (`×1,3`), plus le Binôme senior additif qui
+existe déjà. **Cinq pièces qui se renforcent entre elles**, contre presque rien
+pour les alternatives — un junior-rush n'a que Notion et Sang neuf, un build
+centré PM n'a rien du tout.
+
+« La boîte de vieux singes » a donc toutes les chances d'être *la* ligne
+évidente, ce que §6 prétend justement éviter. Il manque au minimum :
+
+- **deux ou trois pièces pour le junior-rush** — un multiplicateur qui scale sur
+  le nombre de juniors, une pratique qui les fait progresser vite. Le contre-jeu
+  naturel du senior : moins de Levier par tête, mais un Revenue qui respire.
+- **une ligne pour le build PM** — quelque chose qui récompense la qualité des
+  choix de backlog plutôt que la composition brute.
+
+Et attention : le banc de trajectoires de la spec §7 **ne détecterait pas ce
+déséquilibre**. Il teste quatre trajectoires macro (ne rien acheter, investir
+tôt, tard, tout miser), pas la comparaison entre archétypes de composition. Il
+faut lui ajouter cet axe, sinon on validera un jeu où une seule façon de
+construire son équipe est correcte.
 
 ---
 
