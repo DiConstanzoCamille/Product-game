@@ -1,8 +1,8 @@
 # Spec — Le Revenue a des clients
 
-**Statut : proposition, en attente de relecture.** Rien de ce document n'est
-implémenté. Écrit le 02/08/2026, à partir de la question de Camille sur la PR
-#40.
+**Statut : validé le 02/08/2026, non implémenté.** Écrit à partir de la
+question de Camille sur la PR #40, puis tranché avec elle point par point (les
+décisions sont datées dans le texte). Mise en œuvre : issue #42.
 
 Ce document ne remet en cause ni la formule `Traction × Levier = Impact`, ni
 la séparation des deux économies de
@@ -115,6 +115,58 @@ formes de courbe qu'on reconnaît en jouant**.
 | **B2B / grands comptes** | dizaines de comptes | très haut | bas | Peu de clients, chacun énorme. Perdre **un** compte est une catastrophe lisible. Le Sales compte plus que le volume. |
 | **Vente à la version** | pas de population | — | — | Pas de récurrent : de gros paliers ponctuels à la sortie d'une version. C'est `waterfall-release`, aujourd'hui déclaré et vide. |
 
+### 4.0 Deux ou trois segments par modèle, jamais plus
+
+*Tranché le 02/08/2026.*
+
+Un modèle économique ne déclare pas une population, il en déclare **deux ou
+trois** — jamais davantage. C'est le minimum pour que l'exemple du pivot existe
+(on ne peut pas « passer en payant » si tout le monde paie déjà), et le maximum
+lisible sur une ligne de panneau.
+
+```json
+"freemium": {
+  "segments": [
+    { "id": "gratuits", "label": "utilisateurs gratuits", "prix": 0,    "cout": 0.01, "churn": 0.08 },
+    { "id": "payants",  "label": "abonnés",               "prix": 0.6,  "cout": 0.02, "churn": 0.04 }
+  ]
+}
+```
+
+Ce que ça débloque, et qui n'existait pas avec une population unique :
+
+- **La conversion devient un levier.** Une feature, une décision ou un
+  événement peut faire passer des clients d'un segment à l'autre. « 40 gratuits
+  passent payants » est une bonne nouvelle chiffrée ; « la moitié des payants
+  redescend » est une mauvaise.
+- **Le pivot de §4.2 s'écrit sans règle spéciale** : « Fin du gratuit » supprime
+  le segment gratuit et en convertit une fraction. Pas de mécanique dédiée,
+  juste des mouvements entre segments.
+- **Les gratuits coûtent sans payer**, ce qui rend le freemium réellement
+  dangereux : `prix: 0` et `cout: 0.01`, et une base qui grossit sans convertir
+  creuse la caisse.
+
+L'affichage suit la même règle qu'en §2.1 — une ligne de composition, pas des
+compteurs :
+
+```
+💰 Revenue  1 240
+   8 400 gratuits · 240 abonnés × 0,6
+   −22 /sprint
+```
+
+### 4.0.1 C'est le scénario qui fixe le prix
+
+Le prix par client n'est pas un réglage du joueur ni une valeur universelle :
+c'est **un trait du scénario**. `eras.json` choisit le modèle **et** son
+échelle de prix — le logiciel des années garage ne se vend pas au prix d'un
+SaaS de l'ère IA, et c'est comme ça que l'époque se fait sentir dans la caisse
+plutôt que dans un texte d'ambiance.
+
+Conséquence pratique : un même modèle (freemium) joué dans deux scénarios donne
+deux économies différentes sans qu'on écrive deux modèles. C'est ce qui évite
+que « 2 à 3 segments » devienne une usine à variantes.
+
 ### 4.1 L'échelle — le piège le plus concret
 
 Les nombres réalistes que la demande cite (10 000 users, 5 000 €/user) sont dix
@@ -201,15 +253,17 @@ Trois conséquences immédiates :
 1. **La Valeur perçue devient purement produit.** Sa définition dans
    `resources.json` — « ce que le marché pense que vous valez » — est
    précisément la formulation ambiguë à corriger : ce n'est pas *vous* que le
-   marché juge, c'est le produit. Le renommer en **Réputation produit** est
-   proposé, et c'est la seule façon durable d'empêcher le mélange de revenir.
+   marché juge, c'est le produit. **Renommage en Réputation produit tranché le
+   02/08** — une définition ambiguë finit toujours par être re-branchée sur la
+   mauvaise source.
 2. **Le Product marketing change de rôle.** Il ne convertit plus l'Impact en
    Valeur perçue : il **amplifie ce que les livraisons font à la réputation**.
    Même équipe subie, même niveau 0-5, autre entrée.
 3. **La fin positive est à revoir.** `goodEnding.scoreResources` fait
    aujourd'hui la moyenne de `valeur-percue` et `capital-politique` — donc la
    moyenne d'une perception produit et d'une perception joueur. Deux choses qui
-   n'ont pas la même unité ne se moyennent pas : à trancher au moment du lot.
+   n'ont pas la même unité ne se moyennent pas ; à reprendre dans le lot, en
+   distinguant ce que vaut le produit (l'IPO) de ce que vous valez (le rachat).
 
 ### 5.2 Deux nombres qui bougent
 
@@ -263,14 +317,18 @@ modèle client plutôt que deux correctifs séparés. Si cette spec est validée
 2. ~~Le principe d'échelle~~ **Tranché** (02/08) : unités réalistes à
    l'affichage, ordres de grandeur calibrés sur les charges (§4.1). Les
    **valeurs exactes** restent à dériver du banc, pas à choisir à l'œil.
-3. **Le coût unitaire par client est-il le même pour tous les modèles ?**
-   Probablement non : un utilisateur freemium coûte peu et rapporte peu, un
-   grand compte coûte du support. C'est une valeur par modèle.
-4. **Que devient `clientImpact`** des features ? Deux lectures possibles : il
-   *est* le nombre de clients gagnés (une seule valeur, plus simple), ou il
-   reste la réputation et `clientsGagnes` s'ajoute (deux valeurs, plus fin).
-   Recommandation : les fusionner — une feature a un effet client, point.
-5. **Faut-il un plancher de population ?** Une entreprise à zéro client n'a
-   aucun moyen de revenir — est-ce une fin de run à part entière (« plus
-   personne n'utilise le produit ») ou juste un Revenue qui s'assèche jusqu'à la
-   faillite ? Recommandation : pas de fin dédiée, la faillite suffit.
+3. ~~Le coût unitaire par client est-il le même pour tous les modèles ?~~
+   **Tranché** (02/08) : non, il est **par segment**, et un modèle en déclare
+   **2 à 3 au maximum** (§4.0). La variété vient des scénarios, qui fixent le
+   modèle et son échelle de prix (§4.0.1) — pas d'une multiplication des
+   segments.
+4. ~~Que devient `clientImpact` des features ?~~ **Tranché** (02/08) : une
+   feature a **un** effet client, point. Deux valeurs, c'était deux colonnes à
+   masquer, à révéler et à calibrer.
+5. ~~Faut-il une fin dédiée à zéro client ?~~ **Tranché** (02/08) : non. Le
+   Revenue s'assèche et la faillite fait le travail — on n'ajoute pas une
+   cinquième façon de mourir.
+
+**Il ne reste donc aucune décision de conception ouverte sur ce document.** Ce
+qui reste est du calibrage, et se dérive du banc : les valeurs exactes par
+segment, par modèle et par scénario.

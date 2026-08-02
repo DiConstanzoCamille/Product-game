@@ -16,11 +16,19 @@ Trois documents, trois rôles — en cas de contradiction, cet ordre tranche :
 | [`docs/spec-scoring-sprint.md`](docs/spec-scoring-sprint.md) | **La cible de gameplay validée** (31/07/2026) : Traction × Levier = Impact. C'est la direction du produit. |
 | [`docs/spec-profondeur-gameplay.md`](docs/spec-profondeur-gameplay.md) | Les phases A→D. **Sa phase D est remplacée** par la spec de scoring. Sa phase C (roadmap profonde) reste valide et devient le prérequis du chantier scoring. |
 
-Deux propositions attendent une relecture — elles descendent d'un cran là où une
-grandeur abstraite ne raconte rien, et **ne sont pas implémentées** :
+Deux specs **validées et non implémentées** descendent d'un cran là où une
+grandeur abstraite ne raconte rien :
 [`spec-clients-revenue.md`](docs/spec-clients-revenue.md) (le Revenue cache des
-clients) et [`spec-equipe-individuelle.md`](docs/spec-equipe-individuelle.md)
-(le Moral cache des personnes).
+clients qui paient) et
+[`spec-equipe-individuelle.md`](docs/spec-equipe-individuelle.md) (le Moral
+cache des personnes avec un caractère). Elles se font **dans cet ordre** et
+jamais en même temps — les deux réécrivent des effets de contenu.
+
+Un principe en sort, à ne jamais remélanger : **trois entités perçoivent
+quelque chose**, et chacune a sa grandeur. Les *utilisateurs* jugent le produit
+(📈 Réputation produit) ; le *board* juge le joueur (🎯 Capital politique) ;
+l'*équipe* juge le joueur (🤝 Confiance). C'est un mot employé pour deux choses
+qui avait laissé s'installer la fuite `Impact → Valeur perçue → Revenue`.
 
 `docs/data-schema.md` décrit le schéma de chaque JSON de `data/`.
 

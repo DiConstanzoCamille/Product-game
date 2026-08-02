@@ -1,9 +1,9 @@
 # Spec — L'équipe n'est pas une jauge, ce sont des gens
 
-**Statut : proposition, en attente de relecture.** Rien de ce document n'est
-implémenté. Écrit le 02/08/2026, à partir de la question de Camille sur la
-PR #40, dans la foulée de
-[`spec-clients-revenue.md`](spec-clients-revenue.md).
+**Statut : validé le 02/08/2026, non implémenté.** Écrit à partir de la
+question de Camille sur la PR #40, puis tranché avec elle point par point (les
+décisions sont datées dans le texte). À séquencer **après**
+[`spec-clients-revenue.md`](spec-clients-revenue.md) — voir §9.
 
 C'est **le même mouvement appliqué à l'autre côté du plateau** : là où une
 grandeur abstraite ne raconte rien, on descend d'un cran vers ce qu'elle cache.
@@ -44,7 +44,7 @@ critères qui montent et descendent ensemble sont un seul critère avec deux nom
 | Critère | Ce qui le fait baisser | Ce qui le remonte | Ce qu'il produit à 0 |
 |---|---|---|---|
 | 🫶 **Moral** | Surchauffe de sprint, dette subie, trimestre manqué, départs autour de soi | Séminaire, sprints tenus, livraisons réussies | **Démission** — la personne s'en va |
-| 🤝 **Confiance** *(envers vous)* | Décisions annulées, promesses non tenues, licenciements, pivots non expliqués | 1:1, tenir une ligne sur plusieurs sprints, décisions cohérentes | **Rupture** — la personne reste mais cesse de contribuer (facteur de contribution à zéro) |
+| 🤝 **Confiance** *(envers vous)* | Décisions annulées, promesses non tenues, licenciements, pivots non expliqués | 1:1, tenir une ligne sur plusieurs sprints, décisions cohérentes | **Rupture** — un événement Inbox vous met devant le cas (§3.3) |
 | ⚡ **Énergie** | Points livrés au-dessus de la capacité, sprints d'affilée sans répit | Sprints sous-chargés, congés, remise à plat | **Burn-out** — arrêt, la personne quitte le roster pour de bon |
 | 💸 **Satisfaction salariale** | Ancienneté sans promotion, séniorité mal payée, voir arriver une recrue mieux payée | Promotion, augmentation | **Démission pour l'extérieur** — elle part chez le concurrent |
 
@@ -95,6 +95,66 @@ d'un système parallèle.
 Une conséquence agréable : votre Confiance n'existe pas (vous ne pouvez pas
 vous décevoir vous-même), mais votre **Satisfaction salariale**, oui. Un CPO
 sous-payé qui fait tourner la boîte est un ressort qu'on n'avait pas.
+
+### 3.3 Une rupture n'est pas un état, c'est une scène
+
+*Décision du 02/08/2026.*
+
+Quand la Confiance de quelqu'un touche zéro, la personne **reste et cesse de
+contribuer** — mais ça ne se produit pas en silence dans un coin du panneau. Ça
+**déclenche un événement Inbox** qui vous met devant le cas, avec une décision
+à prendre :
+
+> **Marek ne dit plus rien en réunion.**
+> Trois sprints qu'il livre le minimum et qu'il regarde ailleurs.
+> · Lui donner un vrai sujet — coûte de la capacité ce sprint, remonte sa Confiance
+> · Le recadrer — remonte sa contribution, coûte du Moral à toute l'équipe
+> · Laisser filer — ne coûte rien maintenant, et il partira
+
+C'est ce qui transforme un état passif en moment de jeu. Le reproche qu'on
+pouvait faire à « reste et ne produit plus » — un poste occupé sans qu'on
+comprenne pourquoi — tombe : on comprend, on a le choix, et on paie ce choix.
+
+Même principe pour les autres seuils : un burn-out imminent, une démission
+salariale annoncée sont des scènes, pas des lignes de journal.
+
+### 3.4 Chaque personne a un caractère
+
+*Décision du 02/08/2026.*
+
+Les quatre niveaux ne suffisent pas : deux personnes dans la même situation
+doivent réagir différemment, sinon le roster est une rangée de clones avec des
+prénoms. **Chaque employé porte une personnalité**, qui se traduit
+mécaniquement par deux choses et deux seulement :
+
+1. **Des niveaux de départ décalés** — l'idéaliste arrive avec une Confiance
+   haute, le mercenaire avec une Confiance basse et une exigence salariale
+   forte.
+2. **Des facteurs d'influence** — de combien chaque événement déplace chacun de
+   ses niveaux. Le même licenciement coûte 30 de Confiance à l'idéaliste et 5
+   au vétéran désabusé, qui en a vu d'autres.
+
+```json
+{ "id": "veteran-desabuse",
+  "depart":    { "moral": 55, "confiance": 40, "energie": 70, "salaire": 60 },
+  "influence": { "moral": 0.6, "confiance": 0.4, "energie": 1.0, "salaire": 1.2 } }
+```
+
+Rien d'autre. Une personnalité n'ajoute **pas** de règle spéciale, pas d'effet
+scripté, pas de condition : c'est un jeu de curseurs sur des mécaniques qui
+existent déjà. C'est ce qui permet d'en avoir huit sans que le contenu
+explose.
+
+`data/recruitment-archetypes.json` contient déjà cinq caractères écrits en
+prose — ex-consultant, rockstar 10x, junior ambitieux, vétéran désabusé,
+wonderkid — dont le README note qu'ils « restent illustratifs ». Ils cessent de
+l'être : la description devient la promesse, les deux tables ci-dessus
+deviennent la mécanique.
+
+**La personnalité est une information cachée**, comme le reste : on la devine
+aux réactions, le 🤝 1:1 la révèle. C'est ce qui donne au recrutement son pari
+— cette senior est-elle solide ou cassante ? — et au 1:1 sa raison d'exister
+au-delà du premier sprint.
 
 ---
 
@@ -222,28 +282,27 @@ et il ne faut pas le sous-estimer sous prétexte que le moteur tient en une page
 
 ## 8. Ce qui reste à trancher
 
-1. **Le Moral d'entreprise est-il une moyenne ou un minimum ?** La moyenne
-   lisse : une personne au fond se voit peu. Le minimum dramatise : un seul
-   employé à bout fait s'effondrer les frictions du score. Recommandation :
-   moyenne pondérée par la contribution, **plus** une alerte dédiée sur le
-   minimum — l'un pour le moteur, l'autre pour l'œil.
-2. **Le départ pour Confiance à 0 : la personne part, ou reste sans
-   contribuer ?** « Reste et ne produit plus » est plus cruel et plus vrai
-   (c'est la démission silencieuse au sens propre), mais occupe un poste sans
-   qu'on comprenne pourquoi. Recommandation : elle reste, **et l'alerte le
-   dit** — c'est au joueur de licencier ou de réparer.
-3. **Combien de niveaux affiche-t-on par défaut ?** Zéro (alertes seules),
-   ou un état de synthèse par personne ? Recommandation : un point de couleur
-   par personne, les chiffres au clic.
-4. **Les nouvelles recrues arrivent-elles à 100 partout ?** Probablement pas :
-   une recrue arrive avec un Moral élevé et une Confiance neutre — elle ne vous
-   connaît pas encore. Ça donne du sens à la période d'essai.
-5. **Est-ce que ça remplace le Cynisme ?** Le Cynisme ressemble à « la Confiance
-   moyenne, inversée ». À vérifier au moment d'écrire : si les deux bougent
-   toujours ensemble, il faut en supprimer un. Piste de distinction : le Cynisme
-   est ce que l'organisation pense des **méthodes** (« encore un process »), la
-   Confiance ce que les gens pensent de **vous**. Une équipe peut vous croire et
-   railler la énième rétrospective.
+1. ~~Le Moral d'entreprise : moyenne ou minimum ?~~ **Tranché** (02/08) :
+   moyenne pondérée par la contribution pour le moteur, **plus** une alerte
+   dédiée sur le minimum pour l'œil. L'un ne remplace pas l'autre.
+2. ~~Confiance à 0 : la personne part ou reste ?~~ **Tranché** (02/08) : elle
+   reste et cesse de contribuer, **et un événement Inbox vous met devant le
+   cas** — voir §3.3. Un état passif devient une scène jouable.
+3. ~~Combien de niveaux affiche-t-on par défaut ?~~ **Tranché** (02/08) : un
+   point de couleur par personne, les chiffres au clic, et seulement les
+   alertes en clair (§6.1).
+4. ~~Les recrues arrivent-elles à 100 partout ?~~ **Tranché** (02/08) : non, et
+   **leurs niveaux de départ dépendent de leur caractère** — voir §3.4.
+5. ~~Est-ce que ça remplace le Cynisme ?~~ **Tranché** (02/08) : non, les deux
+   survivent. Le Cynisme est ce que l'organisation pense des **méthodes**
+   (« encore un process »), la Confiance ce que les gens pensent de **vous** —
+   une équipe peut vous croire et railler la énième rétrospective. **À
+   revérifier en écrivant les effets** : si les deux finissent par bouger
+   ensemble sur tout le catalogue, il faudra en supprimer un.
+
+**Il ne reste donc aucune décision de conception ouverte sur ce document.** Ce
+qui reste est du calibrage : les valeurs de départ et les facteurs d'influence
+des huit caractères, et les seuils d'alerte de chaque critère.
 
 ---
 
