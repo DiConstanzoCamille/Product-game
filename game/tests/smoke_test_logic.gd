@@ -1464,9 +1464,14 @@ func _play_one_mandate(run_index: int, strategy: String, company_id: String) -> 
 	if not SprintState.is_mandate_over:
 		_fail("Run %d (%s, %s) n'a jamais atteint de fin après 30 sprints — probable bug de seuils." % [run_index, strategy, company_id])
 
-	print("Run %d (%s, %s) terminé — sprint %d, fin='%s', 💥 %d, ⚡ %d, 👥 %d, revue de board='%s', ressources finales=%s" % [
+	# 💰 Le Revenue est imprimé avec sa base d'abonnements et sa facture : sans
+	# ça, le banc ne dit rien de la seule question qui compte pour lui — est-ce
+	# que la caisse contraint encore, ou est-ce qu'elle a décollé toute seule ?
+	print("Run %d (%s, %s) terminé — sprint %d, fin='%s', 💥 %d, 💰 %d (abo %d, charges %d), ⚡ %d, 👥 %d, revue de board='%s', ressources finales=%s" % [
 		run_index, strategy, company_id, SprintState.sprint_number, SprintState.ending_id,
-		SprintState.impact_wallet, SprintState.energy, SprintState.get_roster().size(), SprintState.board_review_state,
+		SprintState.impact_wallet, int(round(SprintState.revenue)), int(round(SprintState.recurring_revenue)),
+		int(SprintState.get_recurring_charges().get("total", 0)),
+		SprintState.energy, SprintState.get_roster().size(), SprintState.board_review_state,
 		SprintState.resource_values
 	])
 
