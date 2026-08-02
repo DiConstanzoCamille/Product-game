@@ -1,5 +1,5 @@
 {
-  "_comment": "Grandes décisions structurelles (spec scoring §7.1/§7.1.1/§7.1.2). Les axes/effects historiques restent le feedback immédiat sur les jauges à l'activation (par teamProfile). Depuis le Lot 3, un outil (family outil-process/methodologie-orga) déclare en plus perEmployee/eligibility/refractory/adoptionCondition/flatModifiers/cumulative/slotBonus : le Levier continu que ScoreResolver applique chaque sprint tant que la carte reste active, calculé sur le roster réel — jamais une valeur figée par entreprise. slotBonus n'existe que sur les outils cumulatifs (ils rendent leur place, §7.1.1.b). Chaque carte outil-process/methodologie-orga du catalogue déclare perEmployee ou cumulative (une carte payante et slottée sans aucun des deux serait un piège pur) ; score_resolver_cases.gd → _test_every_tool_card_has_a_lever le vérifie.",
+  "_comment": "Grandes décisions structurelles (spec scoring §7.1/§7.1.1/§7.1.2). `costImpact` est le prix d'activation en 💥 Impact ; `licensePerSeat` la licence en 💰 Revenue prélevée chaque sprint **par personne du roster** tant que l'outil occupe son slot (spec-impact-monnaie.md §3.6) : le même chiffre gouverne le gain (Levier par employé) et la facture. Les axes/effects historiques restent le feedback immédiat sur les jauges à l'activation (par teamProfile). Depuis le Lot 3, un outil (family outil-process/methodologie-orga) déclare en plus perEmployee/eligibility/refractory/adoptionCondition/flatModifiers/cumulative/slotBonus : le Levier continu que ScoreResolver applique chaque sprint tant que la carte reste active, calculé sur le roster réel — jamais une valeur figée par entreprise. slotBonus n'existe que sur les outils cumulatifs (ils rendent leur place, §7.1.1.b). Chaque carte outil-process/methodologie-orga du catalogue déclare perEmployee ou cumulative (une carte payante et slottée sans aucun des deux serait un piège pur) ; score_resolver_cases.gd → _test_every_tool_card_has_a_lever le vérifie.",
   "axes": [
     { "id": "humain", "label": "Coût humain" },
     { "id": "financier", "label": "Coût financier" },
@@ -13,7 +13,8 @@
   "cards": [
     {
       "id": "rice",
-      "costPieces": 3,
+      "costImpact": 24,
+      "licensePerSeat": 0.3,
       "refId": "PRD-014",
       "family": "outil-process",
       "category": "Module priorisation",
@@ -41,7 +42,8 @@
     },
     {
       "id": "notion",
-      "costPieces": 4,
+      "costImpact": 32,
+      "licensePerSeat": 0.5,
       "refId": "DOC-002",
       "family": "outil-process",
       "category": "Module documentation",
@@ -70,7 +72,8 @@
     },
     {
       "id": "jira",
-      "costPieces": 6,
+      "costImpact": 48,
+      "licensePerSeat": 0.7,
       "refId": "DOC-003",
       "family": "outil-process",
       "category": "Module suivi & doc",
@@ -100,7 +103,8 @@
     },
     {
       "id": "daily-standup",
-      "costPieces": 2,
+      "costImpact": 16,
+      "licensePerSeat": 0.2,
       "refId": "RIT-001",
       "family": "methodologie-orga",
       "category": "Rituel quotidien",
@@ -130,7 +134,8 @@
     },
     {
       "id": "sprint-retro",
-      "costPieces": 2,
+      "costImpact": 16,
+      "licensePerSeat": 0.2,
       "refId": "RIT-002",
       "family": "methodologie-orga",
       "category": "Rituel de fin de sprint",
@@ -159,7 +164,8 @@
     },
     {
       "id": "shape-up",
-      "costPieces": 5,
+      "costImpact": 40,
+      "licensePerSeat": 0.4,
       "refId": "ORG-021",
       "family": "methodologie-orga",
       "category": "Refonte du cycle produit",

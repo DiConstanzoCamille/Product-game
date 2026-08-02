@@ -1,22 +1,22 @@
 {
   "version": 1,
-  "_comment": "Quotas trimestriels et exigences du board. Les valeurs sont indexees par niveau de carriere (careers.json). Chaque niveau recalibre grossierement sa table T1->T4 sur son nombre de squads moyen (careers.json -> squadsMin/squadsMax) : un Director ne joue pas avec les chiffres d'un PM (spec §13.4). Premier jet, a affiner en jeu comme le reste de l'equilibrage.",
+  "_comment": "Quotas trimestriels et exigences du board. Depuis le lot A de l'Impact-monnaie, l'Impact ne se remet plus a zero entre les trimestres : le board regarde le SOLDE du portefeuille, pas la production du trimestre. Les tables ci-dessous sont donc cumulatives (T2 contient T1), et tout ce qui est depense doit etre reproduit avant le verdict. Les valeurs sont indexees par niveau de carriere (careers.json). Chaque niveau recalibre grossierement sa table T1->T4 sur son nombre de squads moyen (careers.json -> squadsMin/squadsMax) : un Director ne joue pas avec les chiffres d'un PM (spec §13.4). Premier jet, a affiner en jeu comme le reste de l'equilibrage.",
 
   "careerLevels": {
     "pm": {
-      "quarterQuotas": [120, 270, 560, 1050]
+      "quarterQuotas": [150, 760, 2200, 4600]
     },
     "lead-pm": {
-      "quarterQuotas": [300, 700, 1400, 2600]
+      "quarterQuotas": [300, 1000, 2400, 5000]
     },
     "director": {
-      "quarterQuotas": [750, 1650, 3400, 6300]
+      "quarterQuotas": [750, 2400, 5800, 12100]
     },
     "cpo": {
-      "quarterQuotas": [1300, 3000, 6200, 11500]
+      "quarterQuotas": [1300, 4300, 10500, 22000]
     },
     "ceo": {
-      "quarterQuotas": [2900, 6500, 13500, 25200]
+      "quarterQuotas": [2900, 9400, 22900, 48100]
     }
   },
 
@@ -25,7 +25,7 @@
     "requirementsAccumulate": true
   },
 
-  "qualitativeBonusBudget": 8,
+  "qualitativeBonusImpact": 70,
 
   "requirements": [
     {
@@ -98,7 +98,7 @@
 
   "qualitativeBonus": {
     "condition": "all-company-objectives-met",
-    "description": "Les objectifs qualitatifs de l'entreprise, tenus en plus du quota, accordent un paquet de Budget au Comite.",
+    "description": "Les objectifs qualitatifs de l'entreprise, tenus en plus du quota, accordent un paquet d'Impact au portefeuille (qualitativeBonusImpact).",
     "longMandate": {
       "enabled": true,
       "accumulates": false

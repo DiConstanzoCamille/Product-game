@@ -62,7 +62,7 @@
       "name": "Réseau",
       "polarity": "positive",
       "description": "Connaît quelqu'un qui connaît quelqu'un. −2 pièces sur le prochain recrutement.",
-      "effects": { "nextHireDiscountPieces": 2 }
+      "effects": { "nextHireDiscountImpact": 16 }
     }
   ]
 }

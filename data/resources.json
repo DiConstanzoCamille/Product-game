@@ -1,15 +1,6 @@
 {
   "resources": [
     {
-      "id": "tresorerie",
-      "icon": "💰",
-      "name": "Trésorerie",
-      "definition": "Le temps qu'il vous reste avant que la question de survie devienne la seule qui compte.",
-      "rises": ["Levée de fonds", "Ventes", "Coupes budgétaires"],
-      "falls": ["Masse salariale", "Outillage", "Tout ce qui promet un ROI « plus tard »"],
-      "extreme": { "condition": "À sec", "outcome": "Faillite" }
-    },
-    {
       "id": "moral",
       "icon": "🫶",
       "name": "Moral & confiance d'équipe",
@@ -62,8 +53,8 @@
       "description": "Rassurer le board coûte souvent la confiance du terrain."
     },
     {
-      "id": "tresorerie-vs-dette",
-      "resources": ["tresorerie", "dette-organisationnelle"],
+      "id": "revenue-vs-dette",
+      "resources": ["revenue", "dette-organisationnelle"],
       "description": "Couper les coins ronds fait gagner du cash à court terme, à rembourser plus tard avec intérêts."
     },
     {

@@ -81,7 +81,7 @@ const SENDER_BADGE_DIR := "res://assets/sender-badges/"
 const DECISION_DESK_SCRIPT := preload("res://scripts/components/decision_desk.gd")
 
 const GAUGE_ICONS := {
-	"tresorerie": "wallet",
+	"revenue": "wallet",
 	"moral": "heart-handshake",
 	"dette-organisationnelle": "brick-wall",
 	"capital-politique": "target",

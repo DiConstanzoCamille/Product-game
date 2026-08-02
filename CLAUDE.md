@@ -16,6 +16,20 @@ Trois documents, trois rôles — en cas de contradiction, cet ordre tranche :
 | [`docs/spec-scoring-sprint.md`](docs/spec-scoring-sprint.md) | **La cible de gameplay validée** (31/07/2026) : Traction × Levier = Impact. C'est la direction du produit. |
 | [`docs/spec-profondeur-gameplay.md`](docs/spec-profondeur-gameplay.md) | Les phases A→D. **Sa phase D est remplacée** par la spec de scoring. Sa phase C (roadmap profonde) reste valide et devient le prérequis du chantier scoring. |
 
+Deux specs **validées et non implémentées** descendent d'un cran là où une
+grandeur abstraite ne raconte rien :
+[`spec-clients-revenue.md`](docs/spec-clients-revenue.md) (le Revenue cache des
+clients qui paient) et
+[`spec-equipe-individuelle.md`](docs/spec-equipe-individuelle.md) (le Moral
+cache des personnes avec un caractère). Elles se font **dans cet ordre** et
+jamais en même temps — les deux réécrivent des effets de contenu.
+
+Un principe en sort, à ne jamais remélanger : **trois entités perçoivent
+quelque chose**, et chacune a sa grandeur. Les *utilisateurs* jugent le produit
+(📈 Réputation produit) ; le *board* juge le joueur (🎯 Capital politique) ;
+l'*équipe* juge le joueur (🤝 Confiance). C'est un mot employé pour deux choses
+qui avait laissé s'installer la fuite `Impact → Valeur perçue → Revenue`.
+
 `docs/data-schema.md` décrit le schéma de chaque JSON de `data/`.
 
 ---
@@ -29,10 +43,14 @@ ce qui suit est le minimum à avoir en tête avant de toucher au gameplay.
 - **`📊 Traction × ⚙️ Levier = 💥 Impact`** — *ce que j'ai produit* ×
   *l'organisation que j'ai construite*. La Traction vient des features
   livrées, le Levier de l'équipe, des outils, de la stratégie et du produit.
-- **L'Impact est la monnaie** : `Budget = floor(√Impact)`. Bien jouer un
-  sprint paie immédiatement en pouvoir d'achat.
-- **Le MRR est un stock cumulatif**, pas un flux recalculé — c'est la
-  composition qui crée l'envie de continuer.
+- **L'Impact est la monnaie**, et la seule : un achat le débite, un sprint
+  bien joué le remplit. Il ne se remet jamais à zéro, et c'est son **solde**
+  que le board compare au quota.
+- **💰 Le Revenue est l'autre économie**, et elle vit indépendamment — voir
+  le principe ci-dessous, c'est le point de game design le plus facile à
+  casser sans s'en apercevoir.
+- **Le revenu récurrent est un stock cumulatif**, pas un flux recalculé —
+  c'est la composition qui crée l'envie de continuer.
 - **Quota trimestriel tous les 3 sprints**, escaladé ×2, **manqué = fin de
   run**. La difficulté se durcit franchement après T4.
 - **Trois familles de décisions** (§7 de la spec) : outils internes (Levier
@@ -42,6 +60,39 @@ ce qui suit est le minimum à avoir en tête avant de toucher au gameplay.
 - **Le modèle doit tenir de 1 squad à 10+** :
   `Impact = Σ(Traction_squad × Levier_local) × Levier_global`. Voir le
   contrat d'architecture ci-dessous — **il est non négociable**.
+
+### L'économie de l'entreprise n'est pas l'économie de l'Impact
+
+Deux économies, deux moteurs, **aucune conversion automatique de l'une vers
+l'autre**. Le détail est dans
+[`docs/spec-impact-monnaie.md`](docs/spec-impact-monnaie.md) §3.8, sa mise en
+œuvre est l'issue #42 ; le minimum à avoir en tête :
+
+| | 💥 L'Impact | 💰 Le Revenue |
+|---|---|---|
+| D'où ça vient | `Traction × Levier` | Ce que l'entreprise vend : features à ROI, primes, événements, équipes subies, décisions |
+| À quoi ça sert | **Acheter** | **Payer** — salaires, licences, récurrents |
+| Ce qui la juge | Le quota | La faillite |
+
+**Produire de l'Impact ne remplit pas la caisse.** Le lien entre les deux
+existe, mais il va dans un seul sens et passe par l'organisation : une bonne
+économie *permet* l'Impact (elle paie l'équipe et les outils qui font le
+Levier), elle ne le produit pas. Et ce n'est pas le seul chemin — on doit
+pouvoir faire un gros Impact avec une économie seulement correcte, en jouant
+le Moral, le Levier ou un combo. Symétriquement, un choix économique se paie
+ailleurs : la feature qui finance les salaires coûte du Moral ou de la Dette.
+
+**Le piège**, et il a déjà été introduit une fois : toute règle du type
+« l'Impact du sprint alimente le revenu » — à n'importe quel taux — fusionne
+les deux monnaies en une seule grandeur à deux noms et supprime l'arbitrage
+*nourrir la boîte ou nourrir la performance*. Ce n'est pas un problème de
+calibrage : c'est le mauvais sens de dépendance.
+
+Trois propriétés le vérifient mécaniquement : le rapport
+`Revenue final / charges par sprint` ne décolle pas au banc ; un run
+« économie » et un run « Levier » franchissent tous deux le mandat sans que
+l'un domine ; **mourir riche** (faillite avec un gros portefeuille, ou quota
+manqué avec une caisse pleine) reste atteignable des deux côtés.
 
 ### Contrat d'architecture — à honorer dès le premier lot de code
 
@@ -186,6 +237,10 @@ honnêtement dans la PR quand la réponse est gênante.
 8. **À N=1, la couche multi-équipe est-elle invisible ?** Vérifier sur `.gd`,
    `.tscn` **et** `data/*.json` — c'est par les JSON que le mot a déjà fui
    jusqu'à l'écran.
+9. **L'économie de l'entreprise s'est-elle remise à dépendre de l'Impact ?**
+   Un gain de 💰 Revenue calculé à partir de l'Impact du sprint fusionne les
+   deux monnaies sans que rien ne casse. Le banc le dit : si
+   `Revenue final / charges` décolle, la caisse a cessé de contraindre.
 
 ### Quand demander une relecture par un agent tiers
 

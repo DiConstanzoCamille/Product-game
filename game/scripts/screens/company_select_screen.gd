@@ -107,16 +107,21 @@ func _build_company_card(company: Dictionary) -> Control:
 	team_label.autowrap_mode = TextServer.AUTOWRAP_WORD
 	vbox.add_child(team_label)
 
-	var pieces_label := Label.new()
-	pieces_label.text = "Budget d'action de départ : %d 🪙" % int(company.get("startingPieces", 0))
-	pieces_label.add_theme_font_size_override("font_size", 12)
-	pieces_label.add_theme_color_override("font_color", UIHelpers.COLOR_AMBER)
-	vbox.add_child(pieces_label)
+	var wallet_label := Label.new()
+	var starting_impact := int(company.get("startingImpact", 0))
+	wallet_label.text = "💥 Impact de départ : %d — le premier sprint sert à livrer avec ce dont on hérite." % starting_impact \
+		if starting_impact <= 0 else "💥 Impact de départ : %d" % starting_impact
+	wallet_label.add_theme_font_size_override("font_size", 12)
+	wallet_label.autowrap_mode = TextServer.AUTOWRAP_WORD
+	wallet_label.add_theme_color_override("font_color", UIHelpers.COLOR_AMBER)
+	vbox.add_child(wallet_label)
 
 	var objectives: Dictionary = company.get("boardObjectives", {})
 	if not objectives.is_empty():
 		var objectives_label := Label.new()
-		var lines: Array = ["🏛️ Bonus qualitatif à chaque quota (+8 Budget) : %s" % objectives.get("title", "")]
+		var lines: Array = ["🏛️ Bonus qualitatif à chaque quota (+%d 💥) : %s" % [
+			int(GameData.quotas.get("qualitativeBonusImpact", 0)), objectives.get("title", "")
+		]]
 		for condition in objectives.get("conditions", []):
 			lines.append("   • %s" % condition.get("label", ""))
 		objectives_label.text = "\n".join(lines)

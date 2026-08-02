@@ -107,7 +107,8 @@ func _build() -> void:
 		if resource_id == "capital-politique":
 			continue  # celle-là est à vous, pas à l'entreprise : bloc « Vous »
 		vbox.add_child(_resource_gauge(resource))
-	vbox.add_child(_pieces_row())
+	vbox.add_child(_wallet_row())
+	vbox.add_child(_revenue_row())
 	vbox.add_child(_rule())
 
 	vbox.add_child(_group_label("Vous"))
@@ -171,11 +172,17 @@ func _build_rail(vbox: VBoxContainer) -> void:
 		UIHelpers.panel_state_color(EffectResolver.gauge_state("", float(SprintState.energy))),
 		UIHelpers.energy_tooltip()))
 
-	var pieces := _label("🪙\n%d" % SprintState.pieces, 12, UIHelpers.PANEL_FG)
-	pieces.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	pieces.tooltip_text = "🪙 Budget d'investissement — les moyens disponibles pour recruter, adopter des pratiques et activer des décisions."
-	pieces.mouse_filter = Control.MOUSE_FILTER_STOP
-	vbox.add_child(_spaced(pieces, 8, 0))
+	var wallet := _label("💥\n%d" % SprintState.impact_wallet, 12, UIHelpers.PANEL_FG)
+	wallet.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	wallet.tooltip_text = _wallet_tooltip()
+	wallet.mouse_filter = Control.MOUSE_FILTER_STOP
+	vbox.add_child(_spaced(wallet, 8, 0))
+
+	var revenue := _label("💰\n%d" % int(round(SprintState.revenue)), 12, UIHelpers.PANEL_FG)
+	revenue.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	revenue.tooltip_text = _revenue_tooltip()
+	revenue.mouse_filter = Control.MOUSE_FILTER_STOP
+	vbox.add_child(_spaced(revenue, 6, 0))
 
 
 func _rail_gauge(icon: String, value: float, maximum: float, color: Color, tooltip: String) -> Control:
@@ -322,19 +329,58 @@ func _gauge(text: String, value: float, maximum: float, color: Color, tooltip: S
 	return _spaced(vbox, 3, 3)
 
 
-func _pieces_row() -> Control:
+## 💥 Le portefeuille — la seule monnaie d'achat, et la valeur que le board
+## regarde au verdict. Un seul nombre : c'est tout l'intérêt du modèle.
+func _wallet_row() -> Control:
+	return _currency_row("💥 Impact", "%d" % SprintState.impact_wallet, _wallet_tooltip(), 6)
+
+
+## 💰 Le Revenue — jamais un prix, seulement la survie : il encaisse les
+## abonnements et paie les charges. La charge du sprint est affichée à côté du
+## solde, sinon « ai-je les moyens de le garder ? » n'a pas de réponse lisible.
+func _revenue_row() -> Control:
+	var charges: Dictionary = SprintState.get_recurring_charges()
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 0)
+	box.add_child(_currency_row("💰 Revenue", "%d" % int(round(SprintState.revenue)), _revenue_tooltip(), 2))
+	# La charge vit sur sa propre ligne : à trois chiffres de part et d'autre,
+	# une seule ligne sortait du panneau en fin de mandat.
+	var charge := _label("charges −%d/sprint" % int(charges.get("total", 0)), 10, UIHelpers.PANEL_MUTED)
+	charge.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	charge.tooltip_text = _revenue_tooltip()
+	charge.mouse_filter = Control.MOUSE_FILTER_STOP
+	box.add_child(charge)
+	return box
+
+
+func _currency_row(title: String, value_text: String, tooltip: String, top_margin: int) -> Control:
 	var row := HBoxContainer.new()
 	row.mouse_filter = Control.MOUSE_FILTER_STOP
-	row.tooltip_text = "🪙 Budget d'investissement.\nSe gagne : Impact du sprint, allocation plancher et combo Quick wins.\nSe dépense : embauches, pratiques, indemnités de licenciement."
-	var label := _label("🪙 Budget d'investissement", 12, UIHelpers.PANEL_FG, true)
+	row.tooltip_text = tooltip
+	var label := _label(title, 12, UIHelpers.PANEL_FG, true)
 	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(label)
 	row.add_child(_spacer_h())
-	var value := _label("%d" % SprintState.pieces, 13, UIHelpers.PANEL_FG)
+	var value := _label(value_text, 13, UIHelpers.PANEL_FG)
 	UIHelpers.apply_mono(value, 13, true)
 	value.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(value)
-	return _spaced(row, 6, 8)
+	return _spaced(row, top_margin, 8)
+
+
+func _wallet_tooltip() -> String:
+	return "💥 Impact — la seule monnaie d'achat.\nSe gagne : Traction × Levier à chaque sprint.\nSe dépense : embauches, pratiques, décisions, tout le Comité.\nIl ne se remet jamais à zéro, et c'est son solde que le board compare au quota."
+
+
+func _revenue_tooltip() -> String:
+	var charges: Dictionary = SprintState.get_recurring_charges()
+	var lines: Array = ["💰 Revenue — la survie de l'entreprise. Jamais un prix.", "Encaisse les abonnements, paie chaque sprint :"]
+	if charges.get("lines", []).is_empty():
+		lines.append("· rien pour l'instant")
+	for line in charges.get("lines", []):
+		lines.append("· %s %s — %d" % [line.get("icon", ""), line.get("label", ""), int(line.get("amount", 0))])
+	lines.append("À zéro, l'entreprise ne paie plus : faillite.")
+	return "\n".join(lines)
 
 
 # ── Équipe : le roster enfin permanent, et actionnable ───────────────────
@@ -440,9 +486,9 @@ func _on_team_row_input(event: InputEvent, employee_id: String) -> void:
 		if refusal != "":
 			menu.set_item_disabled(menu.get_item_index(0), true)
 
-	var severance := int(GameData.balance.get("firing", {}).get("severancePieces", 2))
-	menu.add_item("🚪 Licencier (%d 🪙)" % severance, 1)
-	if SprintState.pieces < severance:
+	var severance := SprintState.resolved_price("severance")
+	menu.add_item("🚪 Licencier (%d 💥)" % severance, 1)
+	if SprintState.impact_wallet < severance:
 		menu.set_item_disabled(menu.get_item_index(1), true)
 
 	menu.id_pressed.connect(func(id: int):
@@ -483,10 +529,11 @@ func _confirm_fire(employee_id: String) -> void:
 		_fire_dialog.confirmed.connect(_on_fire_confirmed)
 		add_child(_fire_dialog)
 
-	_fire_dialog.dialog_text = "Licencier %s ?\n\nIndemnités %d 🪙 · 🫶 Moral %d%s\nIrréversible." % [
+	_fire_dialog.dialog_text = "Licencier %s ?\n\nIndemnités %d 💥 · 🫶 Moral %d · −%d 💰/sprint de salaire%s\nIrréversible." % [
 		employee.get("name", ""),
-		int(firing.get("severancePieces", 2)),
+		SprintState.resolved_price("severance"),
 		int(firing.get("moral", -4)),
+		int(employee.get("salary", 1)),
 		"\n🎭 Cynisme +%d — l'organisation y verra une politique." % int(firing.get("cynismePerExtraFiring", 3)) if SprintState.fired_count >= 1 else "",
 	]
 	_fire_dialog.popup_centered()
@@ -546,7 +593,7 @@ func _build_quota(vbox: VBoxContainer) -> void:
 	section.add_theme_constant_override("separation", 5)
 	vbox.add_child(section)
 	section.add_child(_group_label("Quota trimestriel · T%d" % int(quota.get("quarter", SprintState.quarter_index))))
-	section.add_child(_label("Sprint %d/%d · Impact brut %d / %d" % [
+	section.add_child(_label("Sprint %d/%d · portefeuille %d / %d 💥" % [
 		int(quota.get("sprint", 0)) + 1, int(quota.get("length", 3)), impact, target
 	], 11, UIHelpers.PANEL_FG, true))
 
@@ -570,7 +617,7 @@ func _build_quota(vbox: VBoxContainer) -> void:
 
 	var objectives := SprintState.evaluate_board_objectives()
 	if not objectives.is_empty():
-		section.add_child(_label("Objectifs qualitatifs : bonus +8 Budget", 10, UIHelpers.PANEL_ACCENT, true))
+		section.add_child(_label("Objectifs qualitatifs : bonus +%d 💥" % int(GameData.quotas.get("qualitativeBonusImpact", 0)), 10, UIHelpers.PANEL_ACCENT, true))
 		for objective in objectives:
 			var ok: bool = bool(objective.get("ok", false))
 			section.add_child(_label("%s %s" % ["✓" if ok else "○", objective.get("label", "")], 10,
@@ -579,7 +626,7 @@ func _build_quota(vbox: VBoxContainer) -> void:
 
 func _quota_tooltip() -> String:
 	var quota := SprintState.get_quarter_progress()
-	return "T%d · sprint %d/%d\nImpact brut : %d / %d\n%s" % [
+	return "T%d · sprint %d/%d\nPortefeuille : %d / %d 💥 — c'est le SOLDE qui est jugé, pas la production : dépenser fait reculer vers l'objectif.\n%s" % [
 		int(quota.get("quarter", 1)), int(quota.get("sprint", 0)) + 1, int(quota.get("length", 3)),
 		int(quota.get("impact", 0)), int(quota.get("quota", 0)), SprintState.get_quarter_requirement_text()
 	]

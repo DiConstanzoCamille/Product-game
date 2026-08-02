@@ -219,6 +219,82 @@ Ce choix n'existe pas aujourd'hui — tout va dans le même pot. Il apparaît
 gratuitement avec la séparation des deux monnaies, et c'est probablement son
 meilleur effet secondaire.
 
+### 3.8 Les deux économies sont indépendantes — la règle qui manquait
+
+*Ajouté le 02/08/2026, après le lot A. Le §3.7 ci-dessus **supposait** cette
+règle sans jamais l'écrire ; l'implémentation a donc gardé la conversion
+héritée, et l'arbitrage promis n'est jamais apparu. C'est la section à lire
+avant de toucher au Revenue.*
+
+> **L'économie de l'entreprise n'est pas l'économie de l'Impact.**
+
+Deux économies, deux moteurs, **aucune conversion automatique de l'une vers
+l'autre** :
+
+| | 💥 L'Impact | 💰 Le Revenue |
+|---|---|---|
+| **Ce que c'est** | La performance du joueur | La santé de l'entreprise |
+| **D'où ça vient** | `Traction × Levier` — ce qu'on livre × l'organisation construite | Ce que l'entreprise vend et encaisse : features à ROI, primes ponctuelles, événements, effets des équipes subies, décisions stratégiques |
+| **À quoi ça sert** | **Acheter** | **Payer** — salaires, licences, coûts récurrents |
+| **Ce qui la juge** | Le quota trimestriel | La faillite |
+
+**Produire de l'Impact ne remplit pas la caisse.** C'est la règle, et elle n'a
+aujourd'hui aucune exception légitime.
+
+#### Ce qui les relie quand même — et c'est voulu
+
+L'indépendance ne veut pas dire l'étanchéité. Le lien existe, mais il va dans un
+seul sens et il passe par l'organisation :
+
+- **Une bonne économie rend l'Impact possible** : elle paie l'équipe, les outils
+  et les licences qui produisent le Levier. À sec, l'organisation s'effondre et
+  l'Impact avec elle. C'est un lien de **capacité**, pas de conversion.
+- **Ce n'est pas le seul chemin.** On doit pouvoir faire un gros Impact avec une
+  économie seulement correcte, en jouant le Moral, le Levier ou un combo
+  d'organisation. Une entreprise riche et démoralisée doit pouvoir perdre ;
+  une entreprise juste solvable et bien menée doit pouvoir gagner.
+- **Un choix économique se paie ailleurs.** La feature qui finance les salaires
+  peut coûter du Moral ou de la Dette ; la rallonge coûte du Capital politique ;
+  le rachat d'un concurrent coûte de la Dette. Une décision purement économique
+  n'est jamais gratuite sur le reste du plateau.
+
+#### Le contre-exemple, à ne jamais réintroduire
+
+`scoring.json → conversion.saas-mrr.impactToMrr` fait aujourd'hui rentrer une
+fraction de l'Impact du sprint dans la base d'abonnements. C'est **exactement**
+ce que cette section interdit : produire remplit alors la caisse tout seul, les
+deux monnaies deviennent une seule grandeur avec deux noms, et le choix de
+backlog du §3.7 n'a plus d'objet.
+
+Ce n'est pas une question de calibrage. Une conversion Impact → Revenue, à
+n'importe quel taux, fait de l'économie une conséquence de la performance
+plutôt qu'un terrain de jeu à part.
+
+#### Comment on saura que c'est respecté
+
+Trois propriétés vérifiables, pas une opinion :
+
+1. **Le Revenue contraint jusqu'au bout.** Au banc, le rapport
+   `Revenue final / charges par sprint` ne doit pas décoller. Mesure au lot A,
+   avant correction : `greedy` termine avec 1229 de Revenue pour 22 de charges
+   — la caisse a cessé d'exister comme contrainte après T2.
+2. **Deux trajectoires gagnantes, aucune dominante.** Un run qui maximise
+   l'économie et un run qui maximise le Levier doivent tous deux pouvoir
+   franchir le mandat.
+3. **On peut mourir riche.** Faillite avec un gros portefeuille d'Impact, et
+   licenciement avec une caisse pleine, doivent tous les deux rester des fins
+   atteignables — c'est la preuve que les deux jauges de mort sont réellement
+   distinctes.
+
+#### Ce que ça implique pour le contenu
+
+La conséquence est que **le Revenue devient une affaire de contenu, pas de
+formule** : c'est le catalogue de features, de cartes, d'événements et de
+décisions qui doit porter ses gains, feature par feature. Un backlog où toutes
+les features rapportent autant de Revenue que de Traction reproduit le défaut
+d'un cran plus loin — il faut des features qui paient sans scorer, et des
+features qui scorent sans payer.
+
 ---
 
 ## 4. L'objectif trimestriel porte sur le portefeuille

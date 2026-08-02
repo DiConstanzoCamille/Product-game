@@ -12,8 +12,8 @@
         {
           "id": "negocier-augmentation",
           "label": "Négocier une augmentation",
-          "reveal": "💰 Trésorerie −4 · 🫶 Moral +6 — il reste, et les autres l'apprennent vite.",
-          "effects": { "tresorerie": -4, "moral": 6 }
+          "reveal": "💰 Revenue −4 · 🫶 Moral +6 — il reste, et les autres l'apprennent vite.",
+          "effects": { "revenue": -4, "moral": 6 }
         },
         {
           "id": "promettre-autonomie",
@@ -41,8 +41,8 @@
         {
           "id": "tout-arreter",
           "label": "Tout arrêter pour corriger proprement",
-          "reveal": "🧱 Dette −8 · 🫶 Moral −3 · 💰 Trésorerie −2 — corrigé à la racine, la démo est reportée.",
-          "effects": { "dette-organisationnelle": -8, "moral": -3, "tresorerie": -2 }
+          "reveal": "🧱 Dette −8 · 🫶 Moral −3 · 💰 Revenue −2 — corrigé à la racine, la démo est reportée.",
+          "effects": { "dette-organisationnelle": -8, "moral": -3, "revenue": -2 }
         },
         {
           "id": "corriger-en-douce",
@@ -70,14 +70,14 @@
         {
           "id": "defendre-budget",
           "label": "Défendre le budget avec des chiffres",
-          "reveal": "🎯 Capital politique +5 · 💰 Trésorerie −1 · 🪙 +2 — le board est convaincu, et relâche un peu de budget d'action.",
-          "effects": { "capital-politique": 5, "tresorerie": -1, "pieces": 2 }
+          "reveal": "🎯 Capital politique +5 · 💰 Revenue −1 · 💥 +16 — le board est convaincu, et relâche un peu de son attention.",
+          "effects": { "capital-politique": 5, "revenue": -1, "impact": 16 }
         },
         {
           "id": "couper-budget",
           "label": "Couper 20% du budget outillage",
-          "reveal": "💰 Trésorerie +6 · 🧱 Dette +5 · 🫶 Moral −3 — l'équipe compense avec des raccourcis.",
-          "effects": { "tresorerie": 6, "dette-organisationnelle": 5, "moral": -3 }
+          "reveal": "💰 Revenue +6 · 🧱 Dette +5 · 🫶 Moral −3 — l'équipe compense avec des raccourcis.",
+          "effects": { "revenue": 6, "dette-organisationnelle": 5, "moral": -3 }
         },
         {
           "id": "botter-en-touche",
@@ -99,14 +99,14 @@
         {
           "id": "jour-off",
           "label": "Lui donner un jour off immédiat",
-          "reveal": "🫶 Moral +6 · 💰 Trésorerie −1 — soulagement visible, la charge reste à répartir.",
-          "effects": { "moral": 6, "tresorerie": -1 }
+          "reveal": "🫶 Moral +6 · 💰 Revenue −1 — soulagement visible, la charge reste à répartir.",
+          "effects": { "moral": 6, "revenue": -1 }
         },
         {
           "id": "recruter-renfort",
           "label": "Recruter du renfort en urgence",
-          "reveal": "💰 Trésorerie −8 · 🫶 Moral +3 · 🧱 Dette −2 — coûteux, mais l'astreinte est enfin répartie.",
-          "effects": { "tresorerie": -8, "moral": 3, "dette-organisationnelle": -2 }
+          "reveal": "💰 Revenue −8 · 🫶 Moral +3 · 🧱 Dette −2 — coûteux, mais l'astreinte est enfin répartie.",
+          "effects": { "revenue": -8, "moral": 3, "dette-organisationnelle": -2 }
         },
         {
           "id": "tenir-encore",
@@ -163,8 +163,8 @@
         {
           "id": "sous-traiter-cabinet",
           "label": "Sous-traiter à un cabinet externe",
-          "reveal": "💰 Trésorerie −10 · 🎯 Capital politique +5 — cher, mais l'équipe n'a rien vu passer.",
-          "effects": { "tresorerie": -10, "capital-politique": 5 }
+          "reveal": "💰 Revenue −10 · 🎯 Capital politique +5 — cher, mais l'équipe n'a rien vu passer.",
+          "effects": { "revenue": -10, "capital-politique": 5 }
         },
         {
           "id": "repondre-minima",
@@ -186,8 +186,8 @@
         {
           "id": "demo-soignee",
           "label": "Improviser une démo soignée",
-          "reveal": "🎯 Capital politique +4 · 🫶 Moral −3 · 🪙 +2 — l'investisseur repart conquis et glisse un mot au board.",
-          "effects": { "capital-politique": 4, "moral": -3, "pieces": 2 }
+          "reveal": "🎯 Capital politique +4 · 🫶 Moral −3 · 💥 +16 — l'investisseur repart conquis et glisse un mot au board.",
+          "effects": { "capital-politique": 4, "moral": -3, "impact": 16 }
         },
         {
           "id": "montrer-envers-decor",
@@ -244,8 +244,8 @@
         {
           "id": "remise-personnalisee",
           "label": "Négocier une remise personnalisée",
-          "reveal": "💰 Trésorerie −6 · 📈 Valeur perçue +3 · 🪙 −1 — il reste, à un prix qui fera précédent, et le board retient la remise.",
-          "effects": { "tresorerie": -6, "valeur-percue": 3, "pieces": -1 }
+          "reveal": "💰 Revenue −6 · 📈 Valeur perçue +3 · 💥 −8 — il reste, à un prix qui fera précédent, et le board retient la remise.",
+          "effects": { "revenue": -6, "valeur-percue": 3, "impact": -8 }
         },
         {
           "id": "feature-sur-mesure",
@@ -273,8 +273,8 @@
         {
           "id": "augmenter-offre",
           "label": "Augmenter l'offre salariale",
-          "reveal": "💰 Trésorerie −7 · 🫶 Moral +3 — les candidatures affluent enfin.",
-          "effects": { "tresorerie": -7, "moral": 3 }
+          "reveal": "💰 Revenue −7 · 🫶 Moral +3 — les candidatures affluent enfin.",
+          "effects": { "revenue": -7, "moral": 3 }
         },
         {
           "id": "elargir-criteres",
@@ -333,8 +333,8 @@
         {
           "id": "remplacer-urgence",
           "label": "Le remplacer en urgence",
-          "reveal": "💰 Trésorerie −9 · 🎭 Cynisme −3 — la transformation continue, à prix fort.",
-          "effects": { "tresorerie": -9, "cynisme": -3 }
+          "reveal": "💰 Revenue −9 · 🎭 Cynisme −3 — la transformation continue, à prix fort.",
+          "effects": { "revenue": -9, "cynisme": -3 }
         },
         {
           "id": "internaliser-role",
@@ -370,8 +370,8 @@
         {
           "id": "refuser-deal",
           "label": "Refuser, le deal tombe",
-          "reveal": "🎯 Capital politique −3 · 💰 Trésorerie −3 — un commercial vexé, un client qui va voir ailleurs, et une force de vente faible qui recommencera.",
-          "effects": { "capital-politique": -3, "tresorerie": -3 }
+          "reveal": "🎯 Capital politique −3 · 💰 Revenue −3 — un commercial vexé, un client qui va voir ailleurs, et une force de vente faible qui recommencera.",
+          "effects": { "capital-politique": -3, "revenue": -3 }
         }
       ]
     },
@@ -414,8 +414,8 @@
         {
           "id": "session-cadrage",
           "label": "Organiser une session de cadrage en urgence",
-          "reveal": "💰 Trésorerie −3 · 🎭 Cynisme −2 — un après-midi perdu en réunion, un message qui existe enfin.",
-          "effects": { "tresorerie": -3, "cynisme": -2 }
+          "reveal": "💰 Revenue −3 · 🎭 Cynisme −2 — un après-midi perdu en réunion, un message qui existe enfin.",
+          "effects": { "revenue": -3, "cynisme": -2 }
         },
         {
           "id": "laisser-filer-message",
