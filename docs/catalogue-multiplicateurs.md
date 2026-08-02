@@ -179,3 +179,75 @@ construire son équipe est correcte.
 - **Rien de tout ça n'est jouable avant** la couche `Levier = (base + Σ) × Π` de
   la spec §5. Écrire ces items avant cette couche, c'est écrire des additifs
   déguisés.
+
+---
+
+## 8. Les liens cachés entre features
+
+Les multiplicateurs des sections précédentes s'**achètent**. Ceux-ci se
+**découvrent** — et c'est une famille à part, qui ne récompense pas la même
+chose.
+
+### Ce que ce n'est pas
+
+Ce ne sont **pas** des bonus qui jugent une façon de s'organiser. Le jeu n'a pas
+d'avis sur le management : un joueur qui enchaîne des features sans lien entre
+elles fait un choix, pas une faute, et il en assume le résultat. Aucun item ne
+doit récompenser une école de product contre une autre.
+
+### Ce que c'est
+
+**Deux features livrées ensemble déclenchent un bonus qui n'était pas annoncé.**
+Le support existe déjà : les `tags` de `backlog.json` (`reporting`,
+`enterprise`, `mobile`…) sont la matière naturelle de ces liens.
+
+L'intérêt n'est pas la puissance du bonus, c'est ce qu'il change dans la façon
+de choisir. Sans lui, un joueur prend la meilleure ligne du tableau de stats.
+Avec lui, il commence à se demander si deux tickets vont bien ensemble — et il a
+raison de se le demander, parfois.
+
+### Pourquoi ce n'est pas une epic
+
+Les deux sont proches et se complètent justement parce qu'ils diffèrent :
+
+| | Epic | Lien caché |
+|---|---|---|
+| Connu à l'avance | oui, on s'engage sciemment | **non**, on le découvre |
+| Rythme | planification longue | surprise dans un sprint |
+| Ce que ça récompense | tenir un chantier | l'observation, la mémoire entre runs |
+
+Une epic est un **objectif** ; un lien caché est une **surprise**. Le premier
+structure la partie, le second donne le « ah tiens » qui fait qu'on raconte un
+run à quelqu'un. Les deux exigences du `CLAUDE.md` que rien d'autre ne sert
+aujourd'hui — *surprises* et *informations cachées* — sont portées par le
+second.
+
+### L'infrastructure existe déjà
+
+Le **Compendium des synergies** (Lot 4, autoload `PlayerProfile`) enregistre les
+combos découverts entre runs et les affiche en `???` tant qu'ils ne l'ont pas
+été. Il gère trois familles — composition, main, inter-équipes. Les synergies de
+features en seraient une **quatrième**, sans mécanisme nouveau : la détection lit
+le rapport déjà produit par `ScoreResolver`, elle ne reteste aucune condition.
+
+C'est aussi ce qui donne enfin du contenu au Compendium, livré au Lot 4 avec le
+mécanisme mais presque rien à découvrir.
+
+### Trois exemples
+
+| Lien | Déclencheur | Effet |
+|---|---|---|
+| 🔗 **Bout en bout** | une feature `mobile` et une feature `back-office` dans le même sprint | `×1,2` Traction du sprint |
+| 🧵 **Dette technique assumée** | deux features `refacto` livrées dans le même mandat | `leverMultiplier ×1,15` permanent |
+| 🪞 **Effet miroir** | une feature `reporting` livrée juste après une feature `data` | Traction de la seconde `×1,4` |
+
+Ce sont des exemples de forme, pas des valeurs validées. Trois règles pour en
+écrire d'autres :
+
+- **Jamais annoncé.** Un lien affiché d'avance devient une contrainte à
+  optimiser, pas une découverte.
+- **Jamais indispensable.** Un joueur qui ne les connaît pas doit pouvoir
+  gagner ; ils récompensent, ils ne péagent pas.
+- **Toujours vérifiable après coup.** Le rapport de score doit nommer le lien
+  quand il se déclenche, sinon le joueur ne sait pas ce qui vient de se passer —
+  et une surprise incomprise n'est pas une surprise, c'est du bruit.
