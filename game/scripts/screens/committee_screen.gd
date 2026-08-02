@@ -285,7 +285,7 @@ func _on_quarter_advance_pressed() -> void:
 func _price_text(cost: int, kind: String, item_id: String) -> String:
 	var charge := SprintState.recurring_charge(kind, item_id)
 	if charge <= 0:
-		return "%d 💥" % cost
+		return "%d 💥\nsans charge" % cost
 	return "%d 💥\n+%d 💰/sprint" % [cost, charge]
 
 

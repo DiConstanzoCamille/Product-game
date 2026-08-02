@@ -170,6 +170,26 @@ func _refresh_shelf_head() -> void:
 		parts.append("réseau : −%d 💥 sur la prochaine embauche" % SprintState.next_hire_discount)
 
 	shelf_head.add_child(UIHelpers.make_shelf_head("📦 L'étal du sprint", " · ".join(parts)))
+	_add_empty_wallet_notice()
+
+
+## 💥 Le portefeuille démarre à zéro : rien n'est achetable au premier sprint,
+## et c'est assumé (spec-impact-monnaie.md §3.4). Un étal entièrement grisé
+## sans un mot est un bug aux yeux du joueur ; la même situation expliquée est
+## une règle du jeu. Le message ne parle jamais du sprint 1 en particulier — il
+## répond à « pourquoi tout est gris », quel que soit le moment où ça arrive.
+func _add_empty_wallet_notice() -> void:
+	if SprintState.impact_wallet > 0:
+		return
+	var notice := Label.new()
+	notice.autowrap_mode = TextServer.AUTOWRAP_WORD
+	notice.add_theme_font_size_override("font_size", 13)
+	notice.add_theme_color_override("font_color", UIHelpers.COLOR_SOFT_TEXT)
+	if SprintState.sprint_number <= 1:
+		notice.text = "💥 Vous n'avez pas encore produit d'Impact — l'étal reste hors de portée ce sprint. Le premier sprint sert à livrer avec ce dont vous héritez ; c'est la Résolution qui remplit le portefeuille."
+	else:
+		notice.text = "💥 Portefeuille vide : rien n'est achetable tant que le prochain sprint n'a pas produit. Une bourse vide n'est pas une défaite — ce qui compte, c'est le solde à l'heure du verdict."
+	shelf_head.add_child(notice)
 
 
 # ── 🎲 Re-tirer l'offre ───────────────────────────────────────────────────

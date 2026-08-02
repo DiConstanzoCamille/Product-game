@@ -340,10 +340,17 @@ func _wallet_row() -> Control:
 ## solde, sinon « ai-je les moyens de le garder ? » n'a pas de réponse lisible.
 func _revenue_row() -> Control:
 	var charges: Dictionary = SprintState.get_recurring_charges()
-	return _currency_row(
-		"💰 Revenue",
-		"%d  (−%d/sprint)" % [int(round(SprintState.revenue)), int(charges.get("total", 0))],
-		_revenue_tooltip(), 2)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 0)
+	box.add_child(_currency_row("💰 Revenue", "%d" % int(round(SprintState.revenue)), _revenue_tooltip(), 2))
+	# La charge vit sur sa propre ligne : à trois chiffres de part et d'autre,
+	# une seule ligne sortait du panneau en fin de mandat.
+	var charge := _label("charges −%d/sprint" % int(charges.get("total", 0)), 10, UIHelpers.PANEL_MUTED)
+	charge.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	charge.tooltip_text = _revenue_tooltip()
+	charge.mouse_filter = Control.MOUSE_FILTER_STOP
+	box.add_child(charge)
+	return box
 
 
 func _currency_row(title: String, value_text: String, tooltip: String, top_margin: int) -> Control:

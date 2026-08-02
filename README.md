@@ -54,7 +54,7 @@ Product-game/
 - [`docs/spec-profondeur-gameplay.md`](docs/spec-profondeur-gameplay.md) — la spécification de la prochaine phase de gameplay (économie de pièces, équipe/roster à rôles, shop à tirage aléatoire, roadmap profonde avec epics et informations cachées) — les phases A et B sont implémentées, la phase C reste à faire, la phase D est remplacée par la spec ci-dessous.
 - [`docs/spec-scoring-sprint.md`](docs/spec-scoring-sprint.md) — **la vision de gameplay en cours d'implémentation** : le sprint se résout en un score à combos (`📊 Traction × ⚙️ Levier = 💥 Impact`) et le board impose un quota d'Impact tous les 3 sprints. Le score, son replay, les quotas PM et leurs exigences sont jouables ; l'organisation multi-squad reste un lot ultérieur.
 - [`landing/index.html`](landing/index.html) — une page de présentation interactive du concept : cartes retournables, jauges de ressources, aperçu d'écrans de jeu (inbox, roadmap, recrutement), présentation des époques et des fins de mandat. Toutes ses données viennent de `data/`, pas de contenu codé en dur.
-- [`game/`](game/README.md) — le projet Godot 4 : un mandat complet est jouable de bout en bout (Accueil → Inbox → Roadmap → Investissements → Résolution → sprint suivant → fin de mandat), avec une vraie simulation persistante des 6 ressources et les mêmes `data/*.json` que la landing page (plus `data/balance.json`, propre au jeu), une identité visuelle propre (polices de marque, icônes, portraits, fond quadrillé, animations légères — toutes licences libres, détail dans `game/assets/THIRD_PARTY_NOTICES.md`). Pas encore équilibré (tous les nombres sont dans `data/balance.json`, ajustables sans toucher au code) — voir `game/README.md` pour le détail et les limites connues.
+- [`game/`](game/README.md) — le projet Godot 4 : un mandat complet est jouable de bout en bout (Accueil → Inbox → Roadmap → Investissements → Résolution → sprint suivant → fin de mandat), avec une vraie simulation persistante des deux monnaies et des cinq jauges et les mêmes `data/*.json` que la landing page (plus `data/balance.json`, propre au jeu), une identité visuelle propre (polices de marque, icônes, portraits, fond quadrillé, animations légères — toutes licences libres, détail dans `game/assets/THIRD_PARTY_NOTICES.md`). Pas encore équilibré (tous les nombres sont dans `data/balance.json`, ajustables sans toucher au code) — voir `game/README.md` pour le détail et les limites connues.
 
 ## Voir la landing page
 
@@ -80,9 +80,17 @@ Chaque bonne pratique a un prix. Le·la joueur·se le découvre en le payant : u
 | **Trimestre** | 3 sprints | Quota d'Impact et exigence du board, événement "boss" |
 | **Mandat** | 4 trimestres, puis optionnellement sans limite | Le run entier, de la nomination à la sortie ou au mandat long |
 
-## Les six ressources
+## Les deux monnaies
 
-💰 Trésorerie · 🫶 Moral & confiance d'équipe · 🧱 Dette organisationnelle · 🎯 Capital politique · 📈 Valeur perçue · 🎭 Cynisme
+💥 **L'Impact** — ce que le joueur produit (`Traction × Levier`), et la **seule** monnaie d'achat. 💰 **Le Revenue** — ce qui paie les salaires et les licences à chaque sprint, et qui à zéro met l'entreprise en faillite.
+
+> Un achat coûte de l'Impact maintenant, et engage du Revenue pour toujours.
+
+Les deux ne se remplacent jamais : on peut mourir riche d'Impact et sans caisse. Détail dans [`docs/spec-impact-monnaie.md`](docs/spec-impact-monnaie.md).
+
+## Les cinq jauges
+
+🫶 Moral & confiance d'équipe · 🧱 Dette organisationnelle · 🎯 Capital politique · 📈 Valeur perçue · 🎭 Cynisme
 
 Aucune ne s'optimise seule — voir le détail des tensions entre ressources dans le [carnet de règles](docs/carnet-de-regles.md#5-tensions-entre-ressources).
 

@@ -1339,3 +1339,129 @@ résoudre les autres en auto-pilotage. Sans cette déclaration, une équipe
 purement et simplement son sprint. Le jour où le sélecteur d'équipe arrive,
 seule cette ligne change — le moteur, lui, est complet et sait déjà refuser un
 choix qui dépasse les slots disponibles.
+
+---
+
+## 31. L'Impact-monnaie — Lot A : les deux monnaies
+
+Livré par l'issue #35, d'après [`docs/spec-impact-monnaie.md`](spec-impact-monnaie.md)
+§2 et §3. C'est le lot le plus large du dépôt en surface touchée : il remplace
+l'économie entière et passe sur tous les écrans d'achat d'un coup.
+
+### 31.1 Ce qui disparaît, et ce qui reste
+
+| Avant | Après |
+|---|---|
+| 🪙 `SprintState.pieces` | **Supprimé.** `impact_wallet` est la seule monnaie. |
+| `Budget = floor(√Impact)` + allocation plancher de 2 | **Supprimé.** Le portefeuille encaisse l'Impact du sprint tel quel. |
+| Trésorerie (ressource 0..100) | Fusionnée dans `revenue`, sans plafond, hors de `resources.json`. |
+| `quarter_impact`, remis à zéro chaque trimestre | **Supprimé.** Un seul nombre, jamais remis à zéro. |
+| MRR, stock affiché | Reste **comme moteur** (`recurring_revenue`), disparaît **comme compteur**. |
+
+La suppression de l'allocation plancher n'est pas cosmétique : elle était le
+seul revenu qu'on touchait sans rien produire. Ne rien faire ne rapporte plus
+rien du tout, et le premier critère de recette permanent (« `careful` doit
+perdre ») est désormais mécanique plutôt que dépendant de l'équilibrage.
+
+### 31.2 Le MRR n'a pas été supprimé, il a été démonté
+
+L'issue demandait de fusionner trésorerie et MRR en une seule valeur. Pris au
+pied de la lettre, ça supprimait la seule mécanique **composée** de l'économie :
+sans base d'abonnements qui persiste, le revenu d'un sprint ne dépend plus que
+de ce sprint-là, le churn n'a plus rien à éroder, et le niveau CSM de
+l'entreprise ne sert plus à rien.
+
+L'arbitrage retenu : **une seule valeur affichée** (le Revenue), et la base
+d'abonnements devient un rouage interne (`recurring_revenue`) qui ne se montre
+plus que comme une ligne du rapport de sprint — « vos abonnements ont rapporté
++14 ce sprint ». Le joueur n'a plus deux compteurs à surveiller ; le moteur, lui,
+garde sa composition. C'est la lecture de « fusionner » qui préserve le
+`CLAUDE.md` (« le MRR est un stock cumulatif — c'est la composition qui crée
+l'envie de continuer ») sans trahir l'intention de l'issue.
+
+### 31.3 Un prix maintenant, une charge pour toujours
+
+Deux fonctions, et deux seulement, portent toute l'économie d'achat :
+
+- `SprintState.resolved_price(kind, id, data)` — **aucun écran ne lit un prix
+  brut**. C'est là que vit la remise Réseau, et là que le lot B (#36) branchera
+  l'indexation sur l'escalade : `price_index()` existe déjà, vaut 1.0, et est
+  déjà appelée. Le lot B est une fonction à remplir, pas des écrans à rouvrir.
+- `SprintState.recurring_charge(kind, id, data)` — la charge de Revenue qu'un
+  poste engage à chaque sprint, **comptée par siège** (`licensePerSeat` sur les
+  outils et les pratiques, `licenseFlat` sur les décisions stratégiques,
+  `licenseFlatPerTier` sur les paliers de produit). Grandir n'augmente donc
+  jamais seulement la production : la facture suit, mécaniquement.
+
+`get_recurring_charges()` sert à la fois l'affichage (panneau, Comité, dossier)
+et le prélèvement de la Résolution — un seul calcul, deux usages. Le jour où
+l'addition affichée et l'addition prélevée divergent, c'est qu'on a dupliqué la
+règle.
+
+### 31.4 Le verdict porte sur le solde, pas sur la production
+
+`quarter_impact` a disparu au lieu d'être conservé « pour le quota ». Deux
+grandeurs qui portent le même nom rendaient l'objectif illisible — c'est le
+piège écarté par la spec §4. Conséquence directe et voulue : **dépenser au shop
+du sprint fait reculer vers l'objectif en cours**, dépenser au Comité (après le
+verdict) ne menace que le trimestre suivant. Le joueur découvre seul une
+cadence : investir tôt dans le trimestre, sécuriser à la fin.
+
+Les quotas ont donc été **re-dérivés en lecture cumulative** (T2 contient T1) :
+`[150, 760, 2200, 4600]` pour le PM. Ce n'est pas l'escalade définitive — c'est
+le chantier de #36 — mais laisser la table par-quarter avec une lecture
+cumulative aurait livré un jeu où le bot `greedy` gagne 77 % du temps. Après
+re-dérivation, il gagne 11 % (18 runs sur 160), contre 12 % sur `main` : la
+difficulté est conservée, pas seulement le code.
+
+### 31.5 Le portefeuille peut passer sous zéro, et ce n'est pas une défaite
+
+Trois règles distinctes, à ne pas confondre dans le code comme à l'écran :
+
+- **Revenue ≤ 0 → faillite**, fin de run (`endingThresholds`, inchangé de
+  nature — seulement d'échelle, la valeur n'étant plus bornée à 100).
+- **Objectif trimestriel manqué → licenciement**, fin de run.
+- **Portefeuille à zéro → rien.** C'est une bourse vide, pas une défaite. Un
+  achat ne fait jamais passer le portefeuille sous zéro (`_pay_impact()` refuse) ;
+  seule l'🎲 Avance sur trimestre le creuse, et c'est un pari explicite. Ce qui
+  tue, c'est de ne pas avoir reconstitué **à l'heure du verdict** — pas d'avoir
+  été à zéro en chemin.
+
+### 31.6 Ce que le premier sprint ne peut pas faire
+
+Le portefeuille démarre à zéro : rien n'est achetable au sprint 1. C'est assumé
+(spec §3.4), mais un étal entièrement grisé sans un mot est un bug aux yeux du
+joueur. L'étal affiche donc la règle en clair — « vous n'avez pas encore produit
+d'Impact » — et le même message revient, reformulé, chaque fois que le
+portefeuille est vide plus tard dans le mandat. `companies.json` gagne
+`startingImpact` (0 partout aujourd'hui) pour les scénarios qui démarreront avec
+une avance, comme trait de contexte de run.
+
+### 31.7 Deux gestes changent de monnaie
+
+- 🏛️ **Négocier une rallonge** verse désormais du **Revenue**, jamais de
+  l'Impact : le board peut remplir la caisse, il ne peut pas produire à votre
+  place. C'est le seul geste qui aide à survivre sans rien construire.
+- 🎲 **Avance sur trimestre** est le seul poste qui va dans l'autre sens : il
+  **vend de l'Impact contre du Revenue**. Symétrique du reste du jeu, et le seul
+  moyen d'être endetté en Impact.
+
+### 31.8 Un quota en dur, trouvé par la bande
+
+`get_current_quota()` retombait sur `base_quota = 1050.0` au-delà de la table —
+une valeur d'équilibrage dans un script, exactement ce que la question 7 de la
+vision interdit. Elle n'avait jamais gêné parce qu'elle valait le T4 de
+l'époque ; en re-dérivant les quotas, elle a silencieusement figé tout le
+mandat long sur l'ancien barème. C'est un test rendu data-driven qui l'a
+trouvée, pas une relecture. Le repli est désormais la **dernière ligne de la
+table**, jamais un nombre écrit ici.
+
+### 31.9 Ce que ce lot ne fait pas
+
+- **L'escalade définitive des quotas et l'indexation des prix** sont le lot B
+  (#36). Ici, les quotas ont seulement été re-dérivés pour que la difficulté
+  survive au changement de lecture, et `price_index()` attend son contenu.
+- **Le banc de trajectoires** (spec §7) n'est pas écrit : la calibration a été
+  faite en comptant les fins du banc `greedy/careful/stress` existant sur 40
+  runs. Suffisant pour ne pas régresser, insuffisant pour régler une courbe.
+- **Les six jauges reléguées en alertes** (spec §8) restent au lot D.

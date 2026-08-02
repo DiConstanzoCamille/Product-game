@@ -538,19 +538,23 @@ func _update_impact_projection(line: Dictionary) -> void:
 	, from, float(target), 0.22 / _score_replay_speed).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 
 
+## Ce qui monte ici est le **portefeuille**, pas une production de trimestre :
+## il ne repart jamais de zéro, et ce que le Comité dépensera le fera reculer.
+## La barre reste bornée au quota (au-delà, elle est pleine), mais le nombre
+## affiché ne l'est pas — un solde qui dépasse l'objectif est une bonne
+## nouvelle qu'il faut voir, pas une jauge à saturer.
 func _set_impact_quarter_display(value: int, final: bool) -> void:
 	var quota: int = maxi(1, int(_quota_data.get("quota", 1)))
 	var quarter: int = int(_quota_data.get("quarter", SprintState.quarter_index))
-	var clamped: int = clampi(value, 0, quota)
-	impact_eyebrow.text = "IMPACT TRIMESTRIEL · T%d" % quarter
+	impact_eyebrow.text = "PORTEFEUILLE D'IMPACT · OBJECTIF T%d" % quarter
 	impact_progress.max_value = quota
-	impact_progress.value = clamped
-	impact_value.text = "%d / %d" % [clamped, quota]
-	var sprint_gain: int = maxi(0, clamped - _quota_before)
+	impact_progress.value = clampi(value, 0, quota)
+	impact_value.text = "%d / %d" % [value, quota]
+	var sprint_gain: int = maxi(0, value - _quota_before)
 	if final:
-		impact_context.text = "Objectif trimestriel : %d · ce sprint +%d" % [quota, sprint_gain]
+		impact_context.text = "Le board demande %d 💥 au verdict · ce sprint +%d" % [quota, sprint_gain]
 	else:
-		impact_context.text = "Objectif trimestriel : %d · ce sprint +%d en cours" % [quota, sprint_gain]
+		impact_context.text = "Le board demande %d 💥 au verdict · ce sprint +%d en cours" % [quota, sprint_gain]
 
 
 func _update_strip_stats() -> void:
@@ -782,7 +786,7 @@ func _setup_quota_replay() -> void:
 	var impact := int(_quota_data.get("impact", 0))
 	var sprint_impact := int(SprintState.last_score_report.get("global", {}).get("impact", 0))
 	_quota_before = max(0, impact - sprint_impact)
-	quota_title.text = "Impact trimestriel · T%d" % int(_quota_data.get("quarter", SprintState.quarter_index))
+	quota_title.text = "Portefeuille d'Impact · objectif T%d" % int(_quota_data.get("quarter", SprintState.quarter_index))
 	quota_progress.max_value = max(1, int(_quota_data.get("quota", 1)))
 	quota_progress.value = _quota_before
 	quota_progress.show_percentage = false
@@ -800,7 +804,7 @@ func _start_quota_replay() -> void:
 func _set_quota_display(value: int, final: bool) -> void:
 	var quota := int(_quota_data.get("quota", 0))
 	quota_progress.value = clampi(value, 0, max(1, quota))
-	quota_label.text = "Impact brut %d / %d" % [value, quota]
+	quota_label.text = "Portefeuille %d / %d 💥" % [value, quota]
 	_set_impact_quarter_display(value, final)
 	if final and _quota_data.has("passed"):
 		var passed := bool(_quota_data.get("passed", false))
@@ -1010,7 +1014,7 @@ func _show_quarter_verdict_overlay() -> void:
 	vbox.add_child(title)
 
 	var impact := Label.new()
-	impact.text = "Impact brut %d / %d" % [int(result.get("impact", 0)), int(result.get("quota", 0))]
+	impact.text = "Portefeuille %d / %d 💥" % [int(result.get("impact", 0)), int(result.get("quota", 0))]
 	impact.add_theme_font_size_override("font_size", 18)
 	vbox.add_child(impact)
 

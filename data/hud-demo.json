@@ -23,7 +23,7 @@
     {
       "sprint": 7,
       "text": "Événement : un lead senior menace de partir.",
-      "deltas": "🫶 Moral −15 · 💰 Trésorerie −3 (prime de rétention)"
+      "deltas": "🫶 Moral −15 · 💰 Revenue −3 (prime de rétention)"
     }
   ],
   "alert": "⚠️ Tension active — Capital politique en hausse, Moral en baisse depuis 2 sprints : un évènement de type « mutinerie » devient plus probable au prochain tour."
