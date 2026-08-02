@@ -163,7 +163,52 @@ avec un capital d'Impact initial — l'entreprise qui a déjà levé, celle qui
 reprend un produit qui marchait. Une ligne de `companies.json`, à traiter comme
 un trait de contexte de run, pas comme une règle générale.
 
-### 3.5 Ce que ça change pour la Roadmap
+### 3.5 Les deux façons de perdre — et celle qui n'en est pas une
+
+**Revenue ≤ 0 → faillite, fin de run.** C'est la mort classique, celle qui
+existe déjà (`balance.json`, fin `faillite`) et qu'on garde telle quelle. Elle
+ne change pas de nature en passant à une valeur non bornée : elle change
+seulement d'échelle.
+
+**Objectif trimestriel manqué → licenciement, fin de run.** La mort de
+performance.
+
+**Impact à zéro → rien.** C'est une bourse vide, pas une défaite. On ne peut
+plus rien acheter jusqu'au prochain sprint, et c'est tout. Cette distinction est
+importante à tenir dans le code comme à l'écran : le joueur qui vide son
+portefeuille au premier sprint d'un trimestre fait un pari agressif, il ne se
+suicide pas. Ce qui le tue, c'est de ne pas avoir reconstitué **à l'heure du
+verdict** — pas d'avoir été à zéro en chemin.
+
+### 3.6 Pourquoi le Revenue ne devient jamais trivial
+
+Le risque d'une valeur non bornée est qu'elle décolle et cesse de contraindre :
+au troisième trimestre, plus personne ne regarde la trésorerie. La parade n'est
+pas de plafonner le Revenue, c'est de **faire grossir les charges avec
+l'organisation**.
+
+> **Les coûts récurrents se comptent par employé éligible, pas par forfait.**
+
+Une pratique de développement coûte *par développeur*, un outil coûte *par
+employé qui l'utilise*, une licence coûte *par siège*. Grandir n'augmente donc
+jamais seulement la production : ça augmente aussi la facture, mécaniquement et
+sans qu'aucune règle spéciale ne s'active.
+
+Deux raisons pour lesquelles c'est le bon design :
+
+- **C'est symétrique de ce qui existe déjà.** Les outils internes donnent du
+  Levier *par employé éligible* (spec scoring §7.1). Qu'ils coûtent aussi par
+  employé ferme la boucle : le même chiffre gouverne le gain et la charge, et
+  une organisation qui grossit sans produire se met en danger toute seule.
+- **C'est juste thématiquement.** Le SaaS par siège est la réalité de n'importe
+  quelle entreprise produit. Le joueur qui découvre que son outillage coûte plus
+  cher parce qu'il a recruté vit quelque chose de vrai.
+
+Conséquence à assumer : **il devient possible de faire faillite en grandissant
+trop vite**, et c'est exactement l'intention. Recruter reste bon pour l'Impact
+et devient dangereux pour le Revenue.
+
+### 3.7 Ce que ça change pour la Roadmap
 
 Si le Revenue vient des features à ROI et l'Impact de `Traction × Levier`, alors
 le choix de backlog devient un arbitrage réel : **nourrir la boîte ou nourrir la
@@ -336,9 +381,10 @@ le Revenue, et l'objectif du trimestre.
 3. **L'endettement en Impact.** Le Lot 4 a introduit l'« avance sur trimestre »
    qui débite sans clamp : un solde négatif est déjà possible. Décision prise de
    **garder et assumer**, à réexaminer au playtest.
-4. **Les salaires** : payés en Revenue à chaque sprint — reste à décider si un
-   Revenue insuffisant déclenche un départ immédiat, une dette, ou une chute de
-   moral.
+4. **Le calibrage des charges par employé** (§3.6) : à quel rythme la facture
+   doit-elle grossir pour que la faillite reste une menace réelle sans rendre
+   tout recrutement suicidaire ? C'est du chiffre, à dériver du banc de §7 —
+   la règle, elle, est tranchée.
 
 ---
 
