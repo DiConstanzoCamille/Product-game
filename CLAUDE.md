@@ -51,8 +51,8 @@ ce qui suit est le minimum à avoir en tête avant de toucher au gameplay.
 
 Deux économies, deux moteurs, **aucune conversion automatique de l'une vers
 l'autre**. Le détail est dans
-[`docs/spec-impact-monnaie.md`](docs/spec-impact-monnaie.md) §3.8 ; le
-minimum à avoir en tête :
+[`docs/spec-impact-monnaie.md`](docs/spec-impact-monnaie.md) §3.8, sa mise en
+œuvre est l'issue #42 ; le minimum à avoir en tête :
 
 | | 💥 L'Impact | 💰 Le Revenue |
 |---|---|---|

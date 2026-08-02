@@ -1481,8 +1481,8 @@ La règle manquante a été écrite à cette occasion : **l'économie de l'entre
 n'est pas l'économie de l'Impact** (spec §3.8, résumée dans `CLAUDE.md` et
 devenue la 9e question de la vision). Sa mise en œuvre — couper la conversion,
 faire porter le Revenue par le contenu (features à ROI, primes, événements,
-équipes subies) — est un chantier de contenu autant que de moteur : elle a son
-issue à part.
+équipes subies) — est un chantier de contenu autant que de moteur : c'est
+l'issue #42.
 
 Ce qu'il faut retenir pour la suite : c'est une **question posée par Camille sur
 la PR** qui a fait mesurer, pas un test. Les trois bancs étaient au vert, les
