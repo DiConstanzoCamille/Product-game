@@ -95,7 +95,13 @@ score et de tous les écrans de phase.
   en cas de coupure de crédits ou de session. Ces commits sont préfixés `WIP
   checkpoint:` et n'ont pas vocation à survivre : les squasher (ou les
   réécrire en commits impératifs propres) avant merge, jamais les laisser
-  tels quels dans l'historique de `main`.
+  tels quels dans l'historique de `main`. Le dépôt étant public, ce hook a
+  deux garde-fous : il n'ajoute jamais de fichier à nom sensible (`.env`,
+  clés privées…) et scanne le diff stagé pour des motifs de secret avant de
+  committer (annule le checkpoint plutôt que de committer, si trouvé) ; il ne
+  pousse jamais sur une branche déjà supprimée côté remote (typiquement après
+  un merge) pour éviter de la ressusciter, et gère une divergence de push par
+  un merge propre, jamais par un push forcé.
 
 ## Pièges Godot connus
 
