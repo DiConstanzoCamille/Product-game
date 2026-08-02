@@ -89,6 +89,13 @@ score et de tous les écrans de phase.
   jour où on en ajoute un, il faut rouvrir tous les écrans. Le coût
   aujourd'hui est d'une ligne ; le coût plus tard est un lot entier.
 - Commits **en français, à l'impératif** (« Ajoute… », « Corrige… »).
+- **Checkpoints WIP automatiques.** Un hook `Stop` (`.claude/hooks/wip-checkpoint.sh`)
+  commit et push le travail en cours à chaque fin de tour, sur la branche de
+  feature courante uniquement (jamais `main`/`master`) — pour ne rien perdre
+  en cas de coupure de crédits ou de session. Ces commits sont préfixés `WIP
+  checkpoint:` et n'ont pas vocation à survivre : les squasher (ou les
+  réécrire en commits impératifs propres) avant merge, jamais les laisser
+  tels quels dans l'historique de `main`.
 
 ## Pièges Godot connus
 
