@@ -41,8 +41,8 @@
       "squadsMin": 1,
       "squadsMax": 1,
       "unlock": { "type": "start" },
-      "unlockLabel": "Niveau de depart",
-      "appears": "Le jeu tel que vous le connaissez : une seule equipe, un seul backlog."
+      "unlockLabel": "Niveau de départ",
+      "appears": "Le jeu tel que vous le connaissez : une seule équipe, un seul backlog."
     },
     "lead-pm": {
       "icon": "👥",
@@ -51,7 +51,7 @@
       "squadsMax": 3,
       "unlock": { "type": "win-career-level", "careerLevel": "pm" },
       "unlockLabel": "Gagnez un mandat complet en PM (4 trimestres franchis)",
-      "appears": "Attention limitee, PM locaux, backlogs separes."
+      "appears": "Attention limitée, PM locaux, backlogs séparés."
     },
     "director": {
       "icon": "🏢",
@@ -60,7 +60,7 @@
       "squadsMax": 7,
       "unlock": { "type": "win-career-level", "careerLevel": "lead-pm" },
       "unlockLabel": "Gagnez un mandat complet en Lead PM",
-      "appears": "Combos inter-squads, equipes subies determinantes, tribus."
+      "appears": "Combos inter-équipes, équipes subies déterminantes, tribus."
     },
     "cpo": {
       "icon": "🎩",
@@ -69,7 +69,7 @@
       "squadsMax": 12,
       "unlock": { "type": "win-career-level", "careerLevel": "director" },
       "unlockLabel": "Gagnez un mandat complet en Director",
-      "appears": "Decisions strategiques majeures, board hostile."
+      "appears": "Décisions stratégiques majeures, board hostile."
     },
     "ceo": {
       "icon": "👑",
@@ -78,7 +78,7 @@
       "squadsMax": 24,
       "unlock": { "type": "win-career-level", "careerLevel": "cpo" },
       "unlockLabel": "Gagnez un mandat complet en CPO",
-      "appears": "On gere des Directors, pas des squads - la formule remonte d'un cran (3 x 8 domaines)."
+      "appears": "On gère des Directors, pas des équipes — la formule remonte d'un cran (3 × 8 domaines)."
     }
   }
 }

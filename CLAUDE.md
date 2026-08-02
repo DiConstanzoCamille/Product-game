@@ -79,6 +79,15 @@ score et de tous les écrans de phase.
   appliquée (les objectifs de board, l'impact d'une carte), une seule
   fonction sert les deux — voir `SprintState.evaluate_board_objectives()` et
   `EffectResolver.card_impact_lines()`.
+- **Aucune valeur dérivée ne se lit brute depuis le JSON.** Un prix, un coût,
+  un quota passent par une **fonction de résolution** (`resolved_price()`,
+  `get_current_quota()`…) — jamais `investments.json → cost` lu directement
+  par un écran. Cette fonction est le seul endroit où s'appliquent les
+  modificateurs : remise, indexation sur le trimestre, effet de carte, palier
+  de carrière. Un écran qui lit la valeur brute court-circuite silencieusement
+  tous les modificateurs, **y compris ceux qui n'existent pas encore** — et le
+  jour où on en ajoute un, il faut rouvrir tous les écrans. Le coût
+  aujourd'hui est d'une ligne ; le coût plus tard est un lot entier.
 - Commits **en français, à l'impératif** (« Ajoute… », « Corrige… »).
 
 ## Pièges Godot connus
@@ -89,14 +98,166 @@ score et de tous les écrans de phase.
   précaution.
 - `mouse_exited` se déclenche quand le curseur entre sur un **enfant** du
   nœud survolé. Vérifier la position réelle avant de replier une carte.
+- **Ne jamais libérer un nœud par `free()` direct pendant l'émission de son
+  signal** — passer par `UIHelpers.clear_children()` (`remove_child` puis
+  `queue_free`). Sinon Godot log « Object was freed or unreferenced while a
+  signal is being emitted from it », sur **stderr** et sans lever d'erreur
+  GDScript : le test passe et le bug reste (carnet §21).
+- **Les `.uid` ne sont pas générés en `--headless`.** Tout nouveau `.gd` ou
+  `.tscn` doit avoir son `.uid` versionné, mais un run headless ne le crée
+  pas : il faut un `godot --headless --path game --import` explicite, puis
+  vérifier que `git status` ne laisse rien en `??`. Oublié quatre fois sur ce
+  dépôt — c'est le piège le plus répétitif de la liste.
+- **Un cache `game/.godot` périmé ment.** Après l'ajout d'un script avec un
+  `class_name` global, des erreurs du type `Nonexistent function … in base
+  'Nil'` ou un autoload qui échoue au chargement **ressemblent** à une
+  régression alors que c'est le cache. Faire `rm -rf game/.godot` et relancer
+  (10-15 min de réimport) *avant* de conclure à une régression, jamais après
+  avoir passé une heure à lire du code sain.
+
+## Ce qu'on livre : une expérience, pas des fonctionnalités
+
+On travaille sur **un jeu**. À la fin, seule l'expérience du joueur compte — pas
+le nombre de lots livrés, pas la conformité à la spec, pas la couleur des
+bancs. Les tests et les captures sont des garde-fous contre la régression ; ce
+ne sont pas des objectifs, et les confondre est le travers naturel d'un agent
+qui optimise ce qui se mesure.
+
+Ce que ça change, concrètement :
+
+- **Un lot énonce l'expérience visée avant sa liste de tâches.** « Le joueur
+  doit ressentir un dilemme au moment de dépenser », pas « ajouter l'écran
+  Comité ». Si cette phrase ne s'écrit pas, le lot n'a pas de raison d'être et
+  il faut le dire plutôt que de le coder.
+- **Un lot n'est pas fini parce que le code marche.** La question de clôture est
+  *« qu'est-ce qui est meilleur à jouer maintenant ? »*. « La fonctionnalité X
+  existe » n'est pas une réponse — c'est la reformulation de la tâche.
+- **Livrer la feature n'est pas la mission.** Un lot conforme à sa spec qui rend
+  le jeu moins bon est un échec, et ça se dit dans la PR. Cocher les cases en
+  sachant que le résultat est tiède est le pire service à rendre.
+- **Le doute se signale, il ne se tait pas.** Un dev qui pense que ce qu'on lui
+  demande n'améliorera pas l'expérience doit l'écrire, avec son argument, et
+  livrer quand même si Camille maintient. Livrer en silence ce qu'on croit
+  mauvais est le seul comportement vraiment inacceptable.
+- **La feature factory guette aussi les agents.** Enchaîner les lots parce
+  qu'il y a des issues ouvertes, c'est produire de l'output. Le nombre de lots
+  livrés dans une nuit ne dit rien de la qualité du jeu au matin.
+
+## La vision — les questions qui invalident un lot
+
+Un lot peut avoir ses trois bancs au vert et **quand même être à refuser**. Les
+tests protègent le code ; rien ne protège la direction du jeu, sauf ces
+questions. Se les poser **avant** de déclarer un lot fini, et répondre
+honnêtement dans la PR quand la réponse est gênante.
+
+1. **Ne rien faire peut-il gagner ?** Si une stratégie passive franchit un
+   quota, la difficulté est cassée. C'est un critère de recette permanent, pas
+   une opinion — le banc l'asserte (`careful` doit perdre).
+2. **Le joueur sait-il encore quelle valeur regarder ?** Une seule grandeur est
+   au centre (l'Impact). Ajouter un compteur que le joueur doit surveiller en
+   permanence, c'est revenir au défaut qu'on corrige.
+3. **Existe-t-il un chemin qui fait décoller une partie ?** Un moteur qui
+   plafonne n'est pas un roguelike à combos. Et il en faut **plusieurs**, dont
+   aucun ne domine.
+4. **A-t-on promis quelque chose ?** Le jeu montre ce qu'un achat *aurait*
+   rapporté, jamais ce qu'il *va* rapporter. Un écran qui annonce un gain futur
+   a transformé un pari en calcul, et tué l'intérêt du pari.
+5. **A-t-on réduit l'aléatoire ?** C'est un roguelike : l'aléa n'est pas une
+   gêne à lisser, c'est la matière. Rendre un tirage déterministe « pour que ce
+   soit plus juste » est un défaut, pas une amélioration.
+6. **Un réglage est-il devenu un trait de contexte ?** Les libertés qu'on donne
+   au joueur doivent teinter le run (l'entreprise, l'époque, le niveau), pas
+   rester des options neutres.
+7. **Reste-t-il une valeur d'équilibrage dans un script ?** `grep` le dit. Une
+   seule suffit à rendre le rééquilibrage impossible sans un dev.
+8. **À N=1, la couche multi-équipe est-elle invisible ?** Vérifier sur `.gd`,
+   `.tscn` **et** `data/*.json` — c'est par les JSON que le mot a déjà fui
+   jusqu'à l'écran.
+
+### Quand demander une relecture par un agent tiers
+
+**Obligatoire** quand un lot touche l'économie, le moteur de score, ou une règle
+de progression — c'est-à-dire quand une erreur ne casse aucun test mais se paie
+à la troisième heure de jeu.
+
+Deux règles pour que ça serve à quelque chose :
+
+- **Donner un mandat écrit et vérifiable** : « vérifie ces cinq propriétés »,
+  jamais « dis-moi si c'est bien ». Un relecteur sans mandat approuve — c'est le
+  résultat par défaut, et il ne vaut rien.
+- **Lui dire explicitement d'être critique**, et pourquoi : celui qui a écrit le
+  lot a discuté des heures avec Camille et est trop investi dans ses propres
+  choix.
+
+**Et connaître la limite.** Un agent qui relit partage les biais de celui qui a
+écrit : même documentation, même raisonnement, mêmes angles morts. Il attrape
+les incohérences internes, les oublis, les contradictions entre documents. Il
+n'attrape **pas** les erreurs de vision, ni ce qui ne se voit qu'à l'écran. Une
+relecture d'agent avait validé le Lot 5 sans voir que le mot « squad »
+s'affichait dans un premier run ; c'est une capture d'écran qui l'a trouvé.
+
+Les garde-fous qui ont réellement attrapé des défauts sur ce dépôt sont
+mécaniques : la boucle de 40 runs, le `grep` sur les trois familles de fichiers,
+la capture d'écran. **Préférer toujours un garde-fou qu'une machine peut vérifier
+à une relecture qui dépend du sérieux du relecteur.**
 
 ## Recette — obligatoire à la fin de chaque lot
 
 1. Les **deux smoke tests headless** passent (`game/tests/smoke_test_logic.gd`
-   et `smoke_test_ui.gd`).
-2. Un **run visuel complet** de tous les écrans.
+   et `smoke_test_ui.gd`), plus `score_resolver_cases.gd`.
+2. Les **captures d'écran** sont relues (voir ci-dessous), et un **run visuel
+   complet** est fait par un humain pour ce que les captures ne couvrent pas.
 3. Le **carnet de règles est mis à jour** avec les décisions prises (les
    §14-19 documentent l'historique des arbitrages — continuer la série).
+4. La PR répond à **« qu'est-ce qui est meilleur à jouer maintenant ? »** en une
+   phrase qui ne soit pas la reformulation de la tâche.
+
+### Voir le jeu sans écran
+
+`--headless` ne dessine rien, mais `xvfb` est disponible et Godot accepte le
+driver `x11` : sous un serveur X virtuel, le rendu a réellement lieu et on
+peut sauver des PNG.
+
+```
+SHOT_DIR=/chemin xvfb-run -a godot --path game --display-driver x11 \
+    --resolution 1600x900 res://tests/screenshot_screens.tscn
+```
+
+1600×900 est la résolution réelle du viewport (`project.godot`) — capturer
+plus petit invente des troncatures qui n'existent pas.
+
+Ça attrape les fautes de texte, les débordements et les troncatures ; **pas**
+les enchaînements, les transitions, ni ce qui dépend d'un état de jeu avancé,
+puisque chaque écran est instancié isolément. Quatre lots ont été livrés sans
+qu'un seul pixel soit vu ; la toute première capture a trouvé deux défauts
+dans du code déjà mergé. À lancer avant de déclarer un lot fini.
+
+### Écrire un test sur un jeu aléatoire
+
+- **Ne jamais asserter sur le résultat d'un tirage.** Asserter sur la
+  *relation* entre le tirage et la décision qui en découle. Pas « le plan
+  n'est pas vide », mais « le plan n'est vide que si rien n'était abordable ».
+  Trois tests d'affilée s'y sont fait piéger (carnet §29 et §30.4), à chaque
+  fois avec un code parfaitement sain.
+- **Une règle à double conséquence se teste dans les deux sens.** Quand une
+  règle produit deux effets opposés attendus, asserter les deux — un seul des
+  deux passe aussi bien avec une implémentation fausse. Exemple : indexer les
+  prix sur l'escalade des objectifs doit faire *monter* le prix d'un item d'un
+  trimestre au suivant **et** faire *baisser* son coût relatif à l'objectif.
+  Tester seulement « le prix monte » ne distingue pas une indexation correcte
+  d'une inflation pure, qui est précisément le défaut qu'on cherche à éviter.
+- **Un run unique ne prouve rien.** `smoke_test_logic` coûte 0,8 s : un flaky
+  à 10-20 % passe inaperçu sur un run et coûte une heure trois jours plus
+  tard. Mesurer par **boucle de 40 runs** en comptant les `OK`, et comparer à
+  la même mesure sur `main` avant de conclure qu'on a cassé quelque chose —
+  c'est ce qui distingue « ma régression » de « défaut préexistant ».
+
+### Vérifier une règle d'affichage
+
+Une interdiction qui porte sur du **texte affiché** (« le mot *squad* ne doit
+jamais apparaître dans un premier run ») se vérifie sur `.gd`, `.tscn` **et
+`data/*.json`**. Le mot a fui par les JSON, après un grep qui ne couvrait que
+les deux premiers — et n'a été vu que sur une capture d'écran.
 
 Critères de recette permanents, à ne jamais casser :
 
