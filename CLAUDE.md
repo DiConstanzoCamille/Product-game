@@ -115,6 +115,34 @@ score et de tous les écrans de phase.
   (10-15 min de réimport) *avant* de conclure à une régression, jamais après
   avoir passé une heure à lire du code sain.
 
+## Ce qu'on livre : une expérience, pas des fonctionnalités
+
+On travaille sur **un jeu**. À la fin, seule l'expérience du joueur compte — pas
+le nombre de lots livrés, pas la conformité à la spec, pas la couleur des
+bancs. Les tests et les captures sont des garde-fous contre la régression ; ce
+ne sont pas des objectifs, et les confondre est le travers naturel d'un agent
+qui optimise ce qui se mesure.
+
+Ce que ça change, concrètement :
+
+- **Un lot énonce l'expérience visée avant sa liste de tâches.** « Le joueur
+  doit ressentir un dilemme au moment de dépenser », pas « ajouter l'écran
+  Comité ». Si cette phrase ne s'écrit pas, le lot n'a pas de raison d'être et
+  il faut le dire plutôt que de le coder.
+- **Un lot n'est pas fini parce que le code marche.** La question de clôture est
+  *« qu'est-ce qui est meilleur à jouer maintenant ? »*. « La fonctionnalité X
+  existe » n'est pas une réponse — c'est la reformulation de la tâche.
+- **Livrer la feature n'est pas la mission.** Un lot conforme à sa spec qui rend
+  le jeu moins bon est un échec, et ça se dit dans la PR. Cocher les cases en
+  sachant que le résultat est tiède est le pire service à rendre.
+- **Le doute se signale, il ne se tait pas.** Un dev qui pense que ce qu'on lui
+  demande n'améliorera pas l'expérience doit l'écrire, avec son argument, et
+  livrer quand même si Camille maintient. Livrer en silence ce qu'on croit
+  mauvais est le seul comportement vraiment inacceptable.
+- **La feature factory guette aussi les agents.** Enchaîner les lots parce
+  qu'il y a des issues ouvertes, c'est produire de l'output. Le nombre de lots
+  livrés dans une nuit ne dit rien de la qualité du jeu au matin.
+
 ## La vision — les questions qui invalident un lot
 
 Un lot peut avoir ses trois bancs au vert et **quand même être à refuser**. Les
@@ -181,6 +209,8 @@ la capture d'écran. **Préférer toujours un garde-fou qu'une machine peut vér
    complet** est fait par un humain pour ce que les captures ne couvrent pas.
 3. Le **carnet de règles est mis à jour** avec les décisions prises (les
    §14-19 documentent l'historique des arbitrages — continuer la série).
+4. La PR répond à **« qu'est-ce qui est meilleur à jouer maintenant ? »** en une
+   phrase qui ne soit pas la reformulation de la tâche.
 
 ### Voir le jeu sans écran
 
