@@ -263,7 +263,7 @@
       "clientImpact": 6,
       "risk": 5,
       "quickWin": false,
-      "completionEffects": { "valeur-percue": 4, "pieces": 2 },
+      "completionEffects": { "valeur-percue": 4, "impact": 16 },
       "eras": ["agile-transformation"]
     },
     {
@@ -293,7 +293,7 @@
       "clientImpact": 2,
       "risk": 6,
       "quickWin": false,
-      "completionEffects": { "valeur-percue": 2, "pieces": 3 },
+      "completionEffects": { "valeur-percue": 2, "impact": 24 },
       "eras": ["agile-transformation"]
     }
   ]

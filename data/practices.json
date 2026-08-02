@@ -1,12 +1,13 @@
 {
-  "_comment": "Pool de pratiques du Marché (spec profondeur §5.2) — 2 proposées par sprint parmi les non possédées, permanentes pour le mandat. Chaque achat inflige +2 Cynisme (data/balance.json → shopDraw.practiceCynisme). Le champ unlocks est un flag consommé par les systèmes concernés : entretiens-structures et retros-sinceres sont opérants dès la Phase A ; les flags de révélation roadmap (roi, clientImpact, risk, okrBonus) attendent la roadmap profonde (Phase C) ; burndown et accounts déverrouillent leurs sections du Pilotage.",
+  "_comment": "Pool de pratiques du Marché (spec profondeur §5.2) — 2 proposées par sprint parmi les non possédées, permanentes pour le mandat. Chaque achat inflige +2 Cynisme (data/balance.json → shopDraw.practiceCynisme). `costImpact` est le prix d'adoption en 💥 Impact ; `licensePerSeat` la charge de 💰 Revenue qu'elle prélève chaque sprint, **par personne du roster** (spec-impact-monnaie.md §3.6) — une pratique coûte plus cher dans une grande équipe. Le champ unlocks est un flag consommé par les systèmes concernés : entretiens-structures et retros-sinceres sont opérants dès la Phase A ; les flags de révélation roadmap (roi, clientImpact, risk, okrBonus) attendent la roadmap profonde (Phase C) ; burndown et accounts déverrouillent leurs sections du Pilotage.",
 
   "practices": [
     {
       "id": "discovery",
       "icon": "🔍",
       "name": "Discovery",
-      "costPieces": 4,
+      "costImpact": 32,
+      "licensePerSeat": 0.2,
       "description": "Parler aux clients avant de coder — l'idée choque encore. Révèle la colonne ROI des features de la roadmap.",
       "unlocks": "roi",
       "eras": ["agile-transformation"]
@@ -15,7 +16,8 @@
       "id": "ux-research",
       "icon": "🎨",
       "name": "UX research",
-      "costPieces": 4,
+      "costImpact": 32,
+      "licensePerSeat": 0.2,
       "description": "Regarder de vrais utilisateurs s'y perdre, en direct. Révèle la colonne Impact client des features.",
       "unlocks": "clientImpact",
       "eras": ["agile-transformation"]
@@ -24,7 +26,8 @@
       "id": "tech-radar",
       "icon": "🧭",
       "name": "Tech radar",
-      "costPieces": 4,
+      "costImpact": 32,
+      "licensePerSeat": 0.15,
       "description": "Une cartographie honnête de ce qui va casser en premier. Révèle la colonne Risque (Dette) des features.",
       "unlocks": "risk",
       "eras": ["agile-transformation"]
@@ -33,7 +36,8 @@
       "id": "entretiens-structures",
       "icon": "🗂️",
       "name": "Entretiens structurés",
-      "costPieces": 3,
+      "costImpact": 24,
+      "licensePerSeat": 0.1,
       "description": "Une grille d'évaluation commune au lieu d'un « feeling » après 45 minutes. Les traits cachés des candidats du Marché arrivent révélés.",
       "unlocks": "hiddenTraits",
       "eras": ["agile-transformation"]
@@ -43,7 +47,8 @@
       "rarity": "notable",
       "icon": "📊",
       "name": "Product analytics",
-      "costPieces": 5,
+      "costImpact": 40,
+      "licensePerSeat": 0.4,
       "description": "Des chiffres à la place des anecdotes du commercial le plus bruyant. Déverrouille la section Burn down du Pilotage.",
       "unlocks": "burndown",
       "eras": ["agile-transformation"]
@@ -53,7 +58,8 @@
       "rarity": "notable",
       "icon": "💼",
       "name": "Segmentation clients",
-      "costPieces": 5,
+      "costImpact": 40,
+      "licensePerSeat": 0.3,
       "description": "Découvrir que 80 % du revenu vient de trois comptes que personne ne bichonne. Déverrouille la section Grands comptes du Pilotage.",
       "unlocks": "accounts",
       "eras": ["agile-transformation"]
@@ -62,7 +68,8 @@
       "id": "okr",
       "icon": "🎯",
       "name": "OKR",
-      "costPieces": 4,
+      "costImpact": 32,
+      "licensePerSeat": 0.2,
       "description": "Des objectifs ambitieux, mesurables, et recopiés du template d'une autre boîte. +2 Capital politique par feature à fort ROI livrée.",
       "unlocks": "okrBonus",
       "eras": ["agile-transformation"]
@@ -72,7 +79,8 @@
       "rarity": "rare",
       "icon": "🫶",
       "name": "Rétrospectives sincères",
-      "costPieces": 3,
+      "costImpact": 24,
+      "licensePerSeat": 0.1,
       "description": "Ce qui se dit en rétro reste en rétro — et pour une fois, quelqu'un écoute vraiment. +1 Moral par sprint.",
       "unlocks": "moralPerSprint",
       "perSprint": { "moral": 1 },

@@ -2,7 +2,7 @@
   "era": "🛠️ Les années garage — Sprint 7",
   "cpo": "Vous",
   "gauges": [
-    { "id": "tresorerie", "label": "💰 Trésorerie", "display": "11 mois (−3)", "percent": 46, "state": "warn" },
+    { "id": "revenue", "label": "💰 Revenue", "display": "62 (−3)", "percent": 46, "state": "warn" },
     { "id": "moral", "label": "🫶 Moral équipe", "display": "47% (−15)", "percent": 47, "state": "danger" },
     { "id": "dette-organisationnelle", "label": "🧱 Dette organisationnelle", "display": "58% (+9)", "percent": 58, "state": "danger" },
     { "id": "capital-politique", "label": "🎯 Capital politique", "display": "74% (+6)", "percent": 74, "state": "good" },

@@ -8,7 +8,7 @@
       "perfectSprint": { "capacityTolerance": 1, "multiplier": 1.25, "icon": "🎯", "label": "Sprint parfait" },
       "focus": { "minimumDelivered": 2, "multiplier": 1.3, "icon": "🔎", "label": "Focus" },
       "bundle": { "minimumDelivered": 3, "tractionBonus": 10, "icon": "🧩", "label": "Livraison groupée" },
-      "quickWins": { "minimumDelivered": 2, "budgetBonus": 2, "icon": "⚡", "label": "Quick wins en série" },
+      "quickWins": { "minimumDelivered": 2, "impactBonus": 14, "icon": "⚡", "label": "Quick wins en série" },
       "completedEpic": { "multiplier": 1.5, "icon": "📦", "label": "Epic bouclée" }
     }
   },
@@ -96,7 +96,6 @@
       "pmmMultipliers": { "0": 0.5, "1": 0.65, "2": 0.8, "3": 1.0, "4": 1.2, "5": 1.4 },
       "csmMultipliers": { "0": 1.6, "1": 1.4, "2": 1.2, "3": 1.0, "4": 0.8, "5": 0.6 }
     },
-    "budget": { "boardAllocation": 2, "failedReviewAllocation": 1 },
     "perceivedValue": { "impactPerPoint": 30, "maxPerSprint": 6, "icon": "📈", "label": "Valeur perçue" },
     "politicalCapital": { "impactPerPoint": 150, "icon": "🎯", "label": "Capital politique" }
   }

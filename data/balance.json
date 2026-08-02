@@ -2,7 +2,6 @@
   "_comment": "Données de simulation — consommées uniquement par game/ (pas par landing/). Toutes les valeurs sont indicatives, à ajuster en playtest. Décisions documentées dans docs/carnet-de-regles.md §14-19. Phase C ajoute le backlog profond ; le contenu de ses features et epics vit dans backlog.json.",
 
   "startingResources": {
-    "tresorerie": 50,
     "moral": 60,
     "dette-organisationnelle": 15,
     "capital-politique": 55,
@@ -10,14 +9,18 @@
     "cynisme": 10
   },
 
-  "startingResourceOverrides": {
-    "karavel-scaleup": { "tresorerie": 20 }
-  },
+  "startingResourceOverrides": {},
 
   "resourceBounds": { "min": 0, "max": 100 },
 
+  "revenue": {
+    "_comment": "💰 Le Revenue (spec-impact-monnaie.md §3) — fusion de l'ancienne Trésorerie (ressource 0..100) et du stock de MRR. Valeur SANS plafond : elle ne vit donc plus dans resources.json et n'a pas de jauge. Elle encaisse les abonnements et paie chaque sprint les salaires et les licences. À zéro, c'est la faillite (endingThresholds).",
+    "start": 60,
+    "startOverrides": { "karavel-scaleup": 34 }
+  },
+
   "resourceDirection": {
-    "tresorerie": "high-good",
+    "revenue": "high-good",
     "moral": "high-good",
     "capital-politique": "high-good",
     "valeur-percue": "high-good",
@@ -30,7 +33,7 @@
   "trimesterLengthSprints": 3,
 
   "endingThresholds": [
-    { "resource": "tresorerie", "comparison": "lte", "value": 0, "ending": "faillite" },
+    { "resource": "revenue", "comparison": "lte", "value": 0, "ending": "faillite" },
     { "resource": "moral", "comparison": "lte", "value": 0, "ending": "exode-equipe" },
     { "resource": "dette-organisationnelle", "comparison": "gte", "value": 100, "ending": "entreprise-zombie" },
     { "resource": "capital-politique", "comparison": "lte", "value": 0, "ending": "rachat-hostile" },
@@ -52,7 +55,7 @@
 
   "cardAxisResourceMap": {
     "humain": { "resource": "moral", "invert": false },
-    "financier": { "resource": "tresorerie", "invert": false },
+    "financier": { "resource": "revenue", "invert": false },
     "ttm": { "resource": "valeur-percue", "invert": false },
     "productivite": { "resource": "dette-organisationnelle", "invert": true }
   },
@@ -66,7 +69,7 @@
       "cpo": { "base": 6 },
       "ceo": { "base": 7 }
     },
-    "extraSlotCosts": [12, 20],
+    "extraSlotCosts": [110, 190],
     "swap": { "cynisme": 4, "cynismePerPreviousSwap": 3 }
   },
 
@@ -98,7 +101,7 @@
   "eraCardEffectMultipliers": {
     "garage": {},
     "agile-transformation": { "cynisme": 1.5 },
-    "ai-era": { "dette-organisationnelle": 1.15, "moral": 1.2, "tresorerie": 0.85 }
+    "ai-era": { "dette-organisationnelle": 1.15, "moral": 1.2, "revenue": 0.85 }
   },
 
   "salaries": { "junior": 1, "senior": 2 },
@@ -139,17 +142,18 @@
   },
 
   "firing": {
-    "severancePieces": 2,
+    "severanceImpact": 18,
     "moral": -4,
     "cynismePerExtraFiring": 3
   },
 
   "trialPeriodSprints": 2,
 
-  "pieces": {
-    "boardAllocationPerSprint": 2,
-    "boardAllocationIfReviewFailed": 1,
-    "revenuePerformanceDivider": 4
+  "licenses": {
+    "_comment": "💰 Charges récurrentes (spec-impact-monnaie.md §3.6) — comptées PAR SIÈGE, jamais au forfait : grandir augmente mécaniquement la facture, et une organisation qui grossit sans produire se met en danger toute seule. `perSeat` est un coût de Revenue par sprint et par personne du roster ; `flat` un abonnement fixe. Chaque poste porte sa propre valeur (cards.json, practices.json, strategy.json, investments.json) ; ce bloc n'en donne que le défaut quand le poste n'en déclare pas.",
+    "defaultToolPerSeat": 0.4,
+    "defaultPracticePerSeat": 0.2,
+    "defaultStrategyFlat": 0
   },
 
   "shopDraw": {
@@ -166,10 +170,10 @@
     },
     "practiceCynisme": 2,
     "reroll": {
-      "baseCost": 1,
-      "costIncrement": 1
+      "baseCost": 8,
+      "costIncrement": 8
     },
-    "reserveCostPieces": 1,
+    "reserveCostImpact": 10,
     "rarityWeights": {
       "commune": 100,
       "notable": 40,
@@ -191,7 +195,7 @@
     "actions": {
       "oneOnOne": { "cost": 10 },
       "selfWork": { "cost": 25, "capacityBonus": 2 },
-      "extension": { "cost": 10, "capitalPolitique": -8, "pieces": 4 },
+      "extension": { "cost": 10, "capitalPolitique": -8, "revenue": 14 },
       "featureDive": { "cost": 15 },
       "breather": { "cost": 0 }
     }
@@ -201,7 +205,6 @@
     "valeurPercueDecayPerSprint": 2,
     "revenueCutoffValeurPercue": 5,
     "boardReview": {
-      "successPieces": 5,
       "successCapitalPolitique": 8,
       "failCapitalPolitique": -12
     }
@@ -214,7 +217,6 @@
   "backlogDraw": {
     "itemsPerSprintMin": 4,
     "itemsPerSprintMax": 5,
-    "quickWinPieces": 1,
     "strongRoiThreshold": 2,
     "okrCapitalPolitiqueBonus": 2
   }

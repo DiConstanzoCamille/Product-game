@@ -1,5 +1,5 @@
 {
-  "_comment": "Offres d'emploi — le cadre RP de chaque run (§16 du carnet de règles, spec profondeur §4.1 et §8.2). Chaque entrée est liée à un scénario (era), fixe le profil d'équipe hérité, le roster de départ, le cap d'effectif, le budget d'action initial (pièces) et les objectifs qualitatifs qui peuvent bonifier chaque quota — visibles dès le choix du poste. Consommé uniquement par game/. Les salaires du roster suivent data/balance.json → salaries. `supportTeams` (Lot 4, spec §9.4) fixe le niveau 0-5 des trois équipes subies (sales/pmm/csm), lu par SprintState._build_score_snapshot() puis ScoreResolver._resolve_conversion() — jamais pilotable en jeu, jamais une branche du moteur.",
+  "_comment": "Offres d'emploi — le cadre RP de chaque run (§16 du carnet de règles, spec profondeur §4.1 et §8.2). Chaque entrée est liée à un scénario (era), fixe le profil d'équipe hérité, le roster de départ, le cap d'effectif, le capital de départ (💥 `startingImpact` — zéro partout aujourd'hui : le premier sprint n'achète rien, spec-impact-monnaie.md §3.4 ; un scénario qui a déjà levé démarrera avec une avance, comme trait de contexte de run) et les objectifs qualitatifs qui peuvent bonifier chaque quota — visibles dès le choix du poste. Consommé uniquement par game/. Les salaires du roster suivent data/balance.json → salaries. `supportTeams` (Lot 4, spec §9.4) fixe le niveau 0-5 des trois équipes subies (sales/pmm/csm), lu par SprintState._build_score_snapshot() puis ScoreResolver._resolve_conversion() — jamais pilotable en jeu, jamais une branche du moteur.",
 
   "companies": [
     {
@@ -11,7 +11,7 @@
       "description": "Meridia emploie 4000 personnes et vend le même logiciel de gestion depuis 2003. Le comité de direction a lu un livre blanc sur l'agilité l'an dernier. Un cabinet de conseil a été mandaté. Vous héritez d'une équipe senior, compétente, méfiante, et fatiguée des grandes annonces.",
       "teamProfile": "senior",
       "teamCap": 7,
-      "startingPieces": 5,
+      "startingImpact": 0,
       "supportTeams": { "sales": 4, "pmm": 2, "csm": 3 },
       "inheritedTools": ["jira"],
       "startingRoster": [
@@ -38,7 +38,7 @@
       "description": "Karavel a triplé ses effectifs en 18 mois sans jamais poser de process. Le board veut « structurer avant que ça casse ». Vous héritez d'une équipe jeune, enthousiaste, sans personne aux manettes Ops — la dette monte toute seule tant que vous n'aurez pas recruté. Le défaut de la boîte est dans l'offre d'emploi.",
       "teamProfile": "junior",
       "teamCap": 6,
-      "startingPieces": 4,
+      "startingImpact": 0,
       "supportTeams": { "sales": 2, "pmm": 4, "csm": 1 },
       "inheritedTools": ["notion"],
       "startingRoster": [

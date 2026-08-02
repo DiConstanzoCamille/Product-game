@@ -1,8 +1,9 @@
 {
-  "_comment": "La 4e famille de décisions (spec scoring §7.2) — la seule qui n'existait pas avant le Lot 3. Ce fichier est le catalogue affiché au Comité de fin de trimestre (id, icône, nom, description) : les nombres qui font vraiment tourner le moteur (tractionMultiplier, mrrMultiplier, lever...) vivent dans scoring.json → global.strategies, sous les mêmes ids, pour que ScoreResolver n'ait qu'une seule table à lire. Une décision stratégique ne touche jamais l'équipe : elle redéfinit ce que le produit est pour le marché. 1 par trimestre, irréversible — SprintState.choose_strategy() est le seul point d'entrée qui les active ; l'écran qui les présentera (le Comité) est le Lot 4.",
+  "_comment": "La 4e famille de décisions (spec scoring §7.2) — la seule qui n'existait pas avant le Lot 3. Ce fichier est le catalogue affiché au Comité de fin de trimestre (id, icône, nom, description) : `licenseFlat` est ce que la décision coûte en 💰 Revenue à chaque sprint, pour toujours (une stratégie s'entretient) ; les autres nombres qui font tourner le moteur (tractionMultiplier, mrrMultiplier, lever...) vivent dans scoring.json → global.strategies, sous les mêmes ids, pour que ScoreResolver n'ait qu'une seule table à lire. Une décision stratégique ne touche jamais l'équipe : elle redéfinit ce que le produit est pour le marché. 1 par trimestre, irréversible — SprintState.choose_strategy() est le seul point d'entrée qui les active ; l'écran qui les présentera (le Comité) est le Lot 4.",
   "strategies": [
     {
       "id": "open-source",
+      "licenseFlat": 2,
       "icon": "🔓",
       "name": "Passer en open source",
       "tagline": "Le code est public. La réputation attire — mais elle ne se facture pas.",
@@ -10,6 +11,7 @@
     },
     {
       "id": "freemium",
+      "licenseFlat": 4,
       "icon": "💳",
       "name": "Freemium",
       "tagline": "Tout le monde entre. Tout le monde ne reste pas.",
@@ -17,6 +19,7 @@
     },
     {
       "id": "enterprise-first",
+      "licenseFlat": 6,
       "icon": "🏢",
       "name": "Enterprise first",
       "tagline": "On signe des comptes, pas des utilisateurs.",
@@ -24,6 +27,7 @@
     },
     {
       "id": "plateforme-api-publique",
+      "licenseFlat": 5,
       "icon": "🔌",
       "name": "Plateforme / API publique",
       "tagline": "Le produit devient une fondation pour d'autres produits.",
@@ -31,6 +35,7 @@
     },
     {
       "id": "expansion-internationale",
+      "licenseFlat": 8,
       "icon": "🌍",
       "name": "Expansion internationale",
       "tagline": "Le marché s'élargit. Le quota aussi.",
@@ -38,6 +43,7 @@
     },
     {
       "id": "arreter-de-communiquer",
+      "licenseFlat": 0,
       "icon": "🤫",
       "name": "Arrêter de communiquer",
       "tagline": "L'équipe ne fait plus de démos. Elle produit.",
@@ -45,6 +51,7 @@
     },
     {
       "id": "annee-de-consolidation",
+      "licenseFlat": 0,
       "icon": "🧯",
       "name": "Année de consolidation",
       "tagline": "On répare avant de repartir.",
