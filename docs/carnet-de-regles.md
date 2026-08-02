@@ -1456,7 +1456,41 @@ mandat long sur l'ancien barème. C'est un test rendu data-driven qui l'a
 trouvée, pas une relecture. Le repli est désormais la **dernière ligne de la
 table**, jamais un nombre écrit ici.
 
-### 31.9 Ce que ce lot ne fait pas
+### 31.9 Le défaut que ce lot laisse derrière lui : le Revenue ne contraint plus
+
+Le banc imprime désormais le Revenue final, sa base d'abonnements et sa facture.
+Première mesure, sur 40 runs (160 mandats par stratégie) :
+
+| Stratégie | Revenue final (médiane) | Base d'abonnements | Charges |
+|---|---|---|---|
+| `greedy` | **1229** | 243/sprint | **22/sprint** |
+| `careful` | 10 | 0/sprint | 14/sprint |
+
+La caisse encaisse dix fois ce qu'elle paie : **elle cesse d'exister comme
+contrainte après T2**. Les charges par siège (§31.3) ne peuvent pas gagner cette
+course — l'effectif passe de 5 à 7 personnes pendant que le revenu fait ×20.
+
+La cause n'est pas le calibrage, elle est structurelle : le revenu de
+l'entreprise est **piloté par l'Impact**
+(`scoring.json → conversion.saas-mrr.impactToMrr`, hérité de l'économie
+précédente). Produire remplit donc la caisse tout seul, les deux monnaies ne
+sont pas indépendantes, et l'arbitrage annoncé par la spec §3.7 — *nourrir la
+boîte ou nourrir la performance* — n'a jamais eu d'objet.
+
+La règle manquante a été écrite à cette occasion : **l'économie de l'entreprise
+n'est pas l'économie de l'Impact** (spec §3.8, résumée dans `CLAUDE.md` et
+devenue la 9e question de la vision). Sa mise en œuvre — couper la conversion,
+faire porter le Revenue par le contenu (features à ROI, primes, événements,
+équipes subies) — est un chantier de contenu autant que de moteur : elle a son
+issue à part.
+
+Ce qu'il faut retenir pour la suite : c'est une **question posée par Camille sur
+la PR** qui a fait mesurer, pas un test. Les trois bancs étaient au vert, les
+captures relues, et le défaut était invisible — parce qu'aucune assertion ne
+regardait le Revenue. La leçon est la même que §29 et §30.4, appliquée à
+l'économie : ce qui n'est pas imprimé au banc n'existe pas.
+
+### 31.10 Ce que ce lot ne fait pas
 
 - **L'escalade définitive des quotas et l'indexation des prix** sont le lot B
   (#36). Ici, les quotas ont seulement été re-dérivés pour que la difficulté
@@ -1465,3 +1499,5 @@ table**, jamais un nombre écrit ici.
   faite en comptant les fins du banc `greedy/careful/stress` existant sur 40
   runs. Suffisant pour ne pas régresser, insuffisant pour régler une courbe.
 - **Les six jauges reléguées en alertes** (spec §8) restent au lot D.
+- **L'indépendance des deux économies** (spec §3.8) est écrite mais pas
+  implémentée : `impactToMrr` vaut toujours 0,06. Voir §31.9.

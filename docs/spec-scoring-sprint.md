@@ -539,6 +539,16 @@ Capital politique qui **enregistre** la décision plutôt que de la payer.
 Le business model n'est plus une formule d'affichage : c'est **la règle de
 conversion de l'Impact**.
 
+> ⚠️ **Cette section est périmée sur un point précis, depuis le 02/08/2026.**
+> Faire du business model « la règle de conversion de l'Impact » fusionne les
+> deux économies : produire de l'Impact remplit alors la caisse tout seul.
+> [`spec-impact-monnaie.md`](spec-impact-monnaie.md) §3.8 tranche l'inverse —
+> **l'économie de l'entreprise n'est pas l'économie de l'Impact**, et le terme
+> `Impact × impactToMrr` de la formule ci-dessous doit disparaître. Ce qui reste
+> valide ici : le revenu est un **stock cumulatif** érodé par le churn et modulé
+> par les équipes subies ; seule sa **source** change (les features à ROI, les
+> primes et les événements, pas l'Impact).
+
 ### 9.1 SaaS — MRR cumulatif (Transformation agile)
 
 ```

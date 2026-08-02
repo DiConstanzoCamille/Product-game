@@ -156,6 +156,13 @@ plus ici : il est déclaré directement sur la carte dans `cards.json` (voir
 plus haut) — `ScoreResolver.resolve()` reçoit désormais une table `cards` en
 plus de `scoring` et `hidden_traits`.
 
+> ⚠️ **`conversion.<modele>.impactToMrr` viole la règle d'indépendance des deux
+> économies** (spec-impact-monnaie §3.8, `CLAUDE.md`) : il fait rentrer une
+> fraction de l'Impact du sprint dans le revenu de l'entreprise, ce qui fusionne
+> les deux monnaies. Il est conservé tel quel en attendant son issue dédiée —
+> **ne pas s'en inspirer pour une nouvelle règle**, et ne pas le recalibrer :
+> c'est le sens de la dépendance qui est faux, pas le taux.
+
 Depuis le Lot 4 : `global.productTier.leverPerTier` vaut `0.5` (corrigé de
 `0.1`, hérité du Lot 1, pour matcher le "+0,5 Levier permanent" du Comité,
 spec §12) ; `conversion.saas-mrr.salesMultipliers/pmmMultipliers/csmMultipliers`
