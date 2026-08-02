@@ -53,6 +53,32 @@ Les quatre passent le test : on peut aimer son travail et ne pas croire son CPO
 Énergie basse). Ils ne bougent ni pour les mêmes raisons ni avec les mêmes
 remèdes.
 
+### 3.0 La Confiance est le troisième sommet du triangle
+
+*Décision du 02/08/2026, prise avec `spec-clients-revenue.md` §5.1.1.*
+
+Trois entités perçoivent quelque chose dans ce jeu, et **il ne faut jamais les
+mélanger** — c'est un mot employé pour deux choses qui avait laissé s'installer
+la fuite `Impact → Valeur perçue → Revenue` :
+
+| Qui perçoit | Quoi | La grandeur |
+|---|---|---|
+| Les **utilisateurs** | le produit | 📈 Valeur perçue *(à renommer Réputation produit)* |
+| Le **board** | le joueur | 🎯 Capital politique |
+| L'**équipe** | le joueur | 🤝 **Confiance** — cette spec |
+
+La Confiance n'est donc pas un critère de plus : c'est **la moitié manquante de
+la perception du joueur**. Le board a toujours eu la sienne (le Capital
+politique) ; l'équipe n'avait rien, et son jugement était noyé dans un Moral qui
+mesurait autre chose. Deux conséquences :
+
+- **Le Moral ne juge plus personne.** Il mesure ce que l'équipe *vit* (charge,
+  dette, échecs), pas ce qu'elle *pense de vous*. C'est ce qui rend les deux
+  critères réellement distincts au lieu de bouger ensemble.
+- **Ce que le produit vaut n'a rien à voir avec ce que vous valez.** Une équipe
+  peut vous faire confiance en livrant un produit que le marché ignore, et
+  l'inverse.
+
 **Il n'y en aura pas un cinquième.** Chaque critère ajouté multiplie le contenu
 à écrire et la surface d'affichage ; quatre est déjà le maximum lisible sur une
 ligne de roster.
@@ -214,7 +240,10 @@ et il ne faut pas le sous-estimer sous prétexte que le moteur tient en une page
    connaît pas encore. Ça donne du sens à la période d'essai.
 5. **Est-ce que ça remplace le Cynisme ?** Le Cynisme ressemble à « la Confiance
    moyenne, inversée ». À vérifier au moment d'écrire : si les deux bougent
-   toujours ensemble, il faut en supprimer un.
+   toujours ensemble, il faut en supprimer un. Piste de distinction : le Cynisme
+   est ce que l'organisation pense des **méthodes** (« encore un process »), la
+   Confiance ce que les gens pensent de **vous**. Une équipe peut vous croire et
+   railler la énième rétrospective.
 
 ---
 

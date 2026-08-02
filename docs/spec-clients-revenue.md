@@ -157,6 +157,8 @@ comme idée depuis le carnet §15 et jamais implémenté faute de sens, en a un.
 
 ### 5.1 Le retour de la fuite, par un chemin plus long
 
+*Tranché le 02/08/2026 — option (b), avec la clarification de §5.1.1.*
+
 Aujourd'hui `conversion.perceivedValue` fait monter la **Valeur perçue** à
 partir de l'Impact (`impactPerPoint: 30`, plafonné à +6/sprint). Si la Valeur
 perçue fait ensuite arriver des clients, alors :
@@ -166,20 +168,48 @@ Impact → Valeur perçue → clients → Revenue
 ```
 
 …et on a reconstruit la fuite que `spec-impact-monnaie` §3.8 interdit, avec un
-détour de plus. **C'est le piège principal de cette proposition.**
+détour de plus. **C'était le piège principal de cette proposition.**
 
-Deux issues, à trancher :
+Deux issues étaient possibles :
 
 - **a.** Les clients n'arrivent que par les features, les événements et le
-  Sales. La Valeur perçue reste une jauge de contexte (elle ouvre des
-  événements, elle pèse sur les fins) sans jamais produire de clients.
-- **b.** La Valeur perçue amène des clients, mais elle cesse d'être alimentée
-  par l'Impact — elle ne vient plus que du `clientImpact` des features livrées.
+  Sales. La Valeur perçue reste une jauge de contexte, sans jamais produire de
+  clients.
+- **b. — retenu.** La Valeur perçue amène des clients, mais elle **cesse d'être
+  alimentée par l'Impact** : elle ne vient plus que de ce que les livraisons
+  font au produit.
 
-**Recommandation : (b).** C'est plus riche — la Valeur perçue devient
-« la réputation du produit », qui attire — et ça garde une seule règle à
-retenir : *ce qui amène des clients, c'est ce qu'on livre, jamais ce qu'on
-score*.
+La règle à retenir, et elle tient en une ligne :
+
+> **Ce qui amène des clients, c'est ce qu'on livre — jamais ce qu'on score.**
+
+### 5.1.1 Trois perceptions, trois grandeurs, aucun mélange
+
+La raison pour laquelle la fuite avait pu s'installer est un mot employé pour
+deux choses. « Valeur perçue » mélange aujourd'hui **la perception du produit
+par ses utilisateurs** et **la perception du joueur par ceux qui le jugent**.
+Ce sont trois grandeurs distinctes, et chacune a son propriétaire :
+
+| Qui perçoit | Quoi | La grandeur | Ce qui la fait bouger |
+|---|---|---|---|
+| Les **utilisateurs** | le produit | 📈 **Valeur perçue** | Les features livrées, le bouche-à-oreille, le Product marketing. **Jamais l'Impact.** |
+| Le **board** | le joueur | 🎯 **Capital politique** | Les quotas tenus, les promesses au board, les rallonges négociées |
+| L'**équipe** | le joueur | 🤝 **Confiance** *(spec-equipe-individuelle §3)* | Les décisions annulées, les promesses non tenues, les 1:1 |
+
+Trois conséquences immédiates :
+
+1. **La Valeur perçue devient purement produit.** Sa définition dans
+   `resources.json` — « ce que le marché pense que vous valez » — est
+   précisément la formulation ambiguë à corriger : ce n'est pas *vous* que le
+   marché juge, c'est le produit. Le renommer en **Réputation produit** est
+   proposé, et c'est la seule façon durable d'empêcher le mélange de revenir.
+2. **Le Product marketing change de rôle.** Il ne convertit plus l'Impact en
+   Valeur perçue : il **amplifie ce que les livraisons font à la réputation**.
+   Même équipe subie, même niveau 0-5, autre entrée.
+3. **La fin positive est à revoir.** `goodEnding.scoreResources` fait
+   aujourd'hui la moyenne de `valeur-percue` et `capital-politique` — donc la
+   moyenne d'une perception produit et d'une perception joueur. Deux choses qui
+   n'ont pas la même unité ne se moyennent pas : à trancher au moment du lot.
 
 ### 5.2 Deux nombres qui bougent
 
@@ -228,10 +258,11 @@ modèle client plutôt que deux correctifs séparés. Si cette spec est validée
 
 ## 8. Ce qui reste à trancher
 
-1. **Valeur perçue → clients : (a) ou (b) ?** (§5.1) — c'est le point qui décide
-   si la séparation des deux économies tient. Recommandation : (b).
-2. **L'échelle exacte par modèle** (§4.1) — à dériver du banc, pas à choisir à
-   l'œil.
+1. ~~Valeur perçue → clients : (a) ou (b) ?~~ **Tranché** (02/08) : option (b),
+   et les trois perceptions sont séparées — voir §5.1.1.
+2. ~~Le principe d'échelle~~ **Tranché** (02/08) : unités réalistes à
+   l'affichage, ordres de grandeur calibrés sur les charges (§4.1). Les
+   **valeurs exactes** restent à dériver du banc, pas à choisir à l'œil.
 3. **Le coût unitaire par client est-il le même pour tous les modèles ?**
    Probablement non : un utilisateur freemium coûte peu et rapporte peu, un
    grand compte coûte du support. C'est une valeur par modèle.
