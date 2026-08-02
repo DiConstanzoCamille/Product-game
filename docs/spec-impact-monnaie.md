@@ -50,9 +50,10 @@ a plus de conversion du tout.
 ### 💥 L'Impact — la performance du joueur
 
 Un **portefeuille** qui s'accumule de sprint en sprint, sans plafond, jamais
-remis à zéro. Il monte quand on produit (`Traction × Levier`), il descend quand
-on achète au Comité. C'est **la** valeur du jeu : celle qu'on regarde, celle
-qui est jugée, celle qu'on dépense.
+remis à zéro. Il monte quand on produit (`Traction × Levier`), il descend à
+chaque achat — au shop du sprint comme au Comité (voir §3.1 et §3.2). C'est
+**la** valeur du jeu : celle qu'on regarde, celle qui est jugée, celle qu'on
+dépense.
 
 ### 💰 Le Revenue — la survie de l'entreprise
 
@@ -113,7 +114,44 @@ Conséquence de dimensionnement : les prix du shop de sprint doivent rester
 **petits devant ceux du Comité**. Ajustements fréquents d'un côté, paris
 structurels de l'autre.
 
-### 3.3 Le premier sprint n'achète rien
+### 3.3 Les prix suivent l'escalade — mais moins vite qu'elle
+
+Un objectif à 12 500 face à des outils à 25 rend tout le late game gratuit : le
+joueur achète le catalogue entier sans réfléchir, et la décision disparaît au
+moment précis où elle devrait être la plus tendue. **Les prix doivent donc
+monter avec les objectifs.**
+
+Mais les indexer *exactement* sur l'escalade serait le défaut inverse : le
+pouvoir d'achat relatif ne bougerait jamais, chaque trimestre serait identique
+au précédent avec plus de zéros, et le joueur ne ressentirait aucune
+progression. C'est de l'inflation pure — le contraire du décollage recherché.
+
+```
+prix = prix_base × (objectif_du_trimestre / objectif_T1) ^ k
+```
+
+- `k = 1` → prix parfaitement indexés, aucune progression ressentie ;
+- `k = 0` → prix fixes, late game gratuit ;
+- **`k ≈ 0,7`** → le joueur s'enrichit *relativement* (il s'offre plus de choses
+  qu'au premier trimestre, donc il sent qu'il a construit quelque chose) sans
+  que ce soit gratuit.
+
+`k` vit dans `balance.json` et se règle au banc de trajectoires (§7).
+
+Deux points de mise en œuvre :
+
+- **La source est la table des quotas elle-même**, jamais une seconde table de
+  prix par trimestre. Une seule vérité : changer l'escalade des objectifs fait
+  suivre les prix automatiquement, sans risque de désynchronisation.
+- **Le scaling s'applique au Comité autant qu'au shop du sprint.** Ne le mettre
+  que sur le shop laisserait le Comité — où sont les gros achats — devenir
+  trivial en fin de mandat.
+
+Effet de bord favorable : acheter tôt coûte moins cher en valeur absolue, ce qui
+renforce le rythme de §3.2. Et ça s'équilibre tout seul, puisque c'est
+précisément au début qu'on a le moins d'Impact.
+
+### 3.4 Le premier sprint n'achète rien
 
 Le portefeuille démarre à zéro : on ne peut donc rien acheter au sprint 1, avant
 d'avoir produit quoi que ce soit. **C'est assumé.** Le premier sprint sert à
@@ -125,7 +163,7 @@ avec un capital d'Impact initial — l'entreprise qui a déjà levé, celle qui
 reprend un produit qui marchait. Une ligne de `companies.json`, à traiter comme
 un trait de contexte de run, pas comme une règle générale.
 
-### 3.4 Ce que ça change pour la Roadmap
+### 3.5 Ce que ça change pour la Roadmap
 
 Si le Revenue vient des features à ROI et l'Impact de `Traction × Levier`, alors
 le choix de backlog devient un arbitrage réel : **nourrir la boîte ou nourrir la
