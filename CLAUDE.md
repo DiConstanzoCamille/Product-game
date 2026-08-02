@@ -16,6 +16,12 @@ Trois documents, trois rôles — en cas de contradiction, cet ordre tranche :
 | [`docs/spec-scoring-sprint.md`](docs/spec-scoring-sprint.md) | **La cible de gameplay validée** (31/07/2026) : Traction × Levier = Impact. C'est la direction du produit. |
 | [`docs/spec-profondeur-gameplay.md`](docs/spec-profondeur-gameplay.md) | Les phases A→D. **Sa phase D est remplacée** par la spec de scoring. Sa phase C (roadmap profonde) reste valide et devient le prérequis du chantier scoring. |
 
+Deux propositions attendent une relecture — elles descendent d'un cran là où une
+grandeur abstraite ne raconte rien, et **ne sont pas implémentées** :
+[`spec-clients-revenue.md`](docs/spec-clients-revenue.md) (le Revenue cache des
+clients) et [`spec-equipe-individuelle.md`](docs/spec-equipe-individuelle.md)
+(le Moral cache des personnes).
+
 `docs/data-schema.md` décrit le schéma de chaque JSON de `data/`.
 
 ---
