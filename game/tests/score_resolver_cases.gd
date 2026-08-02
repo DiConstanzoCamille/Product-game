@@ -58,9 +58,13 @@ func _test_quick_wins_are_one_hand_bonus() -> void:
 	var quick_one := {"id": "quick-1", "name": "Quick 1", "costPoints": 1, "clientImpact": 0, "quickWin": true, "tags": ["growth"]}
 	var quick_two := {"id": "quick-2", "name": "Quick 2", "costPoints": 1, "clientImpact": 0, "quickWin": true, "tags": ["growth"]}
 	var report := _resolve([_squad("a", [quick_one, quick_two])], {}, rules)
-	var budget: Dictionary = report.get("conversion", {}).get("budget", {})
-	_assert_equal(int(budget.get("quick_win_bonus", 0)), 2, "Deux quick wins doivent donner un unique bonus de Budget +2.")
-	_assert_equal(int(budget.get("gain", 0)), 6, "Le Budget doit etre floor(sqrt(8)) + allocation 2 + bonus Quick wins 2.")
+	var wallet: Dictionary = report.get("conversion", {}).get("wallet", {})
+	var expected_bonus := int(rules.get("traction", {}).get("handBonuses", {}).get("quickWins", {}).get("impactBonus", 0))
+	_assert_equal(int(wallet.get("quick_win_bonus", 0)), expected_bonus, "Deux quick wins doivent donner un unique bonus d'Impact.")
+	# 💥 Plus de racine carree ni d'allocation plancher : le portefeuille
+	# encaisse l'Impact du sprint tel quel, plus le bonus de main.
+	_assert_equal(int(wallet.get("gain", 0)), int(report.get("global", {}).get("impact", 0)) + expected_bonus,
+		"Le portefeuille doit gagner exactement l'Impact du sprint plus le bonus Quick wins.")
 
 	var focus_rules := _rules_without_streak()
 	focus_rules["traction"]["handBonuses"]["focus"]["minimumDelivered"] = 2
@@ -79,7 +83,7 @@ func _test_hand_bonus_order() -> void:
 	_assert_equal(float(squad_report.get("traction", 0.0)), 29.5, "Les bonus doivent suivre 12 x 1.25 x 1.3 + 10 = 29.5.")
 	var labels: Array = []
 	for line in squad_report.get("lines", []):
-		if int(line.get("step", 0)) == 2 and line.get("type", "") != "budget_add":
+		if int(line.get("step", 0)) == 2 and line.get("type", "") != "wallet_add":
 			labels.append(line.get("label", ""))
 	_assert_equal(labels, ["Sprint parfait", "Focus", "Livraison groupée"], "L'ordre anime des bonus de main doit rester fixe.")
 
@@ -231,18 +235,22 @@ func _test_moral_cap_and_ops_snapshot() -> void:
 func _test_conversion_and_recurring_roi() -> void:
 	var feature := _traction_feature(25)
 	var rules := _rules_without_streak()
-	var base := {"mrr": 100, "budget": 0, "resources": {"moral": 60, "dette-organisationnelle": 0}, "support_teams": {"sales": 3, "pmm": 3, "csm": 3}}
+	var base := {"recurring_revenue": 100, "wallet": 0, "resources": {"moral": 60, "dette-organisationnelle": 0}, "support_teams": {"sales": 3, "pmm": 3, "csm": 3}}
 	var report := _resolve([_squad("a", [feature])], base, rules)
-	_assert_equal(float(report.get("conversion", {}).get("mrr", {}).get("after", 0.0)), 102.0, "MRR 100 avec Impact 100 et churn 4 % doit devenir 102.")
+	_assert_equal(float(report.get("conversion", {}).get("recurring_revenue", {}).get("after", 0.0)), 102.0, "Une base d'abonnements de 100 avec Impact 100 et churn 4 % doit devenir 102.")
 
 	base["recurring_roi"] = 5
 	report = _resolve([_squad("a", [feature])], base, rules)
-	_assert_equal(float(report.get("conversion", {}).get("mrr", {}).get("after", 0.0)), 107.0, "Le recurring_roi doit etre ajoute a chaque sprint en plus du MRR issu de l'Impact.")
-	_assert_equal(float(report.get("conversion", {}).get("mrr", {}).get("recurring_roi_gain", 0.0)), 5.0, "Le rapport doit distinguer le bonus MRR recurrent.")
+	_assert_equal(float(report.get("conversion", {}).get("recurring_revenue", {}).get("after", 0.0)), 107.0, "Le recurring_roi doit etre ajoute a chaque sprint en plus des abonnements issus de l'Impact.")
+	_assert_equal(float(report.get("conversion", {}).get("recurring_revenue", {}).get("recurring_roi_gain", 0.0)), 5.0, "Le rapport doit distinguer le bonus recurrent du backlog.")
 
 	base["resources"] = {"moral": 20, "dette-organisationnelle": 70}
 	report = _resolve([_squad("a", [feature])], base, rules)
-	_assert_equal(float(report.get("conversion", {}).get("mrr", {}).get("churn", 0.0)), 0.15, "Moral bas et Dette haute doivent monter le churn au plafond de 15 %.")
+	_assert_equal(float(report.get("conversion", {}).get("recurring_revenue", {}).get("churn", 0.0)), 0.15, "Moral bas et Dette haute doivent monter le churn au plafond de 15 %.")
+
+	# 💥 La conversion en Budget a disparu avec la racine carree : le rapport
+	# ne doit plus exposer de poste "budget" du tout (spec-impact-monnaie §2).
+	_assert_true(not report.get("conversion", {}).has("budget"), "Le rapport ne doit plus exposer de conversion en Budget.")
 
 
 ## Lot 4, spec §9.4 — critere de recette de l'issue #17 : deux runs sur la
@@ -261,8 +269,8 @@ func _test_support_team_rates_differ_by_company() -> void:
 
 	var feature := _traction_feature(25)
 	var rules := _rules_without_streak()
-	var meridia_report := _resolve([_squad("a", [feature])], {"mrr": 100.0, "support_teams": meridia.get("supportTeams", {})}, rules)
-	var karavel_report := _resolve([_squad("a", [feature])], {"mrr": 100.0, "support_teams": karavel.get("supportTeams", {})}, rules)
+	var meridia_report := _resolve([_squad("a", [feature])], {"recurring_revenue": 100.0, "support_teams": meridia.get("supportTeams", {})}, rules)
+	var karavel_report := _resolve([_squad("a", [feature])], {"recurring_revenue": 100.0, "support_teams": karavel.get("supportTeams", {})}, rules)
 
 	var meridia_rates: Dictionary = meridia_report.get("conversion", {}).get("teamRates", {})
 	var karavel_rates: Dictionary = karavel_report.get("conversion", {}).get("teamRates", {})
@@ -273,10 +281,10 @@ func _test_support_team_rates_differ_by_company() -> void:
 	_assert_equal(float(meridia_rates.get("csm", {}).get("multiplier", 0.0)), 1.0, "Meridia (CSM niveau 3) doit garder un churn neutre x1.0.")
 	_assert_equal(float(karavel_rates.get("csm", {}).get("multiplier", 0.0)), 1.4, "Karavel (CSM niveau 1) doit subir un churn x1.4 (support faible).")
 
-	var meridia_mrr := float(meridia_report.get("conversion", {}).get("mrr", {}).get("after", 0.0))
-	var karavel_mrr := float(karavel_report.get("conversion", {}).get("mrr", {}).get("after", 0.0))
+	var meridia_mrr := float(meridia_report.get("conversion", {}).get("recurring_revenue", {}).get("after", 0.0))
+	var karavel_mrr := float(karavel_report.get("conversion", {}).get("recurring_revenue", {}).get("after", 0.0))
 	_assert_true(not is_equal_approx(meridia_mrr, karavel_mrr),
-		"A Impact et MRR de depart identiques, Meridia (%s) et Karavel (%s) doivent converger differemment — c'est le critere de recette de l'issue #17." % [meridia_mrr, karavel_mrr])
+		"A Impact et abonnements de depart identiques, Meridia (%s) et Karavel (%s) doivent converger differemment — c'est le critere de recette de l'issue #17." % [meridia_mrr, karavel_mrr])
 
 
 func _company(company_id: String) -> Dictionary:

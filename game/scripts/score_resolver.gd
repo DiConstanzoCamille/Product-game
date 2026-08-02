@@ -129,7 +129,7 @@ static func resolve(snapshot: Dictionary, tables: Dictionary = {}) -> Dictionary
 
 	var impact := int(floor(max(0.0, resolved_impact)))
 	global_lines.append(_line(8, "global", "💥", "Impact", "impact", impact, resolved_impact, impact))
-	var conversion := _resolve_conversion(snapshot, rules, resources, impact, strategy_ids, strategy_rules, _quick_win_budget(squad_reports))
+	var conversion := _resolve_conversion(snapshot, rules, resources, impact, strategy_ids, strategy_rules, _quick_win_impact(squad_reports))
 	for conversion_line in conversion.get("lines", []):
 		global_lines.append(conversion_line)
 
@@ -179,11 +179,11 @@ static func _resolve_squad(squad: Dictionary, snapshot: Dictionary, rules: Dicti
 		traction = _add_hand_bonus(lines, squad_id, traction, bonuses.get("bundle", {}), "tractionBonus")
 	if _has_completed_epic(delivered):
 		traction = _multiply_hand_bonus(lines, squad_id, traction, bonuses.get("completedEpic", {}))
-	var quick_win_budget := 0
+	var quick_win_impact := 0
 	var quick_wins: Dictionary = bonuses.get("quickWins", {})
 	if _quick_win_count(delivered) >= int(quick_wins.get("minimumDelivered", 9999)):
-		quick_win_budget = int(quick_wins.get("budgetBonus", 0))
-		lines.append(_line(2, "local", quick_wins.get("icon", "⚡"), quick_wins.get("label", "Quick wins"), "budget_add", quick_win_budget, 0, quick_win_budget, squad_id))
+		quick_win_impact = int(quick_wins.get("impactBonus", 0))
+		lines.append(_line(2, "local", quick_wins.get("icon", "⚡"), quick_wins.get("label", "Quick wins"), "wallet_add", quick_win_impact, 0, quick_win_impact, squad_id))
 
 	var roster: Array = squad.get("roster", [])
 	var local_rule: Dictionary = rules.get("local", {})
@@ -254,7 +254,7 @@ static func _resolve_squad(squad: Dictionary, snapshot: Dictionary, rules: Dicti
 		"local_lever": local_lever,
 		"subtotal": subtotal,
 		"delivered_count": delivered.size(),
-		"quick_win_budget": quick_win_budget,
+		"quick_win_impact": quick_win_impact,
 	}
 
 
@@ -643,7 +643,7 @@ static func _apply_resource_friction(impact: float, lines: Array, rule: Dictiona
 	return after
 
 
-static func _resolve_conversion(snapshot: Dictionary, rules: Dictionary, resources: Dictionary, impact: int, strategy_ids: Array, strategy_rules: Dictionary, quick_win_budget: int) -> Dictionary:
+static func _resolve_conversion(snapshot: Dictionary, rules: Dictionary, resources: Dictionary, impact: int, strategy_ids: Array, strategy_rules: Dictionary, quick_win_impact: int) -> Dictionary:
 	var conversion_rules: Dictionary = rules.get("conversion", {})
 	var model_id: String = snapshot.get("business_model_id", "saas-mrr")
 	var model: Dictionary = conversion_rules.get(model_id, {})
@@ -660,19 +660,21 @@ static func _resolve_conversion(snapshot: Dictionary, rules: Dictionary, resourc
 		mrr_multiplier *= float(strategy.get("mrrMultiplier", 1.0))
 		mrr_stock_multiplier *= float(strategy.get("mrrStockMultiplier", 1.0))
 
-	var mrr_before := float(snapshot.get("mrr", 0.0))
+	var recurring_before := float(snapshot.get("recurring_revenue", 0.0))
 	var churn := float(model.get("baseChurn", 0.0)) * _team_multiplier(model.get("csmMultipliers", {}), csm_level) * churn_multiplier
 	var low_moral_debt: Dictionary = model.get("lowMoralDebt", {})
 	if not low_moral_debt.is_empty() and float(resources.get("moral", 100.0)) < float(low_moral_debt.get("moralBelow", -INF)) and float(resources.get("dette-organisationnelle", 0.0)) >= float(low_moral_debt.get("debtAtLeast", INF)):
 		churn = max(churn, float(low_moral_debt.get("maxChurn", churn)))
-	var impact_mrr := float(impact) * float(model.get("impactToMrr", 0.0)) * _team_multiplier(model.get("salesMultipliers", {}), sales_level) * mrr_multiplier
+	var impact_subscriptions := float(impact) * float(model.get("impactToMrr", 0.0)) * _team_multiplier(model.get("salesMultipliers", {}), sales_level) * mrr_multiplier
 	var recurring_roi := float(snapshot.get("recurring_roi", 0.0)) * float(model.get("recurringRoiMultiplier", 1.0))
-	var mrr_after := mrr_before * mrr_stock_multiplier * (1.0 - churn) + impact_mrr + recurring_roi
+	var recurring_after := recurring_before * mrr_stock_multiplier * (1.0 - churn) + impact_subscriptions + recurring_roi
 
-	var budget_rules: Dictionary = conversion_rules.get("budget", {})
-	var allocation := int(budget_rules.get("failedReviewAllocation", 0)) if bool(snapshot.get("board_review_failed", false)) else int(budget_rules.get("boardAllocation", 0))
-	var budget_gain := int(floor(sqrt(float(impact)))) + allocation + quick_win_budget
-	var budget_before := int(snapshot.get("budget", 0))
+	# 💥 Le portefeuille encaisse l'Impact du sprint tel quel : plus de racine
+	# carrée, plus d'allocation plancher (spec-impact-monnaie.md §2). Ne rien
+	# produire ne rapporte donc plus rien — c'est le premier critère de
+	# difficulté du jeu, et il est désormais mécanique.
+	var wallet_gain := impact + quick_win_impact
+	var wallet_before := int(snapshot.get("wallet", 0))
 	var perceived_rule: Dictionary = conversion_rules.get("perceivedValue", {})
 	var perceived_delta: float = min(int(floor(float(impact) / float(perceived_rule.get("impactPerPoint", INF)))) * _team_multiplier(model.get("pmmMultipliers", {}), pmm_level), float(perceived_rule.get("maxPerSprint", 0)))
 	var capital_rule: Dictionary = conversion_rules.get("politicalCapital", {})
@@ -691,11 +693,11 @@ static func _resolve_conversion(snapshot: Dictionary, rules: Dictionary, resourc
 	}
 
 	var lines: Array = [
-		_line(9, "global", "💼", "Sales — Impact → MRR (niveau %d)" % sales_level, "conversion_rate", sales_multiplier, 0.0, sales_multiplier),
+		_line(9, "global", "💼", "Sales — Impact → abonnements (niveau %d)" % sales_level, "conversion_rate", sales_multiplier, 0.0, sales_multiplier),
 		_line(9, "global", "📣", "Product marketing — Impact → Valeur perçue (niveau %d)" % pmm_level, "conversion_rate", pmm_multiplier, 0.0, pmm_multiplier),
 		_line(9, "global", "🎧", "CSM / Support — churn (niveau %d)" % csm_level, "conversion_rate", csm_multiplier, 0.0, csm_multiplier),
-		_line(9, "global", "💵", "MRR", "mrr", mrr_after - mrr_before, mrr_before, mrr_after),
-		_line(9, "global", "💶", "Budget", "budget", budget_gain, budget_before, budget_before + budget_gain),
+		_line(9, "global", "💰", "Abonnements — ce que le Revenue encaisse ce sprint", "recurring_revenue", recurring_after - recurring_before, recurring_before, recurring_after),
+		_line(9, "global", "💥", "Portefeuille d'Impact", "wallet", wallet_gain, wallet_before, wallet_before + wallet_gain),
 	]
 	if not is_zero_approx(perceived_delta):
 		lines.append(_line(9, "global", perceived_rule.get("icon", "📈"), perceived_rule.get("label", "Valeur perçue"), "resource_delta", perceived_delta, 0, perceived_delta))
@@ -703,8 +705,8 @@ static func _resolve_conversion(snapshot: Dictionary, rules: Dictionary, resourc
 		lines.append(_line(9, "global", capital_rule.get("icon", "🎯"), capital_rule.get("label", "Capital politique"), "resource_delta", capital_delta, 0, capital_delta))
 	return {
 		"lines": lines,
-		"mrr": { "before": mrr_before, "after": mrr_after, "gain": mrr_after - mrr_before, "impact_gain": impact_mrr, "recurring_roi_gain": recurring_roi, "churn": churn },
-		"budget": { "before": budget_before, "after": budget_before + budget_gain, "gain": budget_gain, "allocation": allocation, "quick_win_bonus": quick_win_budget },
+		"recurring_revenue": { "before": recurring_before, "after": recurring_after, "gain": recurring_after - recurring_before, "impact_gain": impact_subscriptions, "recurring_roi_gain": recurring_roi, "churn": churn },
+		"wallet": { "before": wallet_before, "after": wallet_before + wallet_gain, "gain": wallet_gain, "quick_win_bonus": quick_win_impact },
 		"resource_deltas": { "valeur-percue": perceived_delta, "capital-politique": capital_delta },
 		"teamRates": team_rates,
 	}
@@ -714,10 +716,10 @@ static func _team_multiplier(table: Dictionary, level: int) -> float:
 	return float(table.get(str(level), table.get("0", 1.0)))
 
 
-static func _quick_win_budget(squad_reports: Array) -> int:
+static func _quick_win_impact(squad_reports: Array) -> int:
 	var total := 0
 	for report in squad_reports:
-		total += int(report.get("quick_win_budget", 0))
+		total += int(report.get("quick_win_impact", 0))
 	return total
 
 

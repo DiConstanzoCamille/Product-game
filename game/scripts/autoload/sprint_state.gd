@@ -1,8 +1,15 @@
 extends Node
-## Autoload : état complet d'un mandat (run) — les 6 ressources persistantes,
-## le scénario choisi, les squads (une seule aujourd'hui), les pièces, les pratiques, les
+## Autoload : état complet d'un mandat (run) — les 5 ressources persistantes,
+## les **deux monnaies** (💥 le portefeuille d'Impact et 💰 le Revenue), le
+## scénario choisi, les squads (une seule aujourd'hui), les pratiques, les
 ## grandes décisions activées, le journal, et le panier d'effets en attente
 ## pour le sprint en cours.
+##
+## Les deux monnaies ne se remplacent jamais (docs/spec-impact-monnaie.md §3) :
+## **un achat coûte de l'Impact maintenant, et engage du Revenue pour
+## toujours**. L'Impact est la seule monnaie d'achat ; le Revenue ne sert
+## jamais de prix, il paie chaque sprint les salaires et les licences. On peut
+## donc mourir riche d'Impact et sans Revenue.
 ##
 ## Modèle d'application (§11 du carnet de règles) : chaque phase d'un sprint
 ## (Inbox, Roadmap, Grandes décisions, Marché) calcule son effet et
@@ -35,22 +42,34 @@ var pending_journal_lines: Array = []  # texte des choix faits pendant le sprint
 var is_mandate_over: bool = false
 var ending_id: String = ""
 
-var last_revenue: int = 0              # revenu du modèle économique au dernier sprint résolu
-var last_tresorerie_cost: int = 0      # somme des coûts/gains de décisions sur la trésorerie (hors revenu et masse salariale)
+var last_revenue: int = 0              # abonnements encaissés au dernier sprint résolu
+var last_revenue_cost: int = 0         # somme des coûts/gains de décisions sur le Revenue (hors abonnements et charges)
 var last_payroll: int = 0              # masse salariale prélevée au dernier sprint résolu
-var last_pieces_delta: int = 0         # flux net de pièces au dernier sprint résolu
-var last_roi_revenue_bonus: int = 0    # part MRR du revenu du sprint résolu
-var last_score_report: Dictionary = {} # rapport immuable réservé au futur ScoreResolver
-var mrr: float = 0.0                   # stock de MRR réservé à la conversion du score
+var last_licenses: int = 0             # licences et coûts récurrents prélevés au dernier sprint résolu
+var last_wallet_delta: int = 0         # flux net du portefeuille d'Impact au dernier sprint résolu
+var last_roi_revenue_bonus: int = 0    # part des abonnements venue du ROI des livraisons
+var last_score_report: Dictionary = {} # rapport immuable produit par ScoreResolver
+var recurring_revenue: float = 0.0     # 💰 base d'abonnements : ce que le produit encaisse à chaque sprint (ex-stock de MRR)
 var streak: int = 0                    # sprints livrés consécutifs, réservé au score
 
 # --- Phase A : l'entreprise ---
-var pieces: int = 0                    # 🪙 budget d'action de l'entreprise (jamais négatif)
+## 💥 Le portefeuille d'Impact — la monnaie unique. Sans plafond, **jamais
+## remis à zéro** (ni entre les sprints, ni entre les trimestres), alimenté par
+## Traction × Levier et débité par tous les achats. C'est aussi la valeur que
+## le board regarde à chaque verdict : un seul nombre, pas un « produit » et un
+## « disponible » (spec-impact-monnaie.md §4). Il peut passer sous zéro —
+## l'avance sur trimestre le vend contre du Revenue, et c'est un pari assumé.
+var impact_wallet: int = 0
+## 💰 Le Revenue — la survie de l'entreprise. Fusion de l'ancienne Trésorerie
+## (bornée 0..100) et du stock de MRR : sans plafond, jamais une jauge. Il
+## encaisse les abonnements et paie chaque sprint salaires et licences. À zéro,
+## l'entreprise ne paie plus : faillite.
+var revenue: float = 0.0
 var squads: Array = []                 # [{id, name, roster, backlog_draw, capacity, delivered, epic_progress}]
 var piloted_squads: Dictionary = {}    # 🎯 {sprint, ids} — les équipes pilotées ce sprint (Lot 5 §13.3) ; les autres jouent seules
 var owned_practices: Array = []        # ids de pratiques achetées (permanentes pour le mandat)
 var fired_count: int = 0               # licenciements prononcés ce mandat (le cynisme monte à partir du 2e)
-var next_hire_discount: int = 0        # remise 🪙 sur le prochain recrutement (trait caché Réseau)
+var next_hire_discount: int = 0        # remise 💥 sur le prochain recrutement (trait caché Réseau)
 var current_backlog_draw: Dictionary = {}  # {sprint, items} — tirage Roadmap persistant
 var epic_progress: Dictionary = {}         # epic_id -> {invested, startedSprint}
 var completed_backlog_ids: Array = []      # livraisons définitives, hors du sac
@@ -59,7 +78,6 @@ var recurring_roi: int = 0                 # bonus de MRR permanent acquis par l
 var last_roadmap_report: Dictionary = {}   # livraison réelle affichée à la Résolution
 var board_review_state: String = "pending"  # "pending" | "passed" | "failed"
 var board_review_result: Dictionary = {}    # {sprint, passed, title, conditions:[{label, ok}]} — pour l'overlay de verdict
-var quarter_impact: int = 0
 var quarter_index: int = 1
 var quarter_requirement_id: String = ""
 var quarter_requirement_ids: Array = []
@@ -123,12 +141,13 @@ func reset_run(chosen_era_id: String = "", chosen_company_id: String = "", chose
 	is_mandate_over = false
 	ending_id = ""
 	last_revenue = 0
-	last_tresorerie_cost = 0
+	last_revenue_cost = 0
 	last_payroll = 0
-	last_pieces_delta = 0
+	last_licenses = 0
+	last_wallet_delta = 0
 	last_roi_revenue_bonus = 0
 	last_score_report.clear()
-	mrr = 0.0
+	recurring_revenue = 0.0
 	streak = 0
 	_inbox_event_bag.clear()
 	_last_inbox_event_id = ""
@@ -147,7 +166,6 @@ func reset_run(chosen_era_id: String = "", chosen_company_id: String = "", chose
 	last_roadmap_report.clear()
 	board_review_state = "pending"
 	board_review_result.clear()
-	quarter_impact = 0
 	quarter_index = 1
 	quarter_requirement_id = ""
 	quarter_requirement_ids.clear()
@@ -179,7 +197,13 @@ func reset_run(chosen_era_id: String = "", chosen_company_id: String = "", chose
 	current_committee_offer.clear()
 
 	var company: Dictionary = get_company()
-	pieces = int(company.get("startingPieces", 0))
+	# 💥 Le portefeuille démarre à zéro : **le premier sprint n'achète rien**,
+	# et c'est assumé (spec §3.4). `startingImpact` existe pour les scénarios
+	# qui démarreront un jour avec une avance — un trait de contexte de run,
+	# pas une règle générale : la valeur vaut 0 partout aujourd'hui.
+	impact_wallet = int(company.get("startingImpact", 0))
+	var revenue_conf: Dictionary = GameData.balance.get("revenue", {})
+	revenue = float(revenue_conf.get("startOverrides", {}).get(company_id, revenue_conf.get("start", 50)))
 	# 💼📣🎧 Équipes subies (spec §9.4) : niveau 0-5 fixé par l'entreprise,
 	# jamais pilotable en jeu. Défaut 3/3/3 (neutre) si l'entreprise ne le
 	# déclare pas — compatibilité des scénarios qui ne l'ont pas encore.
@@ -301,12 +325,14 @@ func get_current_quota() -> int:
 	var level: Dictionary = levels.get(career_level, levels.get("pm", {}))
 	var configured: Variant = level.get("quarterQuotas", [])
 	var base_quota := 0.0
-	if configured is Array and quarter_index <= configured.size():
-		base_quota = float(configured[quarter_index - 1])
+	if configured is Array and not configured.is_empty():
+		# Au-delà de la table (mandat long), on repart de sa dernière ligne :
+		# jamais d'une valeur écrite ici. Un quota en dur dans un script rend le
+		# rééquilibrage impossible sans un dev — et celui qui vivait là a
+		# silencieusement figé le T5 sur l'ancien barème.
+		base_quota = float(configured[mini(quarter_index, configured.size()) - 1])
 	elif configured is Dictionary:
 		base_quota = float(configured.get(str(min(quarter_index, 4)), 0))
-	if base_quota <= 0.0:
-		base_quota = 1050.0
 
 	var long_conf: Dictionary = GameData.quotas.get("longMandate", {})
 	if quarter_index >= int(long_conf.get("fromQuarter", 5)):
@@ -317,6 +343,185 @@ func get_current_quota() -> int:
 
 func get_quarter_length() -> int:
 	return max(1, int(_active_quarter_effects().get("quarterLength", 3)))
+
+
+# --- 💥 Les prix, 💰 les charges : les deux seules portes d'entrée ---
+## Tout ce qui s'achète a **deux dimensions** et une seule monnaie : un prix en
+## Impact, payé maintenant, et une charge en Revenue, payée à chaque sprint
+## jusqu'à la fin du mandat (spec-impact-monnaie.md §3.1). Les écrans lisent
+## ces deux fonctions et jamais un nombre brut d'un JSON — c'est la condition
+## pour que le lot B (#36) puisse indexer les prix sur l'escalade des objectifs
+## sans rouvrir un seul écran.
+
+## Prix d'un poste, en 💥 Impact. `kind` : "candidate" | "practice" |
+## "decision" | "committee" | "reroll" | "reserve" | "severance". Retourne -1
+## quand la table de prix d'un poste est épuisée (le poste refusera
+## « plafond »), jamais un prix négatif.
+func resolved_price(kind: String, item_id: String = "", data: Dictionary = {}) -> int:
+	var base := _base_price(kind, item_id, data)
+	if base < 0.0:
+		return -1
+	var price := base * price_index()
+	# 🕸️ Réseau : la remise du trait caché s'applique ici et nulle part
+	# ailleurs — un écran qui recalculerait le prix l'oublierait.
+	if kind == "candidate":
+		price -= float(next_hire_discount)
+	return maxi(0, int(round(price)))
+
+
+## Indexation des prix sur l'escalade des objectifs (spec §3.3). Vaut 1.0
+## aujourd'hui : le lot B (#36) la branchera sur
+## `(objectif_du_trimestre / objectif_T1) ^ k`, avec k dans balance.json. Elle
+## existe déjà et est déjà appelée pour que ce lot-là soit une fonction à
+## remplir, pas un lot entier à rouvrir.
+func price_index() -> float:
+	return 1.0
+
+
+func _base_price(kind: String, item_id: String, data: Dictionary) -> float:
+	match kind:
+		"candidate":
+			return float(data.get("costImpact", find_candidate(item_id).get("costImpact", 0)))
+		"practice":
+			return float(find_practice(item_id).get("costImpact", 0))
+		"decision":
+			return float(find_card(item_id).get("costImpact", 0))
+		"reroll":
+			var reroll_conf: Dictionary = GameData.balance.get("shopDraw", {}).get("reroll", {})
+			var used := int(current_shop_offer.get("rerolls", 0)) if int(current_shop_offer.get("sprint", -1)) == sprint_number else 0
+			return float(reroll_conf.get("baseCost", 8)) + float(reroll_conf.get("costIncrement", 8)) * used
+		"reserve":
+			return float(GameData.balance.get("shopDraw", {}).get("reserveCostImpact", 10))
+		"severance":
+			return float(GameData.balance.get("firing", {}).get("severanceImpact", 18))
+		"committee":
+			return _committee_base_price(item_id)
+	return 0.0
+
+
+## Les postes du Comité : prix plat, échelle croissante consommée dans l'ordre,
+## ou fourchette tirée une fois par trimestre. -1 = table épuisée.
+func _committee_base_price(item_id: String) -> float:
+	var item := find_investment_item(item_id)
+	match item_id:
+		"strategic-decision":
+			if int(current_committee_offer.get("quarter", -1)) != quarter_index:
+				var range_conf: Array = item.get("costRange", [150, 300])
+				var low := int(range_conf[0]) if range_conf.size() > 0 else 150
+				var high := int(range_conf[1]) if range_conf.size() > 1 else 300
+				current_committee_offer = {"quarter": quarter_index, "strategy_cost": randi_range(low, high)}
+			return float(current_committee_offer.get("strategy_cost", 150))
+		"tool-slot":
+			var slot_costs: Array = GameData.balance.get("toolSlots", {}).get("extraSlotCosts", [])
+			if tool_slots_purchased >= slot_costs.size():
+				return -1.0
+			return float(slot_costs[tool_slots_purchased])
+		"open-seat":
+			var seat_costs: Array = item.get("costs", [])
+			if team_cap_purchased >= seat_costs.size():
+				return -1.0
+			return float(seat_costs[team_cap_purchased])
+		"product-tier":
+			var tier_costs: Array = item.get("costs", [])
+			if product_tier >= tier_costs.size():
+				return -1.0
+			return float(tier_costs[product_tier])
+	return float(item.get("cost", 0))
+
+
+## 💰 Charge récurrente qu'un poste engage, en Revenue **par sprint**. Comptée
+## par siège pour tout ce qui s'utilise (spec §3.6) : grandir n'augmente jamais
+## seulement la production, ça augmente aussi la facture. Lue avec le roster
+## d'aujourd'hui — c'est ce qu'il faut afficher sur une carte : « voilà ce que
+## ça vous coûterait maintenant ».
+func recurring_charge(kind: String, item_id: String, data: Dictionary = {}) -> int:
+	var seats := get_roster().size()
+	match kind:
+		"candidate":
+			var candidate := data if not data.is_empty() else find_candidate(item_id)
+			var seniority: String = candidate.get("seniority", "junior")
+			return int(candidate.get("salary", GameData.balance.get("salaries", {}).get(seniority, 1)))
+		"practice":
+			return _seat_charge(find_practice(item_id), seats, "defaultPracticePerSeat")
+		"decision":
+			var card := find_card(item_id)
+			if not _card_occupies_a_slot(card):
+				return 0
+			return _seat_charge(card, seats, "defaultToolPerSeat")
+		"strategy":
+			return int(find_strategy(item_id).get("licenseFlat",
+				GameData.balance.get("licenses", {}).get("defaultStrategyFlat", 0)))
+		"committee":
+			if item_id == "product-tier":
+				return int(find_investment_item(item_id).get("licenseFlatPerTier", 0))
+	return 0
+
+
+## Une licence par siège arrondie au plus proche : `licensePerSeat × effectif`,
+## avec le défaut de balance.json quand le poste n'en déclare pas. Un poste qui
+## déclare 0 ne coûte rien — c'est une valeur, pas un oubli.
+func _seat_charge(item: Dictionary, seats: int, default_key: String) -> int:
+	var per_seat := float(item.get("licensePerSeat",
+		GameData.balance.get("licenses", {}).get(default_key, 0.0)))
+	return int(round(per_seat * float(seats)))
+
+
+## Un outil n'occupe un slot — et donc ne se paie une licence — que s'il est de
+## la famille outillage. Les autres grandes décisions sont des bascules
+## ponctuelles : elles coûtent à l'activation, pas tous les mois.
+func _card_occupies_a_slot(card: Dictionary) -> bool:
+	return card.get("family", "") in ["outil-process", "methodologie-orga"]
+
+
+## Ce que l'organisation paie **chaque sprint**, ligne par ligne. Affiché par
+## les écrans et appliqué par la Résolution : une seule fonction pour les deux
+## usages (CLAUDE.md), sinon l'addition affichée finit par mentir.
+## Retourne {total, payroll, licenses, lines:[{icon, label, amount}]}.
+func get_recurring_charges() -> Dictionary:
+	var lines: Array = []
+	var payroll := get_payroll()
+	if payroll > 0:
+		lines.append({"icon": "👥", "label": "Masse salariale (%d personnes)" % get_roster().size(), "amount": payroll})
+
+	var licenses := 0
+	for card_id in activated_cards:
+		var charge := recurring_charge("decision", card_id)
+		if charge > 0:
+			licenses += charge
+			lines.append({"icon": find_card(card_id).get("icon", "🛠️"), "label": "Licence %s" % find_card(card_id).get("name", card_id), "amount": charge})
+	for practice_id in owned_practices:
+		var practice_charge := recurring_charge("practice", practice_id)
+		if practice_charge > 0:
+			licenses += practice_charge
+			lines.append({"icon": find_practice(practice_id).get("icon", "✨"), "label": "Licence %s" % find_practice(practice_id).get("name", practice_id), "amount": practice_charge})
+	for strategy_id in chosen_strategy_ids:
+		var strategy_charge := recurring_charge("strategy", strategy_id)
+		if strategy_charge > 0:
+			licenses += strategy_charge
+			lines.append({"icon": find_strategy(strategy_id).get("icon", "🧭"), "label": find_strategy(strategy_id).get("name", strategy_id), "amount": strategy_charge})
+	var tier_charge := recurring_charge("committee", "product-tier") * product_tier
+	if tier_charge > 0:
+		licenses += tier_charge
+		lines.append({"icon": "🚀", "label": "Infrastructure produit (palier %d)" % product_tier, "amount": tier_charge})
+
+	return {"total": payroll + licenses, "payroll": payroll, "licenses": licenses, "lines": lines}
+
+
+## Texte court de la charge d'un poste, pour la zone « coût » d'une carte :
+## l'achat doit annoncer sa facture, sinon le joueur qui découvre le salaire
+## après avoir recruté a été piégé, pas mis au défi (issue #35).
+func recurring_charge_text(kind: String, item_id: String, data: Dictionary = {}) -> String:
+	var charge := recurring_charge(kind, item_id, data)
+	if charge <= 0:
+		return "aucune charge récurrente"
+	return "%d 💰/sprint, pour toujours" % charge
+
+
+func find_candidate(candidate_id: String) -> Dictionary:
+	for candidate in GameData.candidates:
+		if candidate.get("id", "") == candidate_id:
+			return candidate
+	return {}
 
 
 func get_active_quarter_requirements() -> Array:
@@ -342,7 +547,9 @@ func get_quarter_requirement_effects() -> Dictionary:
 func get_quarter_progress() -> Dictionary:
 	return {
 		"quarter": quarter_index,
-		"impact": quarter_impact,
+		# Le board regarde le **solde** du portefeuille, pas la production du
+		# trimestre : un seul nombre (spec §4).
+		"impact": impact_wallet,
 		"quota": get_current_quota(),
 		"sprint": quarter_sprint,
 		"length": get_quarter_length(),
@@ -403,9 +610,11 @@ func _draw_quarter_requirement_id(excluded: Array = []) -> String:
 	return ""
 
 
+## Le portefeuille d'Impact n'est **pas** remis à zéro ici : il se garde d'un
+## trimestre à l'autre (spec §2). Le cliquet est assumé — c'est l'escalade des
+## quotas, désormais cumulatifs, qui le compense (quotas.json).
 func _prepare_quarter(next_quarter: int) -> void:
 	quarter_index = next_quarter
-	quarter_impact = 0
 	quarter_sprint = 0
 	quarter_forced_strategy_id = ""
 	quarter_strategy_chosen = false
@@ -556,6 +765,17 @@ func _apply_strategy_support_team_deltas(strategy_id: String) -> void:
 ## chaque fonction lit sa propre entrée et n'écrit jamais un nombre en dur.
 ## `committee_screen.gd` n'est qu'une lecture de ces fonctions.
 
+## Débite le portefeuille d'Impact. Retourne "" si le paiement a eu lieu,
+## sinon "impact" — le refus que tous les écrans rejouent tel quel. Un achat ne
+## fait jamais passer le portefeuille sous zéro : on ne s'endette que par un
+## pari explicite (🎲 Avance sur trimestre), jamais par mégarde.
+func _pay_impact(cost: int) -> String:
+	if impact_wallet < cost:
+		return "impact"
+	impact_wallet -= cost
+	return ""
+
+
 func find_investment_item(item_id: String) -> Dictionary:
 	for item in GameData.investments.get("items", []):
 		if item.get("id", "") == item_id:
@@ -563,16 +783,11 @@ func find_investment_item(item_id: String) -> Dictionary:
 	return {}
 
 
-## Le prix de la décision stratégique varie par trimestre (15-30, spec §12) —
-## tiré une fois et mémorisé pour ne pas changer entre deux rafraîchissements
-## du Comité, comme le tirage de l'étal du sprint.
+## Le prix de la décision stratégique varie par trimestre (spec §12) — tiré
+## une fois et mémorisé pour ne pas changer entre deux rafraîchissements du
+## Comité, comme le tirage de l'étal du sprint.
 func strategy_purchase_cost() -> int:
-	if int(current_committee_offer.get("quarter", -1)) != quarter_index:
-		var range_conf: Array = find_investment_item("strategic-decision").get("costRange", [15, 30])
-		var low := int(range_conf[0]) if range_conf.size() > 0 else 15
-		var high := int(range_conf[1]) if range_conf.size() > 1 else 30
-		current_committee_offer = {"quarter": quarter_index, "strategy_cost": randi_range(low, high)}
-	return int(current_committee_offer.get("strategy_cost", 15))
+	return resolved_price("committee", "strategic-decision")
 
 
 ## Version payante de choose_strategy() — la seule que le Comité expose ;
@@ -582,13 +797,16 @@ func buy_strategy(strategy_id: String) -> String:
 	if quarter_strategy_chosen:
 		return "deja-choisie-ce-trimestre"
 	var cost := strategy_purchase_cost()
-	if pieces < cost:
-		return "pieces"
+	if impact_wallet < cost:
+		return "impact"
 	var refusal := choose_strategy(strategy_id)
 	if refusal != "":
 		return refusal
-	pieces -= cost
-	pending_journal_lines.append("🪙 Coût du Comité : %d." % cost)
+	impact_wallet -= cost
+	var charge := recurring_charge("strategy", strategy_id)
+	pending_journal_lines.append("💥 Comité : −%d d'Impact%s." % [
+		cost, " · %d 💰/sprint engagés" % charge if charge > 0 else ""
+	])
 	return ""
 
 
@@ -596,28 +814,25 @@ func buy_strategy(strategy_id: String) -> String:
 ## l'entreprise (companies.json → teamCap). Échelle de prix croissante,
 ## comme les slots d'outillage ; -1 une fois la table épuisée.
 func team_cap_purchase_cost() -> int:
-	var costs: Array = find_investment_item("open-seat").get("costs", [])
-	if team_cap_purchased >= costs.size():
-		return -1
-	return int(costs[team_cap_purchased])
+	return resolved_price("committee", "open-seat")
 
 
 func buy_team_cap_seat() -> String:
 	var cost := team_cap_purchase_cost()
 	if cost < 0:
 		return "plafond"
-	if pieces < cost:
-		return "pieces"
-	pieces -= cost
+	var refusal := _pay_impact(cost)
+	if refusal != "":
+		return refusal
 	team_cap_purchased += 1
-	pending_journal_lines.append("🪑 Poste ouvert (%d 🪙) — cap d'effectif porté à %d." % [cost, get_team_cap()])
+	pending_journal_lines.append("🪑 Poste ouvert (%d 💥) — cap d'effectif porté à %d." % [cost, get_team_cap()])
 	return ""
 
 
 ## 📈 Promotion : un junior nommé devient senior (salaire +1, contribution
 ## senior). Retourne "" si la promotion a eu lieu, sinon la raison du refus.
 func promotion_cost() -> int:
-	return int(find_investment_item("promotion").get("cost", 5))
+	return resolved_price("committee", "promotion")
 
 
 func promote_employee(employee_id: String) -> String:
@@ -628,12 +843,13 @@ func promote_employee(employee_id: String) -> String:
 	if employee.get("seniority", "junior") != "junior":
 		return "deja-senior"
 	var cost := promotion_cost()
-	if pieces < cost:
-		return "pieces"
-	pieces -= cost
+	var refusal := _pay_impact(cost)
+	if refusal != "":
+		return refusal
 	employee["seniority"] = "senior"
+	var raise_amount := int(GameData.balance.get("salaries", {}).get("senior", 2)) - int(employee.get("salary", 1))
 	employee["salary"] = int(GameData.balance.get("salaries", {}).get("senior", 2))
-	pending_journal_lines.append("📈 Promotion (%d 🪙) : %s passe senior." % [cost, employee.get("name", employee_id)])
+	pending_journal_lines.append("📈 Promotion (%d 💥) : %s passe senior — %+d 💰/sprint de salaire." % [cost, employee.get("name", employee_id), raise_amount])
 	return ""
 
 
@@ -641,21 +857,20 @@ func promote_employee(employee_id: String) -> String:
 ## global.productTier), +1 feature proposée par sprint (_draw_backlog_offer).
 ## 3 paliers maximum par run — la table de prix fait foi.
 func product_tier_purchase_cost() -> int:
-	var costs: Array = find_investment_item("product-tier").get("costs", [])
-	if product_tier >= costs.size():
-		return -1
-	return int(costs[product_tier])
+	return resolved_price("committee", "product-tier")
 
 
 func buy_product_tier() -> String:
 	var cost := product_tier_purchase_cost()
 	if cost < 0:
 		return "plafond"
-	if pieces < cost:
-		return "pieces"
-	pieces -= cost
+	var refusal := _pay_impact(cost)
+	if refusal != "":
+		return refusal
 	product_tier += 1
-	pending_journal_lines.append("🚀 Palier de produit %d atteint (%d 🪙)." % [product_tier, cost])
+	pending_journal_lines.append("🚀 Palier de produit %d atteint (%d 💥) — %d 💰/sprint d'infrastructure." % [
+		product_tier, cost, recurring_charge("committee", "product-tier") * product_tier
+	])
 	return ""
 
 
@@ -663,12 +878,12 @@ func buy_product_tier() -> String:
 ## comme tout achat du Comité.
 func buy_team_seminar() -> String:
 	var item := find_investment_item("team-seminar")
-	var cost := int(item.get("cost", 8))
-	if pieces < cost:
-		return "pieces"
-	pieces -= cost
+	var cost := resolved_price("committee", "team-seminar")
+	var refusal := _pay_impact(cost)
+	if refusal != "":
+		return refusal
 	add_pending({"cynisme": float(item.get("cynismeDelta", -15))},
-		"🏝️ Séminaire d'équipe (%d 🪙) : 🎭 Cynisme %d." % [cost, int(item.get("cynismeDelta", -15))])
+		"🏝️ Séminaire d'équipe (%d 💥) : 🎭 Cynisme %d." % [cost, int(item.get("cynismeDelta", -15))])
 	return ""
 
 
@@ -676,27 +891,27 @@ func buy_team_seminar() -> String:
 ## (consommé dans _build_score_snapshot() / apply_pending_and_check()).
 func buy_cleanup_sprint() -> String:
 	var item := find_investment_item("cleanup-sprint")
-	var cost := int(item.get("cost", 6))
-	if pieces < cost:
-		return "pieces"
-	pieces -= cost
+	var cost := resolved_price("committee", "cleanup-sprint")
+	var refusal := _pay_impact(cost)
+	if refusal != "":
+		return refusal
 	cleanup_sprint_pending = true
 	add_pending({"dette-organisationnelle": float(item.get("detteDelta", -20))},
-		"🧹 Sprint de remise à plat acheté (%d 🪙) : 🧱 Dette %d, 0 Traction au prochain sprint." % [cost, int(item.get("detteDelta", -20))])
+		"🧹 Sprint de remise à plat acheté (%d 💥) : 🧱 Dette %d, 0 Traction au prochain sprint." % [cost, int(item.get("detteDelta", -20))])
 	return ""
 
 
-## 🤝 Rachat d'un concurrent : +12 MRR (stock, immédiat), +1 employé
-## aléatoire (rejoint le roster tout de suite, hors étal), +8 Dette (à la
-## prochaine Résolution, comme tout ce qui pèse sur les jauges).
+## 🤝 Rachat d'un concurrent : on n'achète pas du cash mais des clients — les
+## abonnements repris tombent à chaque sprint et subissent le churn comme les
+## vôtres. +1 employé aléatoire (avec son salaire), +8 Dette à la Résolution.
 func buy_competitor_acquisition() -> String:
 	var item := find_investment_item("acquire-competitor")
-	var cost := int(item.get("cost", 30))
-	if pieces < cost:
-		return "pieces"
+	var cost := resolved_price("committee", "acquire-competitor")
+	if impact_wallet < cost:
+		return "impact"
 	var recruit := _draw_candidate([])
-	pieces -= cost
-	mrr += float(item.get("mrrDelta", 12))
+	impact_wallet -= cost
+	recurring_revenue += float(item.get("recurringRevenueDelta", 10))
 	if not recruit.is_empty():
 		_get_primary_roster().append({
 			"id": recruit.get("id", "") + "-rachat-%d" % sprint_number,
@@ -711,8 +926,8 @@ func buy_competitor_acquisition() -> String:
 			"hiredSprint": sprint_number,
 		})
 	add_pending({"dette-organisationnelle": float(item.get("detteDelta", 8))},
-		"🤝 Rachat d'un concurrent (%d 🪙) : +%d MRR%s, 🧱 Dette +%d." % [
-			cost, int(item.get("mrrDelta", 12)),
+		"🤝 Rachat d'un concurrent (%d 💥) : +%d 💰/sprint d'abonnements repris%s, 🧱 Dette +%d." % [
+			cost, int(item.get("recurringRevenueDelta", 10)),
 			" · +1 employé (%s)" % recruit.get("name", "") if not recruit.is_empty() else "",
 			int(item.get("detteDelta", 8)),
 		])
@@ -723,13 +938,13 @@ func buy_competitor_acquisition() -> String:
 ## révèle leurs traits cachés (voir get_shop_offer() / _apply_headhunter_boost()).
 func buy_headhunter() -> String:
 	var item := find_investment_item("headhunter")
-	var cost := int(item.get("cost", 8))
-	if pieces < cost:
-		return "pieces"
-	pieces -= cost
+	var cost := resolved_price("committee", "headhunter")
+	var refusal := _pay_impact(cost)
+	if refusal != "":
+		return refusal
 	headhunter_pending = true
 	headhunter_target_candidates = int(item.get("nextShopCandidates", 4))
-	pending_journal_lines.append("🎯 Chasseur de têtes engagé (%d 🪙) : le prochain étal forcera %d candidats, traits révélés." % [
+	pending_journal_lines.append("🎯 Chasseur de têtes engagé (%d 💥) : le prochain étal forcera %d candidats, traits révélés." % [
 		cost, headhunter_target_candidates
 	])
 	return ""
@@ -739,32 +954,31 @@ func buy_headhunter() -> String:
 ## par _record_quarter_resolution() la première fois qu'un trimestre
 ## manquerait son quota. Rachetable pour empiler les rattrapages.
 func buy_turnaround_plan() -> String:
-	var item := find_investment_item("turnaround-plan")
-	var cost := int(item.get("cost", 20))
-	if pieces < cost:
-		return "pieces"
-	pieces -= cost
+	var cost := resolved_price("committee", "turnaround-plan")
+	var refusal := _pay_impact(cost)
+	if refusal != "":
+		return refusal
 	turnaround_plans_available += 1
-	pending_journal_lines.append("🏛️ Plan de redressement acheté (%d 🪙) — %d rattrapage(s) de quota en réserve." % [
+	pending_journal_lines.append("🏛️ Plan de redressement acheté (%d 💥) — %d rattrapage(s) de quota en réserve." % [
 		cost, turnaround_plans_available
 	])
 	return ""
 
 
-## 🎲 Avance sur trimestre : +10 💶 immédiats contre -80 d'Impact sur le
-## cumul du trimestre qui vient. Un débit assumé sur quarter_impact, pas un
-## abaissement du quota : un cumul qui passe sous zéro est une information de
-## jeu (le pari coûte cher), jamais silencieusement remis à zéro ici — la
-## remise à zéro trimestrielle reste la seule de _prepare_quarter().
-## Répétable : chaque avance alourdit encore le trimestre en cours.
+## 🎲 Avance sur trimestre : le seul poste qui va dans l'autre sens — il vend
+## de l'Impact contre du Revenue immédiat. Le portefeuille **peut passer sous
+## zéro** : un solde négatif est une information de jeu (le pari coûte cher),
+## jamais un état silencieusement corrigé — et il faudra l'avoir reconstitué à
+## l'heure du verdict, pas en chemin (spec §3.5). Répétable, et chaque avance
+## creuse davantage.
 func buy_quarter_advance() -> String:
 	var item := find_investment_item("quarter-advance")
-	var gain := int(item.get("budgetGain", 10))
-	var penalty := int(item.get("impactPenalty", 80))
-	pieces += gain
-	quarter_impact -= penalty
-	pending_journal_lines.append("🎲 Avance sur trimestre : +%d 🪙 contre −%d d'Impact sur le quota en cours (cumul désormais %d)." % [
-		gain, penalty, quarter_impact
+	var gain := int(item.get("revenueGain", 26))
+	var penalty := int(item.get("impactPenalty", 95))
+	revenue += float(gain)
+	impact_wallet -= penalty
+	pending_journal_lines.append("🎲 Avance sur trimestre : +%d 💰 de Revenue contre −%d 💥 (portefeuille désormais %d)." % [
+		gain, penalty, impact_wallet
 	])
 	return ""
 
@@ -1044,21 +1258,22 @@ func do_self_work() -> String:
 	return ""
 
 
-## 🏛️ Négocier une rallonge (§7.2) — votre Capital politique contre des
-## Pièces pour l'entreprise. Les pièces tombent immédiatement (le Marché du
-## sprint en profite) ; le Capital politique se règle à la Résolution,
-## comme tous les effets de ressources.
+## 🏛️ Négocier une rallonge (§7.2) — votre Capital politique contre du
+## Revenue pour l'entreprise. C'est le seul geste qui remplit la caisse sans
+## produire : il ne donne jamais d'Impact, seulement de quoi tenir un sprint de
+## plus. Le cash tombe immédiatement ; le Capital politique se règle à la
+## Résolution, comme tous les effets de ressources.
 func do_negotiate_extension() -> String:
 	var refusal := personal_action_refusal()
 	if refusal != "":
 		return refusal
 	var conf := get_personal_action_conf("extension")
-	var gained := int(conf.get("pieces", 4))
+	var gained := int(conf.get("revenue", 14))
 	var capital := int(conf.get("capitalPolitique", -8))
 	_spend_energy(int(conf.get("cost", 10)))
-	pieces += gained
+	revenue += float(gained)
 	add_pending({"capital-politique": float(capital)},
-		"🏛️ Rallonge négociée au board (−%d ⚡) : +%d 🪙 immédiats, 🎯 Capital politique %d — tout le monde a noté que vous êtes venu·e quémander" % [
+		"🏛️ Rallonge négociée au board (−%d ⚡) : +%d 💰 de Revenue immédiats, 🎯 Capital politique %d — tout le monde a noté que vous êtes venu·e quémander" % [
 			int(conf.get("cost", 10)), gained, capital
 		])
 	return ""
@@ -1874,15 +2089,13 @@ func find_card(card_id: String) -> Dictionary:
 	return {}
 
 
-## Prix d'activation d'une grande décision, en 🪙. Une décision se paie comme
-## une embauche ou une pratique — c'est la condition pour que les trois types
-## soient vraiment en concurrence sur le même rayon (carnet §21). Les pièces
-## sont le budget d'**action** : ce qu'il faut dépenser pour faire passer la
-## bascule. C'est distinct de l'axe `financier` de la carte, qui frappe la
-## Trésorerie sprint après sprint — le prix d'achat n'est pas le coût
-## d'exploitation.
+## Prix d'activation d'une grande décision, en 💥 Impact. Une décision se paie
+## comme une embauche ou une pratique — c'est la condition pour que les trois
+## types soient vraiment en concurrence sur le même rayon (carnet §21). Le prix
+## d'achat n'est pas le coût d'exploitation : celui-là est la licence par
+## siège, prélevée sur le 💰 Revenue à chaque sprint (recurring_charge()).
 func decision_cost(card_id: String) -> int:
-	return int(find_card(card_id).get("costPieces", 0))
+	return resolved_price("decision", card_id)
 
 
 # --- 🔧 Les slots d'outillage — la vraie limite de fin de mandat (spec §7.1.1) ---
@@ -1911,23 +2124,20 @@ func get_tool_slot_capacity() -> int:
 ## Prix du prochain slot supplémentaire (12 puis 20 💶, §7.1.1) ; -1 une fois
 ## le plafond de +2 atteint.
 func tool_slot_purchase_cost() -> int:
-	var costs: Array = GameData.balance.get("toolSlots", {}).get("extraSlotCosts", [])
-	if tool_slots_purchased >= costs.size():
-		return -1
-	return int(costs[tool_slots_purchased])
+	return resolved_price("committee", "tool-slot")
 
 
 ## Achète un slot supplémentaire au Comité. Retourne "" si l'achat a eu lieu,
-## sinon la raison du refus ("plafond" ou "pieces").
+## sinon la raison du refus ("plafond" ou "impact").
 func buy_tool_slot() -> String:
 	var cost := tool_slot_purchase_cost()
 	if cost < 0:
 		return "plafond"
-	if pieces < cost:
-		return "pieces"
-	pieces -= cost
+	var refusal := _pay_impact(cost)
+	if refusal != "":
+		return refusal
 	tool_slots_purchased += 1
-	pending_journal_lines.append("🔧 Slot d'outillage supplémentaire acheté (%d 🪙) — %d/%d." % [
+	pending_journal_lines.append("🔧 Slot d'outillage supplémentaire acheté (%d 💥) — %d/%d." % [
 		cost, get_tool_slot_capacity(), get_tool_slot_capacity()
 	])
 	return ""
@@ -1958,7 +2168,7 @@ func release_tool_slot(card_id: String) -> String:
 	return ""
 
 
-## Active une grande décision : les pièces tombent immédiatement, ses effets
+## Active une grande décision : l'Impact tombe immédiatement, ses effets
 ## rejoignent le panier du sprint, elle devient une Fondation et quitte
 ## définitivement l'offre. Retourne "" si l'activation a eu lieu, sinon la
 ## raison du refus.
@@ -1975,13 +2185,15 @@ func activate_decision(card_id: String) -> String:
 	if not card_requirement_state(card).get("ok", true):
 		return "prerequis"
 	var cost := decision_cost(card_id)
-	if pieces < cost:
-		return "pieces"
+	var refusal := _pay_impact(cost)
+	if refusal != "":
+		return refusal
 
-	pieces -= cost
 	var deltas := EffectResolver.resolve_card_activation(card_id, team_profile, era_id)
-	add_pending(deltas, "Grande décision : %s activée (%d 🪙, %s)" % [
-		card.get("name", card_id), cost, team_profile
+	var charge := recurring_charge("decision", card_id)
+	add_pending(deltas, "Grande décision : %s activée (%d 💥%s, %s)" % [
+		card.get("name", card_id), cost,
+		" · %d 💰/sprint de licence" % charge if charge > 0 else "", team_profile
 	])
 	activated_cards.append(card_id)
 	activated_card_sprints[card_id] = sprint_number
@@ -2044,7 +2256,7 @@ func _expire_leases() -> void:
 # --- 📌 Réserver un Actif pour le sprint suivant ---
 
 func reserve_cost() -> int:
-	return int(GameData.balance.get("shopDraw", {}).get("reserveCostPieces", 1))
+	return resolved_price("reserve")
 
 
 func is_reserved(kind: String, asset_id: String) -> bool:
@@ -2056,20 +2268,20 @@ func is_reserved(kind: String, asset_id: String) -> bool:
 
 ## Punaise un Actif de l'offre : il sera encore là au sprint suivant, et un
 ## 🎲 re-tirage ne l'emporte pas. Le bail est **d'un sprint** — le garder plus
-## longtemps se re-paie, sinon une pièce suffirait à annuler toute la rareté.
-## Deuxième appel = on décolle la punaise et la pièce revient (même sprint).
+## longtemps se re-paie, sinon quelques Impacts suffiraient à annuler toute la
+## rareté. Deuxième appel = on décolle la punaise et l'Impact revient (même sprint).
 ## Retourne "" si l'état a changé, sinon la raison du refus.
 func toggle_reservation(kind: String, asset_id: String, data: Dictionary) -> String:
 	for entry in reserved_assets:
 		if entry.get("kind", "") == kind and entry.get("id", "") == asset_id:
 			reserved_assets.erase(entry)
-			pieces += int(entry.get("paid", 0))
+			impact_wallet += int(entry.get("paid", 0))
 			return ""
 
 	var cost := reserve_cost()
-	if pieces < cost:
-		return "pieces"
-	pieces -= cost
+	var refusal := _pay_impact(cost)
+	if refusal != "":
+		return refusal
 	reserved_assets.append({
 		"kind": kind,
 		"id": asset_id,
@@ -2116,24 +2328,22 @@ func _reservations_for(kind: String) -> Array:
 ## repart à sa base au sprint suivant (le compteur vit dans l'offre, qui est
 ## elle-même datée). Payer pour revoir le hasard est le contrepoids du tirage :
 ## sans lui, un sprint sans rien d'intéressant est subi ; avec lui, c'est un
-## arbitrage de plus contre les pièces qu'on aurait mises dans une embauche.
+## arbitrage de plus contre l'Impact qu'on aurait mis dans une embauche.
 func shop_reroll_cost() -> int:
-	var conf: Dictionary = GameData.balance.get("shopDraw", {}).get("reroll", {})
-	var base := int(conf.get("baseCost", 1))
-	var increment := int(conf.get("costIncrement", 1))
-	return base + increment * int(get_shop_offer().get("rerolls", 0))
+	get_shop_offer()  # le prix dépend du nombre de re-tirages déjà faits ce sprint
+	return resolved_price("reroll")
 
 
 ## Retourne "" si le re-tirage a eu lieu, sinon la raison du refus.
 func reroll_shop_offer() -> String:
 	var cost := shop_reroll_cost()
-	if pieces < cost:
-		return "pieces"
+	var refusal := _pay_impact(cost)
+	if refusal != "":
+		return refusal
 
 	var rerolls := int(get_shop_offer().get("rerolls", 0)) + 1
-	pieces -= cost
 	current_shop_offer = _draw_shop_offer(rerolls)
-	pending_journal_lines.append("🎲 Offre re-tirée (%d 🪙) — %s" % [
+	pending_journal_lines.append("🎲 Offre re-tirée (%d 💥) — %s" % [
 		cost, "le marché a d'autres idées" if rerolls == 1 else "encore une fois (%d ce sprint)" % rerolls
 	])
 	return ""
@@ -2195,20 +2405,23 @@ func _roll_hidden_trait() -> String:
 ## dédié pour l'instant, spec §13.2 — voir carnet §30), la recrue rejoint
 ## l'équipe la moins fournie : un équilibrage simple plutôt qu'un empilement
 ## systématique sur l'équipe historique. Retourne "" si l'embauche a eu lieu,
-## sinon la raison du refus ("pieces" ou "cap").
+## sinon la raison du refus ("impact" ou "cap").
+## Un recrutement engage les **deux** monnaies : un prix d'embauche en Impact
+## et un salaire en Revenue à chaque sprint jusqu'à la fin du mandat — c'est ce
+## qui supprime la réponse « recruter est toujours bon » (spec §3).
 func hire_candidate(candidate: Dictionary, target_squad_id: String = "") -> String:
 	if is_quarter_requirement_active("hiringFrozen"):
 		return "quarter-requirement"
 	if get_roster().size() >= get_team_cap():
 		return "cap"
-	var cost: int = max(0, int(candidate.get("costPieces", 0)) - next_hire_discount)
-	if pieces < cost:
-		return "pieces"
+	var cost := resolved_price("candidate", candidate.get("id", ""), candidate)
+	var refusal := _pay_impact(cost)
+	if refusal != "":
+		return refusal
 
-	pieces -= cost
 	var discount_note := ""
 	if next_hire_discount > 0:
-		discount_note = " (réseau : −%d 🪙)" % next_hire_discount
+		discount_note = " (réseau : −%d 💥)" % next_hire_discount
 		next_hire_discount = 0
 
 	_target_roster(target_squad_id).append({
@@ -2226,14 +2439,17 @@ func hire_candidate(candidate: Dictionary, target_squad_id: String = "") -> Stri
 	_hired_candidate_ids.append(candidate.get("id", ""))
 	release_reservation("candidate", candidate.get("id", ""))
 	candidate["hired"] = true
-	pending_journal_lines.append("Embauche : %s (%s, %d 🪙)%s" % [
-		candidate.get("name", ""), _role_label(candidate.get("role", "")), cost, discount_note
+	pending_journal_lines.append("Embauche : %s (%s, %d 💥 · %d 💰/sprint de salaire)%s" % [
+		candidate.get("name", ""), _role_label(candidate.get("role", "")), cost,
+		recurring_charge("candidate", candidate.get("id", ""), candidate), discount_note
 	])
 	return ""
 
 
-## Licencie un employé du roster (spec §4.4) : indemnités en pièces, Moral en
-## baisse, et Cynisme en hausse à partir du 2e licenciement du mandat.
+## Licencie un employé du roster (spec §4.4) : indemnités en Impact, Moral en
+## baisse, et Cynisme en hausse à partir du 2e licenciement du mandat. Le
+## salaire, lui, quitte la facture du sprint suivant — licencier est bien la
+## seule façon de faire baisser la masse salariale.
 ## Retourne "" si le licenciement a eu lieu, sinon la raison du refus.
 func fire_employee(employee_id: String) -> String:
 	var owner := _find_employee_owner(employee_id)
@@ -2241,14 +2457,16 @@ func fire_employee(employee_id: String) -> String:
 		return "introuvable"
 	var employee: Dictionary = owner.get("employee", {})
 	var firing: Dictionary = GameData.balance.get("firing", {})
-	var severance := int(firing.get("severancePieces", 2))
-	if pieces < severance:
-		return "pieces"
+	var severance := resolved_price("severance")
+	var refusal := _pay_impact(severance)
+	if refusal != "":
+		return refusal
 
-	pieces -= severance
 	fired_count += 1
 	var deltas: Dictionary = {"moral": float(firing.get("moral", -4))}
-	var note := "Licenciement : %s — indemnités %d 🪙" % [employee.get("name", ""), severance]
+	var note := "Licenciement : %s — indemnités %d 💥, −%d 💰/sprint de salaire" % [
+		employee.get("name", ""), severance, int(employee.get("salary", 1))
+	]
 	if fired_count >= 2:
 		deltas["cynisme"] = float(firing.get("cynismePerExtraFiring", 3))
 		note += " (l'organisation commence à y voir une politique)"
@@ -2267,16 +2485,18 @@ func buy_practice(practice_id: String) -> String:
 	var practice := find_practice(practice_id)
 	if practice.is_empty():
 		return "introuvable"
-	var cost := int(practice.get("costPieces", 0))
-	if pieces < cost:
-		return "pieces"
+	var cost := resolved_price("practice", practice_id)
+	var refusal := _pay_impact(cost)
+	if refusal != "":
+		return refusal
 
-	pieces -= cost
 	owned_practices.append(practice_id)
 	release_reservation("practice", practice_id)
 	var cynisme := float(_active_quarter_effects().get("practiceCynisme", GameData.balance.get("shopDraw", {}).get("practiceCynisme", 2)))
-	add_pending({"cynisme": cynisme}, "Nouvelle pratique : %s %s (%d 🪙) — un process de plus, l'organisation lève les yeux au ciel" % [
-		practice.get("icon", ""), practice.get("name", ""), cost
+	var charge := recurring_charge("practice", practice_id)
+	add_pending({"cynisme": cynisme}, "Nouvelle pratique : %s %s (%d 💥%s) — un process de plus, l'organisation lève les yeux au ciel" % [
+		practice.get("icon", ""), practice.get("name", ""), cost,
+		" · %d 💰/sprint de licence" % charge if charge > 0 else ""
 	])
 
 	# Entretiens structurés : les candidats déjà sur l'étal arrivent révélés aussi.
@@ -2349,8 +2569,9 @@ func _find_inbox_event(event_id: String) -> Dictionary:
 
 ## Ajoute des deltas de ressources au panier du sprint en cours (pas encore
 ## appliqués aux jauges) et, optionnellement, une ligne de journal décrivant
-## la décision qui les a produits. La clé "pieces" est acceptée comme
-## pseudo-ressource : appliquée au budget d'action à la Résolution.
+## la décision qui les a produits. Deux pseudo-ressources sont acceptées en
+## plus des 5 jauges : "impact" (crédité au portefeuille) et "revenue"
+## (encaissé ou prélevé sur le Revenue) — aucune des deux n'est bornée.
 func add_pending(deltas: Dictionary, note: String = "") -> void:
 	for resource_id in deltas.keys():
 		var value: float = float(deltas[resource_id])
@@ -2359,16 +2580,16 @@ func add_pending(deltas: Dictionary, note: String = "") -> void:
 		pending_journal_lines.append(note)
 
 
-## Applique le panier d'effets aux ressources (+ masse salariale, effets de
+## Applique le panier d'effets aux 5 jauges (+ charges récurrentes, effets de
 ## roster et de pratiques, décroissance de la Valeur perçue, conversion
-## Traction × Levier × Impact, flux de pièces), journalise, puis vérifie les
-## fins de ressources et la revue trimestrielle. Retourne l'id de la fin
+## Traction × Levier × Impact, flux des deux monnaies), journalise, puis
+## vérifie les fins et la revue trimestrielle. Retourne l'id de la fin
 ## atteinte, ou "" si le mandat continue.
 ## À appeler une seule fois par sprint, depuis l'écran de Résolution.
 func apply_pending_and_check() -> String:
 	if quarter_exit_choice_pending:
 		return ""
-	last_tresorerie_cost = int(round(pending_deltas.get("tresorerie", 0.0)))
+	last_revenue_cost = int(round(pending_deltas.get("revenue", 0.0)))
 
 	_apply_per_sprint_effects()
 	var was_cleanup_sprint := cleanup_sprint_pending
@@ -2386,7 +2607,7 @@ func apply_pending_and_check() -> String:
 	# PlayerProfile, pas ici — un seul calcul (celui du resolver), une seule
 	# lecture (celle du rapport déjà produit).
 	PlayerProfile.record_score_report(last_score_report)
-	_apply_payroll()
+	_apply_recurring_charges()
 	_apply_score_conversion()
 
 	var bounds: Dictionary = GameData.balance.get("resourceBounds", {"min": 0, "max": 100})
@@ -2402,14 +2623,21 @@ func apply_pending_and_check() -> String:
 		applied[resource_id] = new_value - resource_values[resource_id]
 		resource_values[resource_id] = new_value
 
+	# 💰 Le Revenue n'est pas une jauge : il encaisse son delta sans borne, et
+	# c'est ce qui permet de mourir riche d'Impact et sans caisse.
+	var revenue_delta := float(pending_deltas.get("revenue", 0.0))
+	if not is_zero_approx(revenue_delta):
+		revenue += revenue_delta
+		applied["revenue"] = revenue_delta
+
 	_apply_energy_flow()
 	var energy_sprint_delta := int(last_energy_report.get("sprintDelta", 0))
 	if energy_sprint_delta != 0:
 		applied["energie"] = energy_sprint_delta
 
 	var quarter_ending := _record_quarter_resolution()
-	if last_pieces_delta != 0:
-		applied["pieces"] = last_pieces_delta
+	if last_wallet_delta != 0:
+		applied["impact"] = last_wallet_delta
 
 	journal.append({
 		"sprint": sprint_number,
@@ -2511,9 +2739,9 @@ func _build_score_snapshot() -> Dictionary:
 		"sprint": sprint_number,
 		"squads": score_squads,
 		"resources": _projected_score_resources(),
-		"mrr": mrr,
+		"recurring_revenue": recurring_revenue,
 		"recurring_roi": recurring_roi,
-		"budget": pieces,
+		"wallet": impact_wallet,
 		"business_model_id": business_model_id,
 		"support_teams": support_teams.duplicate(),
 		"product_tier": product_tier,
@@ -2556,48 +2784,69 @@ func _projected_score_resources() -> Dictionary:
 	return projected
 
 
-func _apply_payroll() -> void:
-	last_payroll = int(round(float(get_payroll()) * float(_active_quarter_effects().get("payrollMultiplier", 1.0))))
-	if last_payroll > 0:
-		pending_deltas["tresorerie"] = pending_deltas.get("tresorerie", 0.0) - last_payroll
-		pending_journal_lines.append("Masse salariale : −%d 💰 (%d personnes)" % [last_payroll, get_roster().size()])
+## 💰 Ce que l'organisation paie chaque sprint : salaires **et** licences. La
+## facture est celle que get_recurring_charges() affiche sur les écrans — une
+## seule fonction pour l'affichage et le prélèvement, sinon l'addition montrée
+## au joueur finit par mentir.
+func _apply_recurring_charges() -> void:
+	var charges := get_recurring_charges()
+	var payroll_multiplier := float(_active_quarter_effects().get("payrollMultiplier", 1.0))
+	last_payroll = int(round(float(charges.get("payroll", 0)) * payroll_multiplier))
+	last_licenses = int(charges.get("licenses", 0))
+	var total := last_payroll + last_licenses
+	if total <= 0:
+		return
+	pending_deltas["revenue"] = pending_deltas.get("revenue", 0.0) - float(total)
+	pending_journal_lines.append("Charges du sprint : −%d 💰 (salaires %d · licences %d)" % [
+		total, last_payroll, last_licenses
+	])
 
 
 ## Convertit le rapport du ScoreResolver en état de jeu. Aucun calcul de
 ## score ne vit ici : le rapport est la seule source de vérité de l'économie.
 func _apply_score_conversion() -> void:
 	var conversion: Dictionary = last_score_report.get("conversion", {})
-	var mrr_report: Dictionary = conversion.get("mrr", {})
-	var budget_report: Dictionary = conversion.get("budget", {})
+	var recurring_report: Dictionary = conversion.get("recurring_revenue", {})
+	var wallet_report: Dictionary = conversion.get("wallet", {})
 
-	mrr = float(mrr_report.get("after", mrr))
+	# 💰 La base d'abonnements est le moteur du Revenue : le MRR ne disparaît
+	# pas comme mécanique, il disparaît comme compteur à surveiller. Le joueur
+	# ne voit plus qu'une ligne du rapport — « ce que vos clients ont payé ce
+	# sprint » — et un seul solde.
+	recurring_revenue = float(recurring_report.get("after", recurring_revenue))
 	streak = int(last_score_report.get("next_streak", 0))
-	last_revenue = int(round(mrr))
-	last_roi_revenue_bonus = int(round(float(mrr_report.get("recurring_roi_gain", 0.0))))
+	last_revenue = int(round(recurring_revenue))
+	last_roi_revenue_bonus = int(round(float(recurring_report.get("recurring_roi_gain", 0.0))))
 	if last_revenue != 0:
-		pending_deltas["tresorerie"] = pending_deltas.get("tresorerie", 0.0) + last_revenue
-		pending_journal_lines.append("MRR : +%d (dont backlog +%d)" % [last_revenue, last_roi_revenue_bonus])
+		pending_deltas["revenue"] = pending_deltas.get("revenue", 0.0) + float(last_revenue)
+		pending_journal_lines.append("Abonnements : +%d 💰 (dont backlog +%d)" % [last_revenue, last_roi_revenue_bonus])
 
 	for resource_id in conversion.get("resource_deltas", {}).keys():
 		var delta: float = float(conversion["resource_deltas"][resource_id])
 		if not is_zero_approx(delta):
 			pending_deltas[resource_id] = pending_deltas.get(resource_id, 0.0) + delta
 
-	var pending_pieces := int(round(pending_deltas.get("pieces", 0.0)))
-	pending_deltas.erase("pieces")
-	var score_budget_gain := int(budget_report.get("gain", 0))
-	var before := pieces
-	pieces = max(0, pieces + pending_pieces + score_budget_gain)
-	last_pieces_delta = pieces - before
+	# 💥 Le portefeuille encaisse l'Impact du sprint, sans conversion ni
+	# plancher. Il n'est pas ramené à zéro s'il est négatif : ce qui tue, c'est
+	# de ne pas l'avoir reconstitué à l'heure du verdict (spec §3.5).
+	var pending_impact := int(round(pending_deltas.get("impact", 0.0)))
+	pending_deltas.erase("impact")
+	var wallet_gain := int(wallet_report.get("gain", 0))
+	var before := impact_wallet
+	impact_wallet += pending_impact + wallet_gain
+	last_wallet_delta = impact_wallet - before
 
-	var parts: Array = ["rapport +%d" % score_budget_gain]
-	if pending_pieces != 0:
-		parts.append("décisions %s%d" % ["+" if pending_pieces >= 0 else "−", abs(pending_pieces)])
-	pending_journal_lines.append("🪙 Budget d'investissement : %s (solde %d)" % [" · ".join(parts), pieces])
+	var parts: Array = ["sprint +%d" % wallet_gain]
+	if pending_impact != 0:
+		parts.append("décisions %s%d" % ["+" if pending_impact >= 0 else "−", abs(pending_impact)])
+	pending_journal_lines.append("💥 Portefeuille : %s (solde %d)" % [" · ".join(parts), impact_wallet])
 
 
+## Le verdict porte sur le **solde du portefeuille**, pas sur la production du
+## trimestre : dépenser fait donc reculer vers l'objectif en cours, et c'est
+## exactement le rythme voulu — investir tôt dans le trimestre, sécuriser à la
+## fin (spec §3.2 et §4).
 func _record_quarter_resolution() -> String:
-	quarter_impact += int(last_score_report.get("global", {}).get("impact", 0))
 	quarter_sprint += 1
 	if quarter_sprint < get_quarter_length():
 		return ""
@@ -2607,7 +2856,7 @@ func _record_quarter_resolution() -> String:
 	for objective in objectives:
 		if not bool(objective.get("ok", false)):
 			qualitative_ok = false
-	var passed := quarter_impact >= get_current_quota()
+	var passed := impact_wallet >= get_current_quota()
 	# 🏛️ Plan de redressement (spec §12) : un rattrapage de quota consommé
 	# automatiquement, la première fois où il sert — jamais un choix manuel,
 	# sinon on ne le "raterait" jamais.
@@ -2618,16 +2867,16 @@ func _record_quarter_resolution() -> String:
 		turnaround_used = true
 	var qualitative_bonus := 0
 	if passed and qualitative_ok:
-		qualitative_bonus = int(GameData.quotas.get("qualitativeBonusBudget", GameData.quotas.get("qualitativeBonus", {}).get("budget", 8)))
-		pieces += qualitative_bonus
-		last_pieces_delta += qualitative_bonus
+		qualitative_bonus = int(GameData.quotas.get("qualitativeBonusImpact", 0))
+		impact_wallet += qualitative_bonus
+		last_wallet_delta += qualitative_bonus
 
 	quarter_result = {
 		"sprint": sprint_number,
 		"quarter": quarter_index,
 		"length": get_quarter_length(),
 		"quota": get_current_quota(),
-		"impact": quarter_impact,
+		"impact": impact_wallet,
 		"passed": passed,
 		"turnaroundUsed": turnaround_used,
 		"qualitativeBonus": qualitative_bonus,
@@ -2636,8 +2885,8 @@ func _record_quarter_resolution() -> String:
 	}
 	board_review_state = "passed" if qualitative_ok else "failed"
 	board_review_result = quarter_result.duplicate(true)
-	pending_journal_lines.append("Revue trimestrielle : %d / %d Impact%s" % [
-		quarter_impact, get_current_quota(), " · bonus qualitatif +%d 🪙" % qualitative_bonus if qualitative_bonus > 0 else ""
+	pending_journal_lines.append("Revue trimestrielle : %d / %d 💥 au portefeuille%s" % [
+		impact_wallet, get_current_quota(), " · bonus qualitatif +%d 💥" % qualitative_bonus if qualitative_bonus > 0 else ""
 	])
 	if not passed:
 		is_mandate_over = true
@@ -2770,9 +3019,9 @@ func _apply_trait_triggers(employee: Dictionary) -> String:
 		var raise_amount := int(effects.get("salaryRaiseAtTrialEnd", 1))
 		employee["salary"] = int(employee.get("salary", 1)) + raise_amount
 		extra = " Une offre concurrente sur la table : +%d de salaire, ou un départ." % raise_amount
-	if effects.has("nextHireDiscountPieces"):
-		next_hire_discount += int(effects.get("nextHireDiscountPieces", 0))
-		extra = " Son carnet d'adresses vaut %d 🪙 sur le prochain recrutement." % int(effects.get("nextHireDiscountPieces", 0))
+	if effects.has("nextHireDiscountImpact"):
+		next_hire_discount += int(effects.get("nextHireDiscountImpact", 0))
+		extra = " Son carnet d'adresses vaut %d 💥 sur le prochain recrutement." % int(effects.get("nextHireDiscountImpact", 0))
 	return extra
 
 
@@ -2826,11 +3075,11 @@ func evaluate_condition(condition: Dictionary) -> Dictionary:
 	var current := ""
 	match condition.get("type", ""):
 		"resource-max":
-			var max_value: float = resource_values.get(condition.get("resource", ""), 0.0)
+			var max_value := _condition_value(condition.get("resource", ""))
 			ok = max_value <= float(condition.get("value", 0))
 			current = "%d" % int(round(max_value))
 		"resource-min":
-			var min_value: float = resource_values.get(condition.get("resource", ""), 0.0)
+			var min_value := _condition_value(condition.get("resource", ""))
 			ok = min_value >= float(condition.get("value", 0))
 			current = "%d" % int(round(min_value))
 		"decisions-min":
@@ -2839,6 +3088,9 @@ func evaluate_condition(condition: Dictionary) -> Dictionary:
 		"revenue-min":
 			ok = last_revenue >= int(condition.get("value", 0))
 			current = "%d" % last_revenue
+		"wallet-min":
+			ok = impact_wallet >= int(condition.get("value", 0))
+			current = "%d" % impact_wallet
 		"roster-seniority-min":
 			var count := 0
 			for member in get_roster():
@@ -2852,24 +3104,35 @@ func evaluate_condition(condition: Dictionary) -> Dictionary:
 	return {"ok": ok, "current": current}
 
 
-## Fins négatives par seuil (balance.json → endingThresholds). La
-## pseudo-ressource "energie" y est acceptée : elle lit la jauge personnelle
-## du joueur — le burn-out fondateur·rice se déclenche sur Énergie ≤ 0
-## (spec §8.3, remappé en Phase B ; l'ancien couperet Valeur perçue a
-## disparu en Phase A).
+## Une condition peut porter sur une jauge **ou** sur une des deux valeurs non
+## bornées, qui ne vivent pas dans resource_values : le Revenue et le
+## portefeuille d'Impact. Un seul point de lecture pour les trois familles.
+func _condition_value(resource_id: String) -> float:
+	match resource_id:
+		"revenue":
+			return revenue
+		"impact":
+			return float(impact_wallet)
+		"energie":
+			return float(energy)
+	return float(resource_values.get(resource_id, 0.0))
+
+
+## Fins négatives par seuil (balance.json → endingThresholds). Les
+## pseudo-ressources "energie", "revenue" et "impact" y sont acceptées : elles
+## lisent respectivement la jauge personnelle du joueur (burn-out sur ⚡ ≤ 0),
+## le Revenue non borné (faillite sur 💰 ≤ 0) et le portefeuille — ce dernier
+## n'a aucun seuil de fin aujourd'hui, et c'est voulu : une bourse vide n'est
+## pas une défaite (spec §3.5).
 func _check_bad_endings() -> String:
 	var thresholds: Array = GameData.balance.get("endingThresholds", [])
 	var overrides: Dictionary = GameData.balance.get("endingThresholdOverrides", {}).get(era_id, {})
 
 	for threshold in thresholds:
 		var resource_id: String = threshold.get("resource", "")
-		var value: float = 0.0
-		if resource_id == "energie":
-			value = float(energy)
-		elif resource_values.has(resource_id):
-			value = resource_values[resource_id]
-		else:
+		if not (resource_values.has(resource_id) or resource_id in ["energie", "revenue", "impact"]):
 			continue
+		var value := _condition_value(resource_id)
 		var limit: float = overrides.get(resource_id, threshold.get("value", 0))
 		var comparison: String = threshold.get("comparison", "lte")
 		var triggered := (comparison == "lte" and value <= limit) or (comparison == "gte" and value >= limit)

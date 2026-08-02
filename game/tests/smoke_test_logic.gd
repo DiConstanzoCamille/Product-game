@@ -120,7 +120,7 @@ func _test_multi_squad_roster() -> void:
 	if SprintState.find_employee("test-squad-secondaire").is_empty():
 		_fail("Un employé de la seconde équipe est introuvable.")
 
-	SprintState.pieces = 100
+	SprintState.impact_wallet = 2000
 	if SprintState.fire_employee("test-squad-secondaire") != "":
 		_fail("Le licenciement de la seconde équipe a été refusé.")
 	if primary_roster.size() != primary_count:
@@ -189,8 +189,8 @@ func _test_backlog_rules() -> void:
 
 
 ## Le rapport de score est la source unique de l'économie : les quick wins
-## n'ajoutent plus leur ancien +1 individuel, et le MRR récurrent n'est jamais
-## versé deux fois dans la trésorerie.
+## n'ajoutent plus leur ancien +1 individuel, et les abonnements ne sont jamais
+## versés deux fois dans le Revenue.
 func _test_score_resolution_integration() -> void:
 	print("=== SMOKE TEST LOGIQUE — INTEGRATION SCORE ===")
 	SprintState.reset_run("agile-transformation", "meridia-corp")
@@ -213,30 +213,39 @@ func _test_score_resolution_integration() -> void:
 	for feature in quick_wins:
 		plan.append({"id": feature.get("id", ""), "points": feature.get("costPoints", 0)})
 	SprintState.commit_backlog_plan(plan)
-	SprintState.add_pending({"pieces": 3}, "Inbox test : budget ponctuel")
-	var pieces_before := SprintState.pieces
-	var treasury_before := float(SprintState.resource_values.get("tresorerie", 0.0))
-	var payroll := SprintState.get_payroll()
+	SprintState.add_pending({"impact": 3}, "Inbox test : Impact ponctuel")
+	var wallet_before := SprintState.impact_wallet
+	var revenue_before := SprintState.revenue
+	var charges := int(SprintState.get_recurring_charges().get("total", 0))
 	SprintState.apply_pending_and_check()
 
 	var report: Dictionary = SprintState.last_score_report
 	var conversion: Dictionary = report.get("conversion", {})
-	var budget: Dictionary = conversion.get("budget", {})
-	var mrr_report: Dictionary = conversion.get("mrr", {})
+	var wallet: Dictionary = conversion.get("wallet", {})
+	var recurring_report: Dictionary = conversion.get("recurring_revenue", {})
+	var expected_quick_win := int(GameData.scoring.get("traction", {}).get("handBonuses", {}).get("quickWins", {}).get("impactBonus", 0))
 	if report.is_empty() or int(report.get("next_streak", 0)) != 1 or SprintState.streak != 1:
 		_fail("Un sprint avec livraisons doit produire un rapport et commencer la serie.")
-	if int(budget.get("quick_win_bonus", 0)) != 2:
-		_fail("Le rapport doit attribuer exactement +2 de budget aux deux quick wins.")
-	var expected_pieces := pieces_before + 3 + int(budget.get("gain", 0))
-	if SprintState.pieces != expected_pieces or SprintState.last_pieces_delta != expected_pieces - pieces_before:
-		_fail("Les quick wins historiques ont ete comptes deux fois dans les pieces (%d au lieu de %d)." % [SprintState.pieces, expected_pieces])
-	if int(round(SprintState.mrr)) != SprintState.last_revenue or int(round(float(mrr_report.get("after", 0.0)))) != SprintState.last_revenue:
-		_fail("Le revenu applique doit etre exactement le MRR final du rapport.")
-	if int(round(float(mrr_report.get("recurring_roi_gain", 0.0)))) != SprintState.last_roi_revenue_bonus:
+	if int(wallet.get("quick_win_bonus", 0)) != expected_quick_win:
+		_fail("Le rapport doit attribuer exactement +%d d'Impact aux deux quick wins." % expected_quick_win)
+	# 💥 Le portefeuille encaisse l'Impact du sprint tel quel : plus de racine
+	# carree, plus d'allocation plancher.
+	if int(wallet.get("gain", -1)) != int(report.get("global", {}).get("impact", 0)) + expected_quick_win:
+		_fail("Le gain de portefeuille doit valoir l'Impact du sprint plus le bonus quick wins, sans conversion.")
+	var expected_wallet := wallet_before + 3 + int(wallet.get("gain", 0))
+	if SprintState.impact_wallet != expected_wallet or SprintState.last_wallet_delta != expected_wallet - wallet_before:
+		_fail("Le portefeuille doit valoir %d et non %d." % [expected_wallet, SprintState.impact_wallet])
+	if int(round(SprintState.recurring_revenue)) != SprintState.last_revenue or int(round(float(recurring_report.get("after", 0.0)))) != SprintState.last_revenue:
+		_fail("Les abonnements encaisses doivent etre exactement la base finale du rapport.")
+	if int(round(float(recurring_report.get("recurring_roi_gain", 0.0)))) != SprintState.last_roi_revenue_bonus:
 		_fail("Le bonus recurring_roi du rapport n'est pas expose a l'UI.")
-	var expected_treasury: float = clamp(treasury_before - payroll + SprintState.last_revenue, 0.0, 100.0)
-	if not is_equal_approx(float(SprintState.resource_values.get("tresorerie", 0.0)), expected_treasury):
-		_fail("La tresorerie doit recevoir le MRR une seule fois (%s au lieu de %s)." % [SprintState.resource_values.get("tresorerie", 0.0), expected_treasury])
+	# 💰 Le Revenue n'est pas borne : il encaisse les abonnements et paie les
+	# charges, une seule fois chacun.
+	var expected_revenue := revenue_before - float(charges) + float(SprintState.last_revenue)
+	if not is_equal_approx(SprintState.revenue, expected_revenue):
+		_fail("Le Revenue doit recevoir les abonnements une seule fois et payer ses charges une seule fois (%s au lieu de %s)." % [SprintState.revenue, expected_revenue])
+	if SprintState.last_payroll + SprintState.last_licenses != charges:
+		_fail("Les charges prelevees doivent etre exactement celles que get_recurring_charges() affiche.")
 
 	SprintState.sprint_number += 1
 	SprintState.apply_pending_and_check()
@@ -300,7 +309,7 @@ func _test_tool_families_and_strategy_lot3() -> void:
 		_fail("La base de slots au niveau PM doit être 3 (spec §7.1.1).")
 	if SprintState.activated_cards.size() != 1 or SprintState.get_tool_slot_capacity() != 3:
 		_fail("Un run de PM démarre avec l'outillage hérité (1 slot pris) sur une base de 3.")
-	SprintState.pieces = 100
+	SprintState.impact_wallet = 2000
 	if SprintState.buy_tool_slot() != "" or SprintState.get_tool_slot_capacity() != 4:
 		_fail("Le premier slot supplémentaire doit coûter 12 💶 et porter la capacité à 4.")
 	if SprintState.buy_tool_slot() != "" or SprintState.get_tool_slot_capacity() != 5:
@@ -396,13 +405,20 @@ func _test_quarter_runtime() -> void:
 	# Les exigences runtime modifient les actions et le snapshot, sans UI.
 	SprintState.reset_run("agile-transformation", "meridia-corp")
 	SprintState.quarter_requirement_ids = ["short-quarter"]
-	if SprintState.get_quarter_length() != 2 or SprintState.get_current_quota() != 90:
-		_fail("Le trimestre court doit valoir 2 sprints et 75 %% du quota T1 (90).")
+	# 75 % du quota T1, quel que soit le chiffre de quotas.json — asserter la
+	# regle, pas la valeur d'equilibrage du jour.
+	var t1_quota := int(GameData.quotas.get("careerLevels", {}).get("pm", {}).get("quarterQuotas", [])[0])
+	if SprintState.get_quarter_length() != 2 or SprintState.get_current_quota() != int(round(t1_quota * 0.75)):
+		_fail("Le trimestre court doit valoir 2 sprints et 75 %% du quota T1 (%d, obtenu %d)." % [
+			int(round(t1_quota * 0.75)), SprintState.get_current_quota()
+		])
 	SprintState.quarter_requirement_ids = ["finance-watch"]
 	var base_payroll := SprintState.get_payroll()
-	SprintState._apply_payroll()
+	SprintState._apply_recurring_charges()
 	if SprintState.last_payroll != base_payroll * 2:
 		_fail("L'exigence masse salariale doit doubler le prelevement.")
+	if SprintState.last_licenses != int(SprintState.get_recurring_charges().get("licenses", 0)):
+		_fail("Les licences prelevees doivent etre exactement celles annoncees par get_recurring_charges().")
 	SprintState.pending_deltas.clear()
 	SprintState.quarter_requirement_ids = ["hiring-freeze"]
 	if SprintState.hire_candidate(GameData.candidates[0]) != "quarter-requirement":
@@ -411,7 +427,7 @@ func _test_quarter_runtime() -> void:
 	if SprintState.activate_decision("rice") != "quarter-requirement":
 		_fail("Le gel des outils doit refuser les cartes outil/process.")
 	SprintState.quarter_requirement_ids = ["steering-committee"]
-	SprintState.pieces = 20
+	SprintState.impact_wallet = 500
 	var practice_id: String = GameData.practices[0].get("id", "")
 	SprintState.buy_practice(practice_id)
 	if int(SprintState.pending_deltas.get("cynisme", 0.0)) != 4:
@@ -436,17 +452,18 @@ func _test_quarter_runtime() -> void:
 		SprintState.apply_pending_and_check()
 		if sprint < 2:
 			SprintState.sprint_number += 1
-	if int(SprintState.quarter_result.get("qualitativeBonus", 0)) != 8:
-		_fail("Les objectifs qualitatifs tenus doivent accorder exactement 8 pieces une fois.")
+	var expected_qualitative := int(GameData.quotas.get("qualitativeBonusImpact", 0))
+	if int(SprintState.quarter_result.get("qualitativeBonus", 0)) != expected_qualitative:
+		_fail("Les objectifs qualitatifs tenus doivent accorder exactement %d d'Impact une fois." % expected_qualitative)
 	if SprintState.quarter_index != 2 or int(SprintState.quarter_result.get("quarter", 0)) != 1:
 		_fail("Le resultat T1 doit rester disponible pendant que T2 est deja prepare.")
-	var bonus_delta := int(SprintState.last_score_report.get("conversion", {}).get("budget", {}).get("gain", 0)) + 8
-	if SprintState.last_pieces_delta != bonus_delta:
-		_fail("Le bonus qualitatif doit etre ajoute une seule fois au dernier flux de pieces.")
+	var bonus_delta := int(SprintState.last_score_report.get("conversion", {}).get("wallet", {}).get("gain", 0)) + expected_qualitative
+	if SprintState.last_wallet_delta != bonus_delta:
+		_fail("Le bonus qualitatif doit etre ajoute une seule fois au dernier flux de portefeuille.")
 	SprintState.sprint_number += 1
 	SprintState.last_roadmap_report.clear()
 	SprintState.apply_pending_and_check()
-	if SprintState.last_pieces_delta != int(SprintState.last_score_report.get("conversion", {}).get("budget", {}).get("gain", 0)):
+	if SprintState.last_wallet_delta != int(SprintState.last_score_report.get("conversion", {}).get("wallet", {}).get("gain", 0)):
 		_fail("Un sprint hors revue ne doit pas rejouer le bonus qualitatif.")
 	var review_entries := 0
 	for entry in SprintState.journal:
@@ -461,7 +478,7 @@ func _test_quarter_runtime() -> void:
 	SprintState.quarter_requirement_ids = ["hiring-freeze"]
 	SprintState.quarter_requirement_id = "hiring-freeze"
 	SprintState.quarter_sprint = SprintState.get_quarter_length() - 1
-	SprintState.quarter_impact = SprintState.get_current_quota()
+	SprintState.impact_wallet = SprintState.get_current_quota()
 	SprintState.activated_cards = ["rice"]
 	SprintState.last_roadmap_report.clear()
 	SprintState.apply_pending_and_check()
@@ -474,15 +491,21 @@ func _test_quarter_runtime() -> void:
 	if SprintState.quarter_requirement_ids.size() < 2:
 		_fail("Le mandat long doit ajouter une exigence au lieu d'ecraser celle du T4.")
 	SprintState.quarter_requirement_ids = ["hiring-freeze", "tool-freeze"]
-	if SprintState.get_current_quota() != 2310 or SprintState.quarter_requirement_ids.size() < 2:
-		_fail("Le T5 long doit partir a 2310 et conserver les exigences accumulees.")
+	# Le T5 long repart du quota T4 multiplie par longMandate.quotaMultiplier —
+	# la regle, jamais le chiffre du jour.
+	var quotas: Array = GameData.quotas.get("careerLevels", {}).get("pm", {}).get("quarterQuotas", [])
+	var expected_long := int(round(float(quotas[3]) * float(GameData.quotas.get("longMandate", {}).get("quotaMultiplier", 2.2))))
+	if SprintState.get_current_quota() != expected_long or SprintState.quarter_requirement_ids.size() < 2:
+		_fail("Le T5 long doit partir a %d et conserver les exigences accumulees (obtenu %d)." % [
+			expected_long, SprintState.get_current_quota()
+		])
 
 	# La revue de quota a la priorite sur un seuil fatal : une seule fin est emise.
 	SprintState.reset_run("agile-transformation", "meridia-corp")
 	SprintState.quarter_sprint = 2
-	SprintState.quarter_impact = 0
+	SprintState.impact_wallet = 0
 	SprintState.quarter_requirement_ids = ["hiring-freeze"]
-	SprintState.resource_values["tresorerie"] = 0.0
+	SprintState.revenue = 0.0
 	var endings: Array = []
 	var on_ending := func(ending_id: String): endings.append(ending_id)
 	SprintState.ending_reached.connect(on_ending)
@@ -492,8 +515,8 @@ func _test_quarter_runtime() -> void:
 		_fail("Un echec de quota concurrent d'un seuil fatal doit emettre une seule fin 'remercie'.")
 
 
-## Lot 4 (spec scoring §12) : chaque poste du Comité — achat accepté avec
-## budget, refus 'pieces' à sec, plafonds des tables de prix. `committee_screen`
+## Lot 4 (spec scoring §12) : chaque poste du Comité — achat accepté avec de
+## l'Impact, refus 'impact' à sec, plafonds des tables de prix. `committee_screen`
 ## ne fait que lire ces fonctions ; c'est donc ici, pas dans un test UI, que
 ## la logique doit être couverte.
 func _test_committee_lot4() -> void:
@@ -510,14 +533,14 @@ func _test_committee_lot4() -> void:
 		_fail("Un trimestre sans décision déjà choisie doit proposer un catalogue non vide.")
 	else:
 		var strategy_id: String = strategy_options[0].get("id", "")
-		SprintState.pieces = 0
-		if SprintState.buy_strategy(strategy_id) != "pieces":
-			_fail("Sans budget, buy_strategy() doit refuser 'pieces'.")
-		SprintState.pieces = 100
+		SprintState.impact_wallet = 0
+		if SprintState.buy_strategy(strategy_id) != "impact":
+			_fail("Sans budget, buy_strategy() doit refuser 'impact'.")
+		SprintState.impact_wallet = 2000
 		var strategy_cost := SprintState.strategy_purchase_cost()
 		if SprintState.buy_strategy(strategy_id) != "":
-			_fail("Avec assez de budget, buy_strategy() doit accepter.")
-		if SprintState.pieces != 100 - strategy_cost:
+			_fail("Avec assez d'Impact, buy_strategy() doit accepter.")
+		if SprintState.impact_wallet != 2000 - strategy_cost:
 			_fail("buy_strategy() doit prélever exactement le coût affiché (%d)." % strategy_cost)
 		var second_id: String = strategy_options[1].get("id", "") if strategy_options.size() > 1 else strategy_id
 		if SprintState.buy_strategy(second_id) == "":
@@ -527,10 +550,10 @@ func _test_committee_lot4() -> void:
 	# plafond une fois la table épuisée.
 	SprintState.reset_run("agile-transformation", "karavel-scaleup")
 	var base_cap := SprintState.get_team_cap()
-	SprintState.pieces = 0
-	if SprintState.buy_team_cap_seat() != "pieces":
-		_fail("Sans budget, l'ouverture d'un poste doit refuser 'pieces'.")
-	SprintState.pieces = 1000
+	SprintState.impact_wallet = 0
+	if SprintState.buy_team_cap_seat() != "impact":
+		_fail("Sans budget, l'ouverture d'un poste doit refuser 'impact'.")
+	SprintState.impact_wallet = 5000
 	var seat_costs: Array = SprintState.find_investment_item("open-seat").get("costs", [])
 	for i in seat_costs.size():
 		if SprintState.buy_team_cap_seat() != "":
@@ -540,7 +563,7 @@ func _test_committee_lot4() -> void:
 	if SprintState.buy_team_cap_seat() != "plafond":
 		_fail("Au-delà de la table de prix, l'ouverture d'un poste doit refuser 'plafond'.")
 
-	# 📈 Promotion : refus 'introuvable' / 'deja-senior' / 'pieces', effet réel
+	# 📈 Promotion : refus 'introuvable' / 'deja-senior' / 'impact', effet réel
 	# sur la séniorité et le salaire.
 	SprintState.reset_run("agile-transformation", "karavel-scaleup")
 	var junior_id := ""
@@ -550,10 +573,10 @@ func _test_committee_lot4() -> void:
 			break
 	if junior_id == "":
 		_fail("Le roster de départ de Karavel doit compter au moins un junior à promouvoir.")
-	SprintState.pieces = 0
-	if SprintState.promote_employee(junior_id) != "pieces":
-		_fail("Sans budget, promote_employee() doit refuser 'pieces'.")
-	SprintState.pieces = 100
+	SprintState.impact_wallet = 0
+	if SprintState.promote_employee(junior_id) != "impact":
+		_fail("Sans budget, promote_employee() doit refuser 'impact'.")
+	SprintState.impact_wallet = 2000
 	if SprintState.promote_employee(junior_id) != "":
 		_fail("Avec budget, promote_employee() doit accepter un junior existant.")
 	var promoted := SprintState.find_employee(junior_id)
@@ -568,10 +591,10 @@ func _test_committee_lot4() -> void:
 	# 🚀 Palier de produit : échelle de prix, plafond, +1 feature proposée
 	# par sprint et par palier (_draw_backlog_offer).
 	SprintState.reset_run("agile-transformation", "karavel-scaleup")
-	SprintState.pieces = 0
-	if SprintState.buy_product_tier() != "pieces":
-		_fail("Sans budget, le palier de produit doit refuser 'pieces'.")
-	SprintState.pieces = 1000
+	SprintState.impact_wallet = 0
+	if SprintState.buy_product_tier() != "impact":
+		_fail("Sans budget, le palier de produit doit refuser 'impact'.")
+	SprintState.impact_wallet = 5000
 	var tier_costs: Array = SprintState.find_investment_item("product-tier").get("costs", [])
 	for i in tier_costs.size():
 		if SprintState.buy_product_tier() != "":
@@ -583,10 +606,10 @@ func _test_committee_lot4() -> void:
 
 	# 🏝️ Séminaire d'équipe : Cynisme -15 posé en attente de Résolution.
 	SprintState.reset_run("agile-transformation", "karavel-scaleup")
-	SprintState.pieces = 0
-	if SprintState.buy_team_seminar() != "pieces":
-		_fail("Sans budget, le séminaire d'équipe doit refuser 'pieces'.")
-	SprintState.pieces = 100
+	SprintState.impact_wallet = 0
+	if SprintState.buy_team_seminar() != "impact":
+		_fail("Sans budget, le séminaire d'équipe doit refuser 'impact'.")
+	SprintState.impact_wallet = 2000
 	if SprintState.buy_team_seminar() != "":
 		_fail("Avec budget, le séminaire d'équipe doit être accepté.")
 	if int(SprintState.pending_deltas.get("cynisme", 0.0)) != -15:
@@ -595,7 +618,7 @@ func _test_committee_lot4() -> void:
 	# 🧹 Sprint de remise à plat : Dette -20 en attente, 0 Traction à la
 	# Résolution qui suit — même si le roster livre réellement quelque chose.
 	SprintState.reset_run("agile-transformation", "karavel-scaleup")
-	SprintState.pieces = 100
+	SprintState.impact_wallet = 2000
 	if SprintState.buy_cleanup_sprint() != "":
 		_fail("Avec budget, le sprint de remise à plat doit être accepté.")
 	if int(SprintState.pending_deltas.get("dette-organisationnelle", 0.0)) != -20:
@@ -615,19 +638,20 @@ func _test_committee_lot4() -> void:
 	if SprintState.cleanup_sprint_pending:
 		_fail("cleanup_sprint_pending doit être consommé après la Résolution qui suit l'achat.")
 
-	# 🤝 Rachat d'un concurrent : +12 MRR immédiat, +1 employé immédiat,
-	# +8 Dette en attente de Résolution.
+	# 🤝 Rachat d'un concurrent : des abonnements repris (base récurrente,
+	# immédiate), +1 employé immédiat, +8 Dette en attente de Résolution.
 	SprintState.reset_run("agile-transformation", "karavel-scaleup")
 	var roster_before := SprintState.get_roster().size()
-	var mrr_before := SprintState.mrr
-	SprintState.pieces = 0
-	if SprintState.buy_competitor_acquisition() != "pieces":
-		_fail("Sans budget, le rachat d'un concurrent doit refuser 'pieces'.")
-	SprintState.pieces = 100
+	var recurring_before := SprintState.recurring_revenue
+	SprintState.impact_wallet = 0
+	if SprintState.buy_competitor_acquisition() != "impact":
+		_fail("Sans budget, le rachat d'un concurrent doit refuser 'impact'.")
+	SprintState.impact_wallet = 2000
 	if SprintState.buy_competitor_acquisition() != "":
 		_fail("Avec budget, le rachat d'un concurrent doit être accepté.")
-	if not is_equal_approx(SprintState.mrr, mrr_before + 12.0):
-		_fail("Le rachat d'un concurrent doit ajouter 12 MRR immédiatement (stock, pas un flux).")
+	var acquired := float(SprintState.find_investment_item("acquire-competitor").get("recurringRevenueDelta", 10))
+	if not is_equal_approx(SprintState.recurring_revenue, recurring_before + acquired):
+		_fail("Le rachat d'un concurrent doit ajouter %d d'abonnements récurrents immédiatement." % int(acquired))
 	if SprintState.get_roster().size() != roster_before + 1:
 		_fail("Le rachat d'un concurrent doit ajouter un employé au roster immédiatement.")
 	if int(SprintState.pending_deltas.get("dette-organisationnelle", 0.0)) != 8:
@@ -636,10 +660,10 @@ func _test_committee_lot4() -> void:
 	# 🎯 Chasseur de têtes : le prochain étal force au moins 4 candidats,
 	# traits cachés révélés — puis se consomme.
 	SprintState.reset_run("agile-transformation", "karavel-scaleup")
-	SprintState.pieces = 0
-	if SprintState.buy_headhunter() != "pieces":
-		_fail("Sans budget, le chasseur de têtes doit refuser 'pieces'.")
-	SprintState.pieces = 100
+	SprintState.impact_wallet = 0
+	if SprintState.buy_headhunter() != "impact":
+		_fail("Sans budget, le chasseur de têtes doit refuser 'impact'.")
+	SprintState.impact_wallet = 2000
 	if SprintState.buy_headhunter() != "":
 		_fail("Avec budget, le chasseur de têtes doit être accepté.")
 	var offer := SprintState.get_shop_offer()
@@ -655,14 +679,14 @@ func _test_committee_lot4() -> void:
 	# 🏛️ Plan de redressement : rattrapage automatique d'un quota manqué,
 	# consommé une seule fois.
 	SprintState.reset_run("agile-transformation", "karavel-scaleup")
-	SprintState.pieces = 0
-	if SprintState.buy_turnaround_plan() != "pieces":
-		_fail("Sans budget, le plan de redressement doit refuser 'pieces'.")
-	SprintState.pieces = 100
+	SprintState.impact_wallet = 0
+	if SprintState.buy_turnaround_plan() != "impact":
+		_fail("Sans budget, le plan de redressement doit refuser 'impact'.")
+	SprintState.impact_wallet = 2000
 	if SprintState.buy_turnaround_plan() != "":
 		_fail("Avec budget, le plan de redressement doit être accepté.")
 	SprintState.quarter_sprint = SprintState.get_quarter_length() - 1
-	SprintState.quarter_impact = 0
+	SprintState.impact_wallet = 0
 	SprintState.last_score_report = {"global": {"impact": 0}}
 	SprintState._record_quarter_resolution()
 	if not bool(SprintState.quarter_result.get("passed", false)) or not bool(SprintState.quarter_result.get("turnaroundUsed", false)):
@@ -670,16 +694,22 @@ func _test_committee_lot4() -> void:
 	if SprintState.turnaround_plans_available != 0:
 		_fail("Le plan de redressement doit être consommé après avoir servi.")
 
-	# 🎲 Avance sur trimestre : +10 budget immédiat, débit direct sur le
-	# cumul trimestriel — jamais clampé à zéro ici (lot dédié à venir).
+	# 🎲 Avance sur trimestre : le seul poste qui vend de l'Impact contre du
+	# Revenue. Les deux sens comptent — le cash monte ET le portefeuille
+	# descend, y compris sous zéro (une bourse vide n'est pas une défaite).
 	SprintState.reset_run("agile-transformation", "karavel-scaleup")
-	SprintState.pieces = 0
-	SprintState.quarter_impact = 10
+	var advance: Dictionary = SprintState.find_investment_item("quarter-advance")
+	var advance_gain := int(advance.get("revenueGain", 26))
+	var advance_penalty := int(advance.get("impactPenalty", 95))
+	SprintState.impact_wallet = 10
+	var revenue_before_advance := SprintState.revenue
 	SprintState.buy_quarter_advance()
-	if SprintState.pieces != 10:
-		_fail("L'avance sur trimestre doit donner +10 de budget immédiatement.")
-	if SprintState.quarter_impact != -70:
-		_fail("L'avance sur trimestre doit débiter 80 sur le cumul trimestriel, y compris sous zéro (10 - 80 = -70).")
+	if not is_equal_approx(SprintState.revenue, revenue_before_advance + float(advance_gain)):
+		_fail("L'avance sur trimestre doit verser +%d de Revenue immédiatement." % advance_gain)
+	if SprintState.impact_wallet != 10 - advance_penalty:
+		_fail("L'avance sur trimestre doit débiter %d sur le portefeuille, y compris sous zéro (obtenu %d)." % [
+			advance_penalty, SprintState.impact_wallet
+		])
 
 
 ## Lot 4 (spec §9.4) : les équipes subies sont fixées par l'entreprise,
@@ -803,7 +833,7 @@ func _test_career_progression_lot5() -> void:
 	# choix ensuite (spec §13.4 : "un mandat complet en 4 trimestres").
 	SprintState.quarter_index = 4
 	SprintState.long_mandate = false
-	SprintState.quarter_impact = SprintState.get_current_quota()
+	SprintState.impact_wallet = SprintState.get_current_quota()
 	SprintState.quarter_sprint = SprintState.get_quarter_length() - 1
 	SprintState._record_quarter_resolution()
 	if not SprintState.quarter_exit_choice_pending:
@@ -837,7 +867,7 @@ func _test_multi_squad_backlog_isolation_lot5() -> void:
 
 	var candidate: Dictionary = GameData.candidates[0].duplicate()
 	candidate["id"] = "test-lot5-squad-b-hire"
-	SprintState.pieces = 100
+	SprintState.impact_wallet = 2000
 	if SprintState.hire_candidate(candidate, squad_b_id) != "":
 		_fail("L'embauche ciblée sur une équipe précise a été refusée.")
 	if SprintState.squads[1].get("roster", []).size() != 1 or SprintState.get_primary_squad().get("roster", []).size() != primary_count_before:
@@ -1062,23 +1092,23 @@ func _test_investment_draw_rules() -> void:
 
 	# Le prix du re-tirage part de sa base et monte à chaque usage du sprint.
 	if SprintState.shop_reroll_cost() != base_cost:
-		_fail("Premier re-tirage à %d 🪙 au lieu de %d." % [SprintState.shop_reroll_cost(), base_cost])
-	SprintState.pieces = 20
-	var pieces_before := SprintState.pieces
+		_fail("Premier re-tirage à %d 💥 au lieu de %d." % [SprintState.shop_reroll_cost(), base_cost])
+	SprintState.impact_wallet = 200
+	var wallet_before := SprintState.impact_wallet
 	if SprintState.reroll_shop_offer() != "":
-		_fail("Re-tirage refusé alors que les pièces suffisent.")
-	if SprintState.pieces != pieces_before - base_cost:
-		_fail("Le re-tirage a coûté %d 🪙 au lieu de %d." % [pieces_before - SprintState.pieces, base_cost])
+		_fail("Re-tirage refusé alors que l'Impact suffit.")
+	if SprintState.impact_wallet != wallet_before - base_cost:
+		_fail("Le re-tirage a coûté %d 💥 au lieu de %d." % [wallet_before - SprintState.impact_wallet, base_cost])
 	if SprintState.shop_reroll_cost() != base_cost + increment:
-		_fail("Deuxième re-tirage à %d 🪙 au lieu de %d." % [SprintState.shop_reroll_cost(), base_cost + increment])
+		_fail("Deuxième re-tirage à %d 💥 au lieu de %d." % [SprintState.shop_reroll_cost(), base_cost + increment])
 	SprintState.reroll_shop_offer()
 	if SprintState.shop_reroll_cost() != base_cost + 2 * increment:
-		_fail("Troisième re-tirage à %d 🪙 au lieu de %d." % [SprintState.shop_reroll_cost(), base_cost + 2 * increment])
+		_fail("Troisième re-tirage à %d 💥 au lieu de %d." % [SprintState.shop_reroll_cost(), base_cost + 2 * increment])
 
 	# À sec, on ne re-tire pas.
-	SprintState.pieces = 0
-	if SprintState.reroll_shop_offer() != "pieces":
-		_fail("Re-tirage accepté sans pièces.")
+	SprintState.impact_wallet = 0
+	if SprintState.reroll_shop_offer() != "impact":
+		_fail("Re-tirage accepté sans Impact.")
 
 	# Le prix repart à sa base au sprint suivant.
 	SprintState.sprint_number += 1
@@ -1090,22 +1120,22 @@ func _test_investment_draw_rules() -> void:
 	var price := SprintState.decision_cost(priced_id)
 	if price <= 0:
 		_fail("La décision « %s » ne coûte rien — elle est hors du modèle du shop." % priced_id)
-	SprintState.pieces = max(0, price - 1)
-	if SprintState.activate_decision(priced_id) != "pieces":
-		_fail("« %s » s'est activée avec %d 🪙 pour un prix de %d." % [priced_id, SprintState.pieces, price])
+	SprintState.impact_wallet = max(0, price - 1)
+	if SprintState.activate_decision(priced_id) != "impact":
+		_fail("« %s » s'est activée avec %d 💥 pour un prix de %d." % [priced_id, SprintState.impact_wallet, price])
 	if SprintState.activated_cards.has(priced_id):
-		_fail("« %s » a été marquée activée malgré le refus pour pièces insuffisantes." % priced_id)
+		_fail("« %s » a été marquée activée malgré le refus pour Impact insuffisant." % priced_id)
 
 	# Une décision activée sort du tirage : elle ne doit plus jamais reparaître.
-	SprintState.pieces = 20
+	SprintState.impact_wallet = 500
 	var activated_id: String = SprintState.get_shop_offer().get("decisions", [""])[0]
-	var pieces_at_activation := SprintState.pieces
+	var wallet_at_activation := SprintState.impact_wallet
 	var activation_cost := SprintState.decision_cost(activated_id)
 	if SprintState.activate_decision(activated_id) != "":
 		_fail("Activation refusée pour « %s » alors qu'un slot est libre." % activated_id)
-	if SprintState.pieces != pieces_at_activation - activation_cost:
-		_fail("L'activation de « %s » a coûté %d 🪙 au lieu de %d." % [
-			activated_id, pieces_at_activation - SprintState.pieces, activation_cost])
+	if SprintState.impact_wallet != wallet_at_activation - activation_cost:
+		_fail("L'activation de « %s » a coûté %d 💥 au lieu de %d." % [
+			activated_id, wallet_at_activation - SprintState.impact_wallet, activation_cost])
 	for sprint in range(30):
 		SprintState.sprint_number += 1
 		if SprintState.get_shop_offer().get("decisions", []).has(activated_id):
@@ -1117,7 +1147,7 @@ func _test_investment_draw_rules() -> void:
 	_test_reservation()
 	_test_gated_card_lease()
 
-	print("Tirage des Investissements : OK (%d emplacements par sprint, re-tirage %d 🪙 +%d)" % [
+	print("Tirage des Investissements : OK (%d emplacements par sprint, re-tirage %d 💥 +%d)" % [
 		int(draw_conf.get("slotsPerSprint", 6)), base_cost, increment])
 
 
@@ -1198,19 +1228,19 @@ func _test_rarity_weights() -> void:
 
 
 ## 📌 Réserver : l'Actif punaisé traverse un re-tirage et le sprint suivant,
-## puis la punaise tombe. Décoller rembourse la pièce.
+## puis la punaise tombe. Décoller rembourse l'Impact.
 func _test_reservation() -> void:
 	SprintState.reset_run("agile-transformation", "meridia-corp")
-	SprintState.pieces = 20
+	SprintState.impact_wallet = 200
 	var cost := SprintState.reserve_cost()
 	var offer := SprintState.get_shop_offer()
 	var pinned_id: String = offer.get("decisions", [""])[0]
 
-	var pieces_before := SprintState.pieces
+	var wallet_before := SprintState.impact_wallet
 	if SprintState.toggle_reservation("decision", pinned_id, SprintState.find_card(pinned_id)) != "":
-		_fail("Réservation refusée alors que les pièces suffisent.")
-	if SprintState.pieces != pieces_before - cost:
-		_fail("La réservation a coûté %d 🪙 au lieu de %d." % [pieces_before - SprintState.pieces, cost])
+		_fail("Réservation refusée alors que l'Impact suffit.")
+	if SprintState.impact_wallet != wallet_before - cost:
+		_fail("La réservation a coûté %d 💥 au lieu de %d." % [wallet_before - SprintState.impact_wallet, cost])
 	if not SprintState.is_reserved("decision", pinned_id):
 		_fail("« %s » n'est pas marquée réservée après la punaise." % pinned_id)
 
@@ -1232,11 +1262,11 @@ func _test_reservation() -> void:
 
 	# Décoller la punaise rembourse.
 	var other_id: String = SprintState.get_shop_offer().get("decisions", [""])[0]
-	pieces_before = SprintState.pieces
+	wallet_before = SprintState.impact_wallet
 	SprintState.toggle_reservation("decision", other_id, SprintState.find_card(other_id))
 	SprintState.toggle_reservation("decision", other_id, SprintState.find_card(other_id))
-	if SprintState.pieces != pieces_before:
-		_fail("Décoller la punaise n'a pas remboursé la pièce (%d → %d)." % [pieces_before, SprintState.pieces])
+	if SprintState.impact_wallet != wallet_before:
+		_fail("Décoller la punaise n'a pas remboursé l'Impact (%d → %d)." % [wallet_before, SprintState.impact_wallet])
 	if SprintState.is_reserved("decision", other_id):
 		_fail("« %s » est restée réservée après avoir décollé la punaise." % other_id)
 
@@ -1283,10 +1313,10 @@ func _test_gated_card_lease() -> void:
 			_fail("« shape-up » a quitté le rayon au sprint %d, avant la fin de son bail." % SprintState.sprint_number)
 			break
 
-	# Le prérequis rempli — et les pièces en poche, une décision s'achète — elle
+	# Le prérequis rempli — et l'Impact en poche, une décision s'achète — elle
 	# s'active.
 	SprintState.sprint_number = drawn_at + 1
-	SprintState.pieces = 20
+	SprintState.impact_wallet = 500
 	SprintState.get_primary_squad().get("roster", []).append({"id": "t1", "name": "Test", "role": "dev", "seniority": "senior", "salary": 2, "trait": "", "hidden_trait": "", "hiddenRevealed": true, "hiredSprint": 1})
 	SprintState.get_primary_squad().get("roster", []).append({"id": "t2", "name": "Test2", "role": "dev", "seniority": "senior", "salary": 2, "trait": "", "hidden_trait": "", "hiddenRevealed": true, "hiredSprint": 1})
 	if not SprintState.card_requirement_state(gated).get("ok", false):
@@ -1349,14 +1379,18 @@ func _test_energy_rules() -> void:
 	if SprintState.energy != energy_expected:
 		_fail("Le taf soi-même a laissé l'Énergie à %d au lieu de %d." % [SprintState.energy, energy_expected])
 
-	# 🏛️ Rallonge : pièces immédiates, Capital politique au panier du sprint.
+	# 🏛️ Rallonge : du Revenue immédiat (jamais d'Impact — ça remplit la caisse,
+	# ça ne produit rien), Capital politique au panier du sprint.
 	var ext_conf: Dictionary = conf.get("actions", {}).get("extension", {})
-	var pieces_before := SprintState.pieces
+	var revenue_before := SprintState.revenue
+	var wallet_before_extension := SprintState.impact_wallet
 	energy_expected = SprintState.energy - int(ext_conf.get("cost", 10))
 	if SprintState.do_negotiate_extension() != "":
 		_fail("do_negotiate_extension() refusé alors que l'Énergie le permet.")
-	if SprintState.pieces != pieces_before + int(ext_conf.get("pieces", 4)):
-		_fail("La rallonge n'a pas versé %d pièces immédiates." % int(ext_conf.get("pieces", 4)))
+	if not is_equal_approx(SprintState.revenue, revenue_before + float(ext_conf.get("revenue", 14))):
+		_fail("La rallonge n'a pas versé %d de Revenue immédiat." % int(ext_conf.get("revenue", 14)))
+	if SprintState.impact_wallet != wallet_before_extension:
+		_fail("La rallonge ne doit jamais produire d'Impact : elle remplit la caisse, elle ne produit rien.")
 	if int(SprintState.pending_deltas.get("capital-politique", 0.0)) != int(ext_conf.get("capitalPolitique", -8)):
 		_fail("La rallonge n'a pas mis %d de Capital politique au panier." % int(ext_conf.get("capitalPolitique", -8)))
 	if SprintState.energy != energy_expected:
@@ -1414,8 +1448,8 @@ func _test_energy_rules() -> void:
 
 func _play_one_mandate(run_index: int, strategy: String, company_id: String) -> void:
 	SprintState.reset_run("agile-transformation", company_id)
-	print("\n--- Run %d (%s) — %s — 🪙 %d, 👥 %d/%d, capacité %d — Départ : %s ---" % [
-		run_index, strategy, company_id, SprintState.pieces,
+	print("\n--- Run %d (%s) — %s — 💥 %d, 👥 %d/%d, capacité %d — Départ : %s ---" % [
+		run_index, strategy, company_id, SprintState.impact_wallet,
 		SprintState.get_roster().size(), SprintState.get_team_cap(),
 		SprintState.get_effective_capacity(), SprintState.resource_values
 	])
@@ -1430,9 +1464,9 @@ func _play_one_mandate(run_index: int, strategy: String, company_id: String) -> 
 	if not SprintState.is_mandate_over:
 		_fail("Run %d (%s, %s) n'a jamais atteint de fin après 30 sprints — probable bug de seuils." % [run_index, strategy, company_id])
 
-	print("Run %d (%s, %s) terminé — sprint %d, fin='%s', 🪙 %d, ⚡ %d, 👥 %d, revue de board='%s', ressources finales=%s" % [
+	print("Run %d (%s, %s) terminé — sprint %d, fin='%s', 💥 %d, ⚡ %d, 👥 %d, revue de board='%s', ressources finales=%s" % [
 		run_index, strategy, company_id, SprintState.sprint_number, SprintState.ending_id,
-		SprintState.pieces, SprintState.energy, SprintState.get_roster().size(), SprintState.board_review_state,
+		SprintState.impact_wallet, SprintState.energy, SprintState.get_roster().size(), SprintState.board_review_state,
 		SprintState.resource_values
 	])
 
@@ -1440,8 +1474,8 @@ func _play_one_mandate(run_index: int, strategy: String, company_id: String) -> 
 		var value: float = SprintState.resource_values[resource_id]
 		if value < -0.001 or value > 100.001:
 			_fail("Ressource %s hors bornes : %f" % [resource_id, value])
-	if SprintState.pieces < 0:
-		_fail("Pièces négatives : %d" % SprintState.pieces)
+	if SprintState.impact_wallet < 0:
+		_fail("Pièces négatives : %d" % SprintState.impact_wallet)
 	if SprintState.energy < 0 or SprintState.energy > SprintState.get_energy_max():
 		_fail("Énergie hors bornes : %d" % SprintState.energy)
 	if SprintState.get_roster().size() > SprintState.get_team_cap():
@@ -1502,7 +1536,7 @@ func _play_sprint(strategy: String) -> void:
 
 	# 🎲 Re-tirage : "greedy" retente sa chance au sprint 3 s'il a les moyens —
 	# le chemin payant du re-tirage reste couvert, prix croissant compris.
-	if strategy == "greedy" and SprintState.sprint_number == 3 and SprintState.pieces >= SprintState.shop_reroll_cost() + 3:
+	if strategy == "greedy" and SprintState.sprint_number == 3 and SprintState.impact_wallet >= SprintState.shop_reroll_cost() + 3:
 		SprintState.reroll_shop_offer()
 		offer = SprintState.get_shop_offer()
 
@@ -1527,9 +1561,9 @@ func _play_sprint(strategy: String) -> void:
 	# 📌 "greedy" punaise ce qu'il ne peut pas encore payer : au sprint 5, s'il
 	# reste un candidat trop cher sur l'étal, il le réserve pour le sprint
 	# suivant plutôt que de le perdre au tirage.
-	if strategy == "greedy" and SprintState.sprint_number == 5 and SprintState.pieces >= SprintState.reserve_cost():
+	if strategy == "greedy" and SprintState.sprint_number == 5 and SprintState.impact_wallet >= SprintState.reserve_cost():
 		for candidate in offer.get("candidates", []):
-			if int(candidate.get("costPieces", 0)) > SprintState.pieces:
+			if int(candidate.get("costPieces", 0)) > SprintState.impact_wallet:
 				SprintState.toggle_reservation("candidate", candidate.get("id", ""), candidate)
 				break
 
@@ -1558,7 +1592,7 @@ func _play_sprint(strategy: String) -> void:
 				if not (candidate.get("hiddenRevealed", false) and polarity == "negative"):
 					SprintState.hire_candidate(candidate)
 		# Rallonge si le budget d'action est à sec et que le crédit au board le permet.
-		if SprintState.pieces < 2 and SprintState.resource_values.get("capital-politique", 0.0) > 40.0 and SprintState.personal_action_refusal() == "":
+		if SprintState.impact_wallet < 2 and SprintState.resource_values.get("capital-politique", 0.0) > 40.0 and SprintState.personal_action_refusal() == "":
 			SprintState.do_negotiate_extension()
 
 	# Phase 4 — Résolution.

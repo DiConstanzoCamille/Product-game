@@ -103,7 +103,15 @@ static func for_decision(card: Dictionary) -> Dictionary:
 			"tooltip": "Punaisée au rayon jusqu'au sprint %d — vous avez jusque-là pour réunir la condition." % expiry if expiry > 0 else "",
 		})
 
-	var cost := SprintState.decision_cost(card_id)
+	var cost := SprintState.resolved_price("decision", card_id)
+	var charge := SprintState.recurring_charge("decision", card_id)
+	if charge > 0:
+		impacts.append({
+			"label": "💰 Licence, chaque sprint (par personne)",
+			"delta": "−%d/sprint" % charge,
+			"good": false,
+			"tooltip": "Prélevée sur le Revenue à chaque Résolution tant que l'outil occupe son slot — et elle grossit avec l'équipe.",
+		})
 	var tool_frozen: bool = SprintState.is_quarter_requirement_active("toolsFrozen") \
 		and card.get("family", "") in ["outil-process", "methodologie-orga"]
 
@@ -127,17 +135,19 @@ static func for_decision(card: Dictionary) -> Dictionary:
 		}
 	elif used >= max_activations:
 		primary = {"text": "Plus de slot ce mandat", "disabled": true}
-	elif SprintState.pieces < cost:
+	elif SprintState.impact_wallet < cost:
 		primary = {
-			"text": "Activer (%d 🪙 — insuffisant)" % cost,
+			"text": "Activer (%d 💥 — insuffisant)" % cost,
 			"disabled": true,
-			"tooltip": "Il vous manque %d 🪙 de budget d'investissement. Une grande décision se paie comme une embauche." % (cost - SprintState.pieces),
+			"tooltip": "Il vous manque %d 💥 d'Impact. Une grande décision se paie comme une embauche." % (cost - SprintState.impact_wallet),
 		}
 	else:
 		primary = {
-			"text": "Activer (%d 🪙 + 1 slot)" % cost,
+			"text": "Activer (%d 💥 + 1 slot)" % cost,
 			"disabled": false,
-			"tooltip": "Deux coûts distincts : %d 🪙 de budget d'investissement tout de suite et 1 des %d slots du mandat.\nIrréversible. Les effets tombent à la Résolution." % [cost, max_activations],
+			"tooltip": "Trois coûts distincts : %d 💥 d'Impact tout de suite, %s, et 1 des %d slots du mandat.\nIrréversible. Les effets tombent à la Résolution." % [
+				cost, SprintState.recurring_charge_text("decision", card_id), max_activations
+			],
 		}
 
 	return _with_shared({
@@ -153,12 +163,14 @@ static func for_decision(card: Dictionary) -> Dictionary:
 		"subtitle": card.get("category", ""),
 		"tagline": card.get("tagline", ""),
 		"impacts": impacts,
-		"cost": "%d 🪙 · 1 slot de grande décision · %d/%d activées" % [cost, used, max_activations],
+		"cost": "%d 💥 · %s · 1 slot · %d/%d activées" % [
+			cost, SprintState.recurring_charge_text("decision", card_id), used, max_activations
+		],
 		"primary": primary,
 		"dimmed": activated,
 		"stamp": "ACTIVÉE" if activated else "",
 		# Le tampon SVG signale le seul blocage structurel : une condition à
-		# atteindre. Le manque de pièces, lui, reste une information de coût.
+		# atteindre. Le manque d'Impact, lui, reste une information de coût.
 		"status_stamp": "blocked" if requirement.get("gated", false) and not requirement.get("ok", false) else "",
 	}, "decision", card_id, card, activated)
 
@@ -168,18 +180,19 @@ static func for_candidate(candidate: Dictionary) -> Dictionary:
 	var role_id: String = candidate.get("role", "")
 	var role_conf: Dictionary = GameData.balance.get("roles", {}).get(role_id, {})
 	var seniority: String = candidate.get("seniority", "junior")
-	var salary := int(candidate.get("salary", GameData.balance.get("salaries", {}).get(seniority, 1)))
-	var cost: int = max(0, int(candidate.get("costPieces", 0)) - SprintState.next_hire_discount)
+	var candidate_id: String = candidate.get("id", "")
+	var salary := SprintState.recurring_charge("candidate", candidate_id, candidate)
+	var cost := SprintState.resolved_price("candidate", candidate_id, candidate)
 	var hired: bool = candidate.get("hired", false)
 	var cap := SprintState.get_team_cap()
 	var headcount := SprintState.get_roster().size()
 
 	var impacts: Array = _role_impact_lines(role_id, seniority)
 	impacts.append({
-		"label": "💰 Masse salariale, chaque sprint",
+		"label": "💰 Salaire, chaque sprint",
 		"delta": "−%d/sprint" % salary,
 		"good": false,
-		"tooltip": "Prélevée sur la Trésorerie à chaque Résolution, tant que la personne est là.",
+		"tooltip": "Prélevé sur le Revenue à chaque Résolution, tant que la personne est là. Deux questions, pas une : ai-je les moyens de l'embaucher, ai-je les moyens de la garder.",
 	})
 	impacts.append(_hidden_trait_line(candidate))
 
@@ -194,18 +207,22 @@ static func for_candidate(candidate: Dictionary) -> Dictionary:
 		}
 	elif headcount >= cap:
 		primary = {"text": "Cap d'effectif atteint (%d/%d)" % [headcount, cap], "disabled": true}
-	elif SprintState.pieces < cost:
-		primary = {"text": "Embaucher (%d 🪙 — insuffisant)" % cost, "disabled": true}
+	elif SprintState.impact_wallet < cost:
+		primary = {"text": "Embaucher (%d 💥 — insuffisant)" % cost, "disabled": true}
 	else:
-		primary = {"text": "Embaucher (%d 🪙)" % cost, "disabled": false}
+		primary = {
+			"text": "Embaucher (%d 💥)" % cost,
+			"disabled": false,
+			"tooltip": "%d 💥 maintenant, puis %d 💰 de salaire à chaque sprint jusqu'à la fin du mandat." % [cost, salary],
+		}
 
 	var secondary: Dictionary = {}
 	if not hired and not candidate.get("hiddenRevealed", false):
 		secondary = _one_on_one_action()
 
-	var cost_text := "%d 🪙 · effectif %d/%d → %d/%d" % [cost, headcount, cap, headcount + 1, cap]
+	var cost_text := "%d 💥 · %d 💰/sprint · effectif %d/%d → %d/%d" % [cost, salary, headcount, cap, headcount + 1, cap]
 	if SprintState.next_hire_discount > 0:
-		cost_text += " · réseau −%d 🪙" % SprintState.next_hire_discount
+		cost_text += " · réseau −%d 💥" % SprintState.next_hire_discount
 
 	return _with_shared({
 		"kind": "candidate",
@@ -233,7 +250,8 @@ static func for_candidate(candidate: Dictionary) -> Dictionary:
 static func for_practice(practice: Dictionary) -> Dictionary:
 	var practice_id: String = practice.get("id", "")
 	var owned: bool = SprintState.has_practice(practice_id)
-	var cost := int(practice.get("costPieces", 0))
+	var cost := SprintState.resolved_price("practice", practice_id)
+	var charge := SprintState.recurring_charge("practice", practice_id)
 	var flavor_and_effect := _practice_flavor_and_effect(practice)
 
 	var impacts: Array = [{
@@ -248,6 +266,13 @@ static func for_practice(practice: Dictionary) -> Dictionary:
 			"delta": "%s/sprint" % signed(int(value)),
 			"good": EffectResolver.delta_is_good(resource_id, value),
 		})
+	if charge > 0:
+		impacts.append({
+			"label": "💰 Licence, chaque sprint (par personne)",
+			"delta": "−%d/sprint" % charge,
+			"good": false,
+			"tooltip": "Une pratique s'entretient : prélevée sur le Revenue à chaque Résolution, et sa facture grossit avec l'équipe.",
+		})
 	var cynisme := int(GameData.balance.get("shopDraw", {}).get("practiceCynisme", 2))
 	impacts.append({
 		"label": "🎭 Cynisme — un process de plus",
@@ -259,10 +284,14 @@ static func for_practice(practice: Dictionary) -> Dictionary:
 	var primary: Dictionary = {}
 	if owned:
 		primary = {"text": "Adoptée ✓", "disabled": true}
-	elif SprintState.pieces < cost:
-		primary = {"text": "Adopter (%d 🪙 — insuffisant)" % cost, "disabled": true}
+	elif SprintState.impact_wallet < cost:
+		primary = {"text": "Adopter (%d 💥 — insuffisant)" % cost, "disabled": true}
 	else:
-		primary = {"text": "Adopter (%d 🪙)" % cost, "disabled": false}
+		primary = {
+			"text": "Adopter (%d 💥)" % cost,
+			"disabled": false,
+			"tooltip": "%d 💥 maintenant, puis %s." % [cost, SprintState.recurring_charge_text("practice", practice_id)],
+		}
 
 	return _with_shared({
 		"kind": "practice",
@@ -277,7 +306,7 @@ static func for_practice(practice: Dictionary) -> Dictionary:
 		"subtitle": "permanente pour le mandat",
 		"tagline": flavor_and_effect[0],
 		"impacts": impacts,
-		"cost": "%d 🪙" % cost,
+		"cost": "%d 💥 · %s" % [cost, SprintState.recurring_charge_text("practice", practice_id)],
 		"primary": primary,
 		"dimmed": owned,
 		"stamp": "ADOPTÉE" if owned else "",
@@ -315,10 +344,10 @@ static func _with_shared(descriptor: Dictionary, kind: String, asset_id: String,
 	descriptor["pin"] = {
 		"active": reserved,
 		"text": "📌" if reserved else "📍",
-		"tooltip": ("Réservé — cet Actif sera encore là au prochain sprint, et un re-tirage ne l'emporte pas. Cliquez pour décoller la punaise et récupérer la pièce."
+		"tooltip": ("Réservé — cet Actif sera encore là au prochain sprint, et un re-tirage ne l'emporte pas. Cliquez pour décoller la punaise et récupérer l'Impact."
 			if reserved else
-			"📌 Réserver pour %d 🪙 — il sera encore là au prochain sprint (et un 🎲 re-tirage ne l'emportera pas)." % SprintState.reserve_cost()),
-		"disabled": not reserved and SprintState.pieces < SprintState.reserve_cost(),
+			"📌 Réserver pour %d 💥 — il sera encore là au prochain sprint (et un 🎲 re-tirage ne l'emportera pas)." % SprintState.reserve_cost()),
+		"disabled": not reserved and SprintState.impact_wallet < SprintState.reserve_cost(),
 	}
 	return descriptor
 

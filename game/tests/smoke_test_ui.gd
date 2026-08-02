@@ -150,7 +150,7 @@ func _test_roadmap_interactions() -> void:
 func _test_investments_interactions() -> void:
 	print("  → gestes de l'écran Investissements")
 	SprintState.reset_run("agile-transformation", "meridia-corp")
-	SprintState.pieces = 30
+	SprintState.impact_wallet = 300
 
 	var viewport := SubViewport.new()
 	viewport.size = Vector2i(1600, 900)
@@ -323,7 +323,7 @@ func _test_quarter_result_uses_global_sprint() -> void:
 	SprintState.sprint_number = 7
 	SprintState.quarter_index = 3
 	SprintState.quarter_sprint = 1
-	SprintState.quarter_impact = 45
+	SprintState.impact_wallet = 45
 	SprintState.quarter_exit_choice_pending = true
 	var current_viewport := SubViewport.new()
 	current_viewport.size = Vector2i(1600, 900)
@@ -450,7 +450,7 @@ func _test_committee_screen_interactions() -> void:
 	SprintState.reset_run("agile-transformation", "karavel-scaleup")
 	SprintState.chosen_strategy_ids.clear()
 	SprintState.quarter_strategy_chosen = false
-	SprintState.pieces = 200
+	SprintState.impact_wallet = 2000
 
 	var viewport := SubViewport.new()
 	viewport.size = Vector2i(1600, 900)

@@ -4,7 +4,7 @@
 
   "careerLevels": {
     "pm": {
-      "quarterQuotas": [120, 390, 950, 2000]
+      "quarterQuotas": [150, 760, 2200, 4600]
     },
     "lead-pm": {
       "quarterQuotas": [300, 1000, 2400, 5000]

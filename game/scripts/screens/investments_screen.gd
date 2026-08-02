@@ -7,8 +7,8 @@ extends Control
 ## La proposition prévoyait deux rayons empilés ; l'arbitrage a été poussé d'un
 ## cran. Deux rayons séparés garantissaient à chaque type sa place, donc
 ## supprimaient la question « qu'est-ce que le sprint m'a proposé ? ». Un rayon
-## unique met vraiment les investissements en concurrence : la pièce gardée pour
-## Lina est la même que celle qui paierait Discovery, et le slot dépensé sur
+## unique met vraiment les investissements en concurrence : l'Impact gardé pour
+## Lina est le même que celui qui paierait Discovery, et le slot dépensé sur
 ## Jira est celui qu'on n'aura pas pour Shape Up. Certains sprints proposent
 ## trois décisions et un seul candidat, d'autres l'inverse — avec un minimum
 ## garanti par type (SprintState, `guaranteedPerSprint`) pour qu'aucun sprint
@@ -167,7 +167,7 @@ func _refresh_shelf_head() -> void:
 	else:
 		parts.append("🃏 %d/%d grandes décisions activées" % [used, maximum])
 	if SprintState.next_hire_discount > 0:
-		parts.append("réseau : −%d 🪙 de budget sur la prochaine embauche" % SprintState.next_hire_discount)
+		parts.append("réseau : −%d 💥 sur la prochaine embauche" % SprintState.next_hire_discount)
 
 	shelf_head.add_child(UIHelpers.make_shelf_head("📦 L'étal du sprint", " · ".join(parts)))
 
@@ -194,17 +194,17 @@ func _rebuild_shelf() -> void:
 func _refresh_reroll_button() -> void:
 	var reroll_conf: Dictionary = GameData.balance.get("shopDraw", {}).get("reroll", {})
 	var cost := SprintState.shop_reroll_cost()
-	reroll_button.text = "🎲 Re-tirer l'offre — %d 🪙" % cost
-	reroll_button.disabled = SprintState.pieces < cost
-	reroll_button.tooltip_text = "Re-tire tout le rayon, sauf ce qui est punaisé 📌.\nLe prix monte à chaque re-tirage du sprint (le prochain coûtera %d 🪙) et repart à %d au sprint suivant.\nBudget d'investissement disponible : %d 🪙." % [
-		cost + int(reroll_conf.get("costIncrement", 1)),
-		int(reroll_conf.get("baseCost", 1)),
-		SprintState.pieces,
+	reroll_button.text = "🎲 Re-tirer l'offre — %d 💥" % cost
+	reroll_button.disabled = SprintState.impact_wallet < cost
+	reroll_button.tooltip_text = "Re-tire tout le rayon, sauf ce qui est punaisé 📌.\nLe prix monte à chaque re-tirage du sprint (le prochain coûtera %d 💥) et repart à %d au sprint suivant.\nImpact disponible : %d 💥." % [
+		cost + int(reroll_conf.get("costIncrement", 8)),
+		int(reroll_conf.get("baseCost", 8)),
+		SprintState.impact_wallet,
 	]
 
 
 # ── Rafraîchissements ─────────────────────────────────────────────────────
-## Un achat change l'état de *tout* le rayon : les pièces baissent pour les
+## Un achat change l'état de *tout* le rayon : le portefeuille baisse pour les
 ## trois types, l'effectif monte, Entretiens structurés révèle les candidats
 ## déjà sur l'étal, un licenciement change le profil d'effet des décisions.
 func _refresh_shelf() -> void:

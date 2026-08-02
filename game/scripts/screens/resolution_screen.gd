@@ -839,14 +839,14 @@ func _finish_quota_replay() -> void:
 func _quota_verdict_text(result: Dictionary) -> String:
 	var bonus := int(result.get("qualitativeBonus", 0))
 	if bool(result.get("passed", false)):
-		return "Quota atteint.%s" % (" Objectifs qualitatifs tenus : +%d Budget." % bonus if bonus > 0 else " Les objectifs qualitatifs restent un bonus de +8 Budget.")
+		return "Quota atteint.%s" % (" Objectifs qualitatifs tenus : +%d 💥." % bonus if bonus > 0 else " Les objectifs qualitatifs restent un bonus d'Impact, jamais une condition.")
 	return "Quota non atteint : la mission s'arrête ici."
 
 
-## Bloc "Revenus" mis en avant, séparé des coûts — répond au besoin de rendre
-## le ROI visible : un compteur défile de 0 jusqu'au revenu réel du sprint,
-## à côté de la masse salariale, du coût net des décisions, du solde
-## trésorerie et du flux de pièces du sprint.
+## Bloc "Revenue" mis en avant, séparé des coûts — les deux monnaies au même
+## endroit et jamais mélangées : un compteur défile de 0 jusqu'aux abonnements
+## encaissés, à côté des charges du sprint (salaires + licences), du coût net
+## des décisions, et du flux du portefeuille d'Impact.
 func _animate_revenue_callout() -> void:
 	var model: Dictionary = SprintState.get_business_model()
 	if model.is_empty():
@@ -854,25 +854,28 @@ func _animate_revenue_callout() -> void:
 		return
 
 	revenue_label.visible = true
-	var revenue: int = SprintState.last_revenue
+	var subscriptions: int = SprintState.last_revenue
 	var payroll: int = SprintState.last_payroll
-	var cost: int = SprintState.last_tresorerie_cost
-	var pieces_delta: int = SprintState.last_pieces_delta
-	var net: int = revenue - payroll + cost
-	var model_label: String = model.get("label", "Revenu")
+	var licenses: int = SprintState.last_licenses
+	var cost: int = SprintState.last_revenue_cost
+	var wallet_delta: int = SprintState.last_wallet_delta
+	var net: int = subscriptions - payroll - licenses + cost
+	var model_label: String = model.get("label", "Abonnements")
 
 	revenue_label.add_theme_color_override("font_color", UIHelpers.COLOR_GOOD if net >= 0 else UIHelpers.COLOR_DANGER)
-	economics_detail.text = "%s +%d  ·  Masse salariale −%d  ·  Décisions %s%d  ·  Budget %s%d (solde %d)" % [
-		model_label, revenue, payroll,
-		"+" if cost >= 0 else "−", abs(cost),
-		"+" if pieces_delta >= 0 else "−", abs(pieces_delta), SprintState.pieces,
+	economics_detail.text = "%s +%d  ·  Salaires −%d  ·  Licences −%d  ·  Décisions %s%d  ·  💰 solde %d          💥 Impact %s%d (portefeuille %d)" % [
+		model_label, subscriptions, payroll, licenses,
+		"+" if cost >= 0 else "−", abs(cost), int(round(SprintState.revenue)),
+		"+" if wallet_delta >= 0 else "−", abs(wallet_delta), SprintState.impact_wallet,
 	]
+	economics_detail.tooltip_text = "L'Impact s'achète des choses ; le Revenue les garde allumées. Les charges du sprint prochain : %d 💰." % int(SprintState.get_recurring_charges().get("total", 0))
 
+	var fixed_costs := payroll + licenses
 	var tween := create_tween()
 	tween.tween_method(
 		func(v: float):
-			revenue_label.text = "NET TRÉSORERIE  %s%d" % ["+" if int(round(v)) - payroll + cost >= 0 else "−", abs(int(round(v)) - payroll + cost)],
-		0.0, float(revenue), 0.7
+			revenue_label.text = "NET REVENUE  %s%d" % ["+" if int(round(v)) - fixed_costs + cost >= 0 else "−", abs(int(round(v)) - fixed_costs + cost)],
+		0.0, float(subscriptions), 0.7
 	).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 
 
@@ -969,7 +972,7 @@ func _setup_breather_button() -> void:
 
 
 ## Le verdict trimestriel ferme le replay. Il ne mélange jamais le quota et les
-## objectifs qualitatifs : ces derniers ne peuvent donner qu'un bonus Budget.
+## objectifs qualitatifs : ces derniers ne peuvent donner qu'un bonus d'Impact.
 func _show_quarter_verdict_overlay() -> void:
 	if int(_quota_data.get("sprint", -1)) != SprintState.sprint_number:
 		return
@@ -1020,7 +1023,7 @@ func _show_quarter_verdict_overlay() -> void:
 	var verdict := Label.new()
 	if passed:
 		var bonus := int(result.get("qualitativeBonus", 0))
-		verdict.text = "Le quota porte le trimestre. %s" % ("Les objectifs qualitatifs ajoutent +%d Budget." % bonus if bonus > 0 else "Les objectifs qualitatifs sont un bonus, jamais une condition de passage.")
+		verdict.text = "Le quota porte le trimestre. %s" % ("Les objectifs qualitatifs ajoutent +%d 💥." % bonus if bonus > 0 else "Les objectifs qualitatifs sont un bonus, jamais une condition de passage.")
 		verdict.add_theme_color_override("font_color", UIHelpers.COLOR_GOOD)
 	else:
 		verdict.text = "Le quota n'est pas atteint. Le mandat se termine."

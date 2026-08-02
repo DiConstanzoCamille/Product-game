@@ -1,7 +1,8 @@
 class_name EffectResolver
 extends RefCounted
 ## Fonctions pures de résolution d'effets — convertit les données brutes de
-## data/*.json + data/balance.json en deltas sur les 6 ressources, selon le
+## data/*.json + data/balance.json en deltas sur les 5 jauges et les deux
+## monnaies (💥 Impact, 💰 Revenue), selon le
 ## modèle d'effet unifié (carnet de règles §11) : carte → époque → arrondi.
 ## Rien ici ne modifie l'état ; l'appelant décide quand appliquer le
 ## résultat via SprintState.add_pending().
@@ -73,8 +74,11 @@ static func card_impact_lines(card_id: String, team_profile: String, era_id: Str
 			notes[resource_id] = collected
 
 	var lines: Array = []
-	for resource in GameData.resources:
-		var resource_id: String = resource.get("id", "")
+	# L'ordre d'affichage suit resources.json, **puis** le 💰 Revenue : il n'y
+	# est plus (ce n'est pas une jauge) mais l'axe « coût financier » d'une
+	# carte le frappe toujours, et une ligne d'impact qui disparaît de la carte
+	# est un piège pour le joueur.
+	for resource_id in _display_order():
 		if not totals.has(resource_id):
 			continue
 		var value: float = float(totals[resource_id])
@@ -83,15 +87,27 @@ static func card_impact_lines(card_id: String, team_profile: String, era_id: Str
 		var rounded := int(round(value))
 		if rounded == 0:
 			continue
+		var label := resource_label(resource_id).split(" ", false, 1)
 		lines.append({
 			"resource_id": resource_id,
-			"icon": resource.get("icon", ""),
-			"name": resource.get("name", ""),
+			"icon": label[0] if label.size() > 0 else "",
+			"name": label[1] if label.size() > 1 else resource_id,
 			"note": " · ".join(notes.get(resource_id, [])),
 			"value": rounded,
 			"good": delta_is_good(resource_id, float(rounded)),
 		})
 	return lines
+
+
+## Les identifiants affichables dans l'ordre : les jauges de resources.json,
+## puis les deux monnaies, qui n'y vivent pas.
+static func _display_order() -> Array:
+	var ids: Array = []
+	for resource in GameData.resources:
+		ids.append(resource.get("id", ""))
+	ids.append("revenue")
+	ids.append("impact")
+	return ids
 
 
 ## Un delta va-t-il dans le bon sens pour cette ressource ? La dette et le
@@ -176,9 +192,9 @@ static func gauge_state(resource_id: String, value: float) -> String:
 
 
 ## Formate un dictionnaire de deltas en texte façon journal de sprint, ex.
-## "💰 Trésorerie −4 · 🫶 Moral +6". Ignore les deltas nuls, ordre stable
-## (celui de resources.json), pseudo-ressources "pieces" (🪙) puis
-## "energie" (⚡, jauge personnelle du joueur) en dernier.
+## "💰 Revenue −4 · 🫶 Moral +6". Ignore les deltas nuls, ordre stable (celui de
+## resources.json), puis les deux monnaies — 💥 Impact et 💰 Revenue — et enfin
+## la pseudo-ressource "energie" (⚡, jauge personnelle du joueur).
 static func format_deltas(deltas: Dictionary) -> String:
 	var parts: Array = []
 	for resource in GameData.resources:
@@ -190,9 +206,12 @@ static func format_deltas(deltas: Dictionary) -> String:
 			continue
 		var sign := "+" if value > 0 else "−"
 		parts.append("%s %s %s%d" % [resource.get("icon", ""), resource.get("name", ""), sign, abs(value)])
-	var pieces_value := int(round(deltas.get("pieces", 0.0)))
-	if pieces_value != 0:
-		parts.append("🪙 Pièces %s%d" % ["+" if pieces_value > 0 else "−", abs(pieces_value)])
+	var impact_value := int(round(deltas.get("impact", 0.0)))
+	if impact_value != 0:
+		parts.append("💥 Impact %s%d" % ["+" if impact_value > 0 else "−", abs(impact_value)])
+	var revenue_value := int(round(deltas.get("revenue", 0.0)))
+	if revenue_value != 0:
+		parts.append("💰 Revenue %s%d" % ["+" if revenue_value > 0 else "−", abs(revenue_value)])
 	var energie_value := int(round(deltas.get("energie", 0.0)))
 	if energie_value != 0:
 		parts.append("⚡ Énergie %s%d" % ["+" if energie_value > 0 else "−", abs(energie_value)])
@@ -201,10 +220,20 @@ static func format_deltas(deltas: Dictionary) -> String:
 	return " · ".join(parts)
 
 
+## Libellé d'affichage d'une jauge **ou** d'une des deux monnaies : celles-ci
+## ne vivent pas dans resources.json (elles n'ont pas de jauge) mais s'affichent
+## au même endroit dans les lignes d'impact d'une carte.
 static func resource_label(resource_id: String) -> String:
 	for resource in GameData.resources:
 		if resource.get("id", "") == resource_id:
 			return "%s %s" % [resource.get("icon", ""), resource.get("name", "")]
+	match resource_id:
+		"revenue":
+			return "💰 Revenue"
+		"impact":
+			return "💥 Impact"
+		"energie":
+			return "⚡ Énergie"
 	return resource_id
 
 

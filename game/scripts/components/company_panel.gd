@@ -64,20 +64,23 @@ func _populate() -> void:
 
 	_add_section_title("Modèle économique — %s" % model.get("label", "—"))
 	_add_text(model.get("description", ""), 12, UIHelpers.COLOR_SOFT_TEXT)
-	if SprintState.last_revenue > 0 or SprintState.last_payroll > 0:
-		_add_row("Dernier sprint résolu", "revenu +%d 💰 · masse salariale −%d 💰" % [
-			SprintState.last_revenue, SprintState.last_payroll
+	if SprintState.last_revenue > 0 or SprintState.last_payroll > 0 or SprintState.last_licenses > 0:
+		_add_row("Dernier sprint résolu", "abonnements +%d 💰 · salaires −%d 💰 · licences −%d 💰" % [
+			SprintState.last_revenue, SprintState.last_payroll, SprintState.last_licenses
 		])
+	_add_row("Solde", "💰 %d · charges du prochain sprint −%d" % [
+		int(round(SprintState.revenue)), int(SprintState.get_recurring_charges().get("total", 0))
+	])
 
 	var objectives: Dictionary = company.get("boardObjectives", {})
 	if not objectives.is_empty():
-		_add_section_title("Objectifs qualitatifs — bonus +8 Budget")
+		_add_section_title("Objectifs qualitatifs — bonus +%d 💥" % int(GameData.quotas.get("qualitativeBonusImpact", 0)))
 		_add_text(objectives.get("title", ""), 13, UIHelpers.COLOR_AMBER)
 		for condition in objectives.get("conditions", []):
 			_add_text("• %s" % condition.get("label", ""), 12, UIHelpers.COLOR_INK)
 		var latest_bonus := int(SprintState.quarter_result.get("qualitativeBonus", 0))
 		if not SprintState.quarter_result.is_empty() and latest_bonus > 0:
-			_add_text("✅ Dernier trimestre : objectifs tenus, +%d Budget." % latest_bonus, 12, UIHelpers.COLOR_GOOD)
+			_add_text("✅ Dernier trimestre : objectifs tenus, +%d 💥 d'Impact." % latest_bonus, 12, UIHelpers.COLOR_GOOD)
 		elif not SprintState.quarter_result.is_empty():
 			_add_text("○ Dernier trimestre : bonus non obtenu. Le quota reste la seule condition de passage.", 12, UIHelpers.COLOR_SOFT_TEXT)
 		else:
@@ -121,8 +124,8 @@ func _build_extension_row() -> Control:
 	row.add_theme_constant_override("separation", 10)
 
 	var label := Label.new()
-	label.text = "🏛️ Négocier une rallonge — 🎯 %d contre +%d 🪙 de budget immédiat." % [
-		int(conf.get("capitalPolitique", -8)), int(conf.get("pieces", 4))
+	label.text = "🏛️ Négocier une rallonge — 🎯 %d contre +%d 💰 de Revenue immédiat (jamais d'Impact : ça remplit la caisse, ça ne produit rien)." % [
+		int(conf.get("capitalPolitique", -8)), int(conf.get("revenue", 14))
 	]
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD
 	label.add_theme_font_size_override("font_size", 12)

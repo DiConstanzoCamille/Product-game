@@ -47,7 +47,11 @@ func _ready() -> void:
 ## dépensées, slot pris, décision consommée, junior promu) : on reconstruit
 ## tout le contenu à chaque geste, comme le rayon des Investissements.
 func _refresh() -> void:
-	budget_label.text = "🪙 Budget d'investissement disponible : %d" % SprintState.pieces
+	var charges: Dictionary = SprintState.get_recurring_charges()
+	budget_label.text = "💥 Impact disponible : %d          💰 Revenue : %d  (−%d/sprint de charges)" % [
+		SprintState.impact_wallet, int(round(SprintState.revenue)), int(charges.get("total", 0))
+	]
+	budget_label.tooltip_text = "Tout s'achète en 💥 Impact. Ce qui reste allumé après l'achat se paie en 💰 Revenue, à chaque sprint, jusqu'à la fin du mandat."
 	UIHelpers.clear_children(content)
 
 	_build_strategy_section()
@@ -79,14 +83,13 @@ func _build_strategy_section() -> void:
 	var cost := SprintState.strategy_purchase_cost()
 	for strategy in SprintState.get_strategy_options(3):
 		var strategy_id: String = strategy.get("id", "")
-		var disabled := SprintState.pieces < cost
 		content.add_child(_action_row(
 			strategy.get("icon", "🧭"),
 			strategy.get("name", strategy_id),
 			strategy.get("description", strategy.get("tagline", "")),
-			"%d 🪙" % cost,
+			_price_text(cost, "strategy", strategy_id),
 			"Adopter",
-			disabled,
+			SprintState.impact_wallet < cost,
 			_on_strategy_pressed.bind(strategy_id)
 		))
 
@@ -111,8 +114,8 @@ func _build_tool_slot_section() -> void:
 			open_item.get("description", ""), "—", "Plafond atteint", true, Callable()))
 	else:
 		content.add_child(_action_row(open_item.get("icon", "🔧"), "Ouvrir un slot d'outillage",
-			open_item.get("description", ""), "%d 🪙" % open_cost, "Ouvrir",
-			SprintState.pieces < open_cost, _on_open_slot_pressed))
+			open_item.get("description", ""), _price_text(open_cost, "committee", "tool-slot"), "Ouvrir",
+			SprintState.impact_wallet < open_cost, _on_open_slot_pressed))
 
 	var release_item: Dictionary = SprintState.find_investment_item("release-tool-slot")
 	if SprintState.activated_cards.is_empty():
@@ -161,8 +164,8 @@ func _build_team_cap_section() -> void:
 			item.get("description", ""), "—", "Plafond atteint", true, Callable()))
 	else:
 		content.add_child(_action_row(item.get("icon", "🪑"), "Ouvrir un poste",
-			item.get("description", ""), "%d 🪙" % cost, "Ouvrir",
-			SprintState.pieces < cost, _on_team_cap_pressed))
+			item.get("description", ""), _price_text(cost, "committee", "open-seat"), "Ouvrir",
+			SprintState.impact_wallet < cost, _on_team_cap_pressed))
 
 
 func _on_team_cap_pressed() -> void:
@@ -191,10 +194,13 @@ func _build_promotion_section() -> void:
 		content.add_child(_action_row(
 			item.get("icon", "📈"),
 			"Promouvoir %s" % employee.get("name", employee.get("id", "")),
-			item.get("description", ""),
-			"%d 🪙" % cost,
+			"%s Un salaire senior au lieu d'un salaire junior : +%d 💰/sprint." % [
+				item.get("description", ""),
+				int(GameData.balance.get("salaries", {}).get("senior", 2)) - int(employee.get("salary", 1)),
+			],
+			_price_text(cost, "committee", "promotion"),
 			"Promouvoir",
-			SprintState.pieces < cost,
+			SprintState.impact_wallet < cost,
 			_on_promotion_pressed.bind(employee.get("id", ""))
 		))
 
@@ -219,8 +225,8 @@ func _build_product_tier_section() -> void:
 			item.get("description", ""), "—", "Plafond atteint", true, Callable()))
 	else:
 		content.add_child(_action_row(item.get("icon", "🚀"), "Franchir un palier",
-			item.get("description", ""), "%d 🪙" % cost, "Investir",
-			SprintState.pieces < cost, _on_product_tier_pressed))
+			item.get("description", ""), _price_text(cost, "committee", "product-tier"), "Investir",
+			SprintState.impact_wallet < cost, _on_product_tier_pressed))
 
 
 func _on_product_tier_pressed() -> void:
@@ -237,10 +243,10 @@ func _build_flat_effect_section(item_id: String, action_label: String, callback:
 	var item: Dictionary = SprintState.find_investment_item(item_id)
 	content.add_child(_section_title("%s %s" % [item.get("icon", "•"), item.get("name", action_label)]))
 	content.add_child(_flavor_text(item.get("tagline", "")))
-	var cost := int(item.get("cost", 0))
+	var cost := SprintState.resolved_price("committee", item_id)
 	content.add_child(_action_row(item.get("icon", "•"), action_label,
-		item.get("description", ""), "%d 🪙" % cost, "Acheter",
-		SprintState.pieces < cost, _on_flat_effect_pressed.bind(callback)))
+		item.get("description", ""), _price_text(cost, "committee", item_id), "Acheter",
+		SprintState.impact_wallet < cost, _on_flat_effect_pressed.bind(callback)))
 
 
 func _on_flat_effect_pressed(callback: Callable) -> void:
@@ -250,8 +256,9 @@ func _on_flat_effect_pressed(callback: Callable) -> void:
 
 
 # ── 🎲 Avance sur trimestre ────────────────────────────────────────────────
-## Pas un achat classique : ça ne coûte jamais de pièces (ça en donne), donc
-## jamais désactivé par manque de budget — seul un pari sur l'Impact.
+## Le seul poste qui va dans l'autre sens : il vend de l'Impact contre du
+## Revenue. Jamais désactivé — c'est un pari, pas un achat, et il peut creuser
+## le portefeuille sous zéro.
 func _build_quarter_advance_section() -> void:
 	var item: Dictionary = SprintState.find_investment_item("quarter-advance")
 	content.add_child(_section_title("%s Avance sur trimestre" % item.get("icon", "🎲")))
@@ -259,7 +266,7 @@ func _build_quarter_advance_section() -> void:
 	content.add_child(_action_row(
 		item.get("icon", "🎲"), "Prendre l'avance",
 		item.get("description", ""),
-		"+%d 🪙" % int(item.get("budgetGain", 10)),
+		"+%d 💰" % int(item.get("revenueGain", 26)),
 		"Parier",
 		false,
 		_on_quarter_advance_pressed
@@ -272,6 +279,16 @@ func _on_quarter_advance_pressed() -> void:
 
 
 # ── Construction des lignes ───────────────────────────────────────────────
+## Les deux dimensions d'un poste, côte à côte : le prix payé maintenant et la
+## charge engagée pour toujours. Le prix vient toujours de resolved_price() —
+## l'écran ne lit jamais un coût brut dans investments.json.
+func _price_text(cost: int, kind: String, item_id: String) -> String:
+	var charge := SprintState.recurring_charge(kind, item_id)
+	if charge <= 0:
+		return "%d 💥" % cost
+	return "%d 💥\n+%d 💰/sprint" % [cost, charge]
+
+
 func _section_title(text: String) -> Control:
 	var label := Label.new()
 	label.text = text
@@ -318,7 +335,7 @@ func _action_row(icon: String, name_text: String, description: String, cost_text
 
 	var cost_label := Label.new()
 	cost_label.text = cost_text
-	cost_label.custom_minimum_size = Vector2(70, 0)
+	cost_label.custom_minimum_size = Vector2(110, 0)
 	cost_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	row.add_child(cost_label)
 
