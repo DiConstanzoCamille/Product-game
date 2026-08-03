@@ -142,10 +142,19 @@ l'écran Roadmap consomme encore les 4 features de démo. C'est le lot 0 (§17).
 
 ```
 Traction d'une feature = costPoints × tractionPerPoint (4)
-                       + clientImpact × tractionPerClientImpact (3)
 ```
 
-| Feature | Points | Impact client | Traction |
+> ⚠️ **Le terme `clientImpact × 3` a été supprimé par l'issue #42** (carnet
+> §32.4). L'effet client d'une feature est devenu une grandeur **économique**,
+> convertie en clients réels par le modèle du run : le garder dans la Traction
+> rendait mécaniquement corrélées « ce qui score » et « ce qui paie », donc
+> impossibles les features qui paient sans scorer et celles qui scorent sans
+> payer. Le score continue de lire cette colonne, mais comme **condition**
+> (le board qui veut du visible, Enterprise first) et non comme terme. Le
+> tableau ci-dessous garde les chiffres d'avant #42, à titre d'illustration
+> historique — la colonne Traction ne vaut plus que `points × 4`.
+
+| Feature | Points | Impact client | Traction (avant #42) |
 |---|---|---|---|
 | 📤 Export Excel (quick win) | 1 | +2 | **10** |
 | 🔐 SSO grands comptes | 3 | +3 | **21** |

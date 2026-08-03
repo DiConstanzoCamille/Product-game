@@ -121,8 +121,16 @@ static func delta_is_good(resource_id: String, value: float) -> bool:
 
 
 ## Deltas de la Roadmap profonde : les attributs réels viennent directement
-## de `backlog.json`. Seuls les items livrés (feature ou epic achevé) gagnent
-## leur ROI, impact client et risque; un epic entamé ne fait encore rien.
+## de `backlog.json`. Seuls les items livrés (feature ou epic achevé) portent
+## leur effet client et leur risque ; un epic entamé ne fait encore rien.
+##
+## 📈 **C'est ici, et nulle part ailleurs, que naît la Réputation produit**
+## (docs/spec-clients-revenue.md §5.1.1) : elle vient de ce qu'on livre, jamais
+## de ce qu'on score. La règle qui la fabriquait à partir de l'Impact a été
+## supprimée — c'était le premier maillon de la fuite
+## `Impact → perception → Revenue`. Le 📣 Product marketing amplifie ce que les
+## livraisons font à cette réputation (`reputation_multiplier` du contexte de
+## roster) : même équipe subie, même niveau 0-5, autre entrée.
 static func resolve_backlog(delivered_items: Array, spent_points: int, capacity_points: int, roster_context: Dictionary = {}, has_okr: bool = false) -> Dictionary:
 	var roadmap_conf: Dictionary = GameData.balance.get("roadmap", {})
 	var backlog_conf: Dictionary = GameData.balance.get("backlogDraw", {})
@@ -131,30 +139,35 @@ static func resolve_backlog(delivered_items: Array, spent_points: int, capacity_
 	var pm_conf: Dictionary = roles.get("pm", {})
 	var designer_weight: float = roster_context.get("designer_weight", 0.0)
 	var pm_weight: float = roster_context.get("pm_weight", 0.0)
+	var reputation_multiplier: float = roster_context.get("reputation_multiplier", 1.0)
 
-	var valeur_divisor := 1.0
+	var reputation_divisor := 1.0
 	if designer_weight <= 0.0:
-		valeur_divisor = float(designer_conf.get("valeurEffectsDivisorIfAbsent", 2))
+		reputation_divisor = float(designer_conf.get("reputationEffectsDivisorIfAbsent", 2))
 
 	var deltas: Dictionary = {}
+	var reputation := 0.0
 	for item in delivered_items:
-		var client_impact := float(item.get("clientImpact", 0)) / valeur_divisor
+		var client_effect := float(item.get("clients", 0)) / reputation_divisor
 		var risk := float(item.get("risk", 0))
-		if client_impact != 0.0:
-			deltas["valeur-percue"] = deltas.get("valeur-percue", 0.0) + client_impact
+		if client_effect != 0.0:
+			reputation += client_effect
 		if risk != 0.0:
 			deltas["dette-organisationnelle"] = deltas.get("dette-organisationnelle", 0.0) + risk
 		for resource_id in item.get("completionEffects", {}).keys():
 			deltas[resource_id] = deltas.get(resource_id, 0.0) + float(item["completionEffects"][resource_id])
-		if has_okr and int(item.get("roi", 0)) >= int(backlog_conf.get("strongRoiThreshold", 0)):
+		if has_okr and int(item.get("clients", 0)) >= int(backlog_conf.get("strongClientsThreshold", 0)):
 			deltas["capital-politique"] = deltas.get("capital-politique", 0.0) + float(backlog_conf.get("okrCapitalPolitiqueBonus", 0))
 
 	if designer_weight > 0.0 and not delivered_items.is_empty():
 		var per_feature: float = min(
-			floor(designer_weight) * float(designer_conf.get("valeurPerFeatureDelivered", 1)),
-			float(designer_conf.get("valeurPerFeatureDeliveredMax", 2))
+			floor(designer_weight) * float(designer_conf.get("reputationPerFeatureDelivered", 1)),
+			float(designer_conf.get("reputationPerFeatureDeliveredMax", 2))
 		)
-		deltas["valeur-percue"] = deltas.get("valeur-percue", 0.0) + per_feature * delivered_items.size()
+		reputation += per_feature * delivered_items.size()
+
+	if reputation != 0.0:
+		deltas["reputation-produit"] = deltas.get("reputation-produit", 0.0) + reputation * reputation_multiplier
 
 	if spent_points > capacity_points:
 		var penalty: Dictionary = roadmap_conf.get("overCapacityPenalty", {})
@@ -212,6 +225,14 @@ static func format_deltas(deltas: Dictionary) -> String:
 	var revenue_value := int(round(deltas.get("revenue", 0.0)))
 	if revenue_value != 0:
 		parts.append("💰 Revenue %s%d" % ["+" if revenue_value > 0 else "−", abs(revenue_value)])
+	# 👥 Un effet client se raconte en clients réels, jamais en points : la
+	# conversion passe par SprintState, seul détenteur du modèle économique du
+	# run — « +72 » veut dire quelque chose, « +3 » ne veut rien dire.
+	var clients_points := float(deltas.get("clients", 0.0))
+	if not is_zero_approx(clients_points):
+		var real_clients := int(round(SprintState.clients_for_points(clients_points)))
+		if real_clients != 0:
+			parts.append("👥 Clients %s%d" % ["+" if real_clients > 0 else "−", abs(real_clients)])
 	var energie_value := int(round(deltas.get("energie", 0.0)))
 	if energie_value != 0:
 		parts.append("⚡ Énergie %s%d" % ["+" if energie_value > 0 else "−", abs(energie_value)])

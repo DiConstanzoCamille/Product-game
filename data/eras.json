@@ -1,7 +1,10 @@
 {
+  "_comment": "Les scénarios (contextes de run). Depuis #42, un scénario ne fait pas que teinter l'ambiance : il choisit le MODÈLE ÉCONOMIQUE par défaut et surtout son ÉCHELLE DE PRIX (docs/spec-clients-revenue.md §4.0.1). Le logiciel des années garage ne se vend pas au prix d'un SaaS de l'ère IA — c'est comme ça que l'époque se fait sentir dans la caisse plutôt que dans un texte d'ambiance. `priceScale` multiplie le prix de chaque segment, jamais le coût unitaire : une époque riche paie mieux, elle ne rend pas le support gratuit. Une entreprise peut imposer son propre `businessModel` (companies.json) — deux boîtes du même scénario ne vendent pas forcément pareil.",
   "eras": [
     {
       "id": "garage",
+      "businessModel": "waterfall-release",
+      "priceScale": 0.4,
       "icon": "🛠️",
       "period": "1976–1984",
       "name": "Les années garage",
@@ -16,6 +19,8 @@
     },
     {
       "id": "agile-transformation",
+      "businessModel": "grands-comptes",
+      "priceScale": 1.0,
       "icon": "📋",
       "period": "2006–2014",
       "name": "La grande transformation agile",
@@ -30,6 +35,8 @@
     },
     {
       "id": "ai-era",
+      "businessModel": "freemium-volume",
+      "priceScale": 1.75,
       "icon": "🤖",
       "period": "20XX",
       "name": "L'IA qui remplace tout le monde",

@@ -85,7 +85,7 @@ const GAUGE_ICONS := {
 	"moral": "heart-handshake",
 	"dette-organisationnelle": "brick-wall",
 	"capital-politique": "target",
-	"valeur-percue": "trending-up",
+	"reputation-produit": "trending-up",
 	"cynisme": "drama",
 }
 

@@ -343,6 +343,17 @@ func _revenue_row() -> Control:
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 0)
 	box.add_child(_currency_row("💰 Revenue", "%d" % int(round(SprintState.revenue)), _revenue_tooltip(), 2))
+	# 👥 Les clients n'AJOUTENT pas un compteur, ils EXPLIQUENT le solde
+	# (spec-clients-revenue.md §2.1) : une ligne de composition sous la seule
+	# valeur jugée, jamais une deuxième valeur à surveiller.
+	var composition := SprintState.describe_clients(true)
+	if composition != "aucun client":
+		var clients_label := _label(composition, 10, UIHelpers.PANEL_MUTED)
+		clients_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		clients_label.autowrap_mode = TextServer.AUTOWRAP_WORD
+		clients_label.tooltip_text = _revenue_tooltip()
+		clients_label.mouse_filter = Control.MOUSE_FILTER_STOP
+		box.add_child(clients_label)
 	# La charge vit sur sa propre ligne : à trois chiffres de part et d'autre,
 	# une seule ligne sortait du panneau en fin de mandat.
 	var charge := _label("charges −%d/sprint" % int(charges.get("total", 0)), 10, UIHelpers.PANEL_MUTED)
@@ -374,11 +385,16 @@ func _wallet_tooltip() -> String:
 
 func _revenue_tooltip() -> String:
 	var charges: Dictionary = SprintState.get_recurring_charges()
-	var lines: Array = ["💰 Revenue — la survie de l'entreprise. Jamais un prix.", "Encaisse les abonnements, paie chaque sprint :"]
+	var lines: Array = [
+		"💰 Revenue — la survie de l'entreprise. Jamais un prix.",
+		"Encaisse ce que vos clients paient : %s" % SprintState.describe_clients(),
+		"soit +%d par sprint. Paie chaque sprint :" % int(round(SprintState.get_client_revenue())),
+	]
 	if charges.get("lines", []).is_empty():
 		lines.append("· rien pour l'instant")
 	for line in charges.get("lines", []):
 		lines.append("· %s %s — %d" % [line.get("icon", ""), line.get("label", ""), int(line.get("amount", 0))])
+	lines.append("Produire de l'Impact ne remplit pas la caisse : ce sont deux économies.")
 	lines.append("À zéro, l'entreprise ne paie plus : faillite.")
 	return "\n".join(lines)
 

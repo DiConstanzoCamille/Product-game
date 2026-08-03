@@ -602,7 +602,7 @@ func _build_panel() -> Control:
 	vbox.add_child(_gauge("💰 Trésorerie", 42, P_WARN))
 	vbox.add_child(_gauge("🫶 Moral", 55, P_GOOD))
 	vbox.add_child(_gauge("🧱 Dette org.", 38, P_GOOD))
-	vbox.add_child(_gauge("📈 Valeur perçue", 47, P_WARN))
+	vbox.add_child(_gauge("📈 Réputation produit", 47, P_WARN))
 	vbox.add_child(_gauge("🎭 Cynisme", 44, P_WARN))
 
 	var pieces := HBoxContainer.new()

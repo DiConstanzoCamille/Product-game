@@ -154,7 +154,7 @@ func _on_choice_pressed(choice: Dictionary) -> void:
 	next_button.disabled = false
 
 	var note := "%s → %s" % [event.get("subject", ""), choice.get("label", "")]
-	SprintState.add_pending(choice.get("effects", {}), note)
+	SprintState.apply_inbox_choice(choice, note)
 	call_deferred("_scroll_to_latest")
 
 

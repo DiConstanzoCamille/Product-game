@@ -258,15 +258,28 @@ static func _resolve_squad(squad: Dictionary, snapshot: Dictionary, rules: Dicti
 	}
 
 
+## 📊 La Traction d'une livraison — **ce qu'on a produit, et rien d'autre**.
+##
+## Depuis #42, l'effet client d'une feature (`clients`) ne s'ajoute plus
+## linéairement à la Traction. La raison n'est pas cosmétique : `clients` est
+## devenu une grandeur ÉCONOMIQUE, convertie en clients réels par le modèle du
+## run. La garder dans la Traction rendait mécaniquement corrélées « ce qui
+## score » et « ce qui paie » — donc impossibles les deux familles de features
+## que l'issue demande (celles qui paient sans scorer, celles qui scorent sans
+## payer). Une valeur qui vaut 24 inscrits ici et 0,3 compte là n'a de toute
+## façon aucun sens à multiplier par 3 pour en faire de la Traction.
+##
+## Le score continue de LIRE cette colonne, mais comme une **condition**, pas
+## comme un terme : le board qui veut du visible (quotas.json) et Enterprise
+## first (scoring.json) décident tous deux à partir d'elle.
 static func _item_traction(item: Dictionary, feature_rule: Dictionary, epic_rule: Dictionary, strategy_ids: Array, strategy_rules: Dictionary, snapshot: Dictionary) -> float:
 	var result := 0.0
 	if bool(item.get("epic", false)):
 		result = float(item.get("costPoints", 0)) * float(epic_rule.get("pointsMultiplier", 0.0))
 	else:
-		if int(item.get("clientImpact", 0)) < int(snapshot.get("minimum_client_impact_for_traction", 0)):
+		if int(item.get("clients", 0)) < int(snapshot.get("minimum_clients_for_traction", 0)):
 			return 0.0
 		result = float(item.get("costPoints", 0)) * float(feature_rule.get("pointsMultiplier", 0.0))
-		result += float(item.get("clientImpact", 0)) * float(feature_rule.get("clientImpactMultiplier", 0.0))
 	for strategy_id in strategy_ids:
 		var strategy: Dictionary = strategy_rules.get(strategy_id, {})
 		if strategy.is_empty():
@@ -274,9 +287,20 @@ static func _item_traction(item: Dictionary, feature_rule: Dictionary, epic_rule
 		if bool(item.get("quickWin", false)) and strategy.has("quickWinTractionMultiplier"):
 			result *= float(strategy.get("quickWinTractionMultiplier", 1.0))
 		var condition: Dictionary = strategy.get("featureCondition", {})
-		if not condition.is_empty() and float(item.get("roi", 0)) >= float(condition.get("roiMinimum", INF)):
+		if not condition.is_empty() and float(item.get("clients", 0)) >= float(condition.get("clientsMinimum", INF)):
 			result *= float(strategy.get("featureTractionMultiplier", 1.0))
 	return result
+
+
+## Somme des effets clients des livraisons du sprint, toutes squads confondues.
+## C'est **la seule entrée du moteur économique qui vienne de la Roadmap** — et
+## elle part des items livrés, jamais de l'Impact calculé au-dessus.
+static func _delivered_client_points(squads: Array) -> float:
+	var total := 0.0
+	for squad in squads:
+		for item in _completed_deliveries(squad.get("delivered", squad.get("delivered_items", []))):
+			total += float(item.get("clients", 0))
+	return total
 
 
 static func _completed_deliveries(entries: Array) -> Array:
@@ -643,31 +667,111 @@ static func _apply_resource_friction(impact: float, lines: Array, rule: Dictiona
 	return after
 
 
+## 💰 L'économie de l'entreprise, une fois l'Impact connu — et **sans jamais
+## partir de lui** (docs/spec-impact-monnaie.md §3.8). Ce qui entre dans la
+## caisse vient d'une population de clients : ils arrivent parce qu'on a livré,
+## ils partent au churn, et ils paient chaque sprint. La seule chose que
+## l'Impact produise encore ici, c'est 🎯 du Capital politique : le board juge
+## le joueur, pas le produit (spec-clients-revenue.md §5.1.1).
 static func _resolve_conversion(snapshot: Dictionary, rules: Dictionary, resources: Dictionary, impact: int, strategy_ids: Array, strategy_rules: Dictionary, quick_win_impact: int) -> Dictionary:
 	var conversion_rules: Dictionary = rules.get("conversion", {})
-	var model_id: String = snapshot.get("business_model_id", "saas-mrr")
-	var model: Dictionary = conversion_rules.get(model_id, {})
+	var team_rules: Dictionary = conversion_rules.get("teams", {})
 	var support_teams: Dictionary = snapshot.get("support_teams", snapshot.get("supportTeams", {}))
 	var sales_level := int(support_teams.get("sales", 3))
 	var pmm_level := int(support_teams.get("pmm", support_teams.get("product_marketing", 3)))
 	var csm_level := int(support_teams.get("csm", 3))
+	var sales_multiplier := _team_multiplier(team_rules.get("sales", {}), sales_level)
+	var pmm_multiplier := _team_multiplier(team_rules.get("pmm", {}), pmm_level)
+	var csm_multiplier := _team_multiplier(team_rules.get("csm", {}), csm_level)
+
 	var churn_multiplier := 1.0
-	var mrr_multiplier := 1.0
-	var mrr_stock_multiplier := 1.0
+	var arrival_multiplier := 1.0
+	var conversions: Array = []
 	for strategy_id in strategy_ids:
 		var strategy: Dictionary = strategy_rules.get(strategy_id, {})
 		churn_multiplier *= float(strategy.get("churnMultiplier", 1.0))
-		mrr_multiplier *= float(strategy.get("mrrMultiplier", 1.0))
-		mrr_stock_multiplier *= float(strategy.get("mrrStockMultiplier", 1.0))
+		arrival_multiplier *= float(strategy.get("arrivalMultiplier", 1.0))
+		var conversion_rule: Dictionary = strategy.get("segmentConversion", {})
+		if not conversion_rule.is_empty():
+			conversions.append(conversion_rule)
 
-	var recurring_before := float(snapshot.get("recurring_revenue", 0.0))
-	var churn := float(model.get("baseChurn", 0.0)) * _team_multiplier(model.get("csmMultipliers", {}), csm_level) * churn_multiplier
-	var low_moral_debt: Dictionary = model.get("lowMoralDebt", {})
-	if not low_moral_debt.is_empty() and float(resources.get("moral", 100.0)) < float(low_moral_debt.get("moralBelow", -INF)) and float(resources.get("dette-organisationnelle", 0.0)) >= float(low_moral_debt.get("debtAtLeast", INF)):
-		churn = max(churn, float(low_moral_debt.get("maxChurn", churn)))
-	var impact_subscriptions := float(impact) * float(model.get("impactToMrr", 0.0)) * _team_multiplier(model.get("salesMultipliers", {}), sales_level) * mrr_multiplier
-	var recurring_roi := float(snapshot.get("recurring_roi", 0.0)) * float(model.get("recurringRoiMultiplier", 1.0))
-	var recurring_after := recurring_before * mrr_stock_multiplier * (1.0 - churn) + impact_subscriptions + recurring_roi
+	# 💔 Un produit qui se dégrade se voit dans la population, pas dans une
+	# jauge : le churn plancher remplace celui des segments, tous segments
+	# confondus. Enfin lisible — « 120 clients partent ce sprint ».
+	var crisis: Dictionary = conversion_rules.get("churnCrisis", {})
+	var crisis_active := (not crisis.is_empty()
+		and float(resources.get("moral", 100.0)) < float(crisis.get("moralBelow", -INF))
+		and float(resources.get("dette-organisationnelle", 0.0)) >= float(crisis.get("debtAtLeast", INF)))
+
+	var segments: Array = snapshot.get("segments", [])
+	var clients_before: Dictionary = snapshot.get("clients", {})
+	var client_points := _delivered_client_points(snapshot.get("squads", [])) + float(snapshot.get("pending_client_points", 0.0))
+	var price_multipliers: Dictionary = snapshot.get("segment_price_multipliers", {})
+	var price_scale := float(snapshot.get("price_scale", 1.0))
+
+	var lines: Array = []
+	var clients_after: Dictionary = {}
+	var segment_report: Array = []
+	var revenue_in := 0.0
+	var joined_total := 0.0
+	var left_total := 0.0
+
+	# Les conversions se calculent sur la population d'AVANT le sprint : deux
+	# segments ne doivent pas se voler des clients selon l'ordre de la boucle.
+	var converted_in: Dictionary = {}
+	var converted_out: Dictionary = {}
+	for rule in conversions:
+		var ratio := float(rule.get("ratio", 0.0))
+		if is_zero_approx(ratio):
+			continue
+		for segment in segments:
+			if str(segment.get("role", "")) != str(rule.get("from", "")):
+				continue
+			var moved: float = max(0.0, float(clients_before.get(segment.get("id", ""), 0.0)) * ratio)
+			if is_zero_approx(moved):
+				continue
+			converted_out[segment.get("id", "")] = float(converted_out.get(segment.get("id", ""), 0.0)) + moved
+			for target in segments:
+				if str(target.get("role", "")) == str(rule.get("to", "")):
+					converted_in[target.get("id", "")] = float(converted_in.get(target.get("id", ""), 0.0)) + moved
+					break
+
+	for segment in segments:
+		var segment_id: String = segment.get("id", "")
+		var before := float(clients_before.get(segment_id, 0.0))
+		var churn := float(segment.get("churn", 0.0)) * csm_multiplier * churn_multiplier
+		if crisis_active:
+			churn = max(churn, float(crisis.get("minChurn", churn)))
+		var left: float = before * min(1.0, churn)
+		# Une livraison ratée fait partir des clients : le même nombre, l'autre
+		# sens. Le Sales n'amplifie que ce qui arrive, jamais ce qui fuit.
+		# 🚪 Un segment fermé par une décision (§4.2) n'accepte plus d'arrivées :
+		# le vider une fois ne suffit pas, la livraison suivante le repeuplerait.
+		var per_point := float(segment.get("clientsPerPoint", 0.0)) * float(snapshot.get("segment_arrival_multipliers", {}).get(segment_id, 1.0))
+		var joined := client_points * per_point * (sales_multiplier if client_points >= 0.0 else 1.0) * arrival_multiplier
+		var after: float = max(0.0, before - left + joined - float(converted_out.get(segment_id, 0.0)) + float(converted_in.get(segment_id, 0.0)))
+		clients_after[segment_id] = after
+		joined_total += max(0.0, joined)
+		left_total += left + max(0.0, -joined)
+		var price := float(segment.get("price", 0.0)) * price_scale * float(price_multipliers.get(segment_id, 1.0))
+		revenue_in += after * price
+		segment_report.append({
+			"id": segment_id,
+			"label": segment.get("label", segment_id),
+			"singular": segment.get("singular", segment.get("label", segment_id)),
+			"icon": segment.get("icon", "👥"),
+			"before": before,
+			"after": after,
+			"joined": joined,
+			"left": left,
+			"converted": float(converted_in.get(segment_id, 0.0)) - float(converted_out.get(segment_id, 0.0)),
+			"price": price,
+			"revenue": after * price,
+		})
+		lines.append(_line(9, "global", segment.get("icon", "👥"), "%s — %d (%s%d)" % [
+			segment.get("label", segment_id), int(round(after)),
+			"+" if after >= before else "−", int(abs(round(after - before)))
+		], "clients", after - before, before, after))
 
 	# 💥 Le portefeuille encaisse l'Impact du sprint tel quel : plus de racine
 	# carrée, plus d'allocation plancher (spec-impact-monnaie.md §2). Ne rien
@@ -675,44 +779,60 @@ static func _resolve_conversion(snapshot: Dictionary, rules: Dictionary, resourc
 	# difficulté du jeu, et il est désormais mécanique.
 	var wallet_gain := impact + quick_win_impact
 	var wallet_before := int(snapshot.get("wallet", 0))
-	var perceived_rule: Dictionary = conversion_rules.get("perceivedValue", {})
-	var perceived_delta: float = min(int(floor(float(impact) / float(perceived_rule.get("impactPerPoint", INF)))) * _team_multiplier(model.get("pmmMultipliers", {}), pmm_level), float(perceived_rule.get("maxPerSprint", 0)))
 	var capital_rule: Dictionary = conversion_rules.get("politicalCapital", {})
 	var capital_delta := int(floor(float(impact) / float(capital_rule.get("impactPerPoint", INF))))
 
 	# 💼📣🎧 Équipes subies (spec §9.4) : le taux de chaque équipe, visible à
-	# l'étape ⑨ de la Résolution comme les autres lignes de conversion —
-	# calculé une seule fois ici, jamais recalculé côté UI.
-	var sales_multiplier := _team_multiplier(model.get("salesMultipliers", {}), sales_level)
-	var pmm_multiplier := _team_multiplier(model.get("pmmMultipliers", {}), pmm_level)
-	var csm_multiplier := _team_multiplier(model.get("csmMultipliers", {}), csm_level)
+	# l'étape ⑨ de la Résolution comme les autres lignes — calculé une seule
+	# fois ici, jamais recalculé côté UI. Elles gardent leur rôle et changent
+	# d'entrée : Sales sur les clients qui arrivent, CSM sur ceux qui partent,
+	# Product marketing sur ce que les livraisons font à la réputation.
 	var team_rates := {
 		"sales": {"level": sales_level, "multiplier": sales_multiplier},
 		"pmm": {"level": pmm_level, "multiplier": pmm_multiplier},
 		"csm": {"level": csm_level, "multiplier": csm_multiplier},
 	}
 
-	var lines: Array = [
-		_line(9, "global", "💼", "Sales — Impact → abonnements (niveau %d)" % sales_level, "conversion_rate", sales_multiplier, 0.0, sales_multiplier),
-		_line(9, "global", "📣", "Product marketing — Impact → Valeur perçue (niveau %d)" % pmm_level, "conversion_rate", pmm_multiplier, 0.0, pmm_multiplier),
-		_line(9, "global", "🎧", "CSM / Support — churn (niveau %d)" % csm_level, "conversion_rate", csm_multiplier, 0.0, csm_multiplier),
-		_line(9, "global", "💰", "Abonnements — ce que le Revenue encaisse ce sprint", "recurring_revenue", recurring_after - recurring_before, recurring_before, recurring_after),
-		_line(9, "global", "💥", "Portefeuille d'Impact", "wallet", wallet_gain, wallet_before, wallet_before + wallet_gain),
-	]
-	if not is_zero_approx(perceived_delta):
-		lines.append(_line(9, "global", perceived_rule.get("icon", "📈"), perceived_rule.get("label", "Valeur perçue"), "resource_delta", perceived_delta, 0, perceived_delta))
+	lines.append(_line(9, "global", team_rules.get("sales", {}).get("icon", "💼"), "Sales — clients gagnés (niveau %d)" % sales_level, "conversion_rate", sales_multiplier, 0.0, sales_multiplier))
+	lines.append(_line(9, "global", team_rules.get("csm", {}).get("icon", "🎧"), "CSM / Support — churn (niveau %d)" % csm_level, "conversion_rate", csm_multiplier, 0.0, csm_multiplier))
+	lines.append(_line(9, "global", team_rules.get("pmm", {}).get("icon", "📣"), "Product marketing — réputation produit (niveau %d)" % pmm_level, "conversion_rate", pmm_multiplier, 0.0, pmm_multiplier))
+	if crisis_active:
+		lines.append(_line(9, "global", crisis.get("icon", "💔"), crisis.get("label", "Le produit se dégrade"), "churn_floor", crisis.get("minChurn", 0.0), 0.0, crisis.get("minChurn", 0.0)))
+	lines.append(_line(9, "global", "💰", "Ce que les clients paient ce sprint", "revenue_in", revenue_in, 0.0, revenue_in))
+	lines.append(_line(9, "global", "💥", "Portefeuille d'Impact", "wallet", wallet_gain, wallet_before, wallet_before + wallet_gain))
 	if capital_delta != 0:
 		lines.append(_line(9, "global", capital_rule.get("icon", "🎯"), capital_rule.get("label", "Capital politique"), "resource_delta", capital_delta, 0, capital_delta))
+
 	return {
 		"lines": lines,
-		"recurring_revenue": { "before": recurring_before, "after": recurring_after, "gain": recurring_after - recurring_before, "impact_gain": impact_subscriptions, "recurring_roi_gain": recurring_roi, "churn": churn },
+		"clients": {
+			"before": clients_before.duplicate(),
+			"after": clients_after,
+			"segments": segment_report,
+			"joined": joined_total,
+			"left": left_total,
+			"points": client_points,
+			"total": _client_total(clients_after),
+		},
+		# Ce que la population COÛTE n'est pas calculé ici : c'est une charge, et
+		# les charges ont un seul point de calcul, SprintState.get_recurring_charges()
+		# — celui que les écrans affichent et que la Résolution prélève.
+		"revenue": { "in": revenue_in },
 		"wallet": { "before": wallet_before, "after": wallet_before + wallet_gain, "gain": wallet_gain, "quick_win_bonus": quick_win_impact },
-		"resource_deltas": { "valeur-percue": perceived_delta, "capital-politique": capital_delta },
+		"resource_deltas": { "capital-politique": capital_delta },
 		"teamRates": team_rates,
 	}
 
 
-static func _team_multiplier(table: Dictionary, level: int) -> float:
+static func _client_total(clients: Dictionary) -> float:
+	var total := 0.0
+	for value in clients.values():
+		total += float(value)
+	return total
+
+
+static func _team_multiplier(team: Dictionary, level: int) -> float:
+	var table: Dictionary = team.get("multipliers", team)
 	return float(table.get(str(level), table.get("0", 1.0)))
 
 

@@ -16,19 +16,21 @@ Trois documents, trois rôles — en cas de contradiction, cet ordre tranche :
 | [`docs/spec-scoring-sprint.md`](docs/spec-scoring-sprint.md) | **La cible de gameplay validée** (31/07/2026) : Traction × Levier = Impact. C'est la direction du produit. |
 | [`docs/spec-profondeur-gameplay.md`](docs/spec-profondeur-gameplay.md) | Les phases A→D. **Sa phase D est remplacée** par la spec de scoring. Sa phase C (roadmap profonde) reste valide et devient le prérequis du chantier scoring. |
 
-Deux specs **validées et non implémentées** descendent d'un cran là où une
-grandeur abstraite ne raconte rien :
+Deux specs descendaient d'un cran là où une grandeur abstraite ne raconte rien.
 [`spec-clients-revenue.md`](docs/spec-clients-revenue.md) (le Revenue cache des
-clients qui paient) et
+clients qui paient) est **implémentée** — issue #42, carnet §32.
 [`spec-equipe-individuelle.md`](docs/spec-equipe-individuelle.md) (le Moral
-cache des personnes avec un caractère). Elles se font **dans cet ordre** et
-jamais en même temps — les deux réécrivent des effets de contenu.
+cache des personnes avec un caractère) est **validée et non implémentée** :
+c'est le lot suivant, et il ne se fait pas en même temps qu'un autre lot qui
+réécrit des effets de contenu.
 
 Un principe en sort, à ne jamais remélanger : **trois entités perçoivent
 quelque chose**, et chacune a sa grandeur. Les *utilisateurs* jugent le produit
 (📈 Réputation produit) ; le *board* juge le joueur (🎯 Capital politique) ;
 l'*équipe* juge le joueur (🤝 Confiance). C'est un mot employé pour deux choses
-qui avait laissé s'installer la fuite `Impact → Valeur perçue → Revenue`.
+qui avait laissé s'installer la fuite `Impact → Valeur perçue → Revenue` ; la
+grandeur produit s'appelle désormais `reputation-produit` dans les données, et
+plus aucune règle ne l'alimente depuis l'Impact.
 
 `docs/data-schema.md` décrit le schéma de chaque JSON de `data/`.
 
@@ -70,8 +72,8 @@ l'autre**. Le détail est dans
 
 | | 💥 L'Impact | 💰 Le Revenue |
 |---|---|---|
-| D'où ça vient | `Traction × Levier` | Ce que l'entreprise vend : features à ROI, primes, événements, équipes subies, décisions |
-| À quoi ça sert | **Acheter** | **Payer** — salaires, licences, récurrents |
+| D'où ça vient | `Traction × Levier` | **Une population de clients qui paie chaque sprint** — elle grandit par les livraisons, les primes, les événements et le Sales, elle s'érode au churn |
+| À quoi ça sert | **Acheter** | **Payer** — salaires, licences, et le support des clients eux-mêmes |
 | Ce qui la juge | Le quota | La faillite |
 
 **Produire de l'Impact ne remplit pas la caisse.** Le lien entre les deux
@@ -82,17 +84,20 @@ pouvoir faire un gros Impact avec une économie seulement correcte, en jouant
 le Moral, le Levier ou un combo. Symétriquement, un choix économique se paie
 ailleurs : la feature qui finance les salaires coûte du Moral ou de la Dette.
 
-**Le piège**, et il a déjà été introduit une fois : toute règle du type
+**Le piège**, et il a été introduit une fois puis démonté (#42) : toute règle du type
 « l'Impact du sprint alimente le revenu » — à n'importe quel taux — fusionne
 les deux monnaies en une seule grandeur à deux noms et supprime l'arbitrage
 *nourrir la boîte ou nourrir la performance*. Ce n'est pas un problème de
 calibrage : c'est le mauvais sens de dépendance.
 
-Trois propriétés le vérifient mécaniquement : le rapport
-`Revenue final / charges par sprint` ne décolle pas au banc ; un run
-« économie » et un run « Levier » franchissent tous deux le mandat sans que
-l'un domine ; **mourir riche** (faillite avec un gros portefeuille, ou quota
-manqué avec une caisse pleine) reste atteignable des deux côtés.
+Quatre garde-fous le vérifient mécaniquement, et aucun ne dépend du sérieux
+d'un relecteur : `score_resolver_cases.gd → _test_no_revenue_comes_from_impact`
+fait varier l'Impact du simple au quadruple à livraison identique et exige que
+la caisse ne bouge pas ; le rapport `Revenue final / charges par sprint` ne
+décolle pas au banc (3,0× sur `greedy`, mesuré sur 40 runs) ; les trajectoires
+`economie` et `levier` du banc franchissent toutes deux le mandat ; **mourir
+riche** (faillite avec un gros portefeuille, ou quota manqué avec une caisse
+pleine) reste atteignable des deux côtés.
 
 ### Contrat d'architecture — à honorer dès le premier lot de code
 
@@ -115,6 +120,12 @@ score et de tous les écrans de phase.
 
 ## Conventions de code
 
+- **Les features n'ont qu'UN effet client.** `backlog.json → clients`, de −6 à
+  +6. Ce n'est pas un nombre de clients : c'est un effet, converti en clients
+  réels par le modèle économique du run (`businessModels.segments.clientsPerPoint`),
+  pour que le même backlog se joue en freemium comme en grands comptes. **La
+  Traction ne lit pas cette colonne** — sinon « ce qui score » et « ce qui
+  paie » redeviennent la même chose et l'arbitrage disparaît (carnet §32.4).
 - **Aucune valeur d'équilibrage en dur.** Tout vit dans `data/balance.json`
   (ou les autres JSON de `data/`). Rééquilibrer ne doit demander aucune
   modification de script.

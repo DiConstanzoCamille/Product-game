@@ -28,12 +28,12 @@
       "extreme": { "condition": "À zéro", "outcome": "Le board reprend la main : rachat hostile." }
     },
     {
-      "id": "valeur-percue",
+      "id": "reputation-produit",
       "icon": "📈",
-      "name": "Valeur perçue",
-      "definition": "Ce que le marché pense que vous valez, pas ce que vous croyez avoir construit.",
-      "rises": ["Features qui résolvent un vrai problème", "Bouche-à-oreille"],
-      "falls": ["Retards visibles", "Concurrents qui avancent pendant vos réorganisations"],
+      "name": "Réputation produit",
+      "definition": "Ce que les utilisateurs pensent du produit. Pas ce que le board pense de vous — ça, c'est le Capital politique.",
+      "rises": ["Features qui résolvent un vrai problème", "Bouche-à-oreille", "Un Product marketing qui fait entendre les livraisons"],
+      "falls": ["Retards visibles", "Features qui dégradent l'usage", "Concurrents qui avancent pendant vos réorganisations"],
       "extreme": { "condition": "Au plancher", "outcome": "Les utilisateurs partent avant vos investisseurs." }
     },
     {
@@ -58,8 +58,8 @@
       "description": "Couper les coins ronds fait gagner du cash à court terme, à rembourser plus tard avec intérêts."
     },
     {
-      "id": "valeur-vs-moral",
-      "resources": ["valeur-percue", "moral"],
+      "id": "reputation-vs-moral",
+      "resources": ["reputation-produit", "moral"],
       "description": "Pousser une feature en urgence impressionne le marché et épuise l'équipe qui l'a livrée."
     },
     {

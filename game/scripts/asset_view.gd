@@ -42,8 +42,8 @@ const DEFAULT_ITEM_ICON := 50  # ordinateur portable, pour tout id inconnu
 ## Famille d'une pratique, affichée en référence de carte (zone ①) — l'équivalent
 ## du « PRD-014 » des décisions : à quoi sert ce post-it.
 const PRACTICE_FAMILIES := {
-	"roi": "RÉVÉLATION",
-	"clientImpact": "RÉVÉLATION",
+	"clients": "RÉVÉLATION",
+	"clientSegments": "RÉVÉLATION",
 	"risk": "RÉVÉLATION",
 	"hiddenTraits": "RECRUTEMENT",
 	"burndown": "PILOTAGE",
@@ -56,8 +56,8 @@ const PRACTICE_FAMILIES := {
 ## la description ne contient pas de seconde phrase mécanique (voir
 ## _practice_flavor_and_effect).
 const PRACTICE_UNLOCK_LABELS := {
-	"roi": "Révèle la colonne ROI de la roadmap",
-	"clientImpact": "Révèle la colonne Impact client des features",
+	"clients": "Révèle ce que chaque feature fait à la base de clients",
+	"clientSegments": "Détaille cet effet segment par segment",
 	"risk": "Révèle la colonne Risque (Dette) des features",
 	"hiddenTraits": "Les candidats de l'étal arrivent révélés",
 	"burndown": "Déverrouille le Burn down du Dossier entreprise",
@@ -381,16 +381,16 @@ static func _role_impact_lines(role_id: String, seniority: String) -> Array:
 		"designer":
 			if SprintState.get_role_weight("designer") <= 0.0:
 				lines.append({
-					"label": "📈 Sans Designer, les effets Valeur perçue sont divisés par %d" % int(role_conf.get("valeurEffectsDivisorIfAbsent", 2)),
-					"delta": "fin du ÷%d" % int(role_conf.get("valeurEffectsDivisorIfAbsent", 2)),
+					"label": "📈 Sans Designer, les effets Réputation produit sont divisés par %d" % int(role_conf.get("reputationEffectsDivisorIfAbsent", 2)),
+					"delta": "fin du ÷%d" % int(role_conf.get("reputationEffectsDivisorIfAbsent", 2)),
 					"good": true,
 				})
 			else:
 				lines.append({
-					"label": "📈 Valeur perçue par feature livrée",
+					"label": "📈 Réputation produit par feature livrée",
 					"delta": "+%d (max +%d)" % [
-						int(role_conf.get("valeurPerFeatureDelivered", 1)),
-						int(role_conf.get("valeurPerFeatureDeliveredMax", 2)),
+						int(role_conf.get("reputationPerFeatureDelivered", 1)),
+						int(role_conf.get("reputationPerFeatureDeliveredMax", 2)),
 					],
 					"good": true,
 				})
