@@ -1501,3 +1501,159 @@ l'économie : ce qui n'est pas imprimé au banc n'existe pas.
 - **Les six jauges reléguées en alertes** (spec §8) restent au lot D.
 - **L'indépendance des deux économies** (spec §3.8) est écrite mais pas
   implémentée : `impactToMrr` vaut toujours 0,06. Voir §31.9.
+
+---
+
+## 32. Le Revenue a des clients (issue #42)
+
+Mise en œuvre de [`spec-clients-revenue.md`](spec-clients-revenue.md), et
+solde du défaut laissé par le lot A (§31.9) : **l'économie de l'entreprise
+n'est plus l'économie de l'Impact**.
+
+### 32.1 Le Revenue n'est plus un stock, c'est une population
+
+`recurring_revenue` (la base d'abonnements) et `recurring_roi` (le bonus
+permanent des livraisons) ont disparu au profit de `SprintState.clients` — un
+dictionnaire `segment_id → population`. Chaque sprint :
+
+```
+clients ← clients − churn + arrivées ± conversions
+Revenue ← Revenue + Σ(clients × prix) − salaires − licences − support des clients
+```
+
+Le double comptage documenté au §31.9 (`recurring_roi` réinjecté à chaque
+sprint, poussant le revenu vers `roi ÷ churn`) **ne peut plus s'écrire** : une
+feature amène des clients *une fois*, et les clients paient *chaque sprint*. Il
+n'y a plus de grandeur ambiguë entre les deux. C'est le meilleur argument pour
+ce modèle — il rend une classe entière d'erreurs impossible plutôt que de la
+corriger.
+
+Un modèle déclare 2 à 3 segments, jamais plus. Meridia joue `grands-comptes`
+(15 pilotes, 25 comptes signés), Karavel `freemium-volume` (760 gratuits, 58
+abonnés) : même époque, deux économies qui ne se jouent pas pareil. Les
+gratuits **coûtent sans payer** (`unitCost` sans `price`), ce qui rend le
+freemium dangereux tout seul — c'était la condition pour que « passer en
+payant » soit un pari et pas un cadeau.
+
+### 32.2 Ce qui a été coupé, et pourquoi ça ne se recalibre pas
+
+Trois règles ont été **supprimées**, pas ajustées :
+
+| Règle | Ce qu'elle faisait | Pourquoi elle part |
+|---|---|---|
+| `conversion.saas-mrr.impactToMrr` | 6 % de l'Impact du sprint → revenu | Fusionne les deux monnaies en une seule grandeur à deux noms |
+| `conversion.recurringRoiMultiplier` | le ROI cumulé réinjecté chaque sprint | Le double comptage de §31.9 |
+| `conversion.perceivedValue` | Impact → Valeur perçue | Premier maillon de la fuite `Impact → perception → Revenue` |
+
+Ce n'était pas un problème de taux : c'est le **sens de la dépendance** qui
+était faux. Un garde-fou mécanique remplace la vigilance : le banc
+(`score_resolver_cases.gd → _test_no_revenue_comes_from_impact`) fait varier
+l'Impact du simple au quadruple, à livraison et population identiques, et exige
+que la caisse et la population ne bougent pas d'un chiffre.
+
+### 32.3 La Valeur perçue devient la Réputation produit
+
+Le renommage n'est pas cosmétique, et c'est la décision de fond du lot. « Ce que
+le marché pense que vous valez » mélangeait **la perception du produit par ses
+utilisateurs** et **la perception du joueur par ceux qui le jugent**. C'est ce
+mot pour deux choses qui avait laissé la fuite s'installer sans que personne ne
+la voie. Trois entités perçoivent quelque chose, chacune a sa grandeur :
+
+- les **utilisateurs** jugent le produit → 📈 Réputation produit, alimentée
+  **uniquement par les livraisons** (`EffectResolver.resolve_backlog()`) ;
+- le **board** juge le joueur → 🎯 Capital politique, alimenté par l'Impact ;
+- l'**équipe** juge le joueur → 🤝 Confiance, lot suivant.
+
+Le 📣 Product marketing ne convertit plus l'Impact : il **amplifie ce que les
+livraisons font à la réputation**. Même équipe subie, même table de niveaux,
+autre entrée. Et `goodEnding` ne moyenne plus une perception produit et une
+perception joueur : 🚀 l'IPO se gagne sur ce que vaut **le produit**
+(Réputation ≥ 62 **et** une population qui paie au moins ses charges), 🤝 le
+rachat est tout le reste — quelqu'un vous achète, ce qui n'exige rien du
+produit.
+
+### 32.4 La Traction ne lit plus l'effet client — l'arbitrage était à ce prix
+
+**C'est l'écart assumé avec `spec-scoring-sprint.md` §5**, qui écrivait
+`Traction = costPoints × 4 + clientImpact × 3`.
+
+`roi` et `clientImpact` ont fusionné en un seul champ `clients` (spec §8.4 :
+« une feature a **un** effet client, point »). Mais cette valeur est devenue une
+grandeur **économique**, convertie en clients réels par le modèle du run : la
+même feature vaut 72 inscrits chez Karavel et 0,9 compte chez Meridia. La
+multiplier par 3 pour en faire de la Traction n'a plus de sens dimensionnel — et
+surtout, la garder rendait **mécaniquement corrélées** « ce qui score » et « ce
+qui paie », donc impossibles les deux familles que l'issue demande : celles qui
+**paient sans scorer** et celles qui **scorent sans payer**. Avec une seule
+valeur alimentant les deux, tout ce qui rapporte score, et le dilemme n'existe
+pas.
+
+La Traction ne vient donc plus que des **points livrés**. Le score continue de
+lire la colonne client, mais comme une **condition** et non comme un terme :
+« Le board veut du visible » (quotas.json) annule la Traction des livraisons qui
+n'amènent aucun client, et Enterprise first double celle des features à effet
+client ≥ 3. Cinq features ont été ajoutées pour tenir les deux extrêmes —
+🎁 Programme de parrainage (1 point, +6 clients) et ⚙️ Refonte du moteur de
+calcul (6 points, 0 client, −4 Dette).
+
+### 32.5 Ce que le banc dit, et ce qu'il ne dit pas encore
+
+40 runs, 160 mandats par stratégie, cinq trajectoires (`careful` et `stress`
+inchangées, `greedy` conservée, `economie` et `levier` ajoutées pour le critère
+de recette 2) :
+
+| Stratégie | Sprint médian | 💥 médian | 💰 médian | 💰/charges | Fins positives | Faillites |
+|---|---|---|---|---|---|---|
+| `careful` | 3 | 0 | 46 | 2,6× | 0 | 0 |
+| `economie` | 8 | 1448 | 77 | **1,9×** | 2 % | 0 % |
+| `levier` | 8 | 1939 | 35 | **1,0×** | 10 % | 21 % |
+| `greedy` | 8 | 1517 | 80 | **2,4×** | 1 % | 4 % |
+
+Le rapport `Revenue final / charges par sprint` passe de **56× à 2,4×** sur
+`greedy` : la caisse a recommencé à contraindre. Et on meurt **des deux
+côtés** — `levier` fait faillite 21 % du temps avec 2000 💥 en poche,
+`economie` manque son quota avec 150 💰 de caisse.
+
+**Ce qui reste gênant, et qu'il faut dire** : les deux trajectoires franchissent
+bien le mandat (T3 contre T4), mais `levier` gagne **quatre fois plus souvent**
+que `economie` (10 % contre 2 %). Ce n'est pas un défaut de calibrage : c'est la
+conséquence directe de la séparation des deux économies. L'argent n'achète
+rien — l'Impact est la seule monnaie — donc une bonne caisse ne **produit**
+jamais de score, elle **permet** seulement de tenir plus longtemps une
+organisation qui en produit. Le pari de `levier` (sur-investir, risquer la
+faillite) a une espérance meilleure que celui de `economie` (ne jamais engager
+une charge à découvert). Corriger ça sans ré-ouvrir la fuite demanderait de
+rendre la faillite plus fréquente ou l'escalade des quotas moins raide (#36) —
+pas d'ajouter un chemin Revenue → Impact, qui reconstruirait exactement ce que
+ce lot vient de démonter.
+
+### 32.6 Deux pièges rencontrés en route
+
+- **Un prix affiché et un prix encaissé qui divergent.** Le `priceMultiplier`
+  des décisions stratégiques était d'abord lu par `ScoreResolver` seul, pendant
+  que `resolved_segment_price()` servait l'affichage. Deux chemins de calcul
+  pour un même prix : la ligne de composition sous le solde se serait mise à
+  mentir dès la première décision. Il écrit maintenant dans
+  `segment_price_multipliers`, la seule table que les deux lisent.
+- **Une flakiness introduite par un test, pas par le code.** Trois runs sur 40
+  échouaient sur l'injonction du board : les assertions de quota nettoyaient
+  `chosen_strategy_ids` (à cause du nouveau `quotaMultiplier` d'Expansion
+  internationale) sans remettre `quarter_strategy_chosen` à `false`, ce qui
+  rendait `_assign_forced_strategy()` silencieusement inopérant quelques lignes
+  plus bas. Mesure sur `main` d'abord (40/40), puis sur la branche (37/40) :
+  c'est la comparaison qui a distingué « ma régression » de « défaut
+  préexistant ». 40/40 après correction.
+
+### 32.7 Ce que ce lot ne fait pas
+
+- **L'équipe individuelle** ([`spec-equipe-individuelle.md`](spec-equipe-individuelle.md))
+  est le lot d'après. Les deux réécrivent des effets de contenu et ne doivent
+  jamais se faire en même temps.
+- **L'escalade des quotas et l'indexation des prix** restent l'issue #36.
+- **`waterfall-release`** est déclaré avec `segments: []` : le scénario Garage
+  l'attend, et les gros paliers de revenu à la sortie d'une version ne sont pas
+  écrits.
+- **Le pivot « Fin du gratuit »** existe et se joue, mais n'est volontairement
+  **pas dans le pool de l'injonction du board** : imposer un changement de
+  modèle économique irréversible sans le choisir n'est pas un pari, c'est une
+  punition.

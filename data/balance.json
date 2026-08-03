@@ -5,7 +5,7 @@
     "moral": 60,
     "dette-organisationnelle": 15,
     "capital-politique": 55,
-    "valeur-percue": 50,
+    "reputation-produit": 50,
     "cynisme": 10
   },
 
@@ -14,16 +14,16 @@
   "resourceBounds": { "min": 0, "max": 100 },
 
   "revenue": {
-    "_comment": "💰 Le Revenue (spec-impact-monnaie.md §3) — fusion de l'ancienne Trésorerie (ressource 0..100) et du stock de MRR. Valeur SANS plafond : elle ne vit donc plus dans resources.json et n'a pas de jauge. Elle encaisse les abonnements et paie chaque sprint les salaires et les licences. À zéro, c'est la faillite (endingThresholds).",
-    "start": 60,
-    "startOverrides": { "karavel-scaleup": 34 }
+    "_comment": "💰 Le Revenue (spec-impact-monnaie.md §3) — la caisse de l'entreprise. Valeur SANS plafond : elle ne vit donc pas dans resources.json et n'a pas de jauge. Elle encaisse ce que les clients paient (spec-clients-revenue.md §2) et paie chaque sprint les salaires, les licences et le support des clients. À zéro, c'est la faillite (endingThresholds). Ce n'est PAS un stock d'abonnements : le stock, ce sont les clients eux-mêmes (businessModels → segments).",
+    "start": 46,
+    "startOverrides": { "karavel-scaleup": 30 }
   },
 
   "resourceDirection": {
     "revenue": "high-good",
     "moral": "high-good",
     "capital-politique": "high-good",
-    "valeur-percue": "high-good",
+    "reputation-produit": "high-good",
     "dette-organisationnelle": "low-good",
     "cynisme": "low-good"
   },
@@ -47,8 +47,12 @@
   },
 
   "goodEnding": {
-    "scoreResources": ["valeur-percue", "capital-politique"],
-    "ipoThreshold": 60,
+    "_comment": "Deux fins positives, deux juges différents (spec-clients-revenue.md §5.1.1) — on ne moyenne plus une perception produit et une perception joueur. 🚀 L'IPO se gagne sur ce que vaut le PRODUIT : 📈 Réputation produit au-dessus du seuil, et une base de clients réellement là. 🤝 Le rachat est le reste : quelqu'un achète l'entreprise (et vous avec), ce qui n'exige rien du produit.",
+    "ipo": {
+      "resource": "reputation-produit",
+      "threshold": 62,
+      "clientRevenueAtLeastCharges": 1.0
+    },
     "highEnding": "ipo",
     "lowEnding": "rachat"
   },
@@ -56,7 +60,7 @@
   "cardAxisResourceMap": {
     "humain": { "resource": "moral", "invert": false },
     "financier": { "resource": "revenue", "invert": false },
-    "ttm": { "resource": "valeur-percue", "invert": false },
+    "ttm": { "resource": "reputation-produit", "invert": false },
     "productivite": { "resource": "dette-organisationnelle", "invert": true }
   },
 
@@ -75,26 +79,28 @@
 
   "playableEras": ["agile-transformation"],
 
-  "eraBusinessModel": {
-    "agile-transformation": "saas-mrr"
-  },
-
   "businessModels": {
-    "saas-mrr": {
-      "label": "SaaS — revenu récurrent (MRR)",
-      "description": "Un revenu tombe chaque sprint, proportionnel à la Valeur perçue au-dessus du seuil de notoriété, érodé par un Moral bas (churn). Sous le seuil de décrochage, plus aucun revenu.",
-      "revenuePerValeurPercuePoint": 0.75,
-      "revenueValeurPercueOffset": 38,
-      "moralChurnFloor": 0.3,
-      "moralChurnCeiling": 1.1
+    "_comment": "💰 Le Revenue n'est pas un stock, c'est une population qui paie (docs/spec-clients-revenue.md §2). Un modèle déclare 2 à 3 `segments`, jamais plus (§4.0) : c'est le minimum pour que « passer en payant » s'écrive sans règle spéciale, et le maximum lisible sur une ligne de panneau. Chaque sprint : `clients ← clients − churn + arrivées ± conversions`, puis `Revenue ← Revenue + Σ(clients × prix) − charges`. `clientsPerPoint` convertit l'effet client d'une feature (backlog.json → `clients`, une échelle de −6 à +6 partagée par tous les modèles) en clients réels de CE segment : la même feature amène 72 inscrits en freemium et 0,8 compte en B2B, sans qu'on écrive deux backlogs. `unitCost` est ce qu'un client coûte en support et en infra à chaque sprint — c'est lui qui rend une base gratuite dangereuse (§5.3). `price` est une CONSTANTE DU RUN (§5.2) : seule une décision stratégique explicite la change, jamais un événement. L'échelle de prix, elle, vient du scénario (eras.json → priceScale, §4.0.1). `role` (`entry`/`paying`) est ce qui rend les conversions écrivables sans connaître les ids : « faire passer des entrants en payants » est la même règle dans les deux modèles.",
+    "freemium-volume": {
+      "label": "Freemium — beaucoup de monde, peu d'argent",
+      "description": "Des milliers d'inscrits, une poignée qui paie. Chaque utilisateur coûte du support même quand il ne rapporte rien : la base grandit plus vite que la caisse, et c'est exactement le piège.",
+      "segments": [
+        { "id": "gratuits", "role": "entry", "label": "utilisateurs gratuits", "singular": "utilisateur gratuit", "shortLabel": "gratuits", "icon": "👥", "start": 760, "price": 0, "unitCost": 0.014, "churn": 0.07, "clientsPerPoint": 24 },
+        { "id": "payants", "role": "paying", "label": "abonnés", "singular": "abonné", "shortLabel": "abonnés", "icon": "💳", "start": 58, "price": 0.5, "unitCost": 0.04, "churn": 0.045, "clientsPerPoint": 1.5 }
+      ]
+    },
+    "grands-comptes": {
+      "label": "Grands comptes — peu de clients, chacun énorme",
+      "description": "Quelques dizaines de comptes qui signent à l'année. En perdre un se voit sur la ligne du sprint ; en signer un change le trimestre. Le pilote qui traîne coûte cher et ne paie presque rien.",
+      "segments": [
+        { "id": "pilotes", "role": "entry", "label": "comptes en pilote", "singular": "compte en pilote", "shortLabel": "pilotes", "icon": "🧪", "start": 15, "price": 0.28, "unitCost": 0.13, "churn": 0.13, "clientsPerPoint": 1.1 },
+        { "id": "comptes", "role": "paying", "label": "comptes signés", "singular": "compte signé", "shortLabel": "signés", "icon": "🏛️", "start": 25, "price": 1.2, "unitCost": 0.26, "churn": 0.03, "clientsPerPoint": 0.3 }
+      ]
     },
     "waterfall-release": {
       "label": "Vente à la version (waterfall)",
-      "description": "Pas de revenu récurrent — de gros paliers de revenu tombent à la sortie d'une version. Pas encore implémenté (scénario Garage, à venir).",
-      "revenuePerValeurPercuePoint": 0,
-      "revenueValeurPercueOffset": 0,
-      "moralChurnFloor": 1.0,
-      "moralChurnCeiling": 1.0
+      "description": "Pas de population récurrente — de gros paliers de revenu tombent à la sortie d'une version. Déclaré et vide : le scénario Garage l'attend.",
+      "segments": []
     }
   },
 
@@ -127,9 +133,9 @@
       "label": "Designer",
       "icon": "🎨",
       "capacityPerEmployee": { "junior": 0, "senior": 0 },
-      "valeurPerFeatureDelivered": 1,
-      "valeurPerFeatureDeliveredMax": 2,
-      "valeurEffectsDivisorIfAbsent": 2
+      "reputationPerFeatureDelivered": 1,
+      "reputationPerFeatureDeliveredMax": 2,
+      "reputationEffectsDivisorIfAbsent": 2
     },
     "ops": {
       "label": "Ops",
@@ -202,8 +208,7 @@
   },
 
   "pressure": {
-    "valeurPercueDecayPerSprint": 2,
-    "revenueCutoffValeurPercue": 5,
+    "reputationDecayPerSprint": 2,
     "boardReview": {
       "successCapitalPolitique": 8,
       "failCapitalPolitique": -12
@@ -217,7 +222,7 @@
   "backlogDraw": {
     "itemsPerSprintMin": 4,
     "itemsPerSprintMax": 5,
-    "strongRoiThreshold": 2,
+    "strongClientsThreshold": 2,
     "okrCapitalPolitiqueBonus": 2
   }
 }

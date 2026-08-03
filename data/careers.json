@@ -20,14 +20,14 @@
       "junior": {
         "label": "PM junior",
         "sort": "weighted",
-        "weights": { "roi": 1.0, "clientImpact": 1.0, "risk": 0.0 },
+        "weights": { "clients": 1.5, "points": 0.5, "risk": 0.0 },
         "perPoint": false,
         "epicPointsRatio": 0.5
       },
       "senior": {
         "label": "PM senior",
         "sort": "weighted",
-        "weights": { "roi": 1.0, "clientImpact": 1.0, "risk": 0.5 },
+        "weights": { "clients": 1.5, "points": 1.0, "risk": 0.5 },
         "perPoint": true,
         "epicPointsRatio": 0.75
       }

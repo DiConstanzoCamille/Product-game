@@ -1,6 +1,6 @@
 # Spec — Le Revenue a des clients
 
-**Statut : validé le 02/08/2026, non implémenté.** Écrit à partir de la
+**Statut : validé le 02/08/2026, implémenté le 03/08/2026 (issue #42, carnet §32).** Écrit à partir de la
 question de Camille sur la PR #40, puis tranché avec elle point par point (les
 décisions sont datées dans le texte). Mise en œuvre : issue #42.
 

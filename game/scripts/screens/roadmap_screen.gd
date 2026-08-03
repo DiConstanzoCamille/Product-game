@@ -290,24 +290,35 @@ func _add_backlog_card(item: Dictionary) -> void:
 	_refresh_action_button(control)
 
 
+## 👥 Une feature n'annonce plus « ROI +3 » mais « +72 utilisateurs gratuits ».
+## Le chiffre est celui du modèle économique du run, résolu par SprintState :
+## le même ticket dit « +2 comptes signés » chez Meridia. Le masquage n'a pas
+## bougé — Discovery révèle le total, UX research sa ventilation par segment.
 func _attribute_text(item: Dictionary) -> String:
 	var item_id: String = item.get("id", "")
-	return "ROI : %s\nImpact client : %s\nRisque dette : %s" % [
-		_attribute_value(item_id, "roi", "+%d MRR/sprint" % int(item.get("roi", 0))),
-		_attribute_value(item_id, "clientImpact", "%+d Valeur percue" % int(item.get("clientImpact", 0))),
-		_attribute_value(item_id, "risk", "%+d Dette" % int(item.get("risk", 0))),
-	]
+	var lines: Array = ["Clients : %s" % _attribute_value(item_id, "clients", _clients_text(item))]
+	if SprintState.backlog_attribute_revealed(item_id, "clientSegments"):
+		for row in SprintState.clients_for_points_by_segment(float(item.get("clients", 0))):
+			lines.append("  %s %s : %+d" % [row.get("icon", "👥"), row.get("label", ""), int(round(float(row.get("value", 0.0))))])
+	lines.append("Risque dette : %s" % _attribute_value(item_id, "risk", "%+d Dette" % int(item.get("risk", 0))))
+	return "\n".join(lines)
 
 
-## Les trois signaux tiennent sur une ligne dans le board. Les chiffres et
+## Les deux signaux tiennent sur une ligne dans le board. Les chiffres et
 ## leur unité complète restent dans le dossier afin de ne pas tasser le ticket.
 func _attribute_summary(item: Dictionary) -> String:
 	var item_id: String = item.get("id", "")
-	return "ROI %s  ·  Client %s  ·  Dette %s" % [
-		_attribute_value(item_id, "roi", "%+d" % int(item.get("roi", 0))),
-		_attribute_value(item_id, "clientImpact", "%+d" % int(item.get("clientImpact", 0))),
+	return "Clients %s  ·  Dette %s" % [
+		_attribute_value(item_id, "clients", "%+d" % int(round(SprintState.clients_for_points(float(item.get("clients", 0)))))),
 		_attribute_value(item_id, "risk", "%+d" % int(item.get("risk", 0))),
 	]
+
+
+func _clients_text(item: Dictionary) -> String:
+	var gained := SprintState.clients_for_points(float(item.get("clients", 0)))
+	if is_zero_approx(gained):
+		return "aucun mouvement"
+	return "%+d" % int(round(gained))
 
 
 func _attribute_value(item_id: String, attribute: String, value: String) -> String:

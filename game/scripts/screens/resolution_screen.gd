@@ -861,20 +861,34 @@ func _animate_revenue_callout() -> void:
 	var subscriptions: int = SprintState.last_revenue
 	var payroll: int = SprintState.last_payroll
 	var licenses: int = SprintState.last_licenses
+	var client_cost: int = SprintState.last_client_cost
 	var cost: int = SprintState.last_revenue_cost
 	var wallet_delta: int = SprintState.last_wallet_delta
-	var net: int = subscriptions - payroll - licenses + cost
-	var model_label: String = model.get("label", "Abonnements")
+	var net: int = subscriptions - payroll - licenses - client_cost + cost
+
+	# 👥 La ligne d'économie est enfin racontable (spec-clients-revenue.md §6) :
+	# « 38 clients gagnés, 12 partis, 864 abonnés × 0,5 » plutôt qu'un stock
+	# d'abonnements que personne ne peut se représenter.
+	var clients: Dictionary = SprintState.last_client_report
+	var movement := ""
+	if not clients.is_empty():
+		movement = "%d clients gagnés, %d partis  ·  " % [
+			int(round(float(clients.get("joined", 0.0)))),
+			int(round(float(clients.get("left", 0.0)))),
+		]
 
 	revenue_label.add_theme_color_override("font_color", UIHelpers.COLOR_GOOD if net >= 0 else UIHelpers.COLOR_DANGER)
-	economics_detail.text = "%s +%d  ·  Salaires −%d  ·  Licences −%d  ·  Décisions %s%d  ·  💰 solde %d          💥 Impact %s%d (portefeuille %d)" % [
-		model_label, subscriptions, payroll, licenses,
+	economics_detail.text = "%s%s = +%d  ·  Salaires −%d  ·  Licences −%d  ·  Support clients −%d  ·  Décisions %s%d  ·  💰 solde %d          💥 Impact %s%d (portefeuille %d)" % [
+		movement, SprintState.describe_clients(), subscriptions, payroll, licenses, client_cost,
 		"+" if cost >= 0 else "−", abs(cost), int(round(SprintState.revenue)),
 		"+" if wallet_delta >= 0 else "−", abs(wallet_delta), SprintState.impact_wallet,
 	]
-	economics_detail.tooltip_text = "L'Impact s'achète des choses ; le Revenue les garde allumées. Les charges du sprint prochain : %d 💰." % int(SprintState.get_recurring_charges().get("total", 0))
+	economics_detail.tooltip_text = "%s — %s\nL'Impact s'achète des choses ; le Revenue les garde allumées, et il ne vient que de vos clients. Les charges du sprint prochain : %d 💰." % [
+		model.get("label", ""), model.get("description", ""),
+		int(SprintState.get_recurring_charges().get("total", 0)),
+	]
 
-	var fixed_costs := payroll + licenses
+	var fixed_costs := payroll + licenses + client_cost
 	var tween := create_tween()
 	tween.tween_method(
 		func(v: float):
@@ -935,9 +949,10 @@ func _add_roadmap_delivery_line() -> void:
 
 	var lines: Array = []
 	for item in delivered:
-		lines.append("%s %s : ROI +%d MRR/sprint · Impact client %+d · Risque dette %+d" % [
-			item.get("icon", "📌"), item.get("name", ""), int(item.get("roi", 0)),
-			int(item.get("clientImpact", 0)), int(item.get("risk", 0))
+		lines.append("%s %s : %+d clients · Risque dette %+d" % [
+			item.get("icon", "📌"), item.get("name", ""),
+			int(round(SprintState.clients_for_points(float(item.get("clients", 0))))),
+			int(item.get("risk", 0))
 		])
 	for update in progress:
 		if not update.get("completed", false):
@@ -1194,10 +1209,10 @@ func _build_alert_text() -> String:
 	var extreme: Dictionary = worst_resource.get("extreme", {})
 	match worst_state:
 		"danger":
-			# La Valeur perçue ne déclenche plus de fin directe et ne coupe plus
+			# La Réputation produit ne déclenche plus de fin directe et ne coupe plus
 			# artificiellement le MRR : elle reste une pression de marché.
-			if worst_resource.get("id", "") == "valeur-percue":
-				return "⚠️ 📈 Valeur perçue en zone critique — une livraison forte devient urgente."
+			if worst_resource.get("id", "") == "reputation-produit":
+				return "⚠️ 📈 Réputation produit en zone critique — une livraison forte devient urgente."
 			return "⚠️ %s %s en zone critique — encore un peu et : %s" % [
 				worst_resource.get("icon", ""), worst_resource.get("name", ""), extreme.get("outcome", "")
 			]

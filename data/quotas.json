@@ -46,8 +46,8 @@
       "id": "visibility-mandate",
       "icon": "🎪",
       "name": "Le board veut du visible",
-      "description": "Les livraisons sans impact client positif ne produisent aucune Traction.",
-      "effects": { "minimumClientImpactForTraction": 1 }
+      "description": "Les livraisons qui n'amenent aucun client ne produisent aucune Traction.",
+      "effects": { "minimumClientsForTraction": 1 }
     },
     {
       "id": "technical-audit",

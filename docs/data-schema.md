@@ -6,7 +6,7 @@ Toutes les valeurs numériques (coûts, seuils, pourcentages) sont **indicatives
 
 ## `resources.json`
 
-Les 5 jauges du jeu (§4) et leurs tensions croisées (§5). **Le 💰 Revenue n'y est pas** : depuis le lot A de l'Impact-monnaie (carnet §31) c'est une valeur sans plafond, donc pas une jauge — sa valeur de départ vit dans `balance.json → revenue`. Le 💥 Impact non plus : c'est le portefeuille du joueur (`SprintState.impact_wallet`).
+Les 5 jauges du jeu (§4) et leurs tensions croisées (§5). Depuis #42, `valeur-percue` s'appelle **`reputation-produit`** (📈 Réputation produit) : les *utilisateurs* jugent le produit, le *board* juge le joueur (🎯 Capital politique) — un mot employé pour deux choses avait laissé s'installer la fuite `Impact → Valeur perçue → Revenue` (spec-clients-revenue §5.1.1). **Le 💰 Revenue n'y est pas** : depuis le lot A de l'Impact-monnaie (carnet §31) c'est une valeur sans plafond, donc pas une jauge — sa valeur de départ vit dans `balance.json → revenue`. Le 💥 Impact non plus : c'est le portefeuille du joueur (`SprintState.impact_wallet`).
 
 - `resources[]` — `id`, `icon`, `name`, `definition`, `rises[]` (ce qui la fait monter), `falls[]` (ce qui la fait descendre), `extreme` (`condition` + `outcome` : la fin de mandat déclenchée à l'extrême).
 - `tensions[]` — `id`, `resources[]` (2 ids de ressources concernées), `description`.
@@ -66,12 +66,12 @@ Les features proposables en phase Roadmap (§8), exemple d'un sprint : `capacity
 
 Le backlog de la Roadmap profonde (§6 de la [spec profondeur de gameplay](spec-profondeur-gameplay.md)) — le successeur de `roadmap-features.json` côté `game/`, qui reste la démo landing. Il est consommé par `GameData.backlog` et tiré par `SprintState`.
 
-- `features[]` — `id`, `name`, `icon` (emoji), `description` (le pitch satirique affiché au joueur), `costPoints` (1-5, **toujours visible**, se paie en capacité produite par le roster), `roi` (0-3, bonus permanent de MRR une fois livrée), `clientImpact` (−2 à +6, delta de Valeur perçue à la livraison et source de Traction), `risk` (−3 à +8, delta de Dette à la livraison), `quickWin` (booléen — deux quick wins dans la même main donnent +2 de Budget d'investissement), `tags[]` (catégories utilisées par le combo Focus), `eras[]` (mêmes ids que `eras.json`, filtre du tirage par sac). `roi`, `clientImpact` et `risk` sont **cachés par défaut** ("🔒 ?") et révélés par les pratiques ou l'action Plonger dans une feature (§6.3) — d'où les features pièges dont la description flatteuse cache un `clientImpact` négatif.
-- `epics[]` — mêmes champs que `features[]`, plus `epic: true`, `costPoints` (8-12, investissement libre étalé sur plusieurs sprints) et `completionEffects` (deltas structurés par ressource, même format que `effects` dans `inbox-events.json`, `impact` et `revenue` inclus — appliqués **uniquement à la complétion**, en plus des `roi`/`clientImpact`/`risk` de l'epic ; abandonner remet la progression à zéro sans remboursement et rend l'epic éligible à un futur tirage, §6.4).
+- `features[]` — `id`, `name`, `icon` (emoji), `description` (le pitch satirique affiché au joueur), `costPoints` (1-6, **toujours visible**, se paie en capacité produite par le roster et **seule source de Traction** depuis #42), `clients` (−3 à +6 — **l'unique effet client d'une feature**, spec-clients-revenue §8.4 : ce n'est pas un nombre de clients mais un effet, converti en clients réels par `balance.json → businessModels.segments.clientsPerPoint` ; positif = des clients arrivent et la 📈 Réputation produit monte, négatif = ils partent), `risk` (−4 à +8, delta de Dette à la livraison), `quickWin` (booléen — deux quick wins dans la même main versent `handBonuses.quickWins.impactBonus` au portefeuille), `tags[]` (catégories utilisées par le combo Focus), `eras[]` (mêmes ids que `eras.json`, filtre du tirage par sac), `completionEffects` optionnel. `clients` et `risk` sont **cachés par défaut** ("🔒 ?") et révélés par les pratiques ou l'action Plonger dans une feature (§6.3) — d'où les features pièges dont la description flatteuse cache un `clients` négatif. Le catalogue tient deux familles opposées, et c'est délibéré : celles qui **paient sans scorer** (peu de points, gros effet client) et celles qui **scorent sans payer** (beaucoup de points, effet client nul ou négatif).
+- `epics[]` — mêmes champs que `features[]`, plus `epic: true`, `costPoints` (8-12, investissement libre étalé sur plusieurs sprints) et `completionEffects` (deltas structurés par ressource, même format que `effects` dans `inbox-events.json`, `impact` et `revenue` inclus — appliqués **uniquement à la complétion**, en plus des `clients`/`risk` de l'epic ; abandonner remet la progression à zéro sans remboursement et rend l'epic éligible à un futur tirage, §6.4).
 
 ## `inbox-events.json`
 
-Les événements aléatoires de la phase Inbox (§3, phase 1 ; §15 pour la pioche) : `events[].id/from/sprint/status/subject/text`, `eras[]` optionnel (réserve l'événement aux scénarios listés ; absent = disponible partout), et `choices[]` (`id`, `label`, `reveal` — le texte montré après le choix, `effects` — deltas structurés sur les 5 jauges et les deux monnaies, consommés par `game/` ; `reveal` et `effects` doivent rester cohérents mais ne sont pas générés l'un depuis l'autre). `effects` accepte aussi les pseudo-ressources `impact` (💥, le portefeuille), `revenue` (💰, la caisse) et `energie` (⚡, jauge personnelle du joueur — Phase B : les crises vous suivent à la maison) ; toutes trois sont réglées à la Résolution, hors des bornes 0-100 des 5 jauges. `sprint` est un vestige de la démo landing (premier événement affiché) — `game/` tire désormais par pioche "sac", indépendante de ce champ. `supportTeam` + `levelRange` (Lot 4, spec §9.4) réservent un événement à une équipe subie (`sales`/`pmm`/`csm`) dont le niveau (`companies.json → supportTeams`) tombe dans l'intervalle `[min, max]` — filtré par `SprintState._eligible_inbox_events()` comme une troisième couche après `eras[]` ; absent = éligible à tout niveau.
+Les événements aléatoires de la phase Inbox (§3, phase 1 ; §15 pour la pioche) : `events[].id/from/sprint/status/subject/text`, `eras[]` optionnel (réserve l'événement aux scénarios listés ; absent = disponible partout), et `choices[]` (`id`, `label`, `reveal` — le texte montré après le choix, `effects` — deltas structurés sur les 5 jauges et les deux monnaies, consommés par `game/` ; `reveal` et `effects` doivent rester cohérents mais ne sont pas générés l'un depuis l'autre). `effects` accepte aussi les pseudo-ressources `impact` (💥, le portefeuille), `revenue` (💰, la caisse), `clients` (👥, un **effet client en points**, du même vocabulaire qu'une feature — converti en clients réels par le modèle du run) et `energie` (⚡, jauge personnelle du joueur — Phase B : les crises vous suivent à la maison) ; toutes trois sont réglées à la Résolution, hors des bornes 0-100 des 5 jauges. `sprint` est un vestige de la démo landing (premier événement affiché) — `game/` tire désormais par pioche "sac", indépendante de ce champ. Un choix peut aussi porter `clientConversion` (`from`/`to` — des **rôles** de segment, `entry`/`paying` —, `minRatio`/`maxRatio`) : une bascule de population appliquée immédiatement, avec une fraction **tirée** dans la fourchette (le joueur choisit d'y consacrer le sprint, il ne sait pas combien suivront). `supportTeam` + `levelRange` (Lot 4, spec §9.4) réservent un événement à une équipe subie (`sales`/`pmm`/`csm`) dont le niveau (`companies.json → supportTeams`) tombe dans l'intervalle `[min, max]` — filtré par `SprintState._eligible_inbox_events()` comme une troisième couche après `eras[]` ; absent = éligible à tout niveau.
 
 ## `recruitment-archetypes.json`
 
@@ -87,7 +87,7 @@ Le pool de candidats du Marché (spec profondeur §5.1, carnet §17) : `candidat
 
 ## `practices.json`
 
-Le pool de pratiques du Marché (spec profondeur §5.2, carnet §17) : `practices[]` — `id`, `icon`, `name`, `costImpact` (prix d'adoption en 💥), `licensePerSeat` (charge de 💰 Revenue par sprint et par personne du roster), `description`, `unlocks` (flag consommé par le système concerné : `hiddenTraits` révèle les traits cachés au Marché ; `roi`/`clientImpact`/`risk` révèlent définitivement la colonne correspondante du backlog ; `okrBonus` donne le bonus de Capital politique aux livraisons à fort ROI ; `burndown`/`accounts` déverrouillent leurs sections du Pilotage), `perSprint` optionnel (deltas de ressources appliqués à chaque Résolution tant que la pratique est possédée), `rarity` et `eraWeights` optionnels (voir *Rareté et tirage* ci-dessous), `eras[]` optionnel.
+Le pool de pratiques du Marché (spec profondeur §5.2, carnet §17) : `practices[]` — `id`, `icon`, `name`, `costImpact` (prix d'adoption en 💥), `licensePerSeat` (charge de 💰 Revenue par sprint et par personne du roster), `description`, `unlocks` (flag consommé par le système concerné : `hiddenTraits` révèle les traits cachés au Marché ; `clients` révèle définitivement la colonne d'effet client du backlog et `clientSegments` en détaille la ventilation par segment ; `risk` révèle la colonne Dette ; `okrBonus` donne le bonus de Capital politique aux livraisons à fort effet client ; `burndown`/`accounts` déverrouillent leurs sections du Pilotage), `perSprint` optionnel (deltas de ressources appliqués à chaque Résolution tant que la pratique est possédée), `rarity` et `eraWeights` optionnels (voir *Rareté et tirage* ci-dessous), `eras[]` optionnel.
 
 ### Rareté et tirage — commun à `cards.json`, `practices.json` et `candidates.json`
 
@@ -128,45 +128,66 @@ Toutes les valeurs numériques nécessaires à la simulation persistante du MVP 
 - `toolSlots` — capacité d'outillage (spec §7.1.1, Lot 3), qui remplace l'ancien plafond fixe `structuralDecisionMaxActivations` : `careerLevels` (table indexée par niveau de carrière, une seule ligne `pm.base` remplie avant le lot 5), `extraSlotCosts[]` (prix croissant des slots achetables au Comité, plafonnés à `.size()`), `swap` (`cynisme`/`cynismePerPreviousSwap` — le coût de bascule pour libérer un slot occupé, §7.1.2). La capacité effective (`SprintState.get_tool_slot_capacity()`) additionne la base, les achats et le `slotBonus` des outils cumulatifs actifs.
 - `eraCardEffectMultipliers` — multiplicateurs par époque sur les deltas produits par l'activation d'une grande décision.
 - `salaries` — salaire par sprint selon la séniorité (`junior`/`senior`), prélevé sur le 💰 Revenue à chaque Résolution (ligne « charges du sprint »).
-- `roles` — production et pénalités par rôle (spec profondeur §4.2) : `label`, `icon`, `capacityPerEmployee` (points par séniorité), `fullYieldCount`/`extraYieldFactor` (rendements décroissants au-delà du cap de cumul), et les spécificités : PM `overloadReductionPerPm`/`overloadReductionMax` (modulation de la surchauffe), Designer `valeurPerFeatureDelivered`/`valeurPerFeatureDeliveredMax`/`valeurEffectsDivisorIfAbsent`, Ops `dettePerOps`/`detteReliefMax`/`dettePerSprintIfAbsent`.
+- `roles` — production et pénalités par rôle (spec profondeur §4.2) : `label`, `icon`, `capacityPerEmployee` (points par séniorité), `fullYieldCount`/`extraYieldFactor` (rendements décroissants au-delà du cap de cumul), et les spécificités : PM `overloadReductionPerPm`/`overloadReductionMax` (modulation de la surchauffe), Designer `reputationPerFeatureDelivered`/`reputationPerFeatureDeliveredMax`/`reputationEffectsDivisorIfAbsent`, Ops `dettePerOps`/`detteReliefMax`/`dettePerSprintIfAbsent`.
 - `firing` — licenciement (§4.4) : `severanceImpact` (indemnités en 💥), `moral`, `cynismePerExtraFiring` (à partir du 2e licenciement du mandat).
 - `trialPeriodSprints` — durée de la période d'essai avant révélation du trait caché.
 - `shopDraw` — tout le tirage des Investissements (carnet §21), qui sert **un seul rayon où les trois types se mélangent** : `slotsPerSprint` (nombre d'emplacements du rayon), `guaranteedPerSprint` (minimum garanti par type — le garde-fou qui empêche un sprint vide), `typeWeights` (répartition des emplacements restants entre `candidate`/`practice`/`decision` — pondérée par type et non par la taille des pools), `rarityWeights` (poids de tirage par palier de rareté, à l'intérieur d'un type), `practiceCynisme` (+Cynisme par achat de pratique), `reroll` (`baseCost`, `costIncrement` — prix du 🎲 re-tirage, qui monte de `costIncrement` à chaque usage dans le sprint et repart à `baseCost` au sprint suivant), `reserveCostImpact` (prix de la 📌 punaise, qui garantit l'Actif au sprint suivant) et `lockedLeaseSprints` (durée du bail d'une carte à prérequis).
 - `energy` — l'économie du joueur (spec profondeur §7, carnet §18) : `start`/`max` (jauge ⚡, côté jeu uniquement — jamais dans `resources.json`, partagé avec la landing), `regenPerSprint` (régénération à la Résolution), `moralRegenTiers[]` (paliers `moralMin`/`factor` de modulation par le Moral, du plus haut au plus bas : ×1 si Moral ≥ 60, ×0.5 entre 30 et 60, ×0 sous 30), `breatherRegenBonus` (bonus de 🧘 Souffler), `actions` (coûts et effets des actions personnelles : `oneOnOne.cost`, `selfWork.cost`/`capacityBonus`, `featureDive.cost`, `extension.cost`/`capitalPolitique`/`revenue` — la rallonge verse du Revenue, jamais de l'Impact —, `breather.cost`).
-- `pressure` — la pression (§8) : `valeurPercueDecayPerSprint` (décroissance naturelle) et `boardReview` (`successCapitalPolitique`, `failCapitalPolitique`). `revenueCutoffValeurPercue` est un paramètre historique, sans effet sur la conversion MRR actuelle.
+- `pressure` — la pression (§8) : `reputationDecayPerSprint` (décroissance naturelle de la 📈 Réputation produit) et `boardReview` (`successCapitalPolitique`, `failCapitalPolitique`).
 - `roadmap` — `overCapacityPenalty` (pénalité de surchauffe, modulée par les PM). Les coûts et effets propres aux items vivent exclusivement dans `backlog.json`.
 - `backlogDraw` — tirage de la Roadmap profonde : `itemsPerSprintMin`/`itemsPerSprintMax`, `strongRoiThreshold` et `okrCapitalPolitiqueBonus`. `quickWinPieces` est conservé comme donnée historique mais n'est plus lu ; le bonus actif vient de la main complète dans `scoring.json`.
 - `playableEras[]` — sous-ensemble de `eras.json` réellement jouable depuis `scenario_screen` (§15) ; les autres s'affichent verrouillés.
-- `eraBusinessModel` — scénario → id de modèle économique (`businessModels`).
-- `businessModels` conserve les métadonnées des modèles et les paramètres des scénarios non encore migrés. Pour `saas-mrr`, la formule active vit dans `scoring.json` : stock de MRR, churn, conversion de l'Impact et multiplicateurs des équipes support.
+- `businessModels` — **la forme de l'économie** (docs/spec-clients-revenue.md). Chaque modèle déclare `label`, `description` et 2 à 3 `segments[]`, jamais plus (§4.0) : `id`, `role` (`entry`/`paying` — ce qui rend les conversions écrivables sans connaître les ids), `label`/`singular`/`shortLabel`/`icon`, `start` (population de départ), `price` (ce qu'un client paie par sprint — **constante du run**, §5.2), `unitCost` (ce qu'il coûte en support et en infra chaque sprint, §5.3), `churn` (fraction qui part par sprint), `clientsPerPoint` (conversion de l'effet client d'une feature en clients de CE segment). Le modèle du run est choisi par `companies.json → businessModel`, à défaut par `eras.json → businessModel` ; l'échelle de prix vient toujours du scénario (`eras.json → priceScale`, §4.0.1). `waterfall-release` est déclaré avec `segments: []` — le scénario Garage l'attend.
+- `goodEnding` — 🚀 l'IPO se gagne sur ce que vaut le **produit** (`ipo.resource`/`ipo.threshold` sur la 📈 Réputation produit, et `ipo.clientRevenueAtLeastCharges` : une population qui paie au moins ses charges) ; 🤝 le rachat est le reste. On ne moyenne plus une perception produit et une perception joueur (spec-clients-revenue §5.1.1).
 
 ## `scoring.json`
 
 Source de vérité de Traction × Levier = Impact : formules des features et
 epics, bonus de main, série, rôles, huit combos d'organisation, stratégies,
-pratiques, traits visibles, freins et conversion vers les abonnements
-(`conversion.recurring_revenue`), le portefeuille d'Impact
-(`conversion.wallet`), la Valeur perçue et le Capital politique. Depuis le lot A
-de l'Impact-monnaie, `conversion.budget` n'existe plus — la racine carrée et
-l'allocation plancher ont disparu avec les pièces, et le combo Quick wins verse
-désormais `traction.handBonuses.quickWins.impactBonus` directement au
-portefeuille. `ScoreResolver` lit cette
-table sans accéder aux autoloads. Depuis le Lot 3, le Levier par outil ne vit
-plus ici : il est déclaré directement sur la carte dans `cards.json` (voir
-plus haut) — `ScoreResolver.resolve()` reçoit désormais une table `cards` en
-plus de `scoring` et `hidden_traits`.
+pratiques, traits visibles, freins, et ce que le sprint produit une fois
+l'Impact calculé (`conversion`). `ScoreResolver` lit cette table sans accéder
+aux autoloads. Depuis le lot A de l'Impact-monnaie, `conversion.budget`
+n'existe plus — la racine carrée et l'allocation plancher ont disparu avec les
+pièces, et le combo Quick wins verse `traction.handBonuses.quickWins.impactBonus`
+directement au portefeuille. Depuis le Lot 3, le Levier par outil ne vit plus
+ici : il est déclaré directement sur la carte dans `cards.json` (voir plus
+haut) — `ScoreResolver.resolve()` reçoit désormais une table `cards` en plus de
+`scoring` et `hidden_traits`.
 
-> ⚠️ **`conversion.<modele>.impactToMrr` viole la règle d'indépendance des deux
-> économies** (spec-impact-monnaie §3.8, `CLAUDE.md`) : il fait rentrer une
-> fraction de l'Impact du sprint dans le revenu de l'entreprise, ce qui fusionne
-> les deux monnaies. Il est conservé tel quel en attendant son issue dédiée —
-> **ne pas s'en inspirer pour une nouvelle règle**, et ne pas le recalibrer :
-> c'est le sens de la dépendance qui est faux, pas le taux.
+Depuis #42, **`conversion` ne fabrique plus aucun 💰 Revenue à partir de
+l'Impact** (spec-impact-monnaie §3.8) : `impactToMrr`, `recurringRoiMultiplier`
+et la règle `perceivedValue` (Impact → Valeur perçue) ont disparu, et avec eux
+la fuite `Impact → perception → Revenue`. Ce qui part encore de l'Impact ne va
+qu'à ceux qui jugent **le joueur** : `conversion.politicalCapital`. Il reste :
+
+- `conversion.teams` — les trois équipes subies (`sales`/`pmm`/`csm`), chacune
+  avec `icon`, `label`, `effect` et sa table `multipliers` indexée par niveau
+  0-5. Elles gardent leur rôle et **changent d'entrée** : Sales sur les clients
+  qui arrivent, CSM sur ceux qui partent, Product marketing sur ce que les
+  livraisons font à la 📈 Réputation produit (lu par
+  `SprintState.support_team_multiplier()`, une seule table pour les deux
+  usages).
+- `conversion.churnCrisis` — `moralBelow`/`debtAtLeast`/`minChurn` : le churn
+  plancher d'un produit qui se dégrade, tous segments confondus.
+- `traction.feature.pointsMultiplier` — **seul** terme de Traction d'une
+  feature. `clientImpactMultiplier` a disparu : `clients` est devenu une
+  grandeur économique convertie par le modèle du run, et la garder dans la
+  Traction rendait mécaniquement corrélées « ce qui score » et « ce qui paie ».
+  Le score continue de **lire** cette colonne, mais comme une condition
+  (`quotas.json → minimumClientsForTraction`, `strategies.*.featureCondition.clientsMinimum`).
+- `global.strategies.*` — au-delà de `tractionMultiplier`/`lever`, une décision
+  stratégique peut porter `arrivalMultiplier` (clients gagnés),
+  `churnMultiplier`, `priceMultiplier` (appliqué **une fois**, à la décision,
+  via `segment_price_multipliers` — pour que le prix affiché et le prix encaissé
+  restent le même chiffre), `quotaMultiplier`, `segmentConversion`
+  (`from`/`to` par rôle, `ratio` — par sprint) et `onChoice`
+  (`convertRoleRange`, `roleMultipliers`, `rolePriceMultipliers` — le pivot de
+  modèle économique de §4.2, appliqué une seule fois avec une fraction tirée).
 
 Depuis le Lot 4 : `global.productTier.leverPerTier` vaut `0.5` (corrigé de
 `0.1`, hérité du Lot 1, pour matcher le "+0,5 Levier permanent" du Comité,
-spec §12) ; `conversion.saas-mrr.salesMultipliers/pmmMultipliers/csmMultipliers`
-(déjà là depuis le Lot 3) sont désormais réellement alimentés par
+spec §12) ; `conversion.teams.*.multipliers`
+(déjà là depuis le Lot 3, sous un autre nom) sont désormais réellement alimentés par
 `companies.json → supportTeams`, transmis par le snapshot ; et
 `global.strategies.*.supportTeamDeltas` (optionnel, `{sales, pmm, csm}` en
 delta signé) déclare l'effet de bord d'une décision stratégique sur les
@@ -178,7 +199,7 @@ particulier dans `ScoreResolver`.
 
 Les "offres d'emploi" (§16, enrichies en §17) — le cadre RP d'une run, choisi sur `company_select_screen` après le scénario :
 
-- `companies[]` — `id`, `era` (scénario auquel l'entreprise est rattachée), `icon`, `name`, `tagline` (accroche façon offre d'emploi), `description` (contexte de la boîte), `teamProfile` (`junior`/`senior` — fixe `SprintState.team_profile` pour tout le mandat, ce n'est plus un réglage modifiable en jeu), `teamCap` (cap d'effectif de départ — augmenté en jeu par 🪑 Ouvrir un poste au Comité, jamais réécrit ici), `startingImpact` (capital de 💥 au premier sprint — 0 partout aujourd'hui : le premier sprint n'achète rien, spec-impact-monnaie §3.4), `supportTeams` (Lot 4, spec §9.4 — `{sales, pmm, csm}`, niveau 0-5 des trois équipes subies ; absent = neutre 3/3/3, lu par `SprintState.support_teams` puis transmis au score, jamais pilotable en jeu), `inheritedTools[]` optionnel (ids de `cards.json` — outillage déjà installé par quelqu'un d'autre, activé dès `reset_run` et occupant un slot dès le premier sprint, spec §7.1.3), `startingRoster[]` (`id`, `name`, `role`, `seniority`, `trait` — l'équipe héritée, salaires dérivés de `balance.json` → `salaries`, pas de trait caché : sa période d'essai est derrière elle), `boardObjectives` (`title` + `conditions[]` — `type`: `resource-max`/`resource-min`/`decisions-min`/`revenue-min`, `value`, `resource` éventuel, `label` affiché au joueur dès le choix du poste).
+- `companies[]` — `id`, `era` (scénario auquel l'entreprise est rattachée), `icon`, `name`, `tagline` (accroche façon offre d'emploi), `description` (contexte de la boîte), `businessModel` optionnel (id de `balance.json → businessModels` — prime sur celui du scénario : Meridia vend à des grands comptes, Karavel a une base grand public, même époque), `teamProfile` (`junior`/`senior` — fixe `SprintState.team_profile` pour tout le mandat, ce n'est plus un réglage modifiable en jeu), `teamCap` (cap d'effectif de départ — augmenté en jeu par 🪑 Ouvrir un poste au Comité, jamais réécrit ici), `startingImpact` (capital de 💥 au premier sprint — 0 partout aujourd'hui : le premier sprint n'achète rien, spec-impact-monnaie §3.4), `supportTeams` (Lot 4, spec §9.4 — `{sales, pmm, csm}`, niveau 0-5 des trois équipes subies ; absent = neutre 3/3/3, lu par `SprintState.support_teams` puis transmis au score, jamais pilotable en jeu), `inheritedTools[]` optionnel (ids de `cards.json` — outillage déjà installé par quelqu'un d'autre, activé dès `reset_run` et occupant un slot dès le premier sprint, spec §7.1.3), `startingRoster[]` (`id`, `name`, `role`, `seniority`, `trait` — l'équipe héritée, salaires dérivés de `balance.json` → `salaries`, pas de trait caché : sa période d'essai est derrière elle), `boardObjectives` (`title` + `conditions[]` — `type`: `resource-max`/`resource-min`/`decisions-min`/`revenue-min`, `value`, `resource` éventuel, `label` affiché au joueur dès le choix du poste).
 
 ## `investments.json`
 
@@ -187,7 +208,7 @@ deux trimestres, jamais au fil de l'eau ; l'étal du sprint (`balance.json →
 shopDraw`, `cards.json`, `practices.json`) ne change pas et n'est pas
 dupliqué ici.
 
-- `items[]` — `id`, `icon`, `name`, `tagline` (accroche courte), `description` (texte joueur), `kind` (dispatche vers la fonction `SprintState` qui applique l'effet : `strategy`, `tool-slot`, `tool-slot-release`, `team-cap`, `promotion`, `product-tier`, `seminar`, `cleanup-sprint`, `acquisition`, `headhunter`, `turnaround-plan`, `quarter-advance`). Les postes à échelle de prix (`open-seat`, `product-tier`) portent `costs[]`, consommé dans l'ordre (index = achats déjà faits ce mandat) — épuisé, le poste refuse `"plafond"`. Les postes à prix plat (`promotion`, `team-seminar`, `cleanup-sprint`, `acquire-competitor`, `headhunter`, `turnaround-plan`) portent `cost`. `strategic-decision` porte `costRange` (le prix est tiré une fois par trimestre, mémorisé par `SprintState.strategy_purchase_cost()`). `quarter-advance` porte `revenueGain`/`impactPenalty` (pas de prix : c'est le seul poste qui vend de l'Impact contre du Revenue). **Tous les prix sont en 💥 Impact** et se lisent par `SprintState.resolved_price()`, jamais en direct ; `licenseFlatPerTier` est la charge de 💰 Revenue engagée à chaque sprint par palier de produit. Les magnitudes d'effet (`cynismeDelta`, `detteDelta`, `recurringRevenueDelta`, `capIncrement`, `nextShopCandidates`) vivent à côté du prix — jamais dans le script.
+- `items[]` — `id`, `icon`, `name`, `tagline` (accroche courte), `description` (texte joueur), `kind` (dispatche vers la fonction `SprintState` qui applique l'effet : `strategy`, `tool-slot`, `tool-slot-release`, `team-cap`, `promotion`, `product-tier`, `seminar`, `cleanup-sprint`, `acquisition`, `headhunter`, `turnaround-plan`, `quarter-advance`). Les postes à échelle de prix (`open-seat`, `product-tier`) portent `costs[]`, consommé dans l'ordre (index = achats déjà faits ce mandat) — épuisé, le poste refuse `"plafond"`. Les postes à prix plat (`promotion`, `team-seminar`, `cleanup-sprint`, `acquire-competitor`, `headhunter`, `turnaround-plan`) portent `cost`. `strategic-decision` porte `costRange` (le prix est tiré une fois par trimestre, mémorisé par `SprintState.strategy_purchase_cost()`). `quarter-advance` porte `revenueGain`/`impactPenalty` (pas de prix : c'est le seul poste qui vend de l'Impact contre du Revenue). **Tous les prix sont en 💥 Impact** et se lisent par `SprintState.resolved_price()`, jamais en direct ; `licenseFlatPerTier` est la charge de 💰 Revenue engagée à chaque sprint par palier de produit. Les magnitudes d'effet (`cynismeDelta`, `detteDelta`, `clientsGained`, `capIncrement`, `nextShopCandidates`) vivent à côté du prix — jamais dans le script.
 - Consommé uniquement par `game/` (`committee_screen.gd`) — `landing/` n'a pas de Comité.
 
 ## Ce qui reste hors JSON
@@ -203,8 +224,10 @@ multi-équipe du score : `squads[]` contient aujourd'hui une seule entrée
 squads ; les mutations de l'expérience PM actuelle ciblent le roster de la
 squad principale. `last_score_report` est le rapport immuable appliqué puis
 rejoué par la Résolution ; `impact_wallet` (💥, la monnaie unique) et `revenue`
-(💰, sans plafond) sont les deux valeurs de l'économie, `recurring_revenue` la
-base d'abonnements qui les alimente — un rouage, plus un compteur affiché —, et
+(💰, sans plafond) sont les deux valeurs de l'économie ; `clients`
+(segment_id → population) est **le stock qui alimente le Revenue** — les clients
+arrivent parce qu'on a livré, partent au churn et paient chaque sprint — et
+`segment_price_multipliers` le seul endroit qui puisse faire bouger un prix.
 `streak` mémorise les sprints livrés sans surchauffe.
 
 Depuis le Lot 3 : `career_level` (index dans `careers.json`, `balance.json` →
@@ -268,7 +291,7 @@ disque) via `get_unlocked_career_levels()` / `is_career_level_unlocked()` /
 - `attention.autoPilotProfiles` — les trois profils de décision d'une équipe
   non pilotée, retenus par séniorité du meilleur PM (`senior`, `junior`,
   `none`). `sort` vaut `backlog-order` (ordre du tirage) ou `weighted` ;
-  `weights` pondère `roi`, `clientImpact` et `risk` ; `perPoint: true` divise
+  `weights` pondère `clients`, `points` et `risk` ; `perPoint: true` divise
   la note par `costPoints` (le PM raisonne en rendement et non en valeur
   brute) ; `epicPointsRatio` est la part de capacité restante qu'un profil
   investit dans un epic.

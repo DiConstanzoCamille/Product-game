@@ -64,9 +64,10 @@ func _populate() -> void:
 
 	_add_section_title("Modèle économique — %s" % model.get("label", "—"))
 	_add_text(model.get("description", ""), 12, UIHelpers.COLOR_SOFT_TEXT)
+	_add_row("Vos clients", SprintState.describe_clients())
 	if SprintState.last_revenue > 0 or SprintState.last_payroll > 0 or SprintState.last_licenses > 0:
-		_add_row("Dernier sprint résolu", "abonnements +%d 💰 · salaires −%d 💰 · licences −%d 💰" % [
-			SprintState.last_revenue, SprintState.last_payroll, SprintState.last_licenses
+		_add_row("Dernier sprint résolu", "clients +%d 💰 · salaires −%d 💰 · licences −%d 💰 · support −%d 💰" % [
+			SprintState.last_revenue, SprintState.last_payroll, SprintState.last_licenses, SprintState.last_client_cost
 		])
 	_add_row("Solde", "💰 %d · charges du prochain sprint −%d" % [
 		int(round(SprintState.revenue)), int(SprintState.get_recurring_charges().get("total", 0))

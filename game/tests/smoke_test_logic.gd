@@ -23,6 +23,14 @@ extends Node
 ##                personnelles avec discernement (1:1 avant embauche,
 ##                rallonge quand le budget est à sec, Souffler quand la
 ##                jauge est basse).
+##  - "economie" : le·la CPO qui nourrit la boîte — livre en priorité ce qui
+##                amène des clients, n'achète presque rien pour ne pas gonfler
+##                les charges. Doit franchir le mandat sans jouer le Levier.
+##  - "levier"   : l'inverse exact — livre les gros morceaux, achète outils et
+##                pratiques dès qu'il peut, recrute. Doit franchir le mandat
+##                sans jamais optimiser la caisse. Les deux existent pour le
+##                critère de recette 2 de l'issue #42 : deux trajectoires
+##                gagnantes, aucune dominante.
 ##  - "careful" : joueur immobile — choix Inbox le moins coûteux, aucune
 ##                feature livrée, aucune embauche, aucun achat, aucune
 ##                action personnelle. Depuis la Phase A ("la pression"),
@@ -49,21 +57,40 @@ func _ready() -> void:
 	_test_multi_squad_mandate_playthrough_lot5()
 	_test_attention_and_autopilot_lot5()
 
-	for strategy in ["stress", "greedy", "careful"]:
+	var quarters_reached: Dictionary = {}
+	for strategy in ["stress", "greedy", "economie", "levier", "careful"]:
 		print("\n=== SMOKE TEST LOGIQUE — %s ===" % strategy.to_upper())
 		var endings: Array = []
 		var run_index := 0
+		var best_quarter := 0
 		for company_id in ["meridia-corp", "karavel-scaleup"]:
 			for repeat in range(2):
 				_play_one_mandate(run_index, strategy, company_id)
 				endings.append(SprintState.ending_id)
+				best_quarter = max(best_quarter, SprintState.quarter_index)
 				run_index += 1
+		quarters_reached[strategy] = best_quarter
 
 		# Critère de recette Phase B : la spirale burn-out (Moral effondré →
 		# régén nulle → Taf soi-même répété → Énergie ≤ 0) doit rester
 		# atteignable — "stress" est construite pour la déclencher.
 		if strategy == "stress" and not endings.has("burnout-fondateur"):
 			_fail("Aucun run stress ne s'est terminé en burn-out (fins : %s) — la spirale Énergie est devenue inatteignable." % [endings])
+
+	# 🎯 Critère de recette 2 de l'issue #42 : un run « économie » et un run
+	# « Levier » doivent tous deux franchir le mandat, et aucun ne doit
+	# dominer. On assère la RELATION (les deux vont au moins aussi loin que
+	# le premier verdict, et leur écart reste d'un trimestre) — jamais le
+	# trimestre exact atteint, qui dépend des tirages.
+	var economy_quarter := int(quarters_reached.get("economie", 0))
+	var lever_quarter := int(quarters_reached.get("levier", 0))
+	if economy_quarter < 2:
+		_fail("La trajectoire « économie » ne passe plus aucun verdict de board (T%d) — nourrir la boîte doit rester un chemin viable." % economy_quarter)
+	if lever_quarter < 2:
+		_fail("La trajectoire « Levier » ne passe plus aucun verdict de board (T%d) — jouer l'organisation doit rester un chemin viable." % lever_quarter)
+	if absi(economy_quarter - lever_quarter) > 1:
+		_fail("Une trajectoire domine l'autre : économie T%d contre Levier T%d. Les deux doivent tenir la comparaison." % [economy_quarter, lever_quarter])
+	print("\nTrajectoires — économie : meilleur T%d · Levier : meilleur T%d (critère de recette 2 de #42)" % [economy_quarter, lever_quarter])
 
 	if failures > 0:
 		print("\n=== SMOKE TEST LOGIQUE : ÉCHEC — %d assertion(s) en erreur ===" % failures)
@@ -144,8 +171,8 @@ func _test_backlog_rules() -> void:
 
 	var feature: Dictionary = GameData.backlog.get("features", [])[0]
 	SprintState.current_backlog_draw = {"sprint": SprintState.sprint_number, "items": [feature]}
-	if SprintState.backlog_attribute_revealed(feature.get("id", ""), "roi"):
-		_fail("Le ROI est révélé sans pratique ni plongée.")
+	if SprintState.backlog_attribute_revealed(feature.get("id", ""), "clients"):
+		_fail("L'effet client est révélé sans pratique ni plongée.")
 	var energy_before := SprintState.energy
 	if SprintState.do_feature_dive(feature.get("id", "")) != "":
 		_fail("Plonger dans une feature a été refusé sans raison.")
@@ -154,13 +181,12 @@ func _test_backlog_rules() -> void:
 	if SprintState.energy != energy_before - SprintState.get_personal_action_cost("featureDive"):
 		_fail("Plonger n'a pas débité le coût configuré en énergie.")
 	var report := SprintState.commit_backlog_plan([{"id": feature.get("id", ""), "points": feature.get("costPoints", 0)}])
-	if report.get("delivered", []).size() != 1 or SprintState.recurring_roi != int(feature.get("roi", 0)):
-		_fail("La livraison n'a pas appliqué le ROI permanent du backlog.")
+	if report.get("delivered", []).size() != 1 or int(report.get("clientPoints", -99)) != int(feature.get("clients", 0)):
+		_fail("La livraison n'a pas annoncé l'effet client de la feature.")
 	if not SprintState.completed_backlog_ids.has(feature.get("id", "")):
 		_fail("Une feature livrée n'a pas quitté le sac du backlog.")
-	var roi_after_delivery := SprintState.recurring_roi
 	report = SprintState.commit_backlog_plan([{"id": feature.get("id", ""), "points": feature.get("costPoints", 0)}])
-	if not report.get("delivered", []).is_empty() or SprintState.recurring_roi != roi_after_delivery:
+	if not report.get("delivered", []).is_empty() or int(report.get("clientPoints", -99)) != 0:
 		_fail("Une feature déjà livrée a pu être encaissée deux fois.")
 
 	SprintState.reset_run("agile-transformation", "meridia-corp")
@@ -222,7 +248,7 @@ func _test_score_resolution_integration() -> void:
 	var report: Dictionary = SprintState.last_score_report
 	var conversion: Dictionary = report.get("conversion", {})
 	var wallet: Dictionary = conversion.get("wallet", {})
-	var recurring_report: Dictionary = conversion.get("recurring_revenue", {})
+	var client_report: Dictionary = conversion.get("clients", {})
 	var expected_quick_win := int(GameData.scoring.get("traction", {}).get("handBonuses", {}).get("quickWins", {}).get("impactBonus", 0))
 	if report.is_empty() or int(report.get("next_streak", 0)) != 1 or SprintState.streak != 1:
 		_fail("Un sprint avec livraisons doit produire un rapport et commencer la serie.")
@@ -235,16 +261,16 @@ func _test_score_resolution_integration() -> void:
 	var expected_wallet := wallet_before + 3 + int(wallet.get("gain", 0))
 	if SprintState.impact_wallet != expected_wallet or SprintState.last_wallet_delta != expected_wallet - wallet_before:
 		_fail("Le portefeuille doit valoir %d et non %d." % [expected_wallet, SprintState.impact_wallet])
-	if int(round(SprintState.recurring_revenue)) != SprintState.last_revenue or int(round(float(recurring_report.get("after", 0.0)))) != SprintState.last_revenue:
-		_fail("Les abonnements encaisses doivent etre exactement la base finale du rapport.")
-	if int(round(float(recurring_report.get("recurring_roi_gain", 0.0)))) != SprintState.last_roi_revenue_bonus:
-		_fail("Le bonus recurring_roi du rapport n'est pas expose a l'UI.")
+	if SprintState.clients != client_report.get("after", {}):
+		_fail("La population du jeu doit etre exactement celle que le rapport a calculee.")
+	if int(round(float(conversion.get("revenue", {}).get("in", 0.0)))) != SprintState.last_revenue:
+		_fail("Ce qui est encaisse doit etre exactement ce que le rapport dit que les clients ont paye.")
 	# 💰 Le Revenue n'est pas borne : il encaisse les abonnements et paie les
 	# charges, une seule fois chacun.
 	var expected_revenue := revenue_before - float(charges) + float(SprintState.last_revenue)
 	if not is_equal_approx(SprintState.revenue, expected_revenue):
 		_fail("Le Revenue doit recevoir les abonnements une seule fois et payer ses charges une seule fois (%s au lieu de %s)." % [SprintState.revenue, expected_revenue])
-	if SprintState.last_payroll + SprintState.last_licenses != charges:
+	if SprintState.last_payroll + SprintState.last_licenses + SprintState.last_client_cost != charges:
 		_fail("Les charges prelevees doivent etre exactement celles que get_recurring_charges() affiche.")
 
 	SprintState.sprint_number += 1
@@ -392,7 +418,7 @@ func _test_quarter_runtime() -> void:
 			"sprint": SprintState.sprint_number,
 			"plannedPoints": 1,
 			"capacity": 1,
-			"delivered": [{"id": "internal-%d" % sprint, "name": "Travail interne", "costPoints": 1, "clientImpact": 0, "risk": 0, "quickWin": false, "tags": ["tech"]}],
+			"delivered": [{"id": "internal-%d" % sprint, "name": "Travail interne", "costPoints": 1, "clients": 0, "risk": 0, "quickWin": false, "tags": ["tech"]}],
 		}
 		var ending := SprintState.apply_pending_and_check()
 		if sprint < 2:
@@ -405,6 +431,12 @@ func _test_quarter_runtime() -> void:
 	# Les exigences runtime modifient les actions et le snapshot, sans UI.
 	SprintState.reset_run("agile-transformation", "meridia-corp")
 	SprintState.quarter_requirement_ids = ["short-quarter"]
+	# Neutralise aussi la decision strategique tiree au hasard : depuis #42,
+	# Expansion internationale porte un quotaMultiplier et rendait cette
+	# assertion flaky une fois sur douze — meme piege qu'au carnet §29.
+	SprintState.chosen_strategy_ids.clear()
+	SprintState.quarter_strategy_chosen = false
+	SprintState.quarter_forced_strategy_id = ""
 	# 75 % du quota T1, quel que soit le chiffre de quotas.json — asserter la
 	# regle, pas la valeur d'equilibrage du jour.
 	var t1_quota := int(GameData.quotas.get("careerLevels", {}).get("pm", {}).get("quarterQuotas", [])[0])
@@ -447,7 +479,7 @@ func _test_quarter_runtime() -> void:
 			"sprint": SprintState.sprint_number,
 			"plannedPoints": 40,
 			"capacity": 40,
-			"delivered": [{"id": "quota-%d" % sprint, "name": "Livraison quota", "costPoints": 40, "clientImpact": 1, "risk": 0, "quickWin": false, "tags": ["growth"]}],
+			"delivered": [{"id": "quota-%d" % sprint, "name": "Livraison quota", "costPoints": 40, "clients": 1, "risk": 0, "quickWin": false, "tags": ["growth"]}],
 		}
 		SprintState.apply_pending_and_check()
 		if sprint < 2:
@@ -491,6 +523,9 @@ func _test_quarter_runtime() -> void:
 	if SprintState.quarter_requirement_ids.size() < 2:
 		_fail("Le mandat long doit ajouter une exigence au lieu d'ecraser celle du T4.")
 	SprintState.quarter_requirement_ids = ["hiring-freeze", "tool-freeze"]
+	SprintState.chosen_strategy_ids.clear()
+	SprintState.quarter_strategy_chosen = false
+	SprintState.quarter_forced_strategy_id = ""
 	# Le T5 long repart du quota T4 multiplie par longMandate.quotaMultiplier —
 	# la regle, jamais le chiffre du jour.
 	var quotas: Array = GameData.quotas.get("careerLevels", {}).get("pm", {}).get("quarterQuotas", [])
@@ -527,6 +562,8 @@ func _test_committee_lot4() -> void:
 	# board tirée à T1 (déjà couverte ailleurs) pour rester déterministe.
 	SprintState.reset_run("agile-transformation", "karavel-scaleup")
 	SprintState.chosen_strategy_ids.clear()
+	SprintState.quarter_strategy_chosen = false
+	SprintState.quarter_forced_strategy_id = ""
 	SprintState.quarter_strategy_chosen = false
 	var strategy_options := SprintState.get_strategy_options(3)
 	if strategy_options.is_empty():
@@ -642,16 +679,16 @@ func _test_committee_lot4() -> void:
 	# immédiate), +1 employé immédiat, +8 Dette en attente de Résolution.
 	SprintState.reset_run("agile-transformation", "karavel-scaleup")
 	var roster_before := SprintState.get_roster().size()
-	var recurring_before := SprintState.recurring_revenue
+	var clients_before := SprintState.get_client_total()
 	SprintState.impact_wallet = 0
 	if SprintState.buy_competitor_acquisition() != "impact":
 		_fail("Sans budget, le rachat d'un concurrent doit refuser 'impact'.")
 	SprintState.impact_wallet = 2000
 	if SprintState.buy_competitor_acquisition() != "":
 		_fail("Avec budget, le rachat d'un concurrent doit être accepté.")
-	var acquired := float(SprintState.find_investment_item("acquire-competitor").get("recurringRevenueDelta", 10))
-	if not is_equal_approx(SprintState.recurring_revenue, recurring_before + acquired):
-		_fail("Le rachat d'un concurrent doit ajouter %d d'abonnements récurrents immédiatement." % int(acquired))
+	var acquired := SprintState.clients_for_points(float(SprintState.find_investment_item("acquire-competitor").get("clientsGained", 7)))
+	if not is_equal_approx(SprintState.get_client_total(), clients_before + acquired):
+		_fail("Le rachat d'un concurrent doit faire entrer %d clients immédiatement." % int(round(acquired)))
 	if SprintState.get_roster().size() != roster_before + 1:
 		_fail("Le rachat d'un concurrent doit ajouter un employé au roster immédiatement.")
 	if int(SprintState.pending_deltas.get("dette-organisationnelle", 0.0)) != 8:
@@ -767,6 +804,8 @@ func _test_support_teams_and_compendium_lot4() -> void:
 	SprintState.support_teams = SprintState.get_company().get("supportTeams", {}).duplicate()
 	SprintState.chosen_strategy_ids.clear()
 	SprintState.quarter_strategy_chosen = false
+	SprintState.quarter_forced_strategy_id = ""
+	SprintState.quarter_strategy_chosen = false
 	var pmm_before := int(SprintState.support_teams.get("pmm", 3))
 	var sales_before := int(SprintState.support_teams.get("sales", 3))
 	if SprintState.choose_strategy("open-source") != "":
@@ -825,9 +864,36 @@ func _test_career_progression_lot5() -> void:
 	# au carnet §29.
 	SprintState.quarter_requirement_ids = []
 	SprintState.quarter_requirement_id = ""
+	SprintState.chosen_strategy_ids.clear()
+	SprintState.quarter_strategy_chosen = false
+	SprintState.quarter_forced_strategy_id = ""
 	var expected_quota := int(GameData.quotas.get("careerLevels", {}).get("lead-pm", {}).get("quarterQuotas", [])[0])
 	if SprintState.get_current_quota() != expected_quota:
 		_fail("get_current_quota() doit lire la table 'lead-pm' de quotas.json (attendu %d, obtenu %d)." % [expected_quota, SprintState.get_current_quota()])
+
+	# 🌍 Expansion internationale a DEUX consequences opposees : chaque client
+	# paie plus, et le quota monte. Tester une seule des deux ne distingue pas
+	# une indexation correcte d'un simple bonus (CLAUDE.md — une regle a double
+	# consequence se teste dans les deux sens).
+	var price_before := SprintState.resolved_segment_price(SprintState.get_segments()[0].get("id", ""))
+	SprintState.quarter_strategy_chosen = false
+	if SprintState.choose_strategy("expansion-internationale") != "":
+		_fail("Expansion internationale doit pouvoir etre choisie au T1.")
+	var expansion: Dictionary = GameData.scoring.get("global", {}).get("strategies", {}).get("expansion-internationale", {})
+	if SprintState.get_current_quota() != int(round(expected_quota * float(expansion.get("quotaMultiplier", 1.0)))):
+		_fail("Expansion internationale doit relever le quota de %s (attendu %d, obtenu %d)." % [
+			expansion.get("quotaMultiplier", 1.0), int(round(expected_quota * float(expansion.get("quotaMultiplier", 1.0)))), SprintState.get_current_quota()])
+	if SprintState.get_client_revenue() <= 0.0:
+		_fail("Le test d'Expansion internationale a besoin d'une population qui paie.")
+	var price_after := SprintState.resolved_segment_price(SprintState.get_segments()[0].get("id", ""))
+	if not is_equal_approx(price_after, price_before * float(expansion.get("priceMultiplier", 1.0))):
+		_fail("Expansion internationale doit aussi faire monter le prix par client (attendu %s, obtenu %s)." % [
+			price_before * float(expansion.get("priceMultiplier", 1.0)), price_after])
+	# Le vrai piege : monter le prix ET le quota du meme facteur ne serait
+	# qu'une inflation. Le quota monte de 20 %, le prix de 25 % — le pari est
+	# que la difference paie l'ecart.
+	if is_equal_approx(float(expansion.get("priceMultiplier", 1.0)), float(expansion.get("quotaMultiplier", 1.0))):
+		_fail("Un prix et un quota indexes du meme facteur ne changent rien : ce serait une inflation pure.")
 
 	# Franchir le 4e trimestre débloque le niveau suivant, quel que soit le
 	# choix ensuite (spec §13.4 : "un mandat complet en 4 trimestres").
@@ -1467,9 +1533,9 @@ func _play_one_mandate(run_index: int, strategy: String, company_id: String) -> 
 	# 💰 Le Revenue est imprimé avec sa base d'abonnements et sa facture : sans
 	# ça, le banc ne dit rien de la seule question qui compte pour lui — est-ce
 	# que la caisse contraint encore, ou est-ce qu'elle a décollé toute seule ?
-	print("Run %d (%s, %s) terminé — sprint %d, fin='%s', 💥 %d, 💰 %d (abo %d, charges %d), ⚡ %d, 👥 %d, revue de board='%s', ressources finales=%s" % [
+	print("Run %d (%s, %s) terminé — sprint %d, fin='%s', 💥 %d, 💰 %d (clients paient %d, charges %d), ⚡ %d, 👥 %d, revue de board='%s', ressources finales=%s" % [
 		run_index, strategy, company_id, SprintState.sprint_number, SprintState.ending_id,
-		SprintState.impact_wallet, int(round(SprintState.revenue)), int(round(SprintState.recurring_revenue)),
+		SprintState.impact_wallet, int(round(SprintState.revenue)), int(round(SprintState.get_client_revenue())),
 		int(SprintState.get_recurring_charges().get("total", 0)),
 		SprintState.energy, SprintState.get_roster().size(), SprintState.board_review_state,
 		SprintState.resource_values
@@ -1501,10 +1567,12 @@ func _play_sprint(strategy: String) -> void:
 	if not event.is_empty():
 		var choices: Array = event.get("choices", [])
 		var choice: Dictionary = choices[0]
-		if strategy == "careful":
+		if strategy == "careful" or strategy == "levier":
 			choice = _least_costly_choice(choices)
 		elif strategy == "stress":
 			choice = _worst_moral_choice(choices)
+		elif strategy == "economie":
+			choice = _best_client_choice(choices)
 		SprintState.add_pending(choice.get("effects", {}), "%s → %s" % [event.get("subject", ""), choice.get("label", "")])
 
 	# Actions personnelles Roadmap (Phase B) : "stress" fait le taf soi-même
@@ -1515,7 +1583,7 @@ func _play_sprint(strategy: String) -> void:
 		while SprintState.personal_action_refusal() == "" and guard < 4:
 			SprintState.do_self_work()
 			guard += 1
-	elif strategy == "greedy" and SprintState.energy >= 50 and SprintState.personal_action_refusal() == "":
+	elif strategy in ["greedy", "economie", "levier"] and SprintState.energy >= 50 and SprintState.personal_action_refusal() == "":
 		SprintState.do_self_work()
 
 	# Phase 2 — Roadmap : le vrai tirage persistant du backlog remplace les
@@ -1524,9 +1592,21 @@ func _play_sprint(strategy: String) -> void:
 	var plan: Array = []
 	var roadmap_offer := SprintState.get_backlog_offer()
 	var used := 0
-	for item in roadmap_offer.get("items", []):
+	# 💰 « économie » trie par effet client, 📊 « Levier » par taille : deux
+	# lectures du même tirage, et c'est tout ce qui les sépare côté Roadmap.
+	var items: Array = roadmap_offer.get("items", []).duplicate()
+	if strategy == "economie":
+		items.sort_custom(func(a, b): return int(a.get("clients", 0)) > int(b.get("clients", 0)))
+	elif strategy == "levier":
+		items.sort_custom(func(a, b): return int(a.get("costPoints", 0)) > int(b.get("costPoints", 0)))
+	for item in items:
 		var points := SprintState.get_epic_remaining(item.get("id", "")) if SprintState.is_backlog_epic(item) else int(item.get("costPoints", 0))
-		if strategy == "stress" or (strategy == "greedy" and used + points <= capacity):
+		# « économie » refuse ce qui fait fuir les clients, sauf s'il lui reste
+		# de la capacité à ne pas gâcher : produire reste la seule source
+		# d'Impact, même pour qui joue la caisse.
+		if strategy == "economie" and int(item.get("clients", 0)) < 0 and used * 2 < capacity:
+			continue
+		if strategy == "stress" or (strategy in ["greedy", "economie", "levier"] and used + points <= capacity):
 			plan.append({"id": item.get("id", ""), "points": points})
 			used += points
 	if strategy != "careful":
@@ -1562,6 +1642,12 @@ func _play_sprint(strategy: String) -> void:
 		for card_id in offer.get("decisions", []):
 			if SprintState.activate_decision(card_id) == "":
 				break
+	elif strategy == "levier":
+		# Le profil Levier prend tout ce qu'il peut : c'est sa thèse, et c'est
+		# aussi ce qui fait monter sa facture de licences.
+		for card_id in offer.get("decisions", []):
+			if SprintState.activate_decision(card_id) == "":
+				break
 
 	# 📌 "greedy" punaise ce qu'il ne peut pas encore payer : au sprint 5, s'il
 	# reste un candidat trop cher sur l'étal, il le réserve pour le sprint
@@ -1579,6 +1665,33 @@ func _play_sprint(strategy: String) -> void:
 		if SprintState.sprint_number >= 2 and SprintState.get_roster().size() > 1:
 			var last_employee: Dictionary = SprintState.get_roster()[-1]
 			SprintState.fire_employee(last_employee.get("id", ""))
+	elif strategy == "economie":
+		# Nourrir la boîte, ce n'est pas se priver : c'est n'engager une charge
+		# que quand la caisse la porte. Ce profil achète comme les autres —
+		# simplement jamais à découvert, et il négocie une rallonge avant de
+		# couler plutôt qu'après.
+		var economy_room := SprintState.revenue - float(SprintState.get_recurring_charges().get("total", 0)) * 1.5
+		if economy_room > 0.0:
+			var economy_candidates: Array = offer.get("candidates", [])
+			if not economy_candidates.is_empty():
+				SprintState.hire_candidate(economy_candidates[0])
+			var economy_practices: Array = offer.get("practices", [])
+			if not economy_practices.is_empty():
+				SprintState.buy_practice(economy_practices[0])
+			for card_id in offer.get("decisions", []):
+				if SprintState.activate_decision(card_id) == "":
+					break
+		if SprintState.revenue < 30.0 and SprintState.personal_action_refusal() == "":
+			SprintState.do_negotiate_extension()
+	elif strategy == "levier":
+		# Jouer l'organisation : une pratique dès qu'elle passe, un recrutement
+		# dès qu'il passe. La caisse n'est jamais un critère.
+		var lever_practices: Array = offer.get("practices", [])
+		if not lever_practices.is_empty():
+			SprintState.buy_practice(lever_practices[0])
+		var lever_candidates: Array = offer.get("candidates", [])
+		if not lever_candidates.is_empty():
+			SprintState.hire_candidate(lever_candidates[0])
 	elif strategy == "greedy":
 		# ~1 achat par sprint : une pratique les sprints pairs, sinon une
 		# embauche — précédée d'un 1:1 quand l'Énergie le permet : on ne
@@ -1606,7 +1719,7 @@ func _play_sprint(strategy: String) -> void:
 		return
 	# 🧘 Souffler se décide à la Résolution : "greedy" lève le pied quand la
 	# jauge est basse (le prochain sprint se jouera sans action personnelle).
-	if strategy == "greedy" and SprintState.energy < 30:
+	if strategy in ["greedy", "economie", "levier"] and SprintState.energy < 30:
 		SprintState.plan_breather()
 	SprintState.sprint_number += 1
 
@@ -1634,6 +1747,20 @@ func _worst_moral_choice(choices: Array) -> Dictionary:
 			worst_moral = moral
 			worst = choice
 	return worst
+
+
+## 👥 Le choix qui amène le plus de clients — l'heuristique du profil
+## « économie ». À égalité d'effet client, on retombe sur le moins coûteux :
+## nourrir la boîte, ce n'est pas se ruiner ailleurs.
+func _best_client_choice(choices: Array) -> Dictionary:
+	var best: Dictionary = _least_costly_choice(choices)
+	var best_clients := -INF
+	for choice in choices:
+		var value := float(choice.get("effects", {}).get("clients", 0))
+		if value > best_clients:
+			best_clients = value
+			best = choice
+	return best
 
 
 ## La décision tirée qui abîme le plus le Moral, cartes verrouillées écartées.

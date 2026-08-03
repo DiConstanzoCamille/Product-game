@@ -42,14 +42,14 @@ var pending_journal_lines: Array = []  # texte des choix faits pendant le sprint
 var is_mandate_over: bool = false
 var ending_id: String = ""
 
-var last_revenue: int = 0              # abonnements encaissés au dernier sprint résolu
-var last_revenue_cost: int = 0         # somme des coûts/gains de décisions sur le Revenue (hors abonnements et charges)
+var last_revenue: int = 0              # 💰 ce que les clients ont payé au dernier sprint résolu
+var last_revenue_cost: int = 0         # somme des coûts/gains de décisions sur le Revenue (hors clients et charges)
 var last_payroll: int = 0              # masse salariale prélevée au dernier sprint résolu
 var last_licenses: int = 0             # licences et coûts récurrents prélevés au dernier sprint résolu
+var last_client_cost: int = 0          # 🧾 support et infra des clients, prélevés au dernier sprint résolu
 var last_wallet_delta: int = 0         # flux net du portefeuille d'Impact au dernier sprint résolu
-var last_roi_revenue_bonus: int = 0    # part des abonnements venue du ROI des livraisons
+var last_client_report: Dictionary = {}  # 👥 mouvements de population du dernier sprint (arrivées, départs, par segment)
 var last_score_report: Dictionary = {} # rapport immuable produit par ScoreResolver
-var recurring_revenue: float = 0.0     # 💰 base d'abonnements : ce que le produit encaisse à chaque sprint (ex-stock de MRR)
 var streak: int = 0                    # sprints livrés consécutifs, réservé au score
 
 # --- Phase A : l'entreprise ---
@@ -65,6 +65,17 @@ var impact_wallet: int = 0
 ## encaisse les abonnements et paie chaque sprint salaires et licences. À zéro,
 ## l'entreprise ne paie plus : faillite.
 var revenue: float = 0.0
+## 👥 La population qui paie — segment_id → nombre de clients (docs/spec-clients-revenue.md
+## §2). **Le Revenue n'est pas un stock : c'est ceci qui l'est.** Les clients
+## arrivent parce qu'on a livré, partent au churn, et paient chaque sprint le
+## prix de leur segment. Ils coûtent aussi du support à chaque sprint, ce qui
+## rend une base gratuite dangereuse (§5.3). Jamais un compteur de plus à
+## l'écran : c'est la ligne de composition sous le solde, pas une jauge.
+var clients: Dictionary = {}
+## 💳 Le prix d'un segment est une **constante du run** (§5.2). Ce dictionnaire
+## est le seul endroit qui puisse le faire mentir, et seule une décision
+## stratégique explicite y écrit (§4.2 — « Fin du gratuit »).
+var segment_price_multipliers: Dictionary = {}
 var squads: Array = []                 # [{id, name, roster, backlog_draw, capacity, delivered, epic_progress}]
 var piloted_squads: Dictionary = {}    # 🎯 {sprint, ids} — les équipes pilotées ce sprint (Lot 5 §13.3) ; les autres jouent seules
 var owned_practices: Array = []        # ids de pratiques achetées (permanentes pour le mandat)
@@ -74,7 +85,6 @@ var current_backlog_draw: Dictionary = {}  # {sprint, items} — tirage Roadmap 
 var epic_progress: Dictionary = {}         # epic_id -> {invested, startedSprint}
 var completed_backlog_ids: Array = []      # livraisons définitives, hors du sac
 var revealed_backlog_sprint: Dictionary = {}  # feature_id -> sprint du Plonger temporaire
-var recurring_roi: int = 0                 # bonus de MRR permanent acquis par les livraisons
 var last_roadmap_report: Dictionary = {}   # livraison réelle affichée à la Résolution
 var board_review_state: String = "pending"  # "pending" | "passed" | "failed"
 var board_review_result: Dictionary = {}    # {sprint, passed, title, conditions:[{label, ok}]} — pour l'overlay de verdict
@@ -132,7 +142,11 @@ func reset_run(chosen_era_id: String = "", chosen_company_id: String = "", chose
 	era_id = chosen_era_id if chosen_era_id != "" else _pick_random_playable_era()
 	company_id = chosen_company_id if chosen_company_id != "" else _pick_random_company(era_id)
 	team_profile = get_company().get("teamProfile", "junior")
-	business_model_id = GameData.balance.get("eraBusinessModel", {}).get(era_id, "")
+	# 💰 Le scénario choisit le modèle par défaut et surtout l'échelle de prix
+	# (spec-clients-revenue.md §4.0.1) ; l'entreprise peut imposer le sien —
+	# Meridia vend à des grands comptes, Karavel a une base grand public, et
+	# elles jouent la même époque.
+	business_model_id = str(get_company().get("businessModel", get_era().get("businessModel", "")))
 	activated_cards.clear()
 	activated_card_sprints.clear()
 	journal.clear()
@@ -144,10 +158,10 @@ func reset_run(chosen_era_id: String = "", chosen_company_id: String = "", chose
 	last_revenue_cost = 0
 	last_payroll = 0
 	last_licenses = 0
+	last_client_cost = 0
 	last_wallet_delta = 0
-	last_roi_revenue_bonus = 0
+	last_client_report.clear()
 	last_score_report.clear()
-	recurring_revenue = 0.0
 	streak = 0
 	_inbox_event_bag.clear()
 	_last_inbox_event_id = ""
@@ -162,7 +176,6 @@ func reset_run(chosen_era_id: String = "", chosen_company_id: String = "", chose
 	epic_progress.clear()
 	completed_backlog_ids.clear()
 	revealed_backlog_sprint.clear()
-	recurring_roi = 0
 	last_roadmap_report.clear()
 	board_review_state = "pending"
 	board_review_result.clear()
@@ -204,6 +217,13 @@ func reset_run(chosen_era_id: String = "", chosen_company_id: String = "", chose
 	impact_wallet = int(company.get("startingImpact", 0))
 	var revenue_conf: Dictionary = GameData.balance.get("revenue", {})
 	revenue = float(revenue_conf.get("startOverrides", {}).get(company_id, revenue_conf.get("start", 50)))
+	# 👥 On n'hérite pas d'une caisse, on hérite de clients : la population de
+	# départ est celle du modèle économique, et c'est elle qui fait le premier
+	# revenu du premier sprint.
+	clients.clear()
+	segment_price_multipliers.clear()
+	for segment in get_segments():
+		clients[segment.get("id", "")] = float(segment.get("start", 0))
 	# 💼📣🎧 Équipes subies (spec §9.4) : niveau 0-5 fixé par l'entreprise,
 	# jamais pilotable en jeu. Défaut 3/3/3 (neutre) si l'entreprise ne le
 	# déclare pas — compatibilité des scénarios qui ne l'ont pas encore.
@@ -338,7 +358,14 @@ func get_current_quota() -> int:
 	if quarter_index >= int(long_conf.get("fromQuarter", 5)):
 		var multiplier := float(long_conf.get("quotaMultiplier", 2.2))
 		base_quota *= pow(multiplier, quarter_index - 4)
-	return int(round(base_quota * float(_active_quarter_effects().get("quotaMultiplier", 1.0))))
+	# 🧭 Une décision stratégique peut relever la barre pour toujours
+	# (Expansion internationale : plus de marché, plus d'attentes). Elle passe
+	# par ici et nulle part ailleurs — un écran qui lirait la table brute
+	# afficherait un quota que le verdict ne reconnaîtrait pas.
+	var strategy_quota := 1.0
+	for strategy_id in chosen_strategy_ids:
+		strategy_quota *= float(GameData.scoring.get("global", {}).get("strategies", {}).get(strategy_id, {}).get("quotaMultiplier", 1.0))
+	return int(round(base_quota * strategy_quota * float(_active_quarter_effects().get("quotaMultiplier", 1.0))))
 
 
 func get_quarter_length() -> int:
@@ -504,7 +531,20 @@ func get_recurring_charges() -> Dictionary:
 		licenses += tier_charge
 		lines.append({"icon": "🚀", "label": "Infrastructure produit (palier %d)" % product_tier, "amount": tier_charge})
 
-	return {"total": payroll + licenses, "payroll": payroll, "licenses": licenses, "lines": lines}
+	# 🧾 Ce que la population coûte : au même titre qu'une licence par siège,
+	# mais par client (spec-clients-revenue.md §5.3). Sans cette ligne, une base
+	# gratuite n'a aucun inconvénient et le freemium n'est plus un pari.
+	var client_cost := int(round(get_client_support_cost()))
+	if client_cost > 0:
+		lines.append({"icon": "🧾", "label": "Support et infra (%d clients)" % int(round(get_client_total())), "amount": client_cost})
+
+	return {
+		"total": payroll + licenses + client_cost,
+		"payroll": payroll,
+		"licenses": licenses,
+		"clients": client_cost,
+		"lines": lines,
+	}
 
 
 ## Texte court de la charge d'un poste, pour la zone « coût » d'une carte :
@@ -639,7 +679,7 @@ func _active_quarter_effects() -> Dictionary:
 			var value: Variant = normalized[key]
 			if key in ["payrollMultiplier", "debtFrictionScale", "quotaMultiplier"]:
 				result[key] = float(result.get(key, 1.0)) * float(value)
-			elif key == "minimumClientImpactForTraction":
+			elif key == "minimumClientsForTraction":
 				result[key] = max(int(result.get(key, 0)), int(value))
 			elif key == "quarterLength":
 				result[key] = min(int(result.get(key, value)), int(value))
@@ -660,7 +700,7 @@ func _normalize_quarter_effects(raw: Dictionary) -> Dictionary:
 	if raw.has("salaryMultiplier"):
 		result["payrollMultiplier"] = raw.get("salaryMultiplier", 1.0)
 	if raw.has("featureTraction"):
-		result["minimumClientImpactForTraction"] = int(raw.get("featureTraction", {}).get("clientImpactMax", 0)) + 1
+		result["minimumClientsForTraction"] = int(raw.get("featureTraction", {}).get("clientsMax", 0)) + 1
 	if raw.has("friction"):
 		result["debtFrictionScale"] = raw.get("friction", {}).get("debtMultiplier", 1.0)
 	if raw.has("trimester"):
@@ -736,7 +776,69 @@ func choose_strategy(strategy_id: String) -> String:
 		strategy.get("icon", ""), strategy.get("name", strategy_id)
 	])
 	_apply_strategy_support_team_deltas(strategy_id)
+	_apply_strategy_on_choice(strategy_id)
 	return ""
+
+
+## 🔒 Le pivot de modèle économique (spec-clients-revenue.md §4.2) — le seul
+## endroit du jeu qui change le prix d'un segment, et il ne s'exécute qu'une
+## fois : à la décision. La fraction qui bascule est **tirée** dans une
+## fourchette déclarée sur la carte. Le joueur sait qu'il ferme la porte, il ne
+## sait pas combien le suivront — c'est un pari, pas un calcul (question 4 de
+## la vision). Rien n'est en dur ici : sans `onChoice`, la décision ne touche
+## pas la population.
+func _apply_strategy_on_choice(strategy_id: String) -> void:
+	var strategy: Dictionary = GameData.scoring.get("global", {}).get("strategies", {}).get(strategy_id, {})
+	var parts: Array = []
+
+	# 💳 Une décision qui change le prix l'écrit dans `segment_price_multipliers`
+	# et nulle part ailleurs : c'est la table que `resolved_segment_price()` lit
+	# pour l'affichage ET que le rapport de score lit pour encaisser. Deux
+	# chemins de calcul pour un même prix, et la composition affichée sous le
+	# solde se met à mentir dès la première décision.
+	var global_price := float(strategy.get("priceMultiplier", 1.0))
+	if not is_equal_approx(global_price, 1.0):
+		for segment in get_segments():
+			var id: String = segment.get("id", "")
+			segment_price_multipliers[id] = float(segment_price_multipliers.get(id, 1.0)) * global_price
+		parts.append("prix ×%s" % String.num(global_price, 2).trim_suffix("0").trim_suffix("."))
+
+	var rules: Dictionary = strategy.get("onChoice", {})
+	if rules.is_empty():
+		if not parts.is_empty():
+			pending_journal_lines.append("👥 %s" % " · ".join(parts))
+		return
+
+	var conversion: Dictionary = rules.get("convertRoleRange", {})
+	if not conversion.is_empty():
+		var ratio := randf_range(float(conversion.get("minRatio", 0.0)), float(conversion.get("maxRatio", 0.0)))
+		var moved := convert_clients(str(conversion.get("from", "")), str(conversion.get("to", "")), ratio)
+		if moved > 0.0:
+			parts.append("%d clients basculent" % int(round(moved)))
+
+	for role in rules.get("roleMultipliers", {}).keys():
+		var multiplier := float(rules["roleMultipliers"][role])
+		var lost := 0.0
+		for segment in get_segments():
+			if str(segment.get("role", "")) != str(role):
+				continue
+			var segment_id: String = segment.get("id", "")
+			lost += get_client_count(segment_id) * (1.0 - multiplier)
+			clients[segment_id] = get_client_count(segment_id) * multiplier
+		if lost > 0.0:
+			parts.append("%d partent" % int(round(lost)))
+
+	for role in rules.get("rolePriceMultipliers", {}).keys():
+		var price_multiplier := float(rules["rolePriceMultipliers"][role])
+		for segment in get_segments():
+			if str(segment.get("role", "")) != str(role):
+				continue
+			var segment_id: String = segment.get("id", "")
+			segment_price_multipliers[segment_id] = float(segment_price_multipliers.get(segment_id, 1.0)) * price_multiplier
+		parts.append("prix ×%s" % String.num(price_multiplier, 2).trim_suffix("0").trim_suffix("."))
+
+	if not parts.is_empty():
+		pending_journal_lines.append("👥 %s" % " · ".join(parts))
 
 
 ## Effet de bord déclaratif (spec §9.4, dernier tiers) : une décision
@@ -911,7 +1013,7 @@ func buy_competitor_acquisition() -> String:
 		return "impact"
 	var recruit := _draw_candidate([])
 	impact_wallet -= cost
-	recurring_revenue += float(item.get("recurringRevenueDelta", 10))
+	var gained := add_clients_from_points(float(item.get("clientsGained", 7)))
 	if not recruit.is_empty():
 		_get_primary_roster().append({
 			"id": recruit.get("id", "") + "-rachat-%d" % sprint_number,
@@ -926,8 +1028,8 @@ func buy_competitor_acquisition() -> String:
 			"hiredSprint": sprint_number,
 		})
 	add_pending({"dette-organisationnelle": float(item.get("detteDelta", 8))},
-		"🤝 Rachat d'un concurrent (%d 💥) : +%d 💰/sprint d'abonnements repris%s, 🧱 Dette +%d." % [
-			cost, int(item.get("recurringRevenueDelta", 10)),
+		"🤝 Rachat d'un concurrent (%d 💥) : +%d clients repris%s, 🧱 Dette +%d." % [
+			cost, int(round(gained)),
 			" · +1 employé (%s)" % recruit.get("name", "") if not recruit.is_empty() else "",
 			int(item.get("detteDelta", 8)),
 		])
@@ -993,6 +1095,144 @@ func get_companies_for_era(target_era_id: String) -> Array:
 
 func get_business_model() -> Dictionary:
 	return GameData.balance.get("businessModels", {}).get(business_model_id, {})
+
+
+# --- 👥 La population qui paie (docs/spec-clients-revenue.md) ---
+## Toutes les grandeurs client passent par ces fonctions, jamais par une
+## lecture brute de balance.json depuis un écran (CLAUDE.md) : le prix d'un
+## segment est indexé par le scénario **et** par les décisions stratégiques,
+## et un écran qui lirait `segments[].price` court-circuiterait les deux.
+
+func get_segments() -> Array:
+	return get_business_model().get("segments", [])
+
+
+func find_segment(segment_id: String) -> Dictionary:
+	for segment in get_segments():
+		if segment.get("id", "") == segment_id:
+			return segment
+	return {}
+
+
+## L'échelle de prix du scénario (eras.json → priceScale) : le logiciel des
+## années garage ne se vend pas au prix d'un SaaS de l'ère IA.
+func get_price_scale() -> float:
+	return float(get_era().get("priceScale", 1.0))
+
+
+## 💳 Le prix effectif d'un client de ce segment, ce sprint. Seul point de
+## lecture — c'est ici que s'appliquent l'échelle d'époque et le pivot de §4.2.
+func resolved_segment_price(segment_id: String) -> float:
+	return (float(find_segment(segment_id).get("price", 0.0))
+		* get_price_scale()
+		* float(segment_price_multipliers.get(segment_id, 1.0)))
+
+
+func get_client_count(segment_id: String) -> float:
+	return float(clients.get(segment_id, 0.0))
+
+
+func get_client_total() -> float:
+	var total := 0.0
+	for value in clients.values():
+		total += float(value)
+	return total
+
+
+## 💰 Ce que la population paierait au prochain sprint si elle ne bougeait pas.
+## Sert à l'affichage — le vrai encaissement passe par le rapport de score.
+func get_client_revenue() -> float:
+	var total := 0.0
+	for segment in get_segments():
+		total += get_client_count(segment.get("id", "")) * resolved_segment_price(segment.get("id", ""))
+	return total
+
+
+## 🧾 Ce que la population coûte à chaque sprint en support et en infra. C'est
+## ce terme qui rend une base gratuite dangereuse (§5.3) : elle grossit, elle
+## ne paie pas, et elle se facture quand même.
+func get_client_support_cost() -> float:
+	var total := 0.0
+	for segment in get_segments():
+		total += get_client_count(segment.get("id", "")) * float(segment.get("unitCost", 0.0))
+	return total
+
+
+## La ligne de composition sous le solde — jamais des compteurs (§2.1) :
+## « 8 400 gratuits · 240 abonnés × 0,6 ». `compact` prend le libellé court des
+## segments : le panneau latéral est étroit, et une composition tronquée ne
+## raconte plus rien.
+func describe_clients(compact: bool = false) -> String:
+	var parts: Array = []
+	for segment in get_segments():
+		var segment_id: String = segment.get("id", "")
+		var count := get_client_count(segment_id)
+		if count <= 0.0:
+			continue
+		var price := resolved_segment_price(segment_id)
+		var label: String = segment.get("shortLabel", segment.get("label", segment_id)) if compact else segment.get("label", segment_id)
+		var text := "%d %s" % [int(round(count)), label]
+		if price > 0.0:
+			text += " × %s" % String.num(price, 2).trim_suffix("0").trim_suffix(".")
+		parts.append(text)
+	return " · ".join(parts) if not parts.is_empty() else "aucun client"
+
+
+## 👥 Combien de clients une valeur d'effet client vaut, dans CE modèle. Une
+## feature à `clients: 3` amène 72 inscrits en freemium et 0,9 compte signé en
+## grands comptes — la Roadmap annonce le nombre réel, pas la valeur brute.
+func clients_for_points(points: float) -> float:
+	var total := 0.0
+	for segment in get_segments():
+		total += points * float(segment.get("clientsPerPoint", 0.0))
+	return total
+
+
+## Détail par segment du même calcul (révélé par la pratique UX research).
+func clients_for_points_by_segment(points: float) -> Array:
+	var rows: Array = []
+	for segment in get_segments():
+		rows.append({
+			"id": segment.get("id", ""),
+			"icon": segment.get("icon", "👥"),
+			"label": segment.get("label", ""),
+			"value": points * float(segment.get("clientsPerPoint", 0.0)),
+		})
+	return rows
+
+
+## Fait basculer une fraction d'un rôle de segment vers un autre. Utilisé par
+## les événements et les décisions — jamais par le moteur de sprint, qui ne
+## connaît que les arrivées et les départs.
+func convert_clients(from_role: String, to_role: String, ratio: float) -> float:
+	var moved := 0.0
+	for segment in get_segments():
+		if str(segment.get("role", "")) != from_role:
+			continue
+		var taken: float = max(0.0, get_client_count(segment.get("id", "")) * ratio)
+		if is_zero_approx(taken):
+			continue
+		clients[segment.get("id", "")] = get_client_count(segment.get("id", "")) - taken
+		moved += taken
+	if moved <= 0.0:
+		return 0.0
+	for segment in get_segments():
+		if str(segment.get("role", "")) == to_role:
+			clients[segment.get("id", "")] = get_client_count(segment.get("id", "")) + moved
+			return moved
+	return moved
+
+
+## Ajoute (ou retire) des clients à partir d'un effet en points — le vocabulaire
+## partagé par les features, les événements et les postes du Comité.
+func add_clients_from_points(points: float) -> float:
+	var gained := 0.0
+	for segment in get_segments():
+		var segment_id: String = segment.get("id", "")
+		var delta := points * float(segment.get("clientsPerPoint", 0.0))
+		clients[segment_id] = max(0.0, get_client_count(segment_id) + delta)
+		gained += delta
+	return gained
 
 
 # --- Roster, rôles et capacité (spec profondeur §4) ---
@@ -1147,7 +1387,21 @@ func get_roster_context_for(roster: Array) -> Dictionary:
 	return {
 		"pm_weight": _role_weight_in(roster, "pm"),
 		"designer_weight": _role_weight_in(roster, "designer"),
+		# 📣 Le Product marketing n'amplifie plus l'Impact : il amplifie ce que
+		# les livraisons font à la réputation du produit (spec-clients-revenue.md
+		# §5.1.1). Même table qu'avant, autre entrée.
+		"reputation_multiplier": support_team_multiplier("pmm"),
 	}
+
+
+## Le taux d'une équipe subie, lu une seule fois dans scoring.json → conversion
+## .teams. ScoreResolver lit la même table pour le Sales et le CSM : deux
+## usages, un seul chiffre.
+func support_team_multiplier(team_id: String) -> float:
+	var team: Dictionary = GameData.scoring.get("conversion", {}).get("teams", {}).get(team_id, {})
+	var table: Dictionary = team.get("multipliers", {})
+	var level := int(support_teams.get(team_id, 3))
+	return float(table.get(str(level), 1.0))
 
 
 func has_practice(practice_id: String) -> bool:
@@ -1427,10 +1681,12 @@ func commit_backlog_plan(plan: Array) -> Dictionary:
 
 	var capacity := get_effective_capacity()
 	var deltas := EffectResolver.resolve_backlog(delivered, spent, capacity, get_roster_context(), has_practice("okr"))
-	var roi_gain := 0
+	# 👥 L'effet client des livraisons n'est PAS appliqué ici : il est lu par
+	# ScoreResolver dans `squads[].delivered` à la Résolution, au même endroit
+	# et au même moment que la Traction. Le report ne fait que l'annoncer.
+	var client_points := 0
 	for item in delivered:
-		roi_gain += int(item.get("roi", 0))
-	recurring_roi += roi_gain
+		client_points += int(item.get("clients", 0))
 
 	if not deltas.is_empty():
 		add_pending(deltas)
@@ -1440,7 +1696,8 @@ func commit_backlog_plan(plan: Array) -> Dictionary:
 		"capacity": capacity,
 		"delivered": delivered,
 		"epicUpdates": epic_updates,
-		"roiGain": roi_gain,
+		"clientPoints": client_points,
+		"clientsGained": clients_for_points(float(client_points)),
 		"deltas": deltas,
 	}
 	pending_journal_lines.append("Roadmap : %d pts / %d capacité%s" % [
@@ -1675,10 +1932,9 @@ func commit_backlog_plan_for_squad(squad_id: String, plan: Array) -> Dictionary:
 	squad["completed_ids"] = completed_ids
 	var capacity := get_squad_capacity(squad_id)
 	var deltas := EffectResolver.resolve_backlog(delivered, spent, capacity, get_roster_context_for(squad.get("roster", [])), has_practice("okr"))
-	var roi_gain := 0
+	var client_points := 0
 	for item in delivered:
-		roi_gain += int(item.get("roi", 0))
-	recurring_roi += roi_gain
+		client_points += int(item.get("clients", 0))
 	if not deltas.is_empty():
 		add_pending(deltas)
 
@@ -1688,7 +1944,8 @@ func commit_backlog_plan_for_squad(squad_id: String, plan: Array) -> Dictionary:
 		"capacity": capacity,
 		"delivered": delivered,
 		"epicUpdates": epic_updates,
-		"roiGain": roi_gain,
+		"clientPoints": client_points,
+		"clientsGained": clients_for_points(float(client_points)),
 		"deltas": deltas,
 	}
 	squad["delivered"] = delivered
@@ -1782,8 +2039,8 @@ func build_auto_plan_for_squad(squad_id: String) -> Array:
 		var per_point: bool = bool(profile.get("perPoint", false))
 		var scored: Array = []
 		for item in items:
-			var score := float(item.get("roi", 0)) * float(weights.get("roi", 0.0))
-			score += float(item.get("clientImpact", 0)) * float(weights.get("clientImpact", 0.0))
+			var score := float(item.get("clients", 0)) * float(weights.get("clients", 0.0))
+			score += float(item.get("costPoints", 0)) * float(weights.get("points", 0.0))
 			score -= float(item.get("risk", 0)) * float(weights.get("risk", 0.0))
 			if per_point:
 				score /= max(1.0, float(item.get("costPoints", 1)))
@@ -2569,9 +2826,27 @@ func _find_inbox_event(event_id: String) -> Dictionary:
 
 ## Ajoute des deltas de ressources au panier du sprint en cours (pas encore
 ## appliqués aux jauges) et, optionnellement, une ligne de journal décrivant
-## la décision qui les a produits. Deux pseudo-ressources sont acceptées en
-## plus des 5 jauges : "impact" (crédité au portefeuille) et "revenue"
-## (encaissé ou prélevé sur le Revenue) — aucune des deux n'est bornée.
+## la décision qui les a produits. Trois pseudo-ressources sont acceptées en
+## plus des 5 jauges : "impact" (crédité au portefeuille), "revenue" (encaissé
+## ou prélevé sur le Revenue) et "clients" (un **effet client en points**, du
+## même vocabulaire que celui d'une feature, converti en clients réels par le
+## modèle économique du run). Aucune des trois n'est bornée.
+## Applique le choix d'un événement Inbox. Les deltas ordinaires vont au
+## panier ; une bascule de segment (`clientConversion`) s'applique tout de
+## suite, comme le pivot du Comité — c'est un mouvement de population, pas un
+## delta de jauge. La fraction est **tirée** dans la fourchette de la carte :
+## le joueur choisit d'y consacrer le sprint, il ne sait pas combien suivront.
+func apply_inbox_choice(choice: Dictionary, note: String = "") -> void:
+	add_pending(choice.get("effects", {}), note)
+	var conversion: Dictionary = choice.get("clientConversion", {})
+	if conversion.is_empty():
+		return
+	var ratio := randf_range(float(conversion.get("minRatio", 0.0)), float(conversion.get("maxRatio", 0.0)))
+	var moved := convert_clients(str(conversion.get("from", "")), str(conversion.get("to", "")), ratio)
+	if moved > 0.0:
+		pending_journal_lines.append("👥 %d clients basculent vers l'offre payante." % int(round(moved)))
+
+
 func add_pending(deltas: Dictionary, note: String = "") -> void:
 	for resource_id in deltas.keys():
 		var value: float = float(deltas[resource_id])
@@ -2581,7 +2856,7 @@ func add_pending(deltas: Dictionary, note: String = "") -> void:
 
 
 ## Applique le panier d'effets aux 5 jauges (+ charges récurrentes, effets de
-## roster et de pratiques, décroissance de la Valeur perçue, conversion
+## roster et de pratiques, décroissance de la Réputation produit, conversion
 ## Traction × Levier × Impact, flux des deux monnaies), journalise, puis
 ## vérifie les fins et la revue trimestrielle. Retourne l'id de la fin
 ## atteinte, ou "" si le mandat continue.
@@ -2665,7 +2940,7 @@ func apply_pending_and_check() -> String:
 
 ## Effets automatiques du sprint : entretien Ops (ou dérive de dette en leur
 ## absence), traits cachés révélés à effet continu, pratiques à effet
-## par sprint, et décroissance naturelle de la Valeur perçue (§8.1).
+## par sprint, et décroissance naturelle de la Réputation produit (§8.1).
 func _apply_per_sprint_effects() -> void:
 	var roles: Dictionary = GameData.balance.get("roles", {})
 	var ops_conf: Dictionary = roles.get("ops", {})
@@ -2695,10 +2970,10 @@ func _apply_per_sprint_effects() -> void:
 		if not per_sprint.is_empty():
 			add_pending(per_sprint)
 
-	var decay := float(GameData.balance.get("pressure", {}).get("valeurPercueDecayPerSprint", 2))
+	var decay := float(GameData.balance.get("pressure", {}).get("reputationDecayPerSprint", 2))
 	if decay != 0.0:
-		add_pending({"valeur-percue": -decay},
-			"📈 Le marché avance sans vous attendre : Valeur perçue −%d" % int(decay))
+		add_pending({"reputation-produit": -decay},
+			"📈 Le marché avance sans vous attendre : Réputation produit −%d" % int(decay))
 
 
 ## Snapshot immuable du sprint. Les deltas de contenu et de pratiques ont
@@ -2739,16 +3014,23 @@ func _build_score_snapshot() -> Dictionary:
 		"sprint": sprint_number,
 		"squads": score_squads,
 		"resources": _projected_score_resources(),
-		"recurring_revenue": recurring_revenue,
-		"recurring_roi": recurring_roi,
 		"wallet": impact_wallet,
 		"business_model_id": business_model_id,
+		# 👥 L'économie du sprint : la population d'avant, la forme du modèle,
+		# l'échelle de prix du scénario, et l'effet client des décisions déjà
+		# prises ce sprint (événements, Comité). Les livraisons, elles, sont
+		# lues par le resolver dans `squads[].delivered` — comme la Traction.
+		"clients": clients.duplicate(),
+		"segments": get_segments(),
+		"price_scale": get_price_scale(),
+		"segment_price_multipliers": segment_price_multipliers.duplicate(),
+		"pending_client_points": float(pending_deltas.get("clients", 0.0)),
 		"support_teams": support_teams.duplicate(),
 		"product_tier": product_tier,
 		"active_tools": _active_tool_entries(),
 		"owned_practices": owned_practices,
 		"strategy_ids": _score_strategy_ids(),
-		"minimum_client_impact_for_traction": int(_active_quarter_effects().get("minimumClientImpactForTraction", 0)),
+		"minimum_clients_for_traction": int(_active_quarter_effects().get("minimumClientsForTraction", 0)),
 		"debt_friction_scale": float(_active_quarter_effects().get("debtFrictionScale", 1.0)),
 		"streak": streak,
 	}
@@ -2793,12 +3075,13 @@ func _apply_recurring_charges() -> void:
 	var payroll_multiplier := float(_active_quarter_effects().get("payrollMultiplier", 1.0))
 	last_payroll = int(round(float(charges.get("payroll", 0)) * payroll_multiplier))
 	last_licenses = int(charges.get("licenses", 0))
-	var total := last_payroll + last_licenses
+	last_client_cost = int(charges.get("clients", 0))
+	var total := last_payroll + last_licenses + last_client_cost
 	if total <= 0:
 		return
 	pending_deltas["revenue"] = pending_deltas.get("revenue", 0.0) - float(total)
-	pending_journal_lines.append("Charges du sprint : −%d 💰 (salaires %d · licences %d)" % [
-		total, last_payroll, last_licenses
+	pending_journal_lines.append("Charges du sprint : −%d 💰 (salaires %d · licences %d · clients %d)" % [
+		total, last_payroll, last_licenses, last_client_cost
 	])
 
 
@@ -2806,20 +3089,25 @@ func _apply_recurring_charges() -> void:
 ## score ne vit ici : le rapport est la seule source de vérité de l'économie.
 func _apply_score_conversion() -> void:
 	var conversion: Dictionary = last_score_report.get("conversion", {})
-	var recurring_report: Dictionary = conversion.get("recurring_revenue", {})
+	var client_report: Dictionary = conversion.get("clients", {})
 	var wallet_report: Dictionary = conversion.get("wallet", {})
 
-	# 💰 La base d'abonnements est le moteur du Revenue : le MRR ne disparaît
-	# pas comme mécanique, il disparaît comme compteur à surveiller. Le joueur
-	# ne voit plus qu'une ligne du rapport — « ce que vos clients ont payé ce
-	# sprint » — et un seul solde.
-	recurring_revenue = float(recurring_report.get("after", recurring_revenue))
+	# 👥 La population du sprint remplace le stock d'abonnements. Le joueur ne
+	# voit toujours qu'une ligne — « ce que vos clients ont payé ce sprint » —
+	# mais elle est enfin racontable : 38 clients gagnés, 12 partis.
+	pending_deltas.erase("clients")
+	if client_report.has("after"):
+		clients = client_report.get("after", clients).duplicate()
+	last_client_report = client_report.duplicate(true)
 	streak = int(last_score_report.get("next_streak", 0))
-	last_revenue = int(round(recurring_revenue))
-	last_roi_revenue_bonus = int(round(float(recurring_report.get("recurring_roi_gain", 0.0))))
+	last_revenue = int(round(float(conversion.get("revenue", {}).get("in", 0.0))))
 	if last_revenue != 0:
 		pending_deltas["revenue"] = pending_deltas.get("revenue", 0.0) + float(last_revenue)
-		pending_journal_lines.append("Abonnements : +%d 💰 (dont backlog +%d)" % [last_revenue, last_roi_revenue_bonus])
+		pending_journal_lines.append("Clients : +%d 💰 (%d arrivés, %d partis)" % [
+			last_revenue,
+			int(round(float(client_report.get("joined", 0.0)))),
+			int(round(float(client_report.get("left", 0.0)))),
+		])
 
 	for resource_id in conversion.get("resource_deltas", {}).keys():
 		var delta: float = float(conversion["resource_deltas"][resource_id])
@@ -3141,13 +3429,20 @@ func _check_bad_endings() -> String:
 	return ""
 
 
+## 🚀 L'IPO ou 🤝 le rachat ? On ne moyenne plus une perception produit et une
+## perception joueur (spec-clients-revenue.md §5.1.1) : ce sont deux unités
+## différentes. L'IPO se gagne sur **ce que vaut le produit** — une 📈
+## Réputation produit haute ET une population qui paie au moins ses charges.
+## Le rachat est le reste : quelqu'un vous achète, ce qui n'exige rien du
+## produit et ne dit donc rien de lui.
 func _resolve_good_ending() -> String:
 	var config: Dictionary = GameData.balance.get("goodEnding", {})
-	var score_resources: Array = config.get("scoreResources", [])
-	var total := 0.0
-	for resource_id in score_resources:
-		total += resource_values.get(resource_id, 0.0)
-	var average := total / float(max(score_resources.size(), 1))
-	if average >= float(config.get("ipoThreshold", 60)):
-		return config.get("highEnding", "ipo")
-	return config.get("lowEnding", "rachat")
+	var ipo: Dictionary = config.get("ipo", {})
+	var reputation := float(resource_values.get(ipo.get("resource", "reputation-produit"), 0.0))
+	if reputation < float(ipo.get("threshold", 60)):
+		return config.get("lowEnding", "rachat")
+	var charges := float(get_recurring_charges().get("total", 0))
+	var ratio := float(ipo.get("clientRevenueAtLeastCharges", 1.0))
+	if charges > 0.0 and get_client_revenue() < charges * ratio:
+		return config.get("lowEnding", "rachat")
+	return config.get("highEnding", "ipo")

@@ -10,6 +10,7 @@ var hidden_traits_data: Dictionary = {}
 var cards_data: Dictionary = {}
 var candidates_data: Array = []
 var companies_data: Array = []
+var SprintStateModels: Dictionary = {}
 
 
 func _initialize() -> void:
@@ -18,6 +19,7 @@ func _initialize() -> void:
 	cards_data = _load_data("cards.json")
 	candidates_data = _load_data("candidates.json").get("candidates", [])
 	companies_data = _load_data("companies.json").get("companies", [])
+	SprintStateModels = _load_data("balance.json").get("businessModels", {})
 	_test_feature_and_epic_traction()
 	_test_hand_bonus_order()
 	_test_quick_wins_are_one_hand_bonus()
@@ -28,7 +30,8 @@ func _initialize() -> void:
 	_test_streak_and_friction_rules()
 	_test_quarter_visible_board_and_technical_audit()
 	_test_moral_cap_and_ops_snapshot()
-	_test_conversion_and_recurring_roi()
+	_test_client_economy()
+	_test_no_revenue_comes_from_impact()
 	_test_support_team_rates_differ_by_company()
 	_test_multi_squad_contract()
 	_test_visible_trait_integrity()
@@ -41,9 +44,12 @@ func _initialize() -> void:
 
 
 func _test_feature_and_epic_traction() -> void:
-	var excel := {"id": "export-excel", "name": "Export Excel", "costPoints": 1, "clientImpact": 2, "risk": 0, "quickWin": true, "tags": ["reporting"]}
+	var excel := {"id": "export-excel", "name": "Export Excel", "costPoints": 1, "clients": 4, "risk": 0, "quickWin": true, "tags": ["reporting"]}
 	var report := _resolve([_squad("a", [excel])])
-	_assert_equal(_first_local_traction(report), 10.0, "Export Excel doit donner exactement 1 x 4 + 2 x 3 = 10 de Traction.")
+	_assert_equal(_first_local_traction(report), 4.0, "Depuis #42 la Traction ne vient que des points : 1 x 4 = 4, l'effet client n'y entre plus.")
+	var big := {"id": "grosse", "name": "Grosse feature", "costPoints": 1, "clients": 0, "risk": 0, "quickWin": false, "tags": ["tech"]}
+	_assert_equal(_first_local_traction(_resolve([_squad("a", [big])])), _first_local_traction(_resolve([_squad("a", [excel])])),
+		"A points egaux, une feature qui paie et une feature qui ne paie pas doivent scorer pareil — c'est ce qui rend l'arbitrage possible.")
 
 	var epic := {"id": "epic-test", "name": "Epic test", "epic": true, "costPoints": 10, "risk": 0}
 	report = _resolve([_squad("a", [{"item": epic, "completed": false}])])
@@ -55,8 +61,8 @@ func _test_feature_and_epic_traction() -> void:
 func _test_quick_wins_are_one_hand_bonus() -> void:
 	var rules := _rules_without_streak()
 	rules["traction"]["handBonuses"]["bundle"]["minimumDelivered"] = 99
-	var quick_one := {"id": "quick-1", "name": "Quick 1", "costPoints": 1, "clientImpact": 0, "quickWin": true, "tags": ["growth"]}
-	var quick_two := {"id": "quick-2", "name": "Quick 2", "costPoints": 1, "clientImpact": 0, "quickWin": true, "tags": ["growth"]}
+	var quick_one := {"id": "quick-1", "name": "Quick 1", "costPoints": 1, "clients": 0, "quickWin": true, "tags": ["growth"]}
+	var quick_two := {"id": "quick-2", "name": "Quick 2", "costPoints": 1, "clients": 0, "quickWin": true, "tags": ["growth"]}
 	var report := _resolve([_squad("a", [quick_one, quick_two])], {}, rules)
 	var wallet: Dictionary = report.get("conversion", {}).get("wallet", {})
 	var expected_bonus := int(rules.get("traction", {}).get("handBonuses", {}).get("quickWins", {}).get("impactBonus", 0))
@@ -77,7 +83,7 @@ func _test_hand_bonus_order() -> void:
 	rules["streak"]["leverPerSprint"] = 0.0
 	var delivered: Array = []
 	for index in 3:
-		delivered.append({"id": "focus-%d" % index, "name": "Focus", "costPoints": 1, "clientImpact": 0, "quickWin": false, "tags": ["growth"]})
+		delivered.append({"id": "focus-%d" % index, "name": "Focus", "costPoints": 1, "clients": 0, "quickWin": false, "tags": ["growth"]})
 	var report := _resolve([_squad("a", delivered, [], 3, 3)], {}, rules)
 	var squad_report: Dictionary = report["squads"][0]
 	_assert_equal(float(squad_report.get("traction", 0.0)), 29.5, "Les bonus doivent suivre 12 x 1.25 x 1.3 + 10 = 29.5.")
@@ -206,10 +212,10 @@ func _test_streak_and_friction_rules() -> void:
 
 func _test_quarter_visible_board_and_technical_audit() -> void:
 	var rules := _rules_without_streak()
-	var invisible_feature := {"id": "internal-cleanup", "name": "Nettoyage interne", "costPoints": 10, "clientImpact": 0, "risk": 0, "quickWin": false, "tags": ["tech"]}
+	var invisible_feature := {"id": "internal-cleanup", "name": "Nettoyage interne", "costPoints": 10, "clients": 0, "risk": 0, "quickWin": false, "tags": ["tech"]}
 	var epic := {"id": "epic-visible", "name": "Epic utile", "epic": true, "costPoints": 10, "risk": 0}
-	var report := _resolve([_squad("a", [invisible_feature, epic])], {"minimum_client_impact_for_traction": 1}, rules)
-	_assert_equal(float(report.get("squads", [])[0].get("traction", -1.0)), 60.0, "Le board visible doit annuler la Traction des features sans impact client, jamais celle des epics.")
+	var report := _resolve([_squad("a", [invisible_feature, epic])], {"minimum_clients_for_traction": 1}, rules)
+	_assert_equal(float(report.get("squads", [])[0].get("traction", -1.0)), 60.0, "Le board visible doit annuler la Traction des features qui n'amenent aucun client, jamais celle des epics.")
 
 	var feature := _traction_feature(25)
 	report = _resolve([_squad("a", [feature])], {"resources": {"cynisme": 0, "dette-organisationnelle": 70, "moral": 60}, "debt_friction_scale": 2.0}, rules)
@@ -232,25 +238,107 @@ func _test_moral_cap_and_ops_snapshot() -> void:
 	_assert_equal(int(report.get("global", {}).get("impact", -1)), 80, "Le resolver ne doit pas reappliquer le relief Dette d'Ops deja refleche dans le snapshot.")
 
 
-func _test_conversion_and_recurring_roi() -> void:
-	var feature := _traction_feature(25)
+## 💰 L'economie client (docs/spec-clients-revenue.md §2). Les assertions
+## portent sur la RELATION entre ce qui est livre et ce que la population
+## devient — jamais sur un tirage.
+func _test_client_economy() -> void:
 	var rules := _rules_without_streak()
-	var base := {"recurring_revenue": 100, "wallet": 0, "resources": {"moral": 60, "dette-organisationnelle": 0}, "support_teams": {"sales": 3, "pmm": 3, "csm": 3}}
-	var report := _resolve([_squad("a", [feature])], base, rules)
-	_assert_equal(float(report.get("conversion", {}).get("recurring_revenue", {}).get("after", 0.0)), 102.0, "Une base d'abonnements de 100 avec Impact 100 et churn 4 % doit devenir 102.")
+	var segments := [
+		{"id": "gratuits", "role": "entry", "label": "gratuits", "start": 1000, "price": 0.0, "unitCost": 0.01, "churn": 0.1, "clientsPerPoint": 20},
+		{"id": "payants", "role": "paying", "label": "payants", "start": 100, "price": 0.5, "unitCost": 0.04, "churn": 0.05, "clientsPerPoint": 2},
+	]
+	var base := {
+		"segments": segments,
+		"clients": {"gratuits": 1000.0, "payants": 100.0},
+		"price_scale": 1.0,
+		"wallet": 0,
+		"resources": {"moral": 60, "dette-organisationnelle": 0},
+		"support_teams": {"sales": 3, "pmm": 3, "csm": 3},
+	}
 
-	base["recurring_roi"] = 5
-	report = _resolve([_squad("a", [feature])], base, rules)
-	_assert_equal(float(report.get("conversion", {}).get("recurring_revenue", {}).get("after", 0.0)), 107.0, "Le recurring_roi doit etre ajoute a chaque sprint en plus des abonnements issus de l'Impact.")
-	_assert_equal(float(report.get("conversion", {}).get("recurring_revenue", {}).get("recurring_roi_gain", 0.0)), 5.0, "Le rapport doit distinguer le bonus recurrent du backlog.")
+	# Sans livraison : la population ne fait que churner.
+	var idle := _resolve([_squad("a", [])], base, rules)
+	var idle_clients: Dictionary = idle.get("conversion", {}).get("clients", {}).get("after", {})
+	_assert_equal(float(idle_clients.get("gratuits", 0.0)), 900.0, "Sans livraison, 1000 gratuits a 10 % de churn doivent tomber a 900.")
+	_assert_equal(float(idle_clients.get("payants", 0.0)), 95.0, "Sans livraison, 100 payants a 5 % de churn doivent tomber a 95.")
+	_assert_equal(float(idle.get("conversion", {}).get("revenue", {}).get("in", 0.0)), 47.5, "Le Revenue encaisse est la population APRES mouvement x le prix du segment.")
 
-	base["resources"] = {"moral": 20, "dette-organisationnelle": 70}
-	report = _resolve([_squad("a", [feature])], base, rules)
-	_assert_equal(float(report.get("conversion", {}).get("recurring_revenue", {}).get("churn", 0.0)), 0.15, "Moral bas et Dette haute doivent monter le churn au plafond de 15 %.")
+	# Une livraison a effet client 3 amene 3 x clientsPerPoint par segment.
+	var feature := {"id": "payante", "name": "Feature payante", "costPoints": 1, "clients": 3, "risk": 0, "quickWin": false, "tags": ["growth"]}
+	var shipped := _resolve([_squad("a", [feature])], base, rules)
+	var shipped_clients: Dictionary = shipped.get("conversion", {}).get("clients", {}).get("after", {})
+	_assert_equal(float(shipped_clients.get("gratuits", 0.0)), 960.0, "Une feature a effet client 3 doit amener 3 x 20 = 60 gratuits.")
+	_assert_equal(float(shipped_clients.get("payants", 0.0)), 101.0, "La meme feature doit amener 3 x 2 = 6 payants.")
 
-	# 💥 La conversion en Budget a disparu avec la racine carree : le rapport
-	# ne doit plus exposer de poste "budget" du tout (spec-impact-monnaie §2).
-	_assert_true(not report.get("conversion", {}).has("budget"), "Le rapport ne doit plus exposer de conversion en Budget.")
+	# Une feature a effet client negatif fait PARTIR des clients : la meme
+	# regle dans l'autre sens (une regle a double consequence se teste dans
+	# les deux sens — CLAUDE.md).
+	var toxic := {"id": "toxique", "name": "Feature qui fait fuir", "costPoints": 1, "clients": -3, "risk": 0, "quickWin": false, "tags": ["growth"]}
+	var lost: Dictionary = _resolve([_squad("a", [toxic])], base, rules).get("conversion", {}).get("clients", {}).get("after", {})
+	_assert_equal(float(lost.get("gratuits", 0.0)), 840.0, "Une feature a effet client -3 doit faire partir 60 gratuits en plus du churn.")
+	_assert_true(float(lost.get("payants", 0.0)) < float(idle_clients.get("payants", 0.0)),
+		"Elle doit aussi coûter des payants, sinon l'effet client n'a qu'un sens.")
+
+	# 💔 Le produit qui se degrade : churn plancher, tous segments confondus.
+	var crisis_base := base.duplicate(true)
+	crisis_base["resources"] = {"moral": 20, "dette-organisationnelle": 70}
+	var crisis: Dictionary = _resolve([_squad("a", [])], crisis_base, rules).get("conversion", {}).get("clients", {}).get("after", {})
+	_assert_equal(float(crisis.get("payants", 0.0)), 85.0, "Moral bas et Dette haute doivent monter le churn des payants au plancher de 15 %.")
+
+	# 🎧 Le CSM agit sur le churn, 💼 le Sales sur les arrivees — chacun sur
+	# son cote, jamais sur les deux.
+	var weak_csm := base.duplicate(true)
+	weak_csm["support_teams"] = {"sales": 3, "pmm": 3, "csm": 1}
+	var weak: Dictionary = _resolve([_squad("a", [])], weak_csm, rules).get("conversion", {}).get("clients", {}).get("after", {})
+	_assert_true(float(weak.get("gratuits", 0.0)) < float(idle_clients.get("gratuits", 0.0)),
+		"Un CSM faible doit faire partir plus de clients.")
+	var strong_sales := base.duplicate(true)
+	strong_sales["support_teams"] = {"sales": 5, "pmm": 3, "csm": 3}
+	var strong: Dictionary = _resolve([_squad("a", [feature])], strong_sales, rules).get("conversion", {}).get("clients", {}).get("after", {})
+	_assert_true(float(strong.get("payants", 0.0)) > float(shipped_clients.get("payants", 0.0)),
+		"Un Sales fort doit amener plus de clients a livraison identique.")
+
+	# L'echelle de prix du scenario (§4.0.1) frappe le prix, jamais la
+	# population : deux epoques, deux caisses, une seule courbe de clients.
+	var rich_era := base.duplicate(true)
+	rich_era["price_scale"] = 2.0
+	var rich := _resolve([_squad("a", [])], rich_era, rules)
+	_assert_equal(float(rich.get("conversion", {}).get("revenue", {}).get("in", 0.0)), 95.0, "priceScale 2 doit doubler ce que les clients paient.")
+	_assert_equal(float(rich.get("conversion", {}).get("clients", {}).get("after", {}).get("gratuits", 0.0)), 900.0, "priceScale ne doit jamais toucher la population.")
+
+
+## 🚨 Le critere de recette 5 de l'issue #42, verifie mecaniquement plutot que
+## relu : AUCUNE regle ne doit fabriquer du 💰 Revenue a partir de l'Impact
+## (spec-impact-monnaie.md §3.8). Le test fait varier l'Impact du simple au
+## quadruple, a livraison et population IDENTIQUES, et exige que la caisse ne
+## bouge pas. C'est le garde-fou qui manquait quand la fuite s'est installee.
+func _test_no_revenue_comes_from_impact() -> void:
+	var rules := _rules_without_streak()
+	var segments := [{"id": "payants", "role": "paying", "label": "payants", "start": 100, "price": 0.5, "unitCost": 0.0, "churn": 0.0, "clientsPerPoint": 2}]
+	var base := {
+		"segments": segments,
+		"clients": {"payants": 100.0},
+		"price_scale": 1.0,
+		"resources": {"moral": 60, "dette-organisationnelle": 0},
+		"support_teams": {"sales": 3, "pmm": 3, "csm": 3},
+	}
+	var small := _resolve([_squad("a", [{"id": "f", "name": "f", "costPoints": 1, "clients": 1, "risk": 0, "quickWin": false, "tags": ["t"]}])], base, rules)
+	var huge_base := base.duplicate(true)
+	huge_base["product_tier"] = 5
+	var huge := _resolve([_squad("a", [{"id": "f", "name": "f", "costPoints": 1, "clients": 1, "risk": 0, "quickWin": false, "tags": ["t"]}])], huge_base, rules)
+
+	_assert_true(int(huge.get("global", {}).get("impact", 0)) > int(small.get("global", {}).get("impact", 0)),
+		"Le cas de test doit bien produire deux Impacts differents, sinon il ne teste rien.")
+	_assert_equal(float(huge.get("conversion", {}).get("revenue", {}).get("in", 0.0)),
+		float(small.get("conversion", {}).get("revenue", {}).get("in", 0.0)),
+		"Un Impact multiplie ne doit RIEN changer a ce que les clients paient (spec-impact-monnaie §3.8).")
+	_assert_equal(float(huge.get("conversion", {}).get("clients", {}).get("after", {}).get("payants", 0.0)),
+		float(small.get("conversion", {}).get("clients", {}).get("after", {}).get("payants", 0.0)),
+		"Il ne doit rien changer non plus a la population : ce qui amene des clients, c'est ce qu'on livre.")
+	_assert_true(not huge.get("conversion", {}).has("recurring_revenue"),
+		"Le rapport ne doit plus exposer de base d'abonnements : le stock, ce sont les clients.")
+	_assert_true(not huge.get("conversion", {}).get("resource_deltas", {}).has("reputation-produit"),
+		"La Reputation produit ne doit plus etre alimentee par l'Impact (spec-clients-revenue §5.1.1).")
 
 
 ## Lot 4, spec §9.4 — critere de recette de l'issue #17 : deux runs sur la
@@ -267,24 +355,34 @@ func _test_support_team_rates_differ_by_company() -> void:
 	_assert_equal(karavel.get("supportTeams", {}), {"sales": 2.0, "pmm": 4.0, "csm": 1.0},
 		"Karavel doit declarer supportTeams Sales 2 / PMM 4 / CSM 1 (spec 9.4).")
 
-	var feature := _traction_feature(25)
+	var feature := {"id": "f", "name": "f", "costPoints": 25, "clients": 3, "risk": 0, "quickWin": false, "tags": ["t"]}
 	var rules := _rules_without_streak()
-	var meridia_report := _resolve([_squad("a", [feature])], {"recurring_revenue": 100.0, "support_teams": meridia.get("supportTeams", {})}, rules)
-	var karavel_report := _resolve([_squad("a", [feature])], {"recurring_revenue": 100.0, "support_teams": karavel.get("supportTeams", {})}, rules)
+	var segments := [{"id": "payants", "role": "paying", "label": "payants", "start": 100, "price": 0.5, "unitCost": 0.0, "churn": 0.05, "clientsPerPoint": 2}]
+	var economy := {"segments": segments, "clients": {"payants": 100.0}, "price_scale": 1.0}
+	var meridia_snapshot := economy.duplicate(true)
+	meridia_snapshot["support_teams"] = meridia.get("supportTeams", {})
+	var karavel_snapshot := economy.duplicate(true)
+	karavel_snapshot["support_teams"] = karavel.get("supportTeams", {})
+	var meridia_report := _resolve([_squad("a", [feature])], meridia_snapshot, rules)
+	var karavel_report := _resolve([_squad("a", [feature])], karavel_snapshot, rules)
 
 	var meridia_rates: Dictionary = meridia_report.get("conversion", {}).get("teamRates", {})
 	var karavel_rates: Dictionary = karavel_report.get("conversion", {}).get("teamRates", {})
-	_assert_equal(float(meridia_rates.get("sales", {}).get("multiplier", 0.0)), 1.2, "Meridia (Sales niveau 4) doit convertir l'Impact en MRR a x1.2.")
-	_assert_equal(float(karavel_rates.get("sales", {}).get("multiplier", 0.0)), 0.8, "Karavel (Sales niveau 2) doit convertir l'Impact en MRR a x0.8.")
-	_assert_equal(float(meridia_rates.get("pmm", {}).get("multiplier", 0.0)), 0.8, "Meridia (PMM niveau 2) doit convertir l'Impact en Valeur percue a x0.8.")
-	_assert_equal(float(karavel_rates.get("pmm", {}).get("multiplier", 0.0)), 1.2, "Karavel (PMM niveau 4) doit convertir l'Impact en Valeur percue a x1.2.")
+	_assert_equal(float(meridia_rates.get("sales", {}).get("multiplier", 0.0)), 1.2, "Meridia (Sales niveau 4) doit amener 1.2x plus de clients.")
+	_assert_equal(float(karavel_rates.get("sales", {}).get("multiplier", 0.0)), 0.8, "Karavel (Sales niveau 2) doit en amener 0.8x.")
+	_assert_equal(float(meridia_rates.get("pmm", {}).get("multiplier", 0.0)), 0.8, "Meridia (PMM niveau 2) doit amplifier la Reputation produit a x0.8.")
+	_assert_equal(float(karavel_rates.get("pmm", {}).get("multiplier", 0.0)), 1.2, "Karavel (PMM niveau 4) doit l'amplifier a x1.2.")
 	_assert_equal(float(meridia_rates.get("csm", {}).get("multiplier", 0.0)), 1.0, "Meridia (CSM niveau 3) doit garder un churn neutre x1.0.")
 	_assert_equal(float(karavel_rates.get("csm", {}).get("multiplier", 0.0)), 1.4, "Karavel (CSM niveau 1) doit subir un churn x1.4 (support faible).")
 
-	var meridia_mrr := float(meridia_report.get("conversion", {}).get("recurring_revenue", {}).get("after", 0.0))
-	var karavel_mrr := float(karavel_report.get("conversion", {}).get("recurring_revenue", {}).get("after", 0.0))
-	_assert_true(not is_equal_approx(meridia_mrr, karavel_mrr),
-		"A Impact et abonnements de depart identiques, Meridia (%s) et Karavel (%s) doivent converger differemment — c'est le critere de recette de l'issue #17." % [meridia_mrr, karavel_mrr])
+	var meridia_clients := float(meridia_report.get("conversion", {}).get("clients", {}).get("after", {}).get("payants", 0.0))
+	var karavel_clients := float(karavel_report.get("conversion", {}).get("clients", {}).get("after", {}).get("payants", 0.0))
+	_assert_true(meridia_clients > karavel_clients,
+		"A livraison et population de depart identiques, Meridia (%s clients) doit finir devant Karavel (%s) — Sales fort et churn maitrise contre l'inverse. C'est le critere de recette de l'issue #17." % [meridia_clients, karavel_clients])
+	_assert_true(SprintStateModels.has("grands-comptes") and SprintStateModels.has("freemium-volume"),
+		"Les deux modeles economiques doivent exister dans balance.json.")
+	_assert_true(_company("meridia-corp").get("businessModel", "") != _company("karavel-scaleup").get("businessModel", ""),
+		"Meridia et Karavel doivent jouer deux modeles economiques differents : c'est la ou la divergence se voit en jeu.")
 
 
 func _company(company_id: String) -> Dictionary:
@@ -296,11 +394,11 @@ func _company(company_id: String) -> Dictionary:
 
 func _test_multi_squad_contract() -> void:
 	var rules := _rules_without_streak()
-	var excel := {"id": "excel", "name": "Export Excel", "costPoints": 1, "clientImpact": 2, "risk": 0, "quickWin": false, "tags": ["reporting"]}
-	var sso := {"id": "sso", "name": "SSO", "costPoints": 3, "clientImpact": 3, "risk": 0, "quickWin": false, "tags": ["enterprise"]}
+	var excel := {"id": "excel", "name": "Export Excel", "costPoints": 1, "clients": 2, "risk": 0, "quickWin": false, "tags": ["reporting"]}
+	var sso := {"id": "sso", "name": "SSO", "costPoints": 3, "clients": 3, "risk": 0, "quickWin": false, "tags": ["enterprise"]}
 	var report := _resolve([_squad("alpha", [excel]), _squad("beta", [sso])], {}, rules)
 	_assert_equal(report.get("squads", []).size(), 2, "Le resolver doit conserver un sous-rapport par equipe.")
-	_assert_equal(int(report.get("global", {}).get("impact", -1)), 31, "Deux sous-totaux 10 et 21 doivent etre sommes, pas moyennes.")
+	_assert_equal(int(report.get("global", {}).get("impact", -1)), 16, "Deux sous-totaux 4 et 12 doivent etre sommes, pas moyennes.")
 	for squad_report in report.get("squads", []):
 		_assert_true(_has_label(squad_report.get("lines", []), "Sous-total"), "Chaque equipe doit exposer son sous-total dans le rapport anime.")
 		for line in squad_report.get("lines", []):
@@ -354,7 +452,7 @@ func _squad(id: String, delivered: Array, roster: Array = [], capacity: int = 25
 
 
 func _traction_feature(points: int) -> Dictionary:
-	return {"id": "traction-%d" % points, "name": "Feature traction", "costPoints": points, "clientImpact": 0, "risk": 0, "quickWin": false, "tags": ["test"]}
+	return {"id": "traction-%d" % points, "name": "Feature traction", "costPoints": points, "clients": 0, "risk": 0, "quickWin": false, "tags": ["test"]}
 
 
 func _first_local_traction(report: Dictionary) -> float:

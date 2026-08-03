@@ -6,7 +6,10 @@
       "icon": "🧭",
       "name": "Décision stratégique",
       "kind": "strategy",
-      "costRange": [150, 300],
+      "costRange": [
+        150,
+        300
+      ],
       "tagline": "Une par trimestre. Irréversible pour tout le reste du mandat.",
       "description": "Redéfinit ce que le produit est pour le marché — jamais l'équipe. Catalogue et effets : data/strategy.json et scoring.json → global.strategies."
     },
@@ -31,7 +34,12 @@
       "icon": "🪑",
       "name": "Ouvrir un poste",
       "kind": "team-cap",
-      "costs": [60, 110, 180, 270],
+      "costs": [
+        60,
+        110,
+        180,
+        270
+      ],
       "capIncrement": 1,
       "tagline": "+1 au cap d'effectif, aujourd'hui figé par l'entreprise.",
       "description": "Le cap d'effectif devient un objet de jeu : virer un Fantôme pour libérer un poste et déclencher un combo est une décision gagnante, pas un aveu d'échec."
@@ -50,7 +58,11 @@
       "icon": "🚀",
       "name": "Palier de produit",
       "kind": "product-tier",
-      "costs": [130, 270, 480],
+      "costs": [
+        130,
+        270,
+        480
+      ],
       "licenseFlatPerTier": 3,
       "tagline": "+0,5 Levier permanent, +1 feature proposée par sprint — et 3 💰/sprint d'infrastructure, par palier.",
       "description": "Le Levier vit dans scoring.json → global.productTier (leverPerTier). 3 paliers maximum par run."
@@ -81,10 +93,10 @@
       "name": "Rachat d'un concurrent",
       "kind": "acquisition",
       "cost": 320,
-      "recurringRevenueDelta": 10,
+      "clientsGained": 7,
       "detteDelta": 8,
-      "tagline": "+10 💰/sprint d'abonnements repris, +1 employé aléatoire, +8 Dette.",
-      "description": "On n'achète pas du cash mais des clients : les abonnements repris tombent à chaque sprint (et subissent le churn comme les vôtres). L'employé rejoint le roster sur le champ — avec son salaire —, la Dette du rachat se paie à la prochaine Résolution."
+      "tagline": "Leur base de clients rejoint la vôtre, +1 employé aléatoire, +8 Dette.",
+      "description": "On n'achète pas du cash mais des clients : leur population vient grossir la vôtre segment par segment, puis vit sa vie — elle paie chaque sprint, elle coûte du support, et elle churne comme le reste. L'employé rejoint le roster sur le champ (avec son salaire), la Dette du rachat se paie à la prochaine Résolution."
     },
     {
       "id": "headhunter",
