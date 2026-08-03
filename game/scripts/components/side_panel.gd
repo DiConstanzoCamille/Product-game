@@ -108,6 +108,7 @@ func _build() -> void:
 			continue  # celle-là est à vous, pas à l'entreprise : bloc « Vous »
 		vbox.add_child(_resource_gauge(resource))
 	vbox.add_child(_wallet_row())
+	vbox.add_child(_lever_chain_row())
 	vbox.add_child(_revenue_row())
 	vbox.add_child(_rule())
 
@@ -177,6 +178,12 @@ func _build_rail(vbox: VBoxContainer) -> void:
 	wallet.tooltip_text = _wallet_tooltip()
 	wallet.mouse_filter = Control.MOUSE_FILTER_STOP
 	vbox.add_child(_spaced(wallet, 8, 0))
+
+	var lever := _label("⚙️\n%s" % _lever_number(_current_effective_lever()), 10, UIHelpers.PANEL_ACCENT)
+	lever.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lever.tooltip_text = _lever_chain_tooltip()
+	lever.mouse_filter = Control.MOUSE_FILTER_STOP
+	vbox.add_child(_spaced(lever, 5, 0))
 
 	var revenue := _label("💰\n%d" % int(round(SprintState.revenue)), 12, UIHelpers.PANEL_FG)
 	revenue.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -333,6 +340,80 @@ func _gauge(text: String, value: float, maximum: float, color: Color, tooltip: S
 ## regarde au verdict. Un seul nombre : c'est tout l'intérêt du modèle.
 func _wallet_row() -> Control:
 	return _currency_row("💥 Impact", "%d" % SprintState.impact_wallet, _wallet_tooltip(), 6)
+
+
+## La chaîne reste visible entre deux Résolutions : elle raconte la dernière
+## organisation réellement jouée, sans promettre le résultat du prochain
+## sprint. Les facteurs viennent uniquement du rapport du resolver.
+func _lever_chain_row() -> Control:
+	var report: Dictionary = SprintState.last_score_report
+	if report.is_empty():
+		var waiting := _label("⚙️ Levier — révélé après le premier sprint", 10, UIHelpers.PANEL_MUTED, true)
+		waiting.name = "LeverChain"
+		waiting.tooltip_text = "Le Levier combine les fondations additives et les multiplicateurs de votre organisation."
+		return _spaced(waiting, 2, 5)
+
+	var factors := _lever_multiplier_lines(report)
+	var total_factor := 1.0
+	var factor_labels: Array = []
+	for line in factors:
+		var factor := float(line.get("value", 1.0))
+		total_factor *= factor
+		factor_labels.append("×%s %s" % [_lever_number(factor), line.get("icon", "✖️")])
+	var uncapped := float(report.get("global", {}).get("uncapped_effective_lever", 0.0))
+	var base := uncapped / total_factor if not is_zero_approx(total_factor) else uncapped
+	var text := "⚙️ Levier  %s" % _lever_number(base)
+	if not factor_labels.is_empty():
+		text += "  %s" % "  ".join(factor_labels)
+	text += "  →  %s" % _lever_number(_current_effective_lever())
+	var chain := _label(text, 10, UIHelpers.PANEL_ACCENT, true)
+	chain.name = "LeverChain"
+	chain.tooltip_text = _lever_chain_tooltip()
+	chain.mouse_filter = Control.MOUSE_FILTER_STOP
+	UIHelpers.apply_mono(chain, 10, true)
+	return _spaced(chain, 2, 5)
+
+
+func _lever_multiplier_lines(report: Dictionary) -> Array:
+	var lines: Array = []
+	# À plusieurs équipes, les Leviers locaux sont agrégés par moyenne pondérée
+	# dans le resolver : multiplier leurs facteurs entre eux mentirait. Le
+	# panneau montre alors la chaîne globale ; la Résolution garde le détail de
+	# chaque équipe. À N=1, la chaîne est complète et la couche équipe invisible.
+	if report.get("squads", []).size() == 1:
+		for squad_report in report.get("squads", []):
+			for line in squad_report.get("lines", []):
+				if line.get("type", "") == "lever_multiplier":
+					lines.append(line)
+	for line in report.get("global", {}).get("lines", []):
+		if line.get("type", "") == "lever_multiplier":
+			lines.append(line)
+	return lines
+
+
+func _current_effective_lever() -> float:
+	return float(SprintState.last_score_report.get("global", {}).get("effective_lever", 0.0))
+
+
+func _lever_chain_tooltip() -> String:
+	var report: Dictionary = SprintState.last_score_report
+	if report.is_empty():
+		return "Le Levier sera calculé à la première Résolution."
+	var lines: Array = ["⚙️ Levier du dernier sprint — les additifs construisent la base, puis les multiplicateurs la font décoller."]
+	for line in _lever_multiplier_lines(report):
+		lines.append("· %s %s ×%s" % [line.get("icon", "✖️"), line.get("label", "Multiplicateur"), _lever_number(float(line.get("value", 1.0)))])
+	if _lever_multiplier_lines(report).is_empty():
+		lines.append("· Aucun multiplicateur actif pour l'instant.")
+	var uncapped := float(report.get("global", {}).get("uncapped_effective_lever", 0.0))
+	var effective := _current_effective_lever()
+	if not is_equal_approx(uncapped, effective):
+		lines.append("· Le Moral plafonne le résultat à %s." % _lever_number(effective))
+	lines.append("C'est le résultat constaté, jamais une promesse pour le prochain sprint.")
+	return "\n".join(lines)
+
+
+func _lever_number(value: float) -> String:
+	return String.num(value, 2).trim_suffix("0").trim_suffix(".")
 
 
 ## 💰 Le Revenue — jamais un prix, seulement la survie : il encaisse les

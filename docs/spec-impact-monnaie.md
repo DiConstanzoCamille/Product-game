@@ -1,6 +1,7 @@
 # Spec — L'Impact comme monnaie unique
 
-**Statut : proposition, en attente de relecture.** Rien de ce document n'est
+**Statut : mise en œuvre progressive.** La séparation clients/Revenue (§3.8) est
+livrée par #42 et la couche multiplicative du Levier (§5) par #37. Le reste n'est
 implémenté. Écrit le 01/08/2026 après la discussion de conception qui suit la
 livraison des lots 4 et 5 du chantier scoring.
 
@@ -378,7 +379,7 @@ rien ; le même ×1,5 sur un Levier de 4 gagne la partie. **C'est là que naît 
 
 Quelques sources possibles, à écrire comme contenu et non comme règles en dur :
 une décision stratégique tardive et chère, un palier de produit élevé, un combo
-d'organisation rare (les six rôles couverts, une squad entièrement senior), un
+d'organisation rare (tous les rôles couverts dans un effectif étoffé, une squad entièrement senior), un
 outil de fin de partie. Elles doivent être **rares, chères et conditionnelles** —
 un multiplicateur facile détruit la courbe au lieu de la créer.
 

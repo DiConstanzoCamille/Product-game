@@ -211,7 +211,15 @@ func _setup_score_replay() -> void:
 		for choice in team_choices:
 			_add_score_event(choice.get("line", {}), choice)
 
-	var factor_lines: Array = _external_factor_lines(report.get("global", {}).get("lines", []))
+	var factor_lines: Array = []
+	for squad_report in squad_reports:
+		factor_lines.append_array(_local_multiplier_lines(squad_report.get("lines", [])))
+	factor_lines.append_array(_external_factor_lines(report.get("global", {}).get("lines", [])))
+	# Les multiplicateurs sont le moment de décollage : ils doivent rester dans
+	# l'aperçu visible, pas derrière « +N autres » après les additifs familiers.
+	factor_lines.sort_custom(func(a, b):
+		return _factor_display_priority(a) < _factor_display_priority(b)
+	)
 	if not factor_lines.is_empty():
 		_add_score_divider("LEVIERS & FRICTIONS")
 		var factor_choice := _external_factor_choice(factor_lines)
@@ -324,7 +332,7 @@ func _format_score_line(line: Dictionary, current: float) -> String:
 	var before := float(line.get("before", 0.0))
 	if type == "impact":
 		return "%s  %s  %d" % [icon, label, int(round(current))]
-	if type == "traction_multiplier" or type == "impact_multiplier":
+	if type == "traction_multiplier" or type == "lever_multiplier" or type == "impact_multiplier":
 		return "%s  %s ×%s   %s -> %s" % [icon, label, String.num(float(line.get("value", 1.0)), 2), _score_number(before), _score_number(current)]
 	if type == "total_lever_cap":
 		return "%s  %s : plafond %s" % [icon, label, _score_number(current)]
@@ -344,6 +352,8 @@ func _format_choice_line(line: Dictionary) -> String:
 		return "%s %s  ·  +%s traction" % [icon, label, _score_number(value)]
 	if line_type == "lever_add":
 		return "%s %s  ·  %s%s levier" % [icon, label, "+" if value >= 0.0 else "", _score_number(value)]
+	if line_type == "lever_multiplier":
+		return "%s %s  ·  ×%s levier" % [icon, label, String.num(value, 2)]
 	if line_type == "traction_multiplier" or line_type == "impact_multiplier":
 		return "%s %s  ·  ×%s impact" % [icon, label, String.num(value, 2)]
 	if line_type == "budget_add":
@@ -478,9 +488,21 @@ func _external_factor_lines(lines: Array) -> Array:
 		var line_type: String = line.get("type", "")
 		if line_type == "impact" or line_type == "mrr" or line_type == "budget" or line_type == "resource_delta":
 			continue
-		if line_type == "lever_add" or line_type == "traction_multiplier" or line_type == "impact_multiplier" or line_type == "total_lever_cap":
+		if line_type == "lever_add" or line_type == "lever_multiplier" or line_type == "traction_multiplier" or line_type == "impact_multiplier" or line_type == "total_lever_cap":
 			factors.append(line)
 	return factors
+
+
+func _local_multiplier_lines(lines: Array) -> Array:
+	var factors: Array = []
+	for line in lines:
+		if line.get("type", "") == "lever_multiplier":
+			factors.append(line)
+	return factors
+
+
+func _factor_display_priority(line: Dictionary) -> int:
+	return 0 if line.get("type", "") == "lever_multiplier" else 1
 
 
 func _external_factor_choice(lines: Array) -> Dictionary:
@@ -501,7 +523,7 @@ func _external_factor_choice(lines: Array) -> Dictionary:
 
 
 func _style_choice_line(button: Button, line: Dictionary) -> void:
-	var positive := float(line.get("value", 0.0)) >= 0.0
+	var positive := float(line.get("value", 0.0)) >= (1.0 if line.get("type", "") == "lever_multiplier" else 0.0)
 	var is_friction := int(line.get("step", 0)) == 7
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color("#f7f9fc") if not is_friction else Color("#fff2ef")
@@ -643,7 +665,8 @@ func _style_score_line(label: Label, line: Dictionary) -> void:
 		label.add_theme_font_size_override("font_size", font_size)
 		label.add_theme_color_override("font_color", UIHelpers.COLOR_AMBER)
 	elif _is_combo_line(line):
-		var combo_color: Color = UIHelpers.COLOR_GOOD if float(line.get("value", 0.0)) >= 0.0 else UIHelpers.COLOR_DANGER
+		var combo_positive := float(line.get("value", 0.0)) >= (1.0 if line.get("type", "") == "lever_multiplier" else 0.0)
+		var combo_color: Color = UIHelpers.COLOR_GOOD if combo_positive else UIHelpers.COLOR_DANGER
 		var combo_background: Color = combo_color
 		combo_background.a = 0.18
 		var combo_style: StyleBoxFlat = StyleBoxFlat.new()
@@ -660,7 +683,7 @@ func _style_score_line(label: Label, line: Dictionary) -> void:
 
 
 func _is_combo_line(line: Dictionary) -> bool:
-	if line.get("scope", "") != "local" or line.get("type", "") != "lever_add":
+	if line.get("scope", "") != "local" or not line.get("type", "") in ["lever_add", "lever_multiplier"]:
 		return false
 	for combo in GameData.scoring.get("local", {}).get("organizationCombos", []):
 		if line.get("label", "") == combo.get("label", ""):

@@ -208,6 +208,9 @@ func _test_investments_interactions() -> void:
 func _test_resolution_replay() -> void:
 	print("  → lecture animee de la Resolution")
 	SprintState.reset_run("agile-transformation", "meridia-corp")
+	SprintState.activated_cards.append_array(["socle-technique-commun", "notion"])
+	SprintState.activated_card_sprints["socle-technique-commun"] = 1
+	SprintState.activated_card_sprints["notion"] = 1
 	var feature: Dictionary = GameData.backlog.get("features", [])[0]
 	SprintState.current_backlog_draw = {"sprint": SprintState.sprint_number, "items": [feature]}
 	SprintState.commit_backlog_plan([{"id": feature.get("id", ""), "points": feature.get("costPoints", 0)}])
@@ -222,6 +225,25 @@ func _test_resolution_replay() -> void:
 	if SprintState.last_score_report.is_empty() or screen._score_events.is_empty():
 		_fail("La Resolution doit afficher le rapport de score deja resolu.")
 	else:
+		if float(SprintState.last_score_report.get("global", {}).get("lever_multiplier", 1.0)) <= 1.0:
+			_fail("Le rapport UI doit conserver la couche multiplicative du Socle technique.")
+		var has_multiplier_event := false
+		var multiplier_is_visible := false
+		for event in screen._score_events:
+			if "Socle technique commun" in str(event.get("detail", "")) and "×" in str(event.get("detail", "")):
+				has_multiplier_event = true
+			if "Socle technique commun" in str(event.get("display", "")) and "×" in str(event.get("display", "")):
+				multiplier_is_visible = true
+		if not has_multiplier_event:
+			_fail("La Resolution doit rejouer les multiplicateurs comme une etape visible.")
+		if not multiplier_is_visible:
+			_fail("Le multiplicateur principal ne doit pas etre masque derriere « +N autres ».")
+		var panel: Control = load("res://scenes/components/side_panel.tscn").instantiate()
+		viewport.add_child(panel)
+		await get_tree().process_frame
+		if panel.find_child("LeverChain", true, false) == null:
+			_fail("Le panneau lateral doit afficher en permanence la chaine de Levier.")
+		panel.queue_free()
 		screen._accelerate_score_replay()
 		if screen._score_replay_speed != 4.0:
 			_fail("Le premier geste de Resolution n'accelere pas l'animation.")
