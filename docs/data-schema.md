@@ -181,8 +181,12 @@ qu'à ceux qui jugent **le joueur** : `conversion.politicalCapital`. Il reste :
   via `segment_price_multipliers` — pour que le prix affiché et le prix encaissé
   restent le même chiffre), `quotaMultiplier`, `segmentConversion`
   (`from`/`to` par rôle, `ratio` — par sprint) et `onChoice`
-  (`convertRoleRange`, `roleMultipliers`, `rolePriceMultipliers` — le pivot de
-  modèle économique de §4.2, appliqué une seule fois avec une fraction tirée).
+  (`convertRoleRange`, `roleMultipliers`, `roleArrivalMultipliers`,
+  `rolePriceMultipliers` — le pivot de modèle économique de §4.2, appliqué une
+  seule fois avec une fraction tirée). `roleMultipliers` vide une population,
+  `roleArrivalMultipliers` **ferme le segment pour de bon** : sans les deux, la
+  livraison du sprint suivant repeuple ce que la décision promettait de faire
+  disparaître.
 
 Depuis le Lot 4 : `global.productTier.leverPerTier` vaut `0.5` (corrigé de
 `0.1`, hérité du Lot 1, pour matcher le "+0,5 Levier permanent" du Comité,
@@ -227,7 +231,9 @@ rejoué par la Résolution ; `impact_wallet` (💥, la monnaie unique) et `reven
 (💰, sans plafond) sont les deux valeurs de l'économie ; `clients`
 (segment_id → population) est **le stock qui alimente le Revenue** — les clients
 arrivent parce qu'on a livré, partent au churn et paient chaque sprint — et
-`segment_price_multipliers` le seul endroit qui puisse faire bouger un prix.
+`segment_price_multipliers` et `segment_arrival_multipliers` sont les deux
+seuls endroits qui puissent faire bouger le prix d'un segment ou lui fermer la
+porte.
 `streak` mémorise les sprints livrés sans surchauffe.
 
 Depuis le Lot 3 : `career_level` (index dans `careers.json`, `balance.json` →

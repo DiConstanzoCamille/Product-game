@@ -1604,19 +1604,19 @@ de recette 2) :
 
 | Stratégie | Sprint médian | 💥 médian | 💰 médian | 💰/charges | Fins positives | Faillites |
 |---|---|---|---|---|---|---|
-| `careful` | 3 | 0 | 46 | 2,6× | 0 | 0 |
-| `economie` | 8 | 1448 | 77 | **1,9×** | 2 % | 0 % |
-| `levier` | 8 | 1939 | 35 | **1,0×** | 10 % | 21 % |
-| `greedy` | 8 | 1517 | 80 | **2,4×** | 1 % | 4 % |
+| `careful` | 3 | 0 | 50 | 2,8× | 0 % | 0 % |
+| `economie` | 9 | 1416 | 97 | **2,3×** | 2 % | 1 % |
+| `levier` | 8 | 1922 | 33 | **0,8×** | 8 % | **30 %** |
+| `greedy` | 8 | 1331 | 107 | **3,0×** | 3 % | 6 % |
 
-Le rapport `Revenue final / charges par sprint` passe de **56× à 2,4×** sur
+Le rapport `Revenue final / charges par sprint` passe de **56× à 3,0×** sur
 `greedy` : la caisse a recommencé à contraindre. Et on meurt **des deux
-côtés** — `levier` fait faillite 21 % du temps avec 2000 💥 en poche,
-`economie` manque son quota avec 150 💰 de caisse.
+côtés** — `levier` fait faillite 30 % du temps avec ~1900 💥 en poche,
+`economie` manque son quota avec une caisse pleine.
 
 **Ce qui reste gênant, et qu'il faut dire** : les deux trajectoires franchissent
-bien le mandat (T3 contre T4), mais `levier` gagne **quatre fois plus souvent**
-que `economie` (10 % contre 2 %). Ce n'est pas un défaut de calibrage : c'est la
+bien le mandat (T3 ou T4 selon les tirages, dans les deux sens), mais `levier`
+gagne **quatre fois plus souvent** que `economie` (8 % contre 2 %). Ce n'est pas un défaut de calibrage : c'est la
 conséquence directe de la séparation des deux économies. L'argent n'achète
 rien — l'Impact est la seule monnaie — donc une bonne caisse ne **produit**
 jamais de score, elle **permet** seulement de tenir plus longtemps une
@@ -1627,7 +1627,7 @@ rendre la faillite plus fréquente ou l'escalade des quotas moins raide (#36) �
 pas d'ajouter un chemin Revenue → Impact, qui reconstruirait exactement ce que
 ce lot vient de démonter.
 
-### 32.6 Deux pièges rencontrés en route
+### 32.6 Quatre pièges rencontrés en route
 
 - **Un prix affiché et un prix encaissé qui divergent.** Le `priceMultiplier`
   des décisions stratégiques était d'abord lu par `ScoreResolver` seul, pendant
@@ -1642,7 +1642,30 @@ ce lot vient de démonter.
   rendait `_assign_forced_strategy()` silencieusement inopérant quelques lignes
   plus bas. Mesure sur `main` d'abord (40/40), puis sur la branche (37/40) :
   c'est la comparaison qui a distingué « ma régression » de « défaut
-  préexistant ». 40/40 après correction.
+  préexistant ».
+- **Une assertion qui comparait deux tirages entre eux** — §29 apprise une
+  quatrième fois, et cette fois par la relecture. Le critère « aucune
+  trajectoire ne domine » avait été écrit
+  `|meilleur trimestre économie − meilleur trimestre Levier| ≤ 1`, sur deux
+  échantillons indépendants de **quatre mandats**. Elle est tombée une fois sur
+  40 sur un moteur parfaitement sain (économie T4 contre Levier T2) ; la
+  distribution mesurée depuis montre les deux ordres (18 fois T4/T4, 15 fois
+  T3/T4, 2 fois T4/T3). La règle : la **viabilité** d'une trajectoire est une
+  propriété du moteur et s'assère (chacune doit passer au moins un verdict) ;
+  la **domination** est une mesure de calibrage, elle se lit sur 40 runs et se
+  documente ici. On n'assère pas une comparaison entre deux échantillons de
+  quatre.
+- **Encaisser sur la nouvelle population et facturer sur l'ancienne.**
+  `_apply_recurring_charges()` tournait avant `_apply_score_conversion()` : le
+  Revenue entrait sur la population résolue pendant que le support se facturait
+  sur celle d'avant. Une grosse acquisition offrait donc un sprint de support
+  gratuit, et des clients partis restaient facturés un sprint de trop. L'ordre
+  est inversé, et une assertion compare désormais `last_client_cost` à
+  `get_client_support_cost()` **après** résolution. Symétriquement, le pivot
+  « Fin du gratuit » vidait le segment d'entrée sans en fermer la porte : la
+  livraison du sprint suivant le repeuplait, et la décision promettait une
+  disparition qu'elle ne tenait pas. `segment_arrival_multipliers` la ferme
+  pour de bon, et `_test_business_model_pivot()` joue le sprint d'après.
 
 ### 32.7 Ce que ce lot ne fait pas
 

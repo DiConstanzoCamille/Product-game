@@ -45,6 +45,7 @@ func _ready() -> void:
 	_test_multi_squad_roster()
 	_test_inbox_channels()
 	_test_backlog_rules()
+	_test_business_model_pivot()
 	_test_investment_draw_rules()
 	_test_score_resolution_integration()
 	_test_tool_families_and_strategy_lot3()
@@ -79,18 +80,24 @@ func _ready() -> void:
 
 	# 🎯 Critère de recette 2 de l'issue #42 : un run « économie » et un run
 	# « Levier » doivent tous deux franchir le mandat, et aucun ne doit
-	# dominer. On assère la RELATION (les deux vont au moins aussi loin que
-	# le premier verdict, et leur écart reste d'un trimestre) — jamais le
-	# trimestre exact atteint, qui dépend des tirages.
+	# dominer.
+	#
+	# Seule la MOITIÉ de ce critère est assertable ici, et c'est la leçon du
+	# carnet §29 apprise une fois de plus : « les deux trajectoires sont
+	# viables » est une propriété du moteur (chacune doit passer au moins un
+	# verdict de board sur ses 4 mandats), mais « aucune ne domine » compare
+	# DEUX TIRAGES entre eux. La première version de ce test asserait
+	# `|économie − Levier| ≤ 1` sur deux échantillons indépendants de 4
+	# mandats : elle est tombée une fois sur 40 (économie T4 contre Levier T2)
+	# sur un moteur parfaitement sain. La domination se MESURE sur 40 runs et
+	# se documente au carnet (§32.5) ; elle ne s'assère pas sur quatre.
 	var economy_quarter := int(quarters_reached.get("economie", 0))
 	var lever_quarter := int(quarters_reached.get("levier", 0))
 	if economy_quarter < 2:
-		_fail("La trajectoire « économie » ne passe plus aucun verdict de board (T%d) — nourrir la boîte doit rester un chemin viable." % economy_quarter)
+		_fail("La trajectoire « économie » ne passe plus aucun verdict de board sur 4 mandats (T%d) — nourrir la boîte doit rester un chemin viable." % economy_quarter)
 	if lever_quarter < 2:
-		_fail("La trajectoire « Levier » ne passe plus aucun verdict de board (T%d) — jouer l'organisation doit rester un chemin viable." % lever_quarter)
-	if absi(economy_quarter - lever_quarter) > 1:
-		_fail("Une trajectoire domine l'autre : économie T%d contre Levier T%d. Les deux doivent tenir la comparaison." % [economy_quarter, lever_quarter])
-	print("\nTrajectoires — économie : meilleur T%d · Levier : meilleur T%d (critère de recette 2 de #42)" % [economy_quarter, lever_quarter])
+		_fail("La trajectoire « Levier » ne passe plus aucun verdict de board sur 4 mandats (T%d) — jouer l'organisation doit rester un chemin viable." % lever_quarter)
+	print("\nTrajectoires — économie : meilleur T%d · Levier : meilleur T%d (critère de recette 2 de #42 ; la comparaison des deux se lit sur 40 runs, pas ici)" % [economy_quarter, lever_quarter])
 
 	if failures > 0:
 		print("\n=== SMOKE TEST LOGIQUE : ÉCHEC — %d assertion(s) en erreur ===" % failures)
@@ -214,6 +221,65 @@ func _test_backlog_rules() -> void:
 		_fail("L'epic n'a pas livré ses effets à la complétion.")
 
 
+## 🔒 Le pivot de modèle économique (spec-clients-revenue.md §4.2). Le vrai
+## piège n'est pas le sprint de la décision — c'est le SUIVANT : vider le
+## segment gratuit une fois ne le ferme pas, et la première livraison le
+## repeuplerait si les arrivées n'étaient pas coupées avec. Une décision qui
+## promet une disparition et rend les clients trois minutes plus tard n'est pas
+## un pari, c'est un bug de présentation.
+func _test_business_model_pivot() -> void:
+	print("=== SMOKE TEST LOGIQUE — PIVOT DE MODELE ECONOMIQUE ===")
+	SprintState.reset_run("agile-transformation", "karavel-scaleup")
+	var entry_id := ""
+	var paying_id := ""
+	for segment in SprintState.get_segments():
+		if String(segment.get("role", "")) == "entry":
+			entry_id = segment.get("id", "")
+		elif String(segment.get("role", "")) == "paying":
+			paying_id = segment.get("id", "")
+	if entry_id == "" or paying_id == "":
+		_fail("Le modele freemium doit declarer un segment d'entree et un segment payant.")
+		return
+
+	var entry_before := SprintState.get_client_count(entry_id)
+	var paying_before := SprintState.get_client_count(paying_id)
+	var price_before := SprintState.resolved_segment_price(paying_id)
+	if entry_before <= 0.0 or paying_before <= 0.0:
+		_fail("Le test du pivot a besoin des deux populations de depart.")
+		return
+
+	SprintState.quarter_strategy_chosen = false
+	if SprintState.choose_strategy("fin-du-gratuit") != "":
+		_fail("« Fin du gratuit » doit pouvoir etre choisie.")
+		return
+
+	# Au moment de la decision : la porte se ferme, une fraction bascule, le
+	# prix des payants monte. La fraction est TIREE — on assere donc
+	# l'encadrement, jamais la valeur.
+	if SprintState.get_client_count(entry_id) != 0.0:
+		_fail("« Fin du gratuit » doit vider le segment d'entree (reste %d)." % int(SprintState.get_client_count(entry_id)))
+	var converted := SprintState.get_client_count(paying_id) - paying_before
+	var conversion_rule: Dictionary = GameData.scoring.get("global", {}).get("strategies", {}).get("fin-du-gratuit", {}).get("onChoice", {}).get("convertRoleRange", {})
+	var low := entry_before * float(conversion_rule.get("minRatio", 0.0))
+	var high := entry_before * float(conversion_rule.get("maxRatio", 1.0))
+	if converted < low - 0.001 or converted > high + 0.001:
+		_fail("La bascule doit rester dans la fourchette tiree de la carte : %f hors de [%f, %f]." % [converted, low, high])
+	if SprintState.resolved_segment_price(paying_id) <= price_before:
+		_fail("« Fin du gratuit » doit faire monter le prix des payants.")
+
+	# 🚪 Le sprint SUIVANT : une grosse livraison ne doit plus rouvrir la porte.
+	if not is_zero_approx(SprintState.clients_for_points(1.0) - SprintState.clients_for_points_by_segment(1.0)[1].get("value", 0.0)):
+		_fail("Apres le pivot, un point d'effet client ne doit plus rapporter que des payants.")
+	var generous := {"id": "pivot-test", "name": "Feature genereuse", "costPoints": 1, "clients": 6, "risk": 0, "quickWin": false, "tags": ["growth"], "eras": ["agile-transformation"]}
+	SprintState.current_backlog_draw = {"sprint": SprintState.sprint_number, "items": [generous]}
+	SprintState.commit_backlog_plan([{"id": "pivot-test", "points": 1}])
+	SprintState.apply_pending_and_check()
+	if SprintState.get_client_count(entry_id) > 0.0:
+		_fail("Le segment ferme s'est repeuple au sprint suivant (%d clients) — la decision promettait sa disparition." % int(SprintState.get_client_count(entry_id)))
+	if SprintState.get_client_count(paying_id) <= 0.0:
+		_fail("Le segment payant doit continuer d'encaisser les livraisons apres le pivot.")
+
+
 ## Le rapport de score est la source unique de l'économie : les quick wins
 ## n'ajoutent plus leur ancien +1 individuel, et les abonnements ne sont jamais
 ## versés deux fois dans le Revenue.
@@ -265,13 +331,23 @@ func _test_score_resolution_integration() -> void:
 		_fail("La population du jeu doit etre exactement celle que le rapport a calculee.")
 	if int(round(float(conversion.get("revenue", {}).get("in", 0.0)))) != SprintState.last_revenue:
 		_fail("Ce qui est encaisse doit etre exactement ce que le rapport dit que les clients ont paye.")
-	# 💰 Le Revenue n'est pas borne : il encaisse les abonnements et paie les
-	# charges, une seule fois chacun.
-	var expected_revenue := revenue_before - float(charges) + float(SprintState.last_revenue)
+	# 💰 Le Revenue n'est pas borne : il encaisse ce que les clients paient et
+	# paie ses charges, une seule fois chacun.
+	var levied := SprintState.last_payroll + SprintState.last_licenses + SprintState.last_client_cost
+	var expected_revenue := revenue_before - float(levied) + float(SprintState.last_revenue)
 	if not is_equal_approx(SprintState.revenue, expected_revenue):
-		_fail("Le Revenue doit recevoir les abonnements une seule fois et payer ses charges une seule fois (%s au lieu de %s)." % [SprintState.revenue, expected_revenue])
-	if SprintState.last_payroll + SprintState.last_licenses + SprintState.last_client_cost != charges:
-		_fail("Les charges prelevees doivent etre exactement celles que get_recurring_charges() affiche.")
+		_fail("Le Revenue doit encaisser ses clients une seule fois et payer ses charges une seule fois (%s au lieu de %s)." % [SprintState.revenue, expected_revenue])
+	if levied != int(SprintState.get_recurring_charges().get("total", 0)):
+		_fail("Les charges prelevees doivent etre exactement celles que get_recurring_charges() affiche APRES resolution.")
+	# 🧾 Le support se facture sur la population que le sprint vient de
+	# produire, pas sur celle d'avant : encaisser sur la nouvelle base et
+	# facturer sur l'ancienne offrirait un sprint de support gratuit a toute
+	# acquisition, et ferait payer des clients deja partis.
+	if SprintState.last_client_cost != int(round(SprintState.get_client_support_cost())):
+		_fail("Le support des clients doit etre calcule sur la population resolue (%d au lieu de %d)." % [
+			SprintState.last_client_cost, int(round(SprintState.get_client_support_cost()))])
+	if charges == levied and SprintState.last_client_cost > 0:
+		print("  (note : la population n'a pas bouge ce sprint — la charge avant/apres est la meme)")
 
 	SprintState.sprint_number += 1
 	SprintState.apply_pending_and_check()
@@ -1573,7 +1649,9 @@ func _play_sprint(strategy: String) -> void:
 			choice = _worst_moral_choice(choices)
 		elif strategy == "economie":
 			choice = _best_client_choice(choices)
-		SprintState.add_pending(choice.get("effects", {}), "%s → %s" % [event.get("subject", ""), choice.get("label", "")])
+		# Le même point d'entrée que l'écran : sinon les bascules de segment
+		# (`clientConversion`) ne sont jamais jouées par le banc.
+		SprintState.apply_inbox_choice(choice, "%s → %s" % [event.get("subject", ""), choice.get("label", "")])
 
 	# Actions personnelles Roadmap (Phase B) : "stress" fait le taf soi-même
 	# tant qu'il reste de l'Énergie (la réserve part avant la capacité) ;

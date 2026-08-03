@@ -52,10 +52,11 @@
       "arreter-de-communiquer": { "lever": 0.4, "supportTeamDeltas": { "pmm": -1 }, "icon": "🤫", "label": "Arrêter de communiquer" },
       "annee-de-consolidation": { "tractionMultiplier": 0.7, "icon": "🧯", "label": "Année de consolidation" },
       "fin-du-gratuit": {
-        "_comment": "Le pivot de modèle économique (spec-clients-revenue.md §4.2), noté au carnet §15 et jamais implémenté faute de sens. `onChoice` s'applique UNE FOIS, à la décision : c'est le seul endroit du jeu où le prix d'un segment change. La fraction convertie est TIRÉE dans une fourchette — le joueur sait qu'il perd sa base, il ne sait pas combien le suivront (question 5 de la vision : on ne rend pas un pari déterministe pour qu'il soit plus juste).",
+        "_comment": "Le pivot de modèle économique (spec-clients-revenue.md §4.2), noté au carnet §15 et jamais implémenté faute de sens. `onChoice` s'applique UNE FOIS, à la décision : c'est le seul endroit du jeu où le prix d'un segment change. `roleMultipliers` vide la population une fois ; `roleArrivalMultipliers` **referme la porte pour de bon** — sans lui, la livraison du sprint suivant repeuplerait le segment gratuit et la décision mentirait. La fraction convertie est TIRÉE dans une fourchette — le joueur sait qu'il perd sa base, il ne sait pas combien le suivront (question 5 de la vision : on ne rend pas un pari déterministe pour qu'il soit plus juste).",
         "onChoice": {
           "convertRoleRange": { "from": "entry", "to": "paying", "minRatio": 0.03, "maxRatio": 0.09 },
           "roleMultipliers": { "entry": 0 },
+          "roleArrivalMultipliers": { "entry": 0 },
           "rolePriceMultipliers": { "paying": 1.35 }
         },
         "churnMultiplier": 1.3,

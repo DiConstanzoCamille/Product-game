@@ -94,7 +94,7 @@ Quatre garde-fous le vérifient mécaniquement, et aucun ne dépend du sérieux
 d'un relecteur : `score_resolver_cases.gd → _test_no_revenue_comes_from_impact`
 fait varier l'Impact du simple au quadruple à livraison identique et exige que
 la caisse ne bouge pas ; le rapport `Revenue final / charges par sprint` ne
-décolle pas au banc (2,4× sur `greedy`, mesuré sur 40 runs) ; les trajectoires
+décolle pas au banc (3,0× sur `greedy`, mesuré sur 40 runs) ; les trajectoires
 `economie` et `levier` du banc franchissent toutes deux le mandat ; **mourir
 riche** (faillite avec un gros portefeuille, ou quota manqué avec une caisse
 pleine) reste atteignable des deux côtés.

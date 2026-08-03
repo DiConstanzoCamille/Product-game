@@ -76,6 +76,11 @@ var clients: Dictionary = {}
 ## est le seul endroit qui puisse le faire mentir, et seule une décision
 ## stratégique explicite y écrit (§4.2 — « Fin du gratuit »).
 var segment_price_multipliers: Dictionary = {}
+## 🚪 Ce qu'un segment accepte encore comme arrivées. Vider une population une
+## fois ne suffit pas à la faire disparaître : sans ce multiplicateur, la
+## livraison du sprint suivant la repeuple, et « Fin du gratuit » promet une
+## fermeture qu'elle ne tient pas. À 0, le segment est fermé pour de bon.
+var segment_arrival_multipliers: Dictionary = {}
 var squads: Array = []                 # [{id, name, roster, backlog_draw, capacity, delivered, epic_progress}]
 var piloted_squads: Dictionary = {}    # 🎯 {sprint, ids} — les équipes pilotées ce sprint (Lot 5 §13.3) ; les autres jouent seules
 var owned_practices: Array = []        # ids de pratiques achetées (permanentes pour le mandat)
@@ -222,6 +227,7 @@ func reset_run(chosen_era_id: String = "", chosen_company_id: String = "", chose
 	# revenu du premier sprint.
 	clients.clear()
 	segment_price_multipliers.clear()
+	segment_arrival_multipliers.clear()
 	for segment in get_segments():
 		clients[segment.get("id", "")] = float(segment.get("start", 0))
 	# 💼📣🎧 Équipes subies (spec §9.4) : niveau 0-5 fixé par l'entreprise,
@@ -828,6 +834,16 @@ func _apply_strategy_on_choice(strategy_id: String) -> void:
 		if lost > 0.0:
 			parts.append("%d partent" % int(round(lost)))
 
+	for role in rules.get("roleArrivalMultipliers", {}).keys():
+		var arrival_multiplier := float(rules["roleArrivalMultipliers"][role])
+		for segment in get_segments():
+			if str(segment.get("role", "")) != str(role):
+				continue
+			var closed_id: String = segment.get("id", "")
+			segment_arrival_multipliers[closed_id] = float(segment_arrival_multipliers.get(closed_id, 1.0)) * arrival_multiplier
+		if is_zero_approx(arrival_multiplier):
+			parts.append("la porte d'entrée se referme")
+
 	for role in rules.get("rolePriceMultipliers", {}).keys():
 		var price_multiplier := float(rules["rolePriceMultipliers"][role])
 		for segment in get_segments():
@@ -1184,8 +1200,17 @@ func describe_clients(compact: bool = false) -> String:
 func clients_for_points(points: float) -> float:
 	var total := 0.0
 	for segment in get_segments():
-		total += points * float(segment.get("clientsPerPoint", 0.0))
+		total += points * segment_yield_per_point(segment)
 	return total
+
+
+## Ce qu'un point d'effet client rapporte à CE segment aujourd'hui — zéro si le
+## segment a été fermé par une décision (§4.2). Lu par l'affichage comme par le
+## moteur : une Roadmap qui annoncerait encore « +72 gratuits » après la fin du
+## gratuit mentirait au joueur.
+func segment_yield_per_point(segment: Dictionary) -> float:
+	return (float(segment.get("clientsPerPoint", 0.0))
+		* float(segment_arrival_multipliers.get(segment.get("id", ""), 1.0)))
 
 
 ## Détail par segment du même calcul (révélé par la pratique UX research).
@@ -1196,7 +1221,7 @@ func clients_for_points_by_segment(points: float) -> Array:
 			"id": segment.get("id", ""),
 			"icon": segment.get("icon", "👥"),
 			"label": segment.get("label", ""),
-			"value": points * float(segment.get("clientsPerPoint", 0.0)),
+			"value": points * segment_yield_per_point(segment),
 		})
 	return rows
 
@@ -1229,7 +1254,7 @@ func add_clients_from_points(points: float) -> float:
 	var gained := 0.0
 	for segment in get_segments():
 		var segment_id: String = segment.get("id", "")
-		var delta := points * float(segment.get("clientsPerPoint", 0.0))
+		var delta := points * segment_yield_per_point(segment)
 		clients[segment_id] = max(0.0, get_client_count(segment_id) + delta)
 		gained += delta
 	return gained
@@ -2882,8 +2907,12 @@ func apply_pending_and_check() -> String:
 	# PlayerProfile, pas ici — un seul calcul (celui du resolver), une seule
 	# lecture (celle du rapport déjà produit).
 	PlayerProfile.record_score_report(last_score_report)
-	_apply_recurring_charges()
+	# L'ordre compte : la conversion résout la population du sprint, les
+	# charges la facturent. L'inverse encaisserait sur la nouvelle base et
+	# facturerait le support sur l'ancienne — un sprint de support gratuit pour
+	# toute acquisition, et des clients partis facturés un sprint de trop.
 	_apply_score_conversion()
+	_apply_recurring_charges()
 
 	var bounds: Dictionary = GameData.balance.get("resourceBounds", {"min": 0, "max": 100})
 	var min_value: float = bounds.get("min", 0)
@@ -3024,6 +3053,7 @@ func _build_score_snapshot() -> Dictionary:
 		"segments": get_segments(),
 		"price_scale": get_price_scale(),
 		"segment_price_multipliers": segment_price_multipliers.duplicate(),
+		"segment_arrival_multipliers": segment_arrival_multipliers.duplicate(),
 		"pending_client_points": float(pending_deltas.get("clients", 0.0)),
 		"support_teams": support_teams.duplicate(),
 		"product_tier": product_tier,

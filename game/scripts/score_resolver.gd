@@ -745,7 +745,9 @@ static func _resolve_conversion(snapshot: Dictionary, rules: Dictionary, resourc
 		var left: float = before * min(1.0, churn)
 		# Une livraison ratée fait partir des clients : le même nombre, l'autre
 		# sens. Le Sales n'amplifie que ce qui arrive, jamais ce qui fuit.
-		var per_point := float(segment.get("clientsPerPoint", 0.0))
+		# 🚪 Un segment fermé par une décision (§4.2) n'accepte plus d'arrivées :
+		# le vider une fois ne suffit pas, la livraison suivante le repeuplerait.
+		var per_point := float(segment.get("clientsPerPoint", 0.0)) * float(snapshot.get("segment_arrival_multipliers", {}).get(segment_id, 1.0))
 		var joined := client_points * per_point * (sales_multiplier if client_points >= 0.0 else 1.0) * arrival_multiplier
 		var after: float = max(0.0, before - left + joined - float(converted_out.get(segment_id, 0.0)) + float(converted_in.get(segment_id, 0.0)))
 		clients_after[segment_id] = after
