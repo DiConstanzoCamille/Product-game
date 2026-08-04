@@ -4,19 +4,19 @@
 
   "careerLevels": {
     "pm": {
-      "quarterQuotas": [150, 760, 2200, 4600]
+      "quarterQuotas": [150, 760, 2640, 5520]
     },
     "lead-pm": {
-      "quarterQuotas": [300, 1000, 2400, 5000]
+      "quarterQuotas": [300, 1000, 2880, 6000]
     },
     "director": {
-      "quarterQuotas": [750, 2400, 5800, 12100]
+      "quarterQuotas": [750, 2400, 6960, 14520]
     },
     "cpo": {
-      "quarterQuotas": [1300, 4300, 10500, 22000]
+      "quarterQuotas": [1300, 4300, 12600, 26400]
     },
     "ceo": {
-      "quarterQuotas": [2900, 9400, 22900, 48100]
+      "quarterQuotas": [2900, 9400, 27480, 57720]
     }
   },
 

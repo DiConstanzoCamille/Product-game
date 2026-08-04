@@ -494,6 +494,8 @@ func _test_quota_sidebar_and_freezes() -> void:
 		await get_tree().process_frame
 	if screen.side_panel.find_child("QuotaSection", true, false) == null:
 		_fail("Le panneau latéral doit afficher en permanence la section de quota.")
+	else:
+		_check_quota_section_shows_the_mandate(screen.side_panel)
 
 	var candidate: Dictionary = GameData.candidates[0]
 	var candidate_view: Dictionary = AssetView.for_candidate(candidate)
@@ -520,6 +522,56 @@ func _test_quota_sidebar_and_freezes() -> void:
 	screen.queue_free()
 	viewport.queue_free()
 	await get_tree().process_frame
+
+
+## Lot B (#36) — deux informations que le panneau doit porter, et qu'une
+## capture ne montre pas : elles vivent en bas d'une colonne qui défile.
+##
+##  · les quatre objectifs du mandat, dès le premier sprint. La donnée est dans
+##    quotas.json depuis toujours ; ne montrer que le trimestre courant ne
+##    cachait rien d'aléatoire, ça empêchait seulement de voir que la marche
+##    suivante est cinq fois plus haute ;
+##  · la jauge n'est plus bornée à l'objectif. Le `clampi` d'avant rendait le
+##    dépassement invisible — or c'est lui qui dit s'il reste de quoi acheter.
+func _check_quota_section_shows_the_mandate(panel: Node) -> void:
+	var mandate: Node = null
+	for label in _labels_of(panel):
+		if String(label.text).begins_with("Mandat :"):
+			mandate = label
+			break
+	if mandate == null:
+		_fail("Le panneau doit annoncer les objectifs des quatre trimestres dès le premier sprint.")
+	else:
+		for entry in SprintState.get_mandate_quotas():
+			if not String(mandate.text).contains(str(int(entry.get("quota", 0)))):
+				_fail("Le panneau annonce le mandat sans l'objectif du T%d (« %s »)." % [
+					int(entry.get("quarter", 0)), mandate.text
+				])
+
+	# Un portefeuille au-dessus de la barre : la jauge doit le représenter, pas
+	# le tronquer. On force le dépassement, sinon le test passerait aussi bien
+	# avec l'ancien clamp — un portefeuille sous l'objectif ne distingue rien.
+	var previous := SprintState.impact_wallet
+	SprintState.impact_wallet = SprintState.get_current_quota() * 3
+	panel.refresh()
+	var bar: Node = panel.find_child("QuotaProgress", true, false)
+	if bar == null:
+		_fail("La section de quota doit porter sa jauge.")
+	elif int(bar.value) < SprintState.impact_wallet:
+		_fail("La jauge de quota tronque le dépassement (%d affiché pour %d au portefeuille)." % [
+			int(bar.value), SprintState.impact_wallet
+		])
+	SprintState.impact_wallet = previous
+	panel.refresh()
+
+
+func _labels_of(node: Node) -> Array:
+	var labels: Array = []
+	for child in node.get_children():
+		if child is Label:
+			labels.append(child)
+		labels.append_array(_labels_of(child))
+	return labels
 
 
 func _test_t4_mandate_choice() -> void:

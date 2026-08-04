@@ -347,6 +347,43 @@ func get_company() -> Dictionary:
 ## premiere version du JSON, afin que les sauvegardes de developpement ne
 ## dependent pas de la migration de donnees.
 func get_current_quota() -> int:
+	# L'exigence tirée pour CE trimestre est la seule couche qui ne vaut que
+	# maintenant : elle s'ajoute au barème structurel, elle ne le déplace pas.
+	return int(round(_structural_quota(quarter_index) * float(_active_quarter_effects().get("quotaMultiplier", 1.0))))
+
+
+## Le barème d'un trimestre donné, exigence ponctuelle exclue. C'est la courbe
+## que le joueur doit rattraper sur tout son mandat, et c'est elle — pas le
+## quota du moment, qui bouge avec un tirage — qui sert de référence aux prix
+## (§3.3) et à l'affichage des quatre objectifs du mandat.
+func get_quota_for_quarter(index: int) -> int:
+	return int(round(_structural_quota(index)))
+
+
+## Les objectifs du mandat, du premier au dernier, tels qu'ils sont connus dès
+## le sprint 1 : la donnée existe dans quotas.json, la cacher n'ajoutait aucune
+## tension, elle empêchait seulement de préparer un plan.
+func get_mandate_quotas() -> Array:
+	var quotas: Array = []
+	for index in range(1, _mandate_quarter_count() + 1):
+		quotas.append({
+			"quarter": index,
+			"quota": get_quota_for_quarter(index),
+			"reached": quarter_index > index,
+			"current": quarter_index == index,
+		})
+	return quotas
+
+
+func _mandate_quarter_count() -> int:
+	var levels: Dictionary = GameData.quotas.get("careerLevels", {})
+	var level: Dictionary = levels.get(career_level, levels.get("pm", {}))
+	var configured: Variant = level.get("quarterQuotas", [])
+	var table_size: int = configured.size() if configured is Array else 4
+	return maxi(table_size, quarter_index)
+
+
+func _structural_quota(index: int) -> float:
 	var levels: Dictionary = GameData.quotas.get("careerLevels", {})
 	var level: Dictionary = levels.get(career_level, levels.get("pm", {}))
 	var configured: Variant = level.get("quarterQuotas", [])
@@ -356,14 +393,14 @@ func get_current_quota() -> int:
 		# jamais d'une valeur écrite ici. Un quota en dur dans un script rend le
 		# rééquilibrage impossible sans un dev — et celui qui vivait là a
 		# silencieusement figé le T5 sur l'ancien barème.
-		base_quota = float(configured[mini(quarter_index, configured.size()) - 1])
+		base_quota = float(configured[mini(index, configured.size()) - 1])
 	elif configured is Dictionary:
-		base_quota = float(configured.get(str(min(quarter_index, 4)), 0))
+		base_quota = float(configured.get(str(min(index, 4)), 0))
 
 	var long_conf: Dictionary = GameData.quotas.get("longMandate", {})
-	if quarter_index >= int(long_conf.get("fromQuarter", 5)):
+	if index >= int(long_conf.get("fromQuarter", 5)):
 		var multiplier := float(long_conf.get("quotaMultiplier", 2.2))
-		base_quota *= pow(multiplier, quarter_index - 4)
+		base_quota *= pow(multiplier, index - 4)
 	# 🧭 Une décision stratégique peut relever la barre pour toujours
 	# (Expansion internationale : plus de marché, plus d'attentes). Elle passe
 	# par ici et nulle part ailleurs — un écran qui lirait la table brute
@@ -371,7 +408,7 @@ func get_current_quota() -> int:
 	var strategy_quota := 1.0
 	for strategy_id in chosen_strategy_ids:
 		strategy_quota *= float(GameData.scoring.get("global", {}).get("strategies", {}).get(strategy_id, {}).get("quotaMultiplier", 1.0))
-	return int(round(base_quota * strategy_quota * float(_active_quarter_effects().get("quotaMultiplier", 1.0))))
+	return base_quota * strategy_quota
 
 
 func get_quarter_length() -> int:
@@ -402,13 +439,34 @@ func resolved_price(kind: String, item_id: String = "", data: Dictionary = {}) -
 	return maxi(0, int(round(price)))
 
 
-## Indexation des prix sur l'escalade des objectifs (spec §3.3). Vaut 1.0
-## aujourd'hui : le lot B (#36) la branchera sur
-## `(objectif_du_trimestre / objectif_T1) ^ k`, avec k dans balance.json. Elle
-## existe déjà et est déjà appelée pour que ce lot-là soit une fonction à
-## remplir, pas un lot entier à rouvrir.
+## Indexation des prix sur l'escalade des objectifs (spec §3.3) :
+## `(objectif_du_trimestre / objectif_T1) ^ k`, k dans balance.json.
+##
+## Sans elle, un objectif à 4600 face à des outils à 25 rend tout le late game
+## gratuit — le joueur achète le catalogue sans réfléchir au moment précis où
+## la décision devrait être la plus tendue. Avec `k = 1`, le défaut inverse :
+## le pouvoir d'achat relatif ne bouge jamais et chaque trimestre est le
+## précédent avec plus de zéros.
+##
+## Deux choix de mise en œuvre, tous deux volontaires :
+##
+##  · la référence est le barème **structurel** (`_structural_quota`), pas le
+##    quota du moment. Une exigence tirée au sort qui relève la barre d'un
+##    trimestre ne doit pas faire bondir l'étal avec elle : le prix suivrait un
+##    tirage, et le joueur ne pourrait plus rien anticiper ;
+##  · une décision stratégique qui relève la barre **pour toujours**, elle, est
+##    dans la référence. Sinon la stratégie qui durcit le mandat rendrait
+##    mécaniquement le catalogue bon marché.
+##
+## Au Comité, `quarter_index` pointe déjà le trimestre qui s'ouvre (le verdict
+## appelle `_prepare_quarter` avant) : on y achète donc au prix du trimestre
+## dans lequel on entre, ce qui est la lecture voulue.
 func price_index() -> float:
-	return 1.0
+	var exponent := float(GameData.balance.get("prices", {}).get("quotaIndexExponent", 0.7))
+	var reference := _structural_quota(1)
+	if reference <= 0.0:
+		return 1.0
+	return pow(_structural_quota(quarter_index) / reference, exponent)
 
 
 func _base_price(kind: String, item_id: String, data: Dictionary) -> float:
