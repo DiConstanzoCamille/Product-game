@@ -1769,6 +1769,48 @@ avait révélé le problème, est lui aussi couvert.
 
 Ce choix conserve les textes et les données existantes tout en supprimant les
 deux défauts observés : les carrés de remplacement en capture headless et le
-mélange de styles colorés propre à chaque OS. Un test parcourt les scripts,
-scènes et JSON à chaque smoke UI et échoue dès qu'un nouveau pictogramme n'est
-pas embarqué dans la police d'icônes.
+mélange de styles colorés propre à chaque OS.
+
+### 34.1 Une liste blanche ne protège que ce à quoi on a pensé
+
+Le premier garde-fou demandait « ce caractère est-il un pictogramme ? » avant
+de vérifier sa couverture, et répondait avec une liste de codepoints écrite à
+la main. Il est resté vert pendant que `▸`, `◂`, `○`, `●` et `✗` — cinq signes
+bien présents à l'écran, dans les choix de l'Inbox, le bouton *Replier*, les
+objectifs et les en-têtes de panneau — se dessinaient en carrés dès que la
+police système était coupée. Personne ne les avait déclarés « pictogrammes »,
+donc personne ne les vérifiait : le test protégeait exactement ce qu'on savait
+déjà.
+
+Le contrôle prend maintenant le problème par l'autre bout, et n'a plus de
+liste du tout : **tout caractère non-ASCII écrit dans une chaîne de `game/` ou
+de `data/` doit être dessiné par au moins une des six polices embarquées.** Il
+ne peut donc plus rater un signe qu'on n'avait pas anticipé — c'est la
+propriété qui compte, pas l'exhaustivité de la liste. Deux précisions le
+rendent utilisable :
+
+- il ne lit que les **chaînes**, pas les commentaires. Les `①②③` qui découpent
+  les zones d'une carte et les filets `─` des séparateurs ne finissent jamais à
+  l'écran ; les scanner ferait échouer le test sur du texte que personne ne
+  voit ;
+- il interroge **les six polices**, pas seulement celle d'icônes. `✓`, `←`,
+  `→` viennent d'IBM Plex ; exiger qu'ils soient dans l'asset d'icônes serait
+  faux.
+
+### 34.2 Un binaire sans source n'est pas maintenable
+
+La police était livrée compilée, sans le mapping ni le générateur : impossible
+de savoir quel tracé dessinait quel caractère, donc impossible d'en ajouter un
+sans tout refaire. `tools/icons/` versionne désormais les trois pièces —
+`manifest.json` (le caractère → son tracé), les SVG Lucide amont figés à la
+version 0.469.0, et `build_product_icons.py` qui reconstruit l'asset de façon
+déterministe. Deux tracés (`○` et `●`) sont écrits pour le jeu sur la même
+grille 24×24, faute d'équivalent Lucide à la bonne taille optique.
+
+Le smoke UI compare la police à son manifeste : déclarer un caractère sans
+régénérer échoue. `build_product_icons.py --check` fait l'inverse en dehors de
+Godot — il refuse un asset qui ne correspond plus à sa source.
+
+Un effet de bord vaut d'être noté : l'ancien asset dessinait `💥` (l'Impact) et
+`⚡` (l'Énergie) avec le même éclair. Deux grandeurs qui ne se comparent pas
+partageaient un signe. Le manifeste les sépare.

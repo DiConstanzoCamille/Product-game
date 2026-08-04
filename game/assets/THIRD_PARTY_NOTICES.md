@@ -14,12 +14,24 @@ Tous les assets de ce dossier sont libres d'usage commercial. Le fichier de lice
 Mêmes familles que la landing page (`landing/index.html`), pour cohérence visuelle entre les deux.
 
 `ProductIcons.ttf` n'est pas une police de texte ni une police emoji tierce :
-les tracés SVG Lucide ont été compilés localement sur les codepoints déjà
-présents dans les données du jeu. Elle est le fallback explicite des trois
-familles typographiques. Les sélecteurs Unicode invisibles `U+FE0F` et
-`U+200D` ont une avance nulle ; aucun système hôte n'est consulté pour dessiner
-les pictogrammes. Le smoke UI vérifie mécaniquement que chaque pictogramme
-utilisé par `game/` et `data/` est couvert par cet asset.
+les tracés SVG Lucide sont compilés localement sur les codepoints déjà présents
+dans les données du jeu. Elle est le fallback explicite des trois familles
+typographiques. Les sélecteurs Unicode invisibles `U+FE0F` et `U+200D` ont une
+avance nulle ; aucun système hôte n'est consulté pour dessiner les
+pictogrammes.
+
+**Cet asset se régénère.** Sa source vit dans
+[`tools/icons/`](../../tools/icons/README.md) : `manifest.json` associe chaque
+caractère au tracé qui le dessine, `lucide/` fige les SVG amont (Lucide
+0.469.0, ISC), `extra/` contient les deux tracés écrits pour le jeu (`○` et
+`●`), et `build_product_icons.py` reconstruit le binaire à l'octet près.
+`--check` refuse une police qui ne correspond plus à son manifeste.
+
+Deux contrôles mécaniques encadrent le tout : le smoke UI compare la police à
+son manifeste, et il parcourt les **chaînes** de `game/` et `data/` pour exiger
+que tout caractère non-ASCII affiché soit dessiné par au moins une des six
+polices embarquées — sans liste blanche de pictogrammes, puisque c'est
+précisément une liste blanche qui avait laissé passer `▸ ◂ ○ ● ✗`.
 
 ## Icônes — `icons/`
 
