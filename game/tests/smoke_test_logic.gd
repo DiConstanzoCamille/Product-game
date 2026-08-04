@@ -85,6 +85,7 @@ func _ready() -> void:
 	_test_investment_draw_rules()
 	_test_score_resolution_integration()
 	_test_tool_families_and_strategy_lot3()
+	_test_strategy_quota_activation()
 	_test_price_index_follows_quota()
 	_test_quarter_runtime()
 	_test_committee_lot4()
@@ -545,6 +546,31 @@ func _test_tool_families_and_strategy_lot3() -> void:
 	var expected_remaining: int = GameData.strategy.get("strategies", []).size() - SprintState.chosen_strategy_ids.size()
 	if SprintState.get_strategy_options(10).size() != expected_remaining:
 		_fail("Le trimestre suivant doit reproposer tout le catalogue sauf ce qui est déjà choisi.")
+
+
+## Une décision stratégique ne peut jamais modifier l'objectif d'un trimestre
+## déjà clos : le panneau du mandat doit continuer à décrire le verdict rendu.
+func _test_strategy_quota_activation() -> void:
+	print("=== SMOKE TEST LOGIQUE — ACTIVATION DES STRATÉGIES ===")
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+	# Neutralise une éventuelle injonction T1 pour isoler le choix volontaire T2.
+	SprintState.chosen_strategy_ids.clear()
+	SprintState.strategy_activation_quarters.clear()
+	SprintState.quarter_strategy_chosen = false
+	SprintState.quarter_forced_strategy_id = ""
+	var t1_quota := SprintState.get_quota_for_quarter(1)
+	var t2_quota := SprintState.get_quota_for_quarter(2)
+
+	SprintState.quarter_index = 2
+	if SprintState.choose_strategy("expansion-internationale") != "":
+		_fail("Expansion internationale doit pouvoir être adoptée au T2.")
+		return
+	var mandate_quotas := SprintState.get_mandate_quotas()
+	if int(mandate_quotas[0].get("quota", -1)) != t1_quota:
+		_fail("Une stratégie adoptée au T2 ne doit pas réécrire le quota T1 (%d → %d)." % [t1_quota, int(mandate_quotas[0].get("quota", -1))])
+	if SprintState.get_quota_for_quarter(2) != int(round(t2_quota * 1.2)):
+		_fail("Expansion internationale doit relever le quota à partir de son trimestre d'adoption.")
+	SprintState.quarter_index = 1
 
 
 ## Lot B (#36) — les prix suivent l'escalade des objectifs, **mais moins vite

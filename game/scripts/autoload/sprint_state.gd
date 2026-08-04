@@ -106,6 +106,7 @@ var newly_unlocked_career_level: String = ""  # non vide juste après le sprint 
 var tool_slots_purchased: int = 0      # +1/+2 achetés au Comité, à prix croissant (spec §7.1.1)
 var swap_count: int = 0                # bascules d'outil déjà faites ce mandat (spec §7.1.2) — chaque nouvelle coûte plus de Cynisme
 var chosen_strategy_ids: Array = []    # décisions stratégiques choisies ce mandat — permanentes, 1 par trimestre (spec §7.2)
+var strategy_activation_quarters: Dictionary = {}  # strategy_id -> trimestre d'adoption ; un effet ne réécrit jamais un verdict passé
 var quarter_strategy_chosen: bool = false  # une décision stratégique a déjà été prise ce trimestre (imposée ou volontaire)
 var current_shop_offer: Dictionary = {}     # {sprint, candidates:[...], practices:[ids], decisions:[ids], leased:[ids], rerolls} — tirage des Investissements
 var reserved_assets: Array = []             # 📌 [{kind, id, data, sprint, paid}] — punaisés, réinjectés dans l'offre suivante
@@ -197,6 +198,7 @@ func reset_run(chosen_era_id: String = "", chosen_company_id: String = "", chose
 	tool_slots_purchased = 0
 	swap_count = 0
 	chosen_strategy_ids.clear()
+	strategy_activation_quarters.clear()
 	quarter_strategy_chosen = false
 	_quarter_requirement_bag.clear()
 	_last_quarter_requirement_id = ""
@@ -401,12 +403,14 @@ func _structural_quota(index: int) -> float:
 	if index >= int(long_conf.get("fromQuarter", 5)):
 		var multiplier := float(long_conf.get("quotaMultiplier", 2.2))
 		base_quota *= pow(multiplier, index - 4)
-	# 🧭 Une décision stratégique peut relever la barre pour toujours
-	# (Expansion internationale : plus de marché, plus d'attentes). Elle passe
-	# par ici et nulle part ailleurs — un écran qui lirait la table brute
-	# afficherait un quota que le verdict ne reconnaîtrait pas.
+	# 🧭 Une décision stratégique peut relever la barre à partir du trimestre
+	# où elle est prise (Expansion internationale : plus de marché, plus
+	# d'attentes). Elle ne réécrit jamais un quota déjà jugé : l'historique et
+	# le verdict restent donc cohérents dans le panneau latéral.
 	var strategy_quota := 1.0
 	for strategy_id in chosen_strategy_ids:
+		if int(strategy_activation_quarters.get(strategy_id, 1)) > index:
+			continue
 		strategy_quota *= float(GameData.scoring.get("global", {}).get("strategies", {}).get(strategy_id, {}).get("quotaMultiplier", 1.0))
 	return base_quota * strategy_quota
 
@@ -835,6 +839,7 @@ func choose_strategy(strategy_id: String) -> String:
 	if strategy.is_empty():
 		return "introuvable"
 	chosen_strategy_ids.append(strategy_id)
+	strategy_activation_quarters[strategy_id] = quarter_index
 	quarter_strategy_chosen = true
 	pending_journal_lines.append("🧭 Décision stratégique : %s %s adoptée — irréversible pour le reste du mandat." % [
 		strategy.get("icon", ""), strategy.get("name", strategy_id)
