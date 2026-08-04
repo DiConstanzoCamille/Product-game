@@ -5,35 +5,72 @@
       "name": "Ex-consultant McKinsey",
       "cost": "Élevé",
       "capacity": "+",
-      "trait": "Frameworks à −50% de coût humain, mais cynisme passif en hausse"
+      "trait": "Frameworks à −50% de coût humain, mais cynisme passif en hausse",
+      "depart": { "moral": 62, "confiance": 48, "energie": 72, "salaire": 72 },
+      "influence": { "moral": 0.8, "confiance": 0.9, "energie": 0.9, "salaire": 1.3 }
     },
     {
       "id": "rockstar-10x",
       "name": "Rockstar 10x",
       "cost": "Élevé",
       "capacity": "++",
-      "trait": "Productivité individuelle forte, plombe le moral collectif s'il reste trop longtemps"
+      "trait": "Productivité individuelle forte, plombe le moral collectif s'il reste trop longtemps",
+      "depart": { "moral": 66, "confiance": 55, "energie": 84, "salaire": 78 },
+      "influence": { "moral": 1.1, "confiance": 0.8, "energie": 1.25, "salaire": 1.4 }
     },
     {
       "id": "junior-ambitieux",
       "name": "Junior ambitieux",
       "cost": "Faible",
       "capacity": "+ (léger)",
-      "trait": "Adopte vite les nouveaux outils, capacité limitée"
+      "trait": "Adopte vite les nouveaux outils, capacité limitée",
+      "depart": { "moral": 76, "confiance": 74, "energie": 72, "salaire": 58 },
+      "influence": { "moral": 1.15, "confiance": 1.2, "energie": 1.1, "salaire": 0.8 }
     },
     {
       "id": "veteran-desabuse",
       "name": "Vétéran désabusé",
       "cost": "Faible",
       "capacity": "+",
-      "trait": "Résiste aux changements d'outils (coût humain ×1.5 sur cartes structurelles), stabilise le moral en crise"
+      "trait": "Résiste aux changements d'outils (coût humain ×1.5 sur cartes structurelles), stabilise le moral en crise",
+      "depart": { "moral": 55, "confiance": 40, "energie": 70, "salaire": 60 },
+      "influence": { "moral": 0.6, "confiance": 0.4, "energie": 1.0, "salaire": 1.2 }
     },
     {
       "id": "wonderkid",
       "name": "Wonderkid fraîchement diplômé",
       "cost": "Très faible",
       "capacity": "+",
-      "trait": "Apprend vite, mais moral très volatile — part facilement si ça tourne mal"
+      "trait": "Apprend vite, mais moral très volatile — part facilement si ça tourne mal",
+      "depart": { "moral": 82, "confiance": 70, "energie": 78, "salaire": 52 },
+      "influence": { "moral": 1.35, "confiance": 1.15, "energie": 1.25, "salaire": 0.7 }
+    },
+    {
+      "id": "idealiste-produit",
+      "name": "Idéaliste produit",
+      "cost": "Moyen",
+      "capacity": "+",
+      "trait": "Accepte beaucoup tant que le produit va dans le bon sens, mais ne pardonne pas une promesse trahie.",
+      "depart": { "moral": 74, "confiance": 82, "energie": 68, "salaire": 56 },
+      "influence": { "moral": 1.0, "confiance": 1.45, "energie": 1.0, "salaire": 0.75 }
+    },
+    {
+      "id": "mercenaire",
+      "name": "Mercenaire pragmatique",
+      "cost": "Élevé",
+      "capacity": "+",
+      "trait": "Ne demande pas de grand récit, mais regarde très précisément l'offre et le marché.",
+      "depart": { "moral": 58, "confiance": 48, "energie": 74, "salaire": 76 },
+      "influence": { "moral": 0.7, "confiance": 0.65, "energie": 0.9, "salaire": 1.5 }
+    },
+    {
+      "id": "pilier-collectif",
+      "name": "Pilier collectif",
+      "cost": "Moyen",
+      "capacity": "+",
+      "trait": "Tient les autres debout, mais se vide sans bruit lorsque tout repose sur lui.",
+      "depart": { "moral": 70, "confiance": 68, "energie": 62, "salaire": 64 },
+      "influence": { "moral": 0.85, "confiance": 0.9, "energie": 1.4, "salaire": 1.0 }
     }
   ],
   "eraSkins": [

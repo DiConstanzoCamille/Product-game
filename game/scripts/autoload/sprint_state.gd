@@ -37,6 +37,7 @@ var activated_card_sprints: Dictionary = {}  # card_id -> numéro de sprint d'ac
 var journal: Array = []                # [{sprint, text, deltas}], le plus ancien en premier
 
 var pending_deltas: Dictionary = {}    # resource_id -> float, accumulés sur le sprint en cours
+var pending_people_effects: Array = [] # [{target, deltas, note}] — effets individuels, résolus avant le score
 var pending_journal_lines: Array = []  # texte des choix faits pendant le sprint en cours
 
 var is_mandate_over: bool = false
@@ -156,6 +157,7 @@ func reset_run(chosen_era_id: String = "", chosen_company_id: String = "", chose
 	activated_card_sprints.clear()
 	journal.clear()
 	pending_deltas.clear()
+	pending_people_effects.clear()
 	pending_journal_lines.clear()
 	is_mandate_over = false
 	ending_id = ""
@@ -251,18 +253,7 @@ func reset_run(chosen_era_id: String = "", chosen_company_id: String = "", chose
 	var salaries: Dictionary = GameData.balance.get("salaries", {})
 	for member in company.get("startingRoster", []):
 		var seniority: String = member.get("seniority", "junior")
-		primary_roster.append({
-			"id": member.get("id", ""),
-			"name": member.get("name", ""),
-			"role": member.get("role", ""),
-			"seniority": seniority,
-			"salary": int(salaries.get(seniority, 1)),
-			"trait": member.get("trait", ""),
-			"visible_trait_id": member.get("visible_trait_id", ""),
-			"hidden_trait": "",
-			"hiddenRevealed": true,  # l'équipe héritée a déjà fait sa période d'essai
-			"hiredSprint": 0,
-		})
+		primary_roster.append(_employee_from_source(member, 0, true))
 	piloted_squads = {}
 	squads = [{
 		"id": "squad-principale",
@@ -289,6 +280,7 @@ func reset_run(chosen_era_id: String = "", chosen_company_id: String = "", chose
 	for resource in GameData.resources:
 		var resource_id: String = resource.get("id", "")
 		resource_values[resource_id] = float(overrides.get(resource_id, starting.get(resource_id, 50)))
+	_refresh_team_moral()
 	_prepare_quarter(1)
 	get_effective_capacity()
 
@@ -967,6 +959,7 @@ func promote_employee(employee_id: String) -> String:
 	employee["seniority"] = "senior"
 	var raise_amount := int(GameData.balance.get("salaries", {}).get("senior", 2)) - int(employee.get("salary", 1))
 	employee["salary"] = int(GameData.balance.get("salaries", {}).get("senior", 2))
+	apply_people_effect_for_employee(employee, {"salaire": float(get_individual_team_conf().get("promotionSalaire", 0))})
 	pending_journal_lines.append("📈 Promotion (%d 💥) : %s passe senior — %+d 💰/sprint de salaire." % [cost, employee.get("name", employee_id), raise_amount])
 	return ""
 
@@ -1002,6 +995,7 @@ func buy_team_seminar() -> String:
 		return refusal
 	add_pending({"cynisme": float(item.get("cynismeDelta", -15))},
 		"🏝️ Séminaire d'équipe (%d 💥) : 🎭 Cynisme %d." % [cost, int(item.get("cynismeDelta", -15))])
+	queue_people_effect("tous", {"moral": float(get_individual_team_conf().get("seminarMoral", 0))})
 	return ""
 
 
@@ -1330,9 +1324,190 @@ func get_hidden_trait(trait_id: String) -> Dictionary:
 	return {}
 
 
+# --- Équipe individuelle (spec-equipe-individuelle.md) ---
+
+## Le Moral n'est plus une valeur possédée par l'entreprise. Chaque employé
+## porte ses quatre critères ; `resource_values.moral` est seulement le miroir
+## calculé maintenu pour les systèmes historiques de score et de fin de mandat.
+func get_individual_team_conf() -> Dictionary:
+	return GameData.balance.get("individualTeam", {})
+
+
+func get_personality(personality_id: String) -> Dictionary:
+	for personality in GameData.recruitment_archetypes.get("archetypes", []):
+		if String(personality.get("id", "")) == personality_id:
+			return personality
+	return {}
+
+
+func _employee_from_source(source: Dictionary, hired_sprint: int, trait_revealed: bool = false) -> Dictionary:
+	var seniority: String = String(source.get("seniority", "junior"))
+	var defaults: Dictionary = get_individual_team_conf().get("defaultPersonalityBySeniority", {})
+	var personality_id: String = String(source.get("personality", defaults.get(seniority, "junior-ambitieux")))
+	var personality := get_personality(personality_id)
+	var wellbeing: Dictionary = personality.get("depart", {}).duplicate(true)
+	for criterion in get_individual_team_conf().get("criteria", []):
+		var key := String(criterion)
+		wellbeing[key] = clampi(int(wellbeing.get(key, 60)), 0, 100)
+	return {
+		"id": source.get("id", ""),
+		"name": source.get("name", ""),
+		"role": source.get("role", ""),
+		"seniority": seniority,
+		"salary": int(source.get("salary", GameData.balance.get("salaries", {}).get(seniority, 1))),
+		"trait": source.get("trait", ""),
+		"visible_trait_id": source.get("visible_trait_id", ""),
+		"hidden_trait": source.get("hidden_trait", ""),
+		"hiddenRevealed": source.get("hiddenRevealed", trait_revealed),
+		"hiredSprint": hired_sprint,
+		"personality": personality_id,
+		"wellbeing": wellbeing,
+		"contributionBlocked": false,
+	}
+
+
+func employee_wellbeing(employee: Dictionary) -> Dictionary:
+	if not employee.has("wellbeing"):
+		var fallback := _employee_from_source(employee, int(employee.get("hiredSprint", 0)), bool(employee.get("hiddenRevealed", false)))
+		employee["personality"] = fallback.get("personality", "")
+		employee["wellbeing"] = fallback.get("wellbeing", {})
+	return employee.get("wellbeing", {})
+
+
+func get_team_moral() -> float:
+	var weighted_total := 0.0
+	var weights := 0.0
+	for employee in get_roster():
+		var weight := employee_contribution_factor(employee)
+		if weight <= 0.0:
+			continue
+		weighted_total += float(employee_wellbeing(employee).get("moral", 0)) * weight
+		weights += weight
+	if weights > 0.0:
+		return weighted_total / weights
+	# Même une équipe en rupture doit rester lisible : le minimum s'affiche
+	# par les alertes, la moyenne simple conserve une valeur pour les fins.
+	var roster := get_roster()
+	if roster.is_empty():
+		return 0.0
+	var total := 0.0
+	for employee in roster:
+		total += float(employee_wellbeing(employee).get("moral", 0))
+	return total / roster.size()
+
+
+func _refresh_team_moral() -> void:
+	if resource_values.has("moral"):
+		resource_values["moral"] = get_team_moral()
+
+
+## L'état synthétique est la seule chose visible par défaut dans le roster.
+## Les quatre chiffres restent dans le tooltip/détail au clic, jamais en grille.
+func get_employee_alert(employee: Dictionary) -> Dictionary:
+	var wellbeing := employee_wellbeing(employee)
+	var alert_at := int(get_individual_team_conf().get("alertAt", 25))
+	var lowest_key := ""
+	var lowest_value := 101
+	for criterion in get_individual_team_conf().get("criteria", []):
+		var key := String(criterion)
+		var value := int(wellbeing.get(key, 100))
+		if value < lowest_value:
+			lowest_key = key
+			lowest_value = value
+	if lowest_value > alert_at:
+		return {"active": false, "criterion": lowest_key, "value": lowest_value, "label": ""}
+	var labels := {
+		"moral": "décroche",
+		"confiance": "cherche ailleurs",
+		"energie": "en surchauffe",
+		"salaire": "regarde le marché",
+	}
+	return {"active": true, "criterion": lowest_key, "value": lowest_value, "label": labels.get(lowest_key, "fragile")}
+
+
+func _select_people(target: String) -> Array:
+	var roster := get_roster()
+	if target == "un-au-hasard":
+		return [roster[randi() % roster.size()]] if not roster.is_empty() else []
+	if target.begins_with("role:"):
+		var role := target.trim_prefix("role:")
+		return roster.filter(func(employee): return String(employee.get("role", "")) == role)
+	if target.begins_with("seniorite:"):
+		var seniority := target.trim_prefix("seniorite:")
+		return roster.filter(func(employee): return String(employee.get("seniority", "")) == seniority)
+	if target == "le-plus-ancien":
+		if roster.is_empty():
+			return []
+		var oldest: Dictionary = roster[0]
+		for employee in roster:
+			if int(employee.get("hiredSprint", 0)) < int(oldest.get("hiredSprint", 0)):
+				oldest = employee
+		return [oldest]
+	if target == "le-mieux-paye":
+		if roster.is_empty():
+			return []
+		var highest_paid: Dictionary = roster[0]
+		for employee in roster:
+			if int(employee.get("salary", 0)) > int(highest_paid.get("salary", 0)):
+				highest_paid = employee
+		return [highest_paid]
+	if target == "le-plus-fragile":
+		if roster.is_empty():
+			return []
+		var most_fragile: Dictionary = roster[0]
+		for employee in roster:
+			if int(get_employee_alert(employee).get("value", 100)) < int(get_employee_alert(most_fragile).get("value", 100)):
+				most_fragile = employee
+		return [most_fragile]
+	return roster
+
+
+func queue_people_effect(target: String, deltas: Dictionary, note: String = "") -> void:
+	if deltas.is_empty():
+		return
+	pending_people_effects.append({"target": target, "deltas": deltas.duplicate(), "note": note})
+
+
+func apply_people_effect(target: String, deltas: Dictionary) -> void:
+	var criteria: Array = get_individual_team_conf().get("criteria", [])
+	for employee in _select_people(target):
+		var wellbeing := employee_wellbeing(employee)
+		var personality := get_personality(String(employee.get("personality", "")))
+		var influence: Dictionary = personality.get("influence", {})
+		for criterion in deltas:
+			var key := String(criterion)
+			if not criteria.has(key):
+				continue
+			var moved := float(deltas[key]) * float(influence.get(key, 1.0))
+			wellbeing[key] = clampi(int(round(float(wellbeing.get(key, 0)) + moved)), 0, 100)
+	_refresh_team_moral()
+
+
+func apply_people_effect_for_employee(employee: Dictionary, deltas: Dictionary) -> void:
+	var criteria: Array = get_individual_team_conf().get("criteria", [])
+	var wellbeing := employee_wellbeing(employee)
+	var personality := get_personality(String(employee.get("personality", "")))
+	var influence: Dictionary = personality.get("influence", {})
+	for criterion in deltas:
+		var key := String(criterion)
+		if not criteria.has(key):
+			continue
+		var moved := float(deltas[key]) * float(influence.get(key, 1.0))
+		wellbeing[key] = clampi(int(round(float(wellbeing.get(key, 0)) + moved)), 0, 100)
+	_refresh_team_moral()
+
+
+func _apply_pending_people_effects() -> void:
+	for effect in pending_people_effects:
+		apply_people_effect(String(effect.get("target", "tous")), effect.get("deltas", {}))
+	pending_people_effects.clear()
+
+
 ## Facteur de contribution d'un employé : 1.0 par défaut, réduit par un
 ## trait caché révélé de type Fantôme (contributionFactor).
 func employee_contribution_factor(employee: Dictionary) -> float:
+	if bool(employee.get("contributionBlocked", false)):
+		return 0.0
 	if not employee.get("hiddenRevealed", false):
 		return 1.0
 	var hidden_trait: Dictionary = get_hidden_trait(employee.get("hidden_trait", ""))
@@ -1462,7 +1637,7 @@ func get_personal_action_cost(action_id: String) -> int:
 ## une équipe qui va mal vous épuise. Paliers dans balance.json →
 ## energy.moralRegenTiers (×1 si Moral ≥ 60, ×0.5 si 30-60, ×0 sous 30).
 func get_energy_regen_factor() -> float:
-	var moral: float = resource_values.get("moral", 0.0)
+	var moral := get_team_moral()
 	for tier in get_energy_conf().get("moralRegenTiers", []):
 		if moral >= float(tier.get("moralMin", 0)):
 			return float(tier.get("factor", 1.0))
@@ -1497,7 +1672,9 @@ func do_one_on_one(person: Dictionary) -> String:
 	var refusal := personal_action_refusal()
 	if refusal != "":
 		return refusal
-	if person.get("hiddenRevealed", false):
+	var is_employee := person.has("hiredSprint")
+	var was_revealed := bool(person.get("hiddenRevealed", false))
+	if not is_employee and person.get("hiddenRevealed", false):
 		return "deja-revele"
 
 	var cost := get_personal_action_cost("oneOnOne")
@@ -1513,8 +1690,10 @@ func do_one_on_one(person: Dictionary) -> String:
 			hidden_trait.get("icon", ""), hidden_trait.get("name", ""), hidden_trait.get("description", "")
 		]
 	var extra := ""
-	if person.has("hiredSprint"):  # employé du roster (un candidat n'a pas encore de sprint d'embauche)
-		extra = _apply_trait_triggers(person)
+	if is_employee:  # employé du roster (un candidat n'a pas encore de sprint d'embauche)
+		apply_people_effect_for_employee(person, {"confiance": float(get_individual_team_conf().get("oneOnOneConfiance", 0))})
+		if not was_revealed:
+			extra = _apply_trait_triggers(person)
 	pending_journal_lines.append("🤝 1:1 avec %s (−%d ⚡) : %s%s" % [
 		person.get("name", ""), cost, verdict, extra
 	])
@@ -2706,18 +2885,7 @@ func hire_candidate(candidate: Dictionary, target_squad_id: String = "") -> Stri
 		discount_note = " (réseau : −%d 💥)" % next_hire_discount
 		next_hire_discount = 0
 
-	_target_roster(target_squad_id).append({
-		"id": candidate.get("id", ""),
-		"name": candidate.get("name", ""),
-		"role": candidate.get("role", ""),
-		"seniority": candidate.get("seniority", "junior"),
-		"salary": int(candidate.get("salary", GameData.balance.get("salaries", {}).get(candidate.get("seniority", "junior"), 1))),
-		"trait": candidate.get("trait", ""),
-		"visible_trait_id": candidate.get("visible_trait_id", ""),
-		"hidden_trait": candidate.get("hidden_trait", ""),
-		"hiddenRevealed": candidate.get("hiddenRevealed", false),
-		"hiredSprint": sprint_number,
-	})
+	_target_roster(target_squad_id).append(_employee_from_source(candidate, sprint_number, bool(candidate.get("hiddenRevealed", false))))
 	_hired_candidate_ids.append(candidate.get("id", ""))
 	release_reservation("candidate", candidate.get("id", ""))
 	candidate["hired"] = true
@@ -2745,7 +2913,7 @@ func fire_employee(employee_id: String) -> String:
 		return refusal
 
 	fired_count += 1
-	var deltas: Dictionary = {"moral": float(firing.get("moral", -4))}
+	var deltas: Dictionary = {}
 	var note := "Licenciement : %s — indemnités %d 💥, −%d 💰/sprint de salaire" % [
 		employee.get("name", ""), severance, int(employee.get("salary", 1))
 	]
@@ -2753,6 +2921,7 @@ func fire_employee(employee_id: String) -> String:
 		deltas["cynisme"] = float(firing.get("cynismePerExtraFiring", 3))
 		note += " (l'organisation commence à y voir une politique)"
 	add_pending(deltas, note)
+	queue_people_effect("tous", {"confiance": float(firing.get("confiance", -8))})
 	var owner_squad: Dictionary = owner.get("squad", {})
 	var owner_roster: Array = owner_squad.get("roster", [])
 	owner_roster.erase(employee)
@@ -2863,6 +3032,9 @@ func _find_inbox_event(event_id: String) -> Dictionary:
 ## le joueur choisit d'y consacrer le sprint, il ne sait pas combien suivront.
 func apply_inbox_choice(choice: Dictionary, note: String = "") -> void:
 	add_pending(choice.get("effects", {}), note)
+	var people_effect: Dictionary = choice.get("peopleEffects", {})
+	if not people_effect.is_empty():
+		queue_people_effect(String(people_effect.get("target", "tous")), people_effect.get("deltas", {}))
 	var conversion: Dictionary = choice.get("clientConversion", {})
 	if conversion.is_empty():
 		return
@@ -2875,6 +3047,12 @@ func apply_inbox_choice(choice: Dictionary, note: String = "") -> void:
 func add_pending(deltas: Dictionary, note: String = "") -> void:
 	for resource_id in deltas.keys():
 		var value: float = float(deltas[resource_id])
+		# Compatibilité des contenus écrits avant le lot : un "moral": -4
+		# devient un effet sur chaque personne, modulé par son caractère. Les
+		# nouvelles cartes peuvent choisir une cible avec `peopleEffects`.
+		if resource_id == "moral":
+			queue_people_effect("tous", {"moral": value})
+			continue
 		pending_deltas[resource_id] = pending_deltas.get(resource_id, 0.0) + value
 	if note != "":
 		pending_journal_lines.append(note)
@@ -2892,6 +3070,8 @@ func apply_pending_and_check() -> String:
 	last_revenue_cost = int(round(pending_deltas.get("revenue", 0.0)))
 
 	_apply_per_sprint_effects()
+	_apply_pending_people_effects()
+	_apply_team_sprint_energy()
 	var was_cleanup_sprint := cleanup_sprint_pending
 	last_score_report = ScoreResolver.resolve(_build_score_snapshot(), {
 		"scoring": GameData.scoring,
@@ -3003,6 +3183,29 @@ func _apply_per_sprint_effects() -> void:
 	if decay != 0.0:
 		add_pending({"reputation-produit": -decay},
 			"📈 Le marché avance sans vous attendre : Réputation produit −%d" % int(decay))
+
+
+## L'énergie devient aussi l'état des personnes : une équipe qui utilise toute
+## sa capacité finit le sprint entamée, une équipe sous-chargée récupère. Le
+## CPO garde sa propre jauge, dont la régénération lit la moyenne de Moral.
+func _apply_team_sprint_energy() -> void:
+	var energy_conf: Dictionary = get_individual_team_conf().get("sprintEnergy", {})
+	for squad_index in squads.size():
+		var squad: Dictionary = squads[squad_index]
+		var capacity := int(squad.get("capacity", 0))
+		var spent := int(squad.get("spent_points", 0))
+		if squad_index == 0 and int(last_roadmap_report.get("sprint", -1)) == sprint_number:
+			capacity = int(last_roadmap_report.get("capacity", capacity))
+			spent = int(last_roadmap_report.get("plannedPoints", spent))
+		if capacity <= 0:
+			continue
+		var delta: float = float(energy_conf.get("underCapacity", 0))
+		if spent > capacity:
+			delta = float(energy_conf.get("overCapacity", 0))
+		elif spent >= capacity:
+			delta = float(energy_conf.get("atCapacity", 0))
+		for employee in squad.get("roster", []):
+			apply_people_effect_for_employee(employee, {"energie": delta})
 
 
 ## Snapshot immuable du sprint. Les deltas de contenu et de pratiques ont

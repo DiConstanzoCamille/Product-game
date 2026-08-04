@@ -101,6 +101,10 @@ Depuis le carnet §21, les trois pools sont tirés **au poids**, sans mémoire d
 
 Le pool de traits cachés des candidats (spec profondeur §4.5, carnet §17) : `distribution` (poids relatifs `none`/`negative`/`positive` du tirage — ~50/30/20), `traits[]` — `id`, `icon`, `name`, `polarity`, `description`, `effects` (une clé par mécanique : `moralPerSprint`, `contributionFactor` — divise les contributions de rôle, `capacityBonus`, `salaryRaiseAtTrialEnd`, `quitsAtHiredPlus` — départ sans préavis au sprint d'embauche + N, `nextHireDiscountPieces`). Les effets ne s'appliquent qu'une fois le trait révélé (fin de période d'essai).
 
+## `recruitment-archetypes.json` — états individuels
+
+La table des caractères du recrutement est aussi la source des niveaux de départ du roster : chaque archétype porte `depart` (`moral`, `confiance`, `energie`, `salaire`, tous 0–100) et `influence` (multiplicateur de chaque effet reçu). À runtime, un employé conserve `personality` et `wellbeing` ; ces deux champs ne sont pas écrits dans les pools de démo. Le Moral d'équipe est une moyenne pondérée par contribution de `wellbeing.moral`, jamais une valeur de règle indépendante.
+
 ## `hud-demo.json`
 
 L'état d'exemple du HUD de résolution de sprint montré sur la landing page : `era`, `cpo`, `gauges[]` (`id`, `label`, `display`, `percent`, `state`: `good`/`warn`/`danger`), `journal[]` (`sprint`, `text`, `deltas`), `alert`.

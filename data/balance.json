@@ -30,6 +30,25 @@
 
   "stateThresholds": { "goodMin": 60, "dangerMax": 25 },
 
+  "individualTeam": {
+    "_comment": "L'équipe n'est plus une jauge : chaque personne porte ces quatre niveaux. `moral` reste dans resources.json uniquement comme vue calculée, pour les systèmes qui le lisent (score, fatigue, fins). Toutes les valeurs de ce bloc sont de l'équilibrage, jamais des constantes de script.",
+    "criteria": ["moral", "confiance", "energie", "salaire"],
+    "alertAt": 25,
+    "leaveAt": 0,
+    "oneOnOneConfiance": 14,
+    "promotionSalaire": 18,
+    "seminarMoral": 10,
+    "sprintEnergy": {
+      "underCapacity": 4,
+      "atCapacity": -4,
+      "overCapacity": -9
+    },
+    "defaultPersonalityBySeniority": {
+      "junior": "junior-ambitieux",
+      "senior": "veteran-desabuse"
+    }
+  },
+
   "trimesterLengthSprints": 3,
 
   "endingThresholds": [
@@ -149,7 +168,7 @@
 
   "firing": {
     "severanceImpact": 18,
-    "moral": -4,
+    "confiance": -8,
     "cynismePerExtraFiring": 3
   },
 

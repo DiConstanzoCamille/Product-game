@@ -46,6 +46,7 @@ var failures: int = 0
 
 func _ready() -> void:
 	_test_energy_rules()
+	_test_individual_team_rules()
 	_test_multi_squad_roster()
 	_test_inbox_channels()
 	_test_backlog_rules()
@@ -1506,16 +1507,16 @@ func _test_energy_rules() -> void:
 		_fail("Énergie de départ %d au lieu de %d." % [SprintState.energy, int(conf.get("start", 70))])
 
 	# Modulation de la régénération par le Moral (×1 / ×0.5 / ×0).
-	SprintState.resource_values["moral"] = 80.0
+	_set_team_moral_for_test(80)
 	if SprintState.get_energy_regen_factor() != 1.0:
 		_fail("Facteur de régén attendu ×1 à Moral 80, obtenu ×%s." % SprintState.get_energy_regen_factor())
-	SprintState.resource_values["moral"] = 45.0
+	_set_team_moral_for_test(45)
 	if SprintState.get_energy_regen_factor() != 0.5:
 		_fail("Facteur de régén attendu ×0.5 à Moral 45, obtenu ×%s." % SprintState.get_energy_regen_factor())
-	SprintState.resource_values["moral"] = 10.0
+	_set_team_moral_for_test(10)
 	if SprintState.get_energy_regen_factor() != 0.0:
 		_fail("Facteur de régén attendu ×0 à Moral 10, obtenu ×%s." % SprintState.get_energy_regen_factor())
-	SprintState.resource_values["moral"] = 60.0
+	_set_team_moral_for_test(60)
 
 	# 🔧 Faire le taf soi-même : capacité en plus, Énergie en moins.
 	var self_conf: Dictionary = conf.get("actions", {}).get("selfWork", {})
@@ -1570,7 +1571,7 @@ func _test_energy_rules() -> void:
 		_fail("plan_breather() devrait refuser un second appel (deja-planifie).")
 	if SprintState.do_self_work() != "souffler":
 		_fail("Souffler doit bloquer les actions personnelles jusqu'à la prochaine Résolution.")
-	SprintState.resource_values["moral"] = 10.0
+	_set_team_moral_for_test(10)
 	SprintState.apply_pending_and_check()
 	var report: Dictionary = SprintState.last_energy_report
 	if int(report.get("regen", -1)) != 0:
@@ -1584,7 +1585,7 @@ func _test_energy_rules() -> void:
 
 	# 🔥 Burn-out remappé (spec §8.3) : Énergie ≤ 0 à la Résolution = fin.
 	SprintState.reset_run("agile-transformation", "meridia-corp")
-	SprintState.resource_values["moral"] = 10.0  # régén nulle
+	_set_team_moral_for_test(10)  # régén nulle
 	SprintState.energy = 3
 	SprintState.do_self_work()  # puise les 3 derniers points : jauge à 0
 	if SprintState.energy != 0:
@@ -1593,6 +1594,65 @@ func _test_energy_rules() -> void:
 	if ending != "burnout-fondateur":
 		_fail("Énergie 0 + régén nulle devrait finir en burn-out, obtenu '%s'." % ending)
 	print("Règles d'Énergie : %s" % ("OK" if failures == 0 else "ÉCHEC"))
+
+
+## Le Moral est désormais une vue calculée : un test qui veut le contrôler
+## pose l'état des personnes, jamais un nombre global dans `resource_values`.
+func _set_team_moral_for_test(value: int) -> void:
+	for employee in SprintState.get_roster():
+		SprintState.employee_wellbeing(employee)["moral"] = value
+	SprintState._refresh_team_moral()
+
+
+## Le Moral est une vue ; les effets d'équipe doivent donc atteindre les
+## personnes ciblées, être modulés par leur personnalité, puis seulement
+## reflétés dans la moyenne utilisée par les anciens systèmes.
+func _test_individual_team_rules() -> void:
+	print("=== SMOKE TEST LOGIQUE — ÉQUIPE INDIVIDUELLE ===")
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+	var roster := SprintState.get_roster()
+	if roster.is_empty():
+		_fail("Le roster de départ est vide : impossible de tester l'équipe individuelle.")
+		return
+	for employee in roster:
+		var wellbeing := SprintState.employee_wellbeing(employee)
+		for criterion in GameData.balance.get("individualTeam", {}).get("criteria", []):
+			if not wellbeing.has(criterion):
+				_fail("%s n'a pas le critère individuel '%s'." % [employee.get("name", "?"), criterion])
+
+	var pm: Dictionary = {}
+	var dev: Dictionary = {}
+	for employee in roster:
+		if employee.get("role", "") == "pm":
+			pm = employee
+		if employee.get("role", "") == "dev" and dev.is_empty():
+			dev = employee
+	if pm.is_empty() or dev.is_empty():
+		_fail("Le roster de Meridia doit permettre de tester un ciblage rôle:dev.")
+		return
+	var pm_confiance := int(SprintState.employee_wellbeing(pm).get("confiance", 0))
+	var dev_confiance := int(SprintState.employee_wellbeing(dev).get("confiance", 0))
+	SprintState.queue_people_effect("role:dev", {"confiance": -20})
+	SprintState._apply_pending_people_effects()
+	if int(SprintState.employee_wellbeing(pm).get("confiance", 0)) != pm_confiance:
+		_fail("Un effet role:dev ne doit pas atteindre le PM.")
+	if int(SprintState.employee_wellbeing(dev).get("confiance", 0)) >= dev_confiance:
+		_fail("Un effet role:dev doit baisser la Confiance du dev ciblé.")
+
+	var confidence_before_one_on_one := int(SprintState.employee_wellbeing(dev).get("confiance", 0))
+	if SprintState.do_one_on_one(dev) != "":
+		_fail("Un 1:1 avec un employé doit rester jouable pour rétablir la Confiance.")
+	if int(SprintState.employee_wellbeing(dev).get("confiance", 0)) <= confidence_before_one_on_one:
+		_fail("Le 1:1 n'a pas remonté la Confiance de la personne choisie.")
+
+	var moral_before := SprintState.get_team_moral()
+	SprintState.add_pending({"moral": -10})
+	if SprintState.pending_deltas.has("moral"):
+		_fail("Un effet moral hérité ne doit plus s'accumuler dans une jauge globale.")
+	SprintState._apply_pending_people_effects()
+	if SprintState.get_team_moral() >= moral_before:
+		_fail("Un effet moral hérité doit être traduit en baisse de Moral individuel.")
+	print("Équipe individuelle : %s" % ("OK" if failures == 0 else "ÉCHEC"))
 
 
 func _play_one_mandate(run_index: int, strategy: String, company_id: String) -> void:

@@ -522,6 +522,13 @@ func _team_row(employee: Dictionary) -> Control:
 	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	name_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(name_label)
+	var alert: Dictionary = SprintState.get_employee_alert(employee)
+	if bool(alert.get("active", false)):
+		var warning := _label("%s %d %s" % [
+			_alert_icon(String(alert.get("criterion", ""))), int(alert.get("value", 0)), alert.get("label", "")
+		], 9, UIHelpers.PANEL_WARN)
+		warning.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		row.add_child(warning)
 
 	var suffix := " 🔒" if not revealed else _hidden_trait_icon(employee)
 	var role_label := _label("%s %s%s" % [
@@ -549,6 +556,11 @@ func _employee_tooltip(employee: Dictionary, role_conf: Dictionary) -> String:
 	]]
 	if employee.get("trait", "") != "":
 		lines.append(employee.get("trait", ""))
+	var wellbeing: Dictionary = SprintState.employee_wellbeing(employee)
+	lines.append("🫶 Moral %d · 🤝 Confiance %d · ⚡ Énergie %d · 💸 Salaire %d" % [
+		int(wellbeing.get("moral", 0)), int(wellbeing.get("confiance", 0)),
+		int(wellbeing.get("energie", 0)), int(wellbeing.get("salaire", 0)),
+	])
 	if employee.get("hiddenRevealed", false):
 		var hidden_trait: Dictionary = SprintState.get_hidden_trait(employee.get("hidden_trait", ""))
 		if not hidden_trait.is_empty():
@@ -557,8 +569,17 @@ func _employee_tooltip(employee: Dictionary, role_conf: Dictionary) -> String:
 			])
 	else:
 		lines.append("🔒 Période d'essai en cours — trait caché non révélé.")
-	lines.append("Clic : actions (🤝 1:1 · licencier)")
+	lines.append("Clic : actions (🤝 1:1 pour rétablir la confiance · licencier)")
 	return "\n".join(lines)
+
+
+func _alert_icon(criterion: String) -> String:
+	match criterion:
+		"moral": return "🫶"
+		"confiance": return "🤝"
+		"energie": return "⚡"
+		"salaire": return "💸"
+	return "!"
 
 
 ## Un clic sur une ligne de roster ouvre le mini-menu d'actions : plus besoin
@@ -575,13 +596,9 @@ func _on_team_row_input(event: InputEvent, employee_id: String) -> void:
 
 	var one_on_one_cost := SprintState.get_personal_action_cost("oneOnOne")
 	var refusal := SprintState.personal_action_refusal()
-	if employee.get("hiddenRevealed", false):
-		menu.add_item("🤝 1:1 — trait déjà connu", 0)
+	menu.add_item("🤝 1:1 — rétablir la confiance (%d ⚡)" % one_on_one_cost, 0)
+	if refusal != "":
 		menu.set_item_disabled(menu.get_item_index(0), true)
-	else:
-		menu.add_item("🤝 1:1 (%d ⚡)" % one_on_one_cost, 0)
-		if refusal != "":
-			menu.set_item_disabled(menu.get_item_index(0), true)
 
 	var severance := SprintState.resolved_price("severance")
 	menu.add_item("🚪 Licencier (%d 💥)" % severance, 1)
@@ -609,8 +626,9 @@ func _on_one_on_one(employee_id: String) -> void:
 		state_changed.emit()
 
 
-## Le licenciement garde sa confirmation : c'est irréversible, ça coûte des
-## indemnités, du Moral, et du Cynisme à partir du deuxième du mandat.
+## Le licenciement garde sa confirmation : c'est irréversible, coûte des
+## indemnités, de la Confiance à celles et ceux qui restent, et du Cynisme à
+## partir du deuxième du mandat.
 func _confirm_fire(employee_id: String) -> void:
 	var employee := SprintState.find_employee(employee_id)
 	if employee.is_empty():
@@ -626,10 +644,10 @@ func _confirm_fire(employee_id: String) -> void:
 		_fire_dialog.confirmed.connect(_on_fire_confirmed)
 		add_child(_fire_dialog)
 
-	_fire_dialog.dialog_text = "Licencier %s ?\n\nIndemnités %d 💥 · 🫶 Moral %d · −%d 💰/sprint de salaire%s\nIrréversible." % [
+	_fire_dialog.dialog_text = "Licencier %s ?\n\nIndemnités %d 💥 · 🤝 Confiance %d pour l'équipe · −%d 💰/sprint de salaire%s\nIrréversible." % [
 		employee.get("name", ""),
 		SprintState.resolved_price("severance"),
-		int(firing.get("moral", -4)),
+		int(firing.get("confiance", -8)),
 		int(employee.get("salary", 1)),
 		"\n🎭 Cynisme +%d — l'organisation y verra une politique." % int(firing.get("cynismePerExtraFiring", 3)) if SprintState.fired_count >= 1 else "",
 	]
