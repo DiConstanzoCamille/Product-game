@@ -543,9 +543,13 @@ func _check_quota_section_shows_the_mandate(panel: Node) -> void:
 		_fail("Le panneau doit annoncer les objectifs des quatre trimestres dès le premier sprint.")
 	else:
 		for entry in SprintState.get_mandate_quotas():
-			if not String(mandate.text).contains(str(int(entry.get("quota", 0)))):
-				_fail("Le panneau annonce le mandat sans l'objectif du T%d (« %s »)." % [
-					int(entry.get("quarter", 0)), mandate.text
+			# Le trimestre en cours porte la barre réelle (exigence comprise),
+			# les autres leur barème : afficher le barème pour le trimestre
+			# courant donnerait deux nombres pour la même échéance.
+			var expected: int = SprintState.get_current_quota() if bool(entry.get("current", false)) else int(entry.get("quota", 0))
+			if not String(mandate.text).contains(str(expected)):
+				_fail("Le panneau annonce le mandat sans l'objectif du T%d (attendu %d, lu « %s »)." % [
+					int(entry.get("quarter", 0)), expected, mandate.text
 				])
 
 	# Un portefeuille au-dessus de la barre : la jauge doit le représenter, pas

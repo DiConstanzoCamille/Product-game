@@ -1893,8 +1893,36 @@ celle du joueur qui achète : au-delà, c'est la trajectoire qui dépense qui
 cesse de passer, et on aurait corrigé le déséquilibre en cassant le chemin
 qu'on veut récompenser. Table finale : `[150, 760, 2640, 5520]`, soit ×5,1 puis
 ×3,5 puis ×2,1, appliqué à tous les niveaux de carrière pour que la
-progression garde sa forme. Mesure de contrôle : **0 franchissement sur 200
-runs**.
+progression garde sa forme. Mesure de contrôle : **1 franchissement sur 260
+runs** (0/200 puis 1/60), contre 16/400 avant — un facteur 10.
+
+### 35.2 bis — La propriété ne s'asserte pas sur un run, elle se mesure
+
+La première version du garde-fou asserait « le thésauriseur n'a jamais franchi
+T3 sur ses quatre mandats ». C'est la bonne propriété, et c'est une assertion
+friable : elle tombe une fois sur 260 runs sur une courbe pourtant saine. La
+relecture l'a trouvée en rejouant 60 runs — la mesure de l'auteur, 0/200,
+n'était pas fausse, elle était simplement trop courte pour un événement à 0,4 %.
+
+Deux formes plus stables ont été essayées, et **il faut les connaître pour ne
+pas les re-tenter** :
+
+- **la marge** — portefeuille rapporté à l'objectif au verdict qui tue le
+  mandat. Elle ne discrimine rien : médiane 91 % sur la table livrée contre
+  87 % sur l'ancienne, défectueuse. La raison est structurelle : une barre plus
+  basse ne fait pas gagner le thésauriseur, elle le fait mourir **un trimestre
+  plus loin**, au même ratio ;
+- **le compte de mandats** — « pas plus d'un des quatre ». Stable (0/20 faux
+  positifs sur les deux tables) et capable d'attraper une courbe franchement
+  cassée (13/20 quand T3 est divisé par deux), mais **aveugle au défaut qui a
+  motivé le lot** : à T3 = 2200 il ne se déclenche jamais.
+
+C'est cette dernière qui est en place, avec sa portée écrite dans le code. Le
+**vrai** critère reste le taux de franchissement mesuré sur 200 runs, à
+re-mesurer chaque fois qu'on touche à l'escalade : le banc ne le dira pas. Même
+conclusion que pour « aucune trajectoire ne domine » (§32.5) — certaines
+propriétés d'un jeu aléatoire se mesurent et se documentent, elles ne
+s'assèrent pas.
 
 **Ce que ça coûte, et c'est assumé.** Le jeu est plus dur qu'avant : la part
 des runs de banc où une trajectoire atteint une fin positive passe de **175/200
@@ -1925,6 +1953,14 @@ hasard — elles disent toutes les trois **la règle** :
   dépense.** Le verdict avait déjà tiré l'exigence et le quota ; l'écran ne les
   lisait pas. On engageait un portefeuille qui ne se reconstitue plus par un
   cliquet, sans voir la barre à franchir.
+
+Une précision trouvée en relecture, et qui a failli passer : dans la liste du
+mandat, **le trimestre en cours affiche la barre réelle, les suivants leur
+barème**. L'exigence « Trimestre court » baisse le quota de 25 % ; annoncer
+`T1 150` dans la liste pendant que la ligne du dessus affiche `0 / 113` aurait
+donné deux nombres pour la même échéance, à trois lignes d'écart. Les
+trimestres à venir gardent le barème : leur exigence n'est pas encore tirée, et
+l'inventer serait promettre.
 
 Ces trois-là ne franchissent pas la ligne de la question 4 de la vision : le
 jeu montre ce qu'un achat **aurait** rapporté, jamais ce qu'il **va** rapporter.

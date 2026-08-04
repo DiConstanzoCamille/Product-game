@@ -740,11 +740,20 @@ func _build_mandate_objectives(section: VBoxContainer) -> void:
 		return
 	var parts: Array = []
 	for entry in quotas:
-		var text := "T%d %d" % [int(entry.get("quarter", 0)), int(entry.get("quota", 0))]
+		var quota := int(entry.get("quota", 0))
+		var text := ""
 		if bool(entry.get("current", false)):
-			text = "▸ %s" % text
+			# Le trimestre en cours affiche la barre RÉELLE, celle que le
+			# verdict appliquera : « Trimestre court » la baisse de 25 %, et
+			# annoncer le barème structurel donnerait deux nombres différents
+			# pour le même trimestre à trois lignes d'écart. Les trimestres à
+			# venir gardent le barème : leur exigence n'est pas encore tirée,
+			# et l'inventer serait promettre.
+			text = "▸ T%d %d" % [int(entry.get("quarter", 0)), SprintState.get_current_quota()]
 		elif bool(entry.get("reached", false)):
-			text = "✓ %s" % text
+			text = "✓ T%d %d" % [int(entry.get("quarter", 0)), quota]
+		else:
+			text = "T%d %d" % [int(entry.get("quarter", 0)), quota]
 		parts.append(text)
 	var label := _label("Mandat : %s" % " · ".join(parts), 10, UIHelpers.PANEL_MUTED, true)
 	label.mouse_filter = Control.MOUSE_FILTER_STOP

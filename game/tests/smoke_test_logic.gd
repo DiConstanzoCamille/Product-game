@@ -47,6 +47,32 @@ extends Node
 ##                ne rien faire DOIT perdre avant la fin du mandat.
 const GOOD_ENDINGS := ["ipo", "rachat"]
 
+## Combien des quatre mandats du thésauriseur (#36) ont le droit de franchir
+## T3. Un seul est toléré ; deux sont un échec.
+##
+## Ce seuil est un compromis mesuré, et il faut connaître sa portée exacte
+## avant de s'y fier — c'est un garde-fou grossier, pas une preuve :
+##
+##  · **il ne se déclenche jamais à tort.** 0/20 sur la table livrée comme sur
+##    l'ancienne, défectueuse ;
+##  · **il attrape une courbe franchement cassée.** 13/20 quand T3 est divisé
+##    par deux ;
+##  · **il est aveugle au défaut qui a motivé le lot.** À T3 = 2200, où le
+##    thésauriseur franchissait quand même une fois sur vingt-cinq, il ne se
+##    déclenche pas.
+##
+## Asserter « il n'a jamais franchi T3 » serait plus sensible mais friable :
+## l'événement arrive une fois sur 260 runs sur la courbe saine. Une marge
+## (portefeuille / objectif au verdict fatal) a été essayée puis abandonnée :
+## les deux courbes y sont indiscernables — médianes 91 % contre 87 % — parce
+## qu'une barre plus basse ne fait pas gagner le thésauriseur, elle le fait
+## mourir un trimestre plus loin, au même ratio.
+##
+## **Le vrai critère est donc une mesure, pas une assertion** : le taux de
+## franchissement sur 200 runs (carnet §35.2). À re-mesurer chaque fois qu'on
+## touche à l'escalade — ce test-là ne le dira pas.
+const HOARDER_MAX_MANDATES_PAST_T3 := 1
+
 var failures: int = 0
 
 
@@ -70,18 +96,23 @@ func _ready() -> void:
 	_test_attention_and_autopilot_lot5()
 
 	var quarters_reached: Dictionary = {}
+	var mandates_past_t3: Dictionary = {}  # portefeuille / quota au verdict qui a tué le mandat
 	for strategy in ["stress", "greedy", "economie", "levier", "outillage", "generaliste", "thesauriseur", "careful"]:
 		print("\n=== SMOKE TEST LOGIQUE — %s ===" % strategy.to_upper())
 		var endings: Array = []
 		var run_index := 0
 		var best_quarter := 0
+		var past_t3 := 0
 		for company_id in ["meridia-corp", "karavel-scaleup"]:
 			for repeat in range(2):
 				_play_one_mandate(run_index, strategy, company_id)
 				endings.append(SprintState.ending_id)
 				best_quarter = max(best_quarter, SprintState.quarter_index)
+				if SprintState.quarter_index >= 4:
+					past_t3 += 1
 				run_index += 1
 		quarters_reached[strategy] = best_quarter
+		mandates_past_t3[strategy] = past_t3
 
 		# Critère de recette Phase B : la spirale burn-out (Moral effondré →
 		# régén nulle → Taf soi-même répété → Énergie ≤ 0) doit rester
@@ -114,13 +145,20 @@ func _ready() -> void:
 	# le cliquet du portefeuille joue à la place du joueur, et « dépenser ou
 	# garder » cesse d'être une décision.
 	#
-	# L'assertion porte sur le MEILLEUR des quatre mandats, pas sur leur
-	# moyenne : c'est la seule forme qui distingue « le thésauriseur ne passe
-	# jamais » de « il n'a pas eu de chance cette fois-ci ».
-	var hoarder_quarter := int(quarters_reached.get("thesauriseur", 0))
-	if hoarder_quarter >= 4:
-		_fail("Le thésauriseur a franchi T3 (meilleur T%d) sans acheter quoi que ce soit — l'escalade de quotas.json est trop douce, accumuler suffit." % hoarder_quarter)
-	print("Thésauriseur (#36) — meilleur T%d, sans un seul achat : l'escalade tient." % hoarder_quarter)
+	# L'assertion compte **combien des quatre mandats** franchissent T3, et pas
+	# si le meilleur y arrive. La première version asserait le meilleur : elle
+	# tombait une fois sur 260 runs, sur un moteur parfaitement calibré, parce
+	# qu'un tirage favorable sur quatre mandats suffisait à la faire mentir.
+	# C'est la leçon du carnet §29 encore une fois — « thésauriser ne marche
+	# pas » est une propriété de la courbe, « ce mandat-là est passé » est un
+	# tirage. Deux mandats sur quatre, en revanche, ne s'obtiennent pas par
+	# chance : ce serait une stratégie.
+	var hoarder_past_t3 := int(mandates_past_t3.get("thesauriseur", 0))
+	if hoarder_past_t3 > HOARDER_MAX_MANDATES_PAST_T3:
+		_fail("Le thésauriseur a franchi T3 sur %d de ses 4 mandats sans acheter quoi que ce soit — l'escalade de quotas.json est trop douce, accumuler est redevenu une stratégie." % hoarder_past_t3)
+	print("Thésauriseur (#36) — meilleur T%d, %d/4 mandats au-delà de T3, sans un seul achat (le vrai critère est le taux sur 200 runs, carnet §35.2)." % [
+		int(quarters_reached.get("thesauriseur", 0)), hoarder_past_t3
+	])
 	print("\nTrajectoires — économie : meilleur T%d · Levier : meilleur T%d (critère de recette 2 de #42 ; la comparaison des deux se lit sur 40 runs, pas ici)" % [economy_quarter, lever_quarter])
 	print("Archétypes #37 — outillage : meilleur T%d · généraliste : meilleur T%d (la domination se mesure sur 40 runs)" % [
 		int(quarters_reached.get("outillage", 0)), int(quarters_reached.get("generaliste", 0))
