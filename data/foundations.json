@@ -1,0 +1,36 @@
+{
+  "families": [
+    { "id": "outil-process", "label": "Outil / process", "affects": "jauges" },
+    { "id": "stack-technique", "label": "Stack technique / produit", "affects": "shop de recrutement" },
+    { "id": "methodologie-orga", "label": "Méthodologie d'orga", "affects": "gatée par prérequis" }
+  ],
+  "demoBoard": [
+    {
+      "id": "shape-up",
+      "family": "methodologie-orga",
+      "name": "Passage en Shape Up",
+      "status": "waiting",
+      "activeSinceSprint": null,
+      "detail": "Manque : 1 Lead formé. S'active automatiquement au sprint suivant le recrutement du bon profil.",
+      "prerequisite": "1 Lead formé recruté"
+    },
+    {
+      "id": "notion",
+      "family": "outil-process",
+      "name": "Notion",
+      "status": "active",
+      "activeSinceSprint": 6,
+      "detail": "+ Réputation produit sur toute feature Roadmap taguée documentation.",
+      "prerequisite": null
+    },
+    {
+      "id": "stack-react",
+      "family": "stack-technique",
+      "name": "Stack React",
+      "status": "active",
+      "activeSinceSprint": 3,
+      "detail": "Profils Dev Frontend ×2 plus fréquents dans le shop, coût réduit.",
+      "prerequisite": null
+    }
+  ]
+}

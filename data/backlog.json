@@ -1,0 +1,499 @@
+{
+  "_comment": "Backlog profond (Phase C). Depuis #42, une feature n'a plus qu'UN effet client : `clients`, un nombre de -6 a +6 (docs/spec-clients-revenue.md §8.4). Ce n'est pas un nombre de clients : c'est un effet, converti en clients reels par le modele economique du run (balance.json -> businessModels.segments.clientsPerPoint), pour que le meme backlog se joue en freemium comme en grands comptes. Positif = des clients arrivent et la Reputation produit monte ; negatif = ils partent et elle baisse. La Traction, elle, ne lit plus cette colonne : elle ne vient que des points livres. C'est ce qui rend possibles les deux familles que le catalogue n'avait pas — celles qui PAIENT SANS SCORER (peu de points, gros effet client) et celles qui SCORENT SANS PAYER (beaucoup de points, effet client nul ou negatif).",
+  "features": [
+    {
+      "id": "dashboard-comex",
+      "name": "Dashboard temps réel pour le COMEX",
+      "icon": "📊",
+      "description": "Douze KPI actualisés à la seconde pour des gens qui le regarderont une fois par trimestre, en réunion, sur un rétroprojecteur.",
+      "costPoints": 3,
+      "clients": -1,
+      "risk": 3,
+      "quickWin": false,
+      "tags": [
+        "reporting",
+        "enterprise"
+      ],
+      "eras": [
+        "agile-transformation"
+      ]
+    },
+    {
+      "id": "refonte-portail-client",
+      "name": "Refonte du portail client",
+      "icon": "🏗️",
+      "description": "Le portail date de 2009 et le montre. Tout le monde est d'accord pour le refaire, personne n'est d'accord sur quoi que ce soit d'autre.",
+      "costPoints": 5,
+      "clients": 4,
+      "risk": 6,
+      "quickWin": false,
+      "tags": [
+        "experience",
+        "client"
+      ],
+      "eras": [
+        "agile-transformation"
+      ]
+    },
+    {
+      "id": "chatbot-support",
+      "name": "Chatbot d'assistance « intelligent »",
+      "icon": "🤖",
+      "description": "Répond en 0,3 seconde à des questions que personne ne pose, et redirige les vraies vers un formulaire. Le sponsor l'a vu chez un concurrent.",
+      "costPoints": 3,
+      "clients": -2,
+      "risk": 4,
+      "quickWin": false,
+      "tags": [
+        "support",
+        "automation"
+      ],
+      "eras": [
+        "agile-transformation"
+      ]
+    },
+    {
+      "id": "export-excel",
+      "name": "Export Excel",
+      "icon": "📤",
+      "description": "La feature la moins glorieuse du backlog et la seule que les clients utilisent tous les jours. Trois ans qu'elle attend derrière des sujets « stratégiques ».",
+      "costPoints": 1,
+      "clients": 4,
+      "risk": 0,
+      "quickWin": true,
+      "tags": [
+        "reporting",
+        "export"
+      ],
+      "eras": [
+        "agile-transformation"
+      ]
+    },
+    {
+      "id": "sso-grands-comptes",
+      "name": "SSO pour les grands comptes",
+      "icon": "🔐",
+      "description": "Aucun utilisateur ne l'a demandé. En revanche, trois DSI en ont fait une condition de signature. La feature préférée du service commercial.",
+      "costPoints": 3,
+      "clients": 5,
+      "risk": 1,
+      "quickWin": false,
+      "tags": [
+        "security",
+        "enterprise"
+      ],
+      "eras": [
+        "agile-transformation"
+      ]
+    },
+    {
+      "id": "popup-nps",
+      "name": "Popup de score NPS",
+      "icon": "🎯",
+      "description": "« Recommanderiez-vous notre produit ? » — demandé à chaque connexion, sur toute la surface de l'écran, jusqu'à obtention d'un 9. Le marketing en rêve.",
+      "costPoints": 1,
+      "clients": -1,
+      "risk": 1,
+      "quickWin": true,
+      "tags": [
+        "feedback",
+        "growth"
+      ],
+      "eras": [
+        "agile-transformation"
+      ]
+    },
+    {
+      "id": "migration-framework-front",
+      "name": "Migration du framework front",
+      "icon": "🔩",
+      "description": "Le framework actuel n'est plus maintenu depuis quatre ans. Invisible pour les clients, invendable au board, indispensable selon quiconque a ouvert le code.",
+      "costPoints": 4,
+      "clients": 0,
+      "risk": -3,
+      "quickWin": false,
+      "tags": [
+        "technical",
+        "platform"
+      ],
+      "eras": [
+        "agile-transformation"
+      ]
+    },
+    {
+      "id": "mode-hors-ligne",
+      "name": "Mode hors ligne",
+      "icon": "✈️",
+      "description": "Pour les 2 % d'utilisateurs en zone blanche, une synchronisation bidirectionnelle avec résolution de conflits. L'architecte est très enthousiaste. C'est mauvais signe.",
+      "costPoints": 5,
+      "clients": 2,
+      "risk": 8,
+      "quickWin": false,
+      "tags": [
+        "reliability",
+        "mobile"
+      ],
+      "eras": [
+        "agile-transformation"
+      ]
+    },
+    {
+      "id": "gamification-badges",
+      "name": "Badges et gamification",
+      "icon": "🏅",
+      "description": "Des trophées virtuels pour récompenser la saisie de notes de frais. Un cabinet de conseil a montré des slides où des adultes trouvaient ça motivant.",
+      "costPoints": 2,
+      "clients": -1,
+      "risk": 2,
+      "quickWin": false,
+      "tags": [
+        "growth",
+        "engagement"
+      ],
+      "eras": [
+        "agile-transformation"
+      ]
+    },
+    {
+      "id": "facturation-annuelle",
+      "name": "Facturation annuelle",
+      "icon": "🧾",
+      "description": "Permettre aux clients de payer douze mois d'avance. Personne n'en parle en rétrospective, mais la trésorerie n'a jamais eu de meilleure idée.",
+      "costPoints": 2,
+      "clients": 5,
+      "risk": 1,
+      "quickWin": false,
+      "tags": [
+        "billing",
+        "enterprise"
+      ],
+      "eras": [
+        "agile-transformation"
+      ]
+    },
+    {
+      "id": "page-statut-publique",
+      "name": "Page de statut publique",
+      "icon": "🚦",
+      "description": "Afficher les pannes au lieu de les nier. Le support arrête de mentir, les clients arrêtent d'appeler, et curieusement tout le monde respire mieux.",
+      "costPoints": 1,
+      "clients": 2,
+      "risk": -1,
+      "quickWin": true,
+      "tags": [
+        "reliability",
+        "transparency"
+      ],
+      "eras": [
+        "agile-transformation"
+      ]
+    },
+    {
+      "id": "integration-teams",
+      "name": "Intégration Microsoft Teams",
+      "icon": "💬",
+      "description": "Recevoir les notifications du produit là où les clients passent déjà leurs journées. Peu prestigieux, très demandé, étonnamment rentable.",
+      "costPoints": 3,
+      "clients": 4,
+      "risk": 3,
+      "quickWin": false,
+      "tags": [
+        "integration",
+        "enterprise"
+      ],
+      "eras": [
+        "agile-transformation"
+      ]
+    },
+    {
+      "id": "refonte-navigation",
+      "name": "Refonte de la navigation",
+      "icon": "🧭",
+      "description": "Un menu « repensé autour des usages » par une agence. Magnifique en maquette. Les utilisateurs, eux, savaient où étaient leurs boutons depuis six ans.",
+      "costPoints": 4,
+      "clients": -2,
+      "risk": 2,
+      "quickWin": false,
+      "tags": [
+        "experience",
+        "usability"
+      ],
+      "eras": [
+        "agile-transformation"
+      ]
+    },
+    {
+      "id": "audit-accessibilite",
+      "name": "Mise en conformité accessibilité",
+      "icon": "♿",
+      "description": "Rendre le produit utilisable au clavier et au lecteur d'écran. Obligatoire depuis des années, reporté depuis autant, et le code en sort toujours plus propre.",
+      "costPoints": 2,
+      "clients": 1,
+      "risk": -2,
+      "quickWin": false,
+      "tags": [
+        "experience",
+        "quality"
+      ],
+      "eras": [
+        "agile-transformation"
+      ]
+    },
+    {
+      "id": "notifications-push",
+      "name": "Notifications push",
+      "icon": "🔔",
+      "description": "Prévenir les utilisateurs en temps réel. La frontière entre « information utile » et « harcèlement de marque » sera réglée plus tard, dans un ticket.",
+      "costPoints": 2,
+      "clients": 0,
+      "risk": 2,
+      "quickWin": false,
+      "tags": [
+        "engagement",
+        "mobile"
+      ],
+      "eras": [
+        "agile-transformation"
+      ]
+    },
+    {
+      "id": "api-publique",
+      "name": "API publique",
+      "icon": "🔌",
+      "description": "Ouvrir le produit aux intégrations tierces. Les clients techniques la réclament, les autres découvriront dans deux ans qu'ils ne peuvent plus s'en passer.",
+      "costPoints": 4,
+      "clients": 3,
+      "risk": 5,
+      "quickWin": false,
+      "tags": [
+        "platform",
+        "integration"
+      ],
+      "eras": [
+        "agile-transformation"
+      ]
+    },
+    {
+      "id": "traduction-allemand",
+      "name": "Traduction allemande",
+      "icon": "🇩🇪",
+      "description": "Le marché allemand attend une seule chose pour signer : que le produit lui parle allemand. Aucune innovation, aucun risque, juste du travail.",
+      "costPoints": 3,
+      "clients": 3,
+      "risk": 0,
+      "quickWin": false,
+      "tags": [
+        "international",
+        "localization"
+      ],
+      "eras": [
+        "agile-transformation"
+      ]
+    },
+    {
+      "id": "mode-demo-salon",
+      "name": "Mode démo salon",
+      "icon": "🎪",
+      "description": "Un compte de démonstration avec des données propres et des courbes qui montent. Ne sert à aucun client, sauve la vie des commerciaux quatre fois par an.",
+      "costPoints": 1,
+      "clients": 1,
+      "risk": 1,
+      "quickWin": true,
+      "tags": [
+        "growth",
+        "event"
+      ],
+      "eras": [
+        "agile-transformation"
+      ]
+    },
+    {
+      "id": "programme-parrainage",
+      "name": "Programme de parrainage",
+      "icon": "🎁",
+      "description": "Un client qui en amène un autre contre trois mois offerts. Le tableur du CFO explique que c'est rentable ; personne n'a osé vérifier la formule.",
+      "costPoints": 1,
+      "clients": 6,
+      "risk": 3,
+      "quickWin": true,
+      "tags": [
+        "growth",
+        "client"
+      ],
+      "eras": [
+        "agile-transformation"
+      ]
+    },
+    {
+      "id": "refonte-moteur-calcul",
+      "name": "Refonte du moteur de calcul",
+      "icon": "⚙️",
+      "description": "Six semaines de travail que pas un utilisateur ne verra, sur le composant dont dépend tout le reste. Le jour où il lâche, il n'y a pas de plan B.",
+      "costPoints": 6,
+      "clients": 0,
+      "risk": -4,
+      "quickWin": false,
+      "tags": [
+        "technical",
+        "platform"
+      ],
+      "completionEffects": {
+        "dette-organisationnelle": -6
+      },
+      "eras": [
+        "agile-transformation"
+      ]
+    },
+    {
+      "id": "onboarding-guide",
+      "name": "Onboarding guidé",
+      "icon": "🧭",
+      "description": "Quatre écrans pour expliquer ce que le produit fait. Ceux qui les lisent restent ; les autres ne seraient pas restés de toute façon.",
+      "costPoints": 2,
+      "clients": 4,
+      "risk": 1,
+      "quickWin": false,
+      "tags": [
+        "growth",
+        "usability"
+      ],
+      "eras": [
+        "agile-transformation"
+      ]
+    },
+    {
+      "id": "nettoyage-comptes-inactifs",
+      "name": "Purge des comptes inactifs",
+      "icon": "🧹",
+      "description": "Des milliers de comptes qui ne se connectent plus mais qu'on héberge, qu'on sauvegarde et qu'on compte dans les slides du board. Les supprimer allège tout — sauf la réunion où il faudra l'annoncer.",
+      "costPoints": 2,
+      "clients": -3,
+      "risk": -3,
+      "quickWin": false,
+      "tags": [
+        "technical",
+        "quality"
+      ],
+      "completionEffects": {
+        "capital-politique": -3
+      },
+      "eras": [
+        "agile-transformation"
+      ]
+    },
+    {
+      "id": "salon-professionnel",
+      "name": "Stand au salon professionnel",
+      "icon": "🎪",
+      "description": "Trois jours de moquette bleue et de badges. La démo plante deux fois, et vous repartez quand même avec des contacts que le commerce rappellera.",
+      "costPoints": 2,
+      "clients": 5,
+      "risk": 2,
+      "quickWin": false,
+      "tags": [
+        "growth",
+        "event"
+      ],
+      "completionEffects": {
+        "moral": -2
+      },
+      "eras": [
+        "agile-transformation"
+      ]
+    }
+  ],
+  "epics": [
+    {
+      "id": "epic-migration-cloud",
+      "name": "Migration vers le cloud",
+      "icon": "☁️",
+      "description": "Sortir des serveurs de la cave pour « le cloud de confiance ». Dix-huit mois annoncés, un comité de pilotage mensuel, et à la fin — si fin il y a — une infrastructure qui respire.",
+      "epic": true,
+      "costPoints": 12,
+      "sprintStages": [
+        4,
+        4,
+        4
+      ],
+      "clients": 0,
+      "risk": -3,
+      "quickWin": false,
+      "completionEffects": {
+        "dette-organisationnelle": -12,
+        "moral": 3
+      },
+      "eras": [
+        "agile-transformation"
+      ]
+    },
+    {
+      "id": "epic-appli-mobile",
+      "name": "Application mobile",
+      "icon": "📱",
+      "description": "« Nos clients vivent sur leur téléphone. » Le board l'a décidé lors d'un séminaire. Le jour où elle sort vraiment, en revanche, personne ne pourra plus vous ignorer.",
+      "epic": true,
+      "costPoints": 10,
+      "sprintStages": [
+        3,
+        3,
+        4
+      ],
+      "clients": 6,
+      "risk": 5,
+      "quickWin": false,
+      "completionEffects": {
+        "reputation-produit": 4,
+        "impact": 16
+      },
+      "eras": [
+        "agile-transformation"
+      ]
+    },
+    {
+      "id": "epic-chantier-rgpd",
+      "name": "Grand chantier RGPD",
+      "icon": "⚖️",
+      "description": "Cartographier dix ans de données collectées « au cas où ». Aucun client ne dira merci, mais le jour du contrôle, vous serez la personne la plus populaire du COMEX.",
+      "epic": true,
+      "costPoints": 8,
+      "sprintStages": [
+        3,
+        3,
+        2
+      ],
+      "clients": -1,
+      "risk": -2,
+      "quickWin": false,
+      "completionEffects": {
+        "capital-politique": 6,
+        "dette-organisationnelle": -4
+      },
+      "eras": [
+        "agile-transformation"
+      ]
+    },
+    {
+      "id": "epic-plateforme-data",
+      "name": "Plateforme data unifiée",
+      "icon": "🗄️",
+      "description": "Réconcilier les sept bases qui se contredisent sur le nombre de clients. Le genre de chantier dont trois directeurs se sont déjà attribué le succès — avant le premier commit.",
+      "epic": true,
+      "costPoints": 11,
+      "sprintStages": [
+        4,
+        4,
+        3
+      ],
+      "clients": 2,
+      "risk": 6,
+      "quickWin": false,
+      "completionEffects": {
+        "reputation-produit": 2,
+        "impact": 24
+      },
+      "eras": [
+        "agile-transformation"
+      ]
+    }
+  ]
+}

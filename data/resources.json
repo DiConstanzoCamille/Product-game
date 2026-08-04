@@ -1,0 +1,71 @@
+{
+  "resources": [
+    {
+      "id": "moral",
+      "icon": "🫶",
+      "name": "Moral & confiance d'équipe",
+      "definition": "S'effondre en un sprint, se reconstruit en dix.",
+      "rises": ["Autonomie réelle", "Reconnaissance", "Décisions cohérentes avec le discours"],
+      "falls": ["Pivots non expliqués", "Reporting excessif", "Promesses non tenues"],
+      "extreme": { "condition": "Au plancher", "outcome": "Exode d'équipe" }
+    },
+    {
+      "id": "dette-organisationnelle",
+      "icon": "🧱",
+      "name": "Dette organisationnelle",
+      "definition": "Le prix différé de chaque raccourci — technique, process ou décisionnel.",
+      "rises": ["Livrer vite", "Sauter les revues", "Empiler les exceptions « juste cette fois »"],
+      "falls": ["Sprints de remise à plat", "Refus assumés de certaines demandes"],
+      "extreme": { "condition": "Au maximum", "outcome": "Entreprise zombie : tout tourne, plus rien n'avance." }
+    },
+    {
+      "id": "capital-politique",
+      "icon": "🎯",
+      "name": "Capital politique",
+      "definition": "Votre crédibilité auprès du board et des investisseurs — votre droit à vous tromper une fois de plus.",
+      "rises": ["Résultats visibles", "Alliés bien placés", "Reporting rassurant"],
+      "falls": ["Objectifs manqués", "Silence en période de crise"],
+      "extreme": { "condition": "À zéro", "outcome": "Le board reprend la main : rachat hostile." }
+    },
+    {
+      "id": "reputation-produit",
+      "icon": "📈",
+      "name": "Réputation produit",
+      "definition": "Ce que les utilisateurs pensent du produit. Pas ce que le board pense de vous — ça, c'est le Capital politique.",
+      "rises": ["Features qui résolvent un vrai problème", "Bouche-à-oreille", "Un Product marketing qui fait entendre les livraisons"],
+      "falls": ["Retards visibles", "Features qui dégradent l'usage", "Concurrents qui avancent pendant vos réorganisations"],
+      "extreme": { "condition": "Au plancher", "outcome": "Les utilisateurs partent avant vos investisseurs." }
+    },
+    {
+      "id": "cynisme",
+      "icon": "🎭",
+      "name": "Cynisme",
+      "definition": "La jauge invisible. Monte quand une pratique est copiée sans la culture qui va avec.",
+      "rises": ["Process imposés sans contexte", "Méthodes « parce que ça se fait ailleurs »"],
+      "falls": ["Pratiques expliquées, adoptées sincèrement, ajustées avec l'équipe"],
+      "extreme": { "condition": "Au maximum", "outcome": "Vos meilleures pratiques ne produisent plus que leurs effets pervers." }
+    }
+  ],
+  "tensions": [
+    {
+      "id": "capital-vs-moral",
+      "resources": ["capital-politique", "moral"],
+      "description": "Rassurer le board coûte souvent la confiance du terrain."
+    },
+    {
+      "id": "revenue-vs-dette",
+      "resources": ["revenue", "dette-organisationnelle"],
+      "description": "Couper les coins ronds fait gagner du cash à court terme, à rembourser plus tard avec intérêts."
+    },
+    {
+      "id": "reputation-vs-moral",
+      "resources": ["reputation-produit", "moral"],
+      "description": "Pousser une feature en urgence impressionne le marché et épuise l'équipe qui l'a livrée."
+    },
+    {
+      "id": "cynisme-compounding",
+      "resources": ["cynisme"],
+      "description": "Monte quand une pratique est copiée sans la culture qui va avec — et plus il est haut, pires deviennent tous vos futurs choix."
+    }
+  ]
+}

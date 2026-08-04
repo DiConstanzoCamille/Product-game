@@ -1,0 +1,1950 @@
+extends Node
+## Test headless : simule des mandats complets en pilotant SprintState +
+## EffectResolver directement (sans UI), pour valider la logique de
+## simulation Phase A (roster, pièces, Marché, pression) + Phase B
+## (Énergie, actions personnelles, burn-out) et la détection de fin de
+## mandat.
+##
+## Lancer : godot --headless --path game res://tests/smoke_test_logic.tscn
+## Sort avec un code non nul si une assertion échoue — en particulier les
+## critères de recette : "careful" DOIT perdre (Phase A) et la spirale
+## burn-out DOIT rester atteignable par "stress" (Phase B).
+
+## Stratégies simulées :
+##  - "stress"  : le·la CPO qui compense tout de sa personne — toutes les
+##                features en surchauffe, choix Inbox les plus toxiques
+##                pour le Moral, un licenciement par sprint, et "Faire le
+##                taf soi-même" tant qu'il reste de l'Énergie. La spirale
+##                attendue : Moral effondré → régén nulle → Énergie 0 →
+##                burn-out fondateur·rice.
+##  - "greedy"  : proche d'un joueur pressé mais pas absurde — remplit la
+##                capacité sans la dépasser, achète ~1 item de Marché par
+##                sprint, active des grandes décisions, et joue les actions
+##                personnelles avec discernement (1:1 avant embauche,
+##                rallonge quand le budget est à sec, Souffler quand la
+##                jauge est basse).
+##  - "economie" : le·la CPO qui nourrit la boîte — livre en priorité ce qui
+##                amène des clients, n'achète presque rien pour ne pas gonfler
+##                les charges. Doit franchir le mandat sans jouer le Levier.
+##  - "levier"   : l'inverse exact — livre les gros morceaux, achète outils et
+##                pratiques dès qu'il peut, recrute. Doit franchir le mandat
+##                sans jamais optimiser la caisse. Les deux existent pour le
+##                critère de recette 2 de l'issue #42 : deux trajectoires
+##                gagnantes, aucune dominante.
+##  - "careful" : joueur immobile — choix Inbox le moins coûteux, aucune
+##                feature livrée, aucune embauche, aucun achat, aucune
+##                action personnelle. Depuis la Phase A ("la pression"),
+##                ne rien faire DOIT perdre avant la fin du mandat.
+const GOOD_ENDINGS := ["ipo", "rachat"]
+
+var failures: int = 0
+
+
+func _ready() -> void:
+	_test_energy_rules()
+	_test_multi_squad_roster()
+	_test_inbox_channels()
+	_test_backlog_rules()
+	_test_business_model_pivot()
+	_test_investment_draw_rules()
+	_test_score_resolution_integration()
+	_test_tool_families_and_strategy_lot3()
+	_test_quarter_runtime()
+	_test_committee_lot4()
+	_test_support_teams_and_compendium_lot4()
+	_test_career_progression_lot5()
+	_test_multi_squad_backlog_isolation_lot5()
+	_test_inter_squad_combos_reachable_lot5()
+	_test_multi_squad_mandate_playthrough_lot5()
+	_test_attention_and_autopilot_lot5()
+
+	var quarters_reached: Dictionary = {}
+	for strategy in ["stress", "greedy", "economie", "levier", "careful"]:
+		print("\n=== SMOKE TEST LOGIQUE — %s ===" % strategy.to_upper())
+		var endings: Array = []
+		var run_index := 0
+		var best_quarter := 0
+		for company_id in ["meridia-corp", "karavel-scaleup"]:
+			for repeat in range(2):
+				_play_one_mandate(run_index, strategy, company_id)
+				endings.append(SprintState.ending_id)
+				best_quarter = max(best_quarter, SprintState.quarter_index)
+				run_index += 1
+		quarters_reached[strategy] = best_quarter
+
+		# Critère de recette Phase B : la spirale burn-out (Moral effondré →
+		# régén nulle → Taf soi-même répété → Énergie ≤ 0) doit rester
+		# atteignable — "stress" est construite pour la déclencher.
+		if strategy == "stress" and not endings.has("burnout-fondateur"):
+			_fail("Aucun run stress ne s'est terminé en burn-out (fins : %s) — la spirale Énergie est devenue inatteignable." % [endings])
+
+	# 🎯 Critère de recette 2 de l'issue #42 : un run « économie » et un run
+	# « Levier » doivent tous deux franchir le mandat, et aucun ne doit
+	# dominer.
+	#
+	# Seule la MOITIÉ de ce critère est assertable ici, et c'est la leçon du
+	# carnet §29 apprise une fois de plus : « les deux trajectoires sont
+	# viables » est une propriété du moteur (chacune doit passer au moins un
+	# verdict de board sur ses 4 mandats), mais « aucune ne domine » compare
+	# DEUX TIRAGES entre eux. La première version de ce test asserait
+	# `|économie − Levier| ≤ 1` sur deux échantillons indépendants de 4
+	# mandats : elle est tombée une fois sur 40 (économie T4 contre Levier T2)
+	# sur un moteur parfaitement sain. La domination se MESURE sur 40 runs et
+	# se documente au carnet (§32.5) ; elle ne s'assère pas sur quatre.
+	var economy_quarter := int(quarters_reached.get("economie", 0))
+	var lever_quarter := int(quarters_reached.get("levier", 0))
+	if economy_quarter < 2:
+		_fail("La trajectoire « économie » ne passe plus aucun verdict de board sur 4 mandats (T%d) — nourrir la boîte doit rester un chemin viable." % economy_quarter)
+	if lever_quarter < 2:
+		_fail("La trajectoire « Levier » ne passe plus aucun verdict de board sur 4 mandats (T%d) — jouer l'organisation doit rester un chemin viable." % lever_quarter)
+	print("\nTrajectoires — économie : meilleur T%d · Levier : meilleur T%d (critère de recette 2 de #42 ; la comparaison des deux se lit sur 40 runs, pas ici)" % [economy_quarter, lever_quarter])
+
+	if failures > 0:
+		print("\n=== SMOKE TEST LOGIQUE : ÉCHEC — %d assertion(s) en erreur ===" % failures)
+		get_tree().quit(1)
+		return
+	print("\n=== SMOKE TEST LOGIQUE : OK ===")
+	get_tree().quit()
+
+
+func _fail(message: String) -> void:
+	failures += 1
+	push_error(message)
+	print("ASSERTION ÉCHOUÉE : %s" % message)
+
+
+func _test_inbox_channels() -> void:
+	for event in GameData.inbox_events:
+		if String(event.get("channel", "")).strip_edges() == "":
+			_fail("L'événement Inbox '%s' n'a pas de canal." % event.get("id", ""))
+
+
+func _test_multi_squad_roster() -> void:
+	print("=== SMOKE TEST LOGIQUE — ROSTER MULTI-EQUIPE ===")
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+	var primary: Dictionary = SprintState.get_primary_squad()
+	var primary_roster: Array = primary.get("roster", [])
+	var primary_count := primary_roster.size()
+	for employee in primary_roster:
+		if String(employee.get("visible_trait_id", "")) == "":
+			_fail("Le trait visible de %s a ete perdu lors de la creation du roster runtime." % employee.get("name", ""))
+	var secondary_roster: Array = [{
+		"id": "test-squad-secondaire",
+		"name": "Test secondaire",
+		"role": "dev",
+		"seniority": "junior",
+		"salary": 1,
+		"trait": "",
+		"hidden_trait": "",
+		"hiddenRevealed": true,
+		"hiredSprint": 1,
+	}]
+	SprintState.squads.append({
+		"id": "squad-secondaire",
+		"name": "Equipe plateforme",
+		"roster": secondary_roster,
+		"backlog_draw": {},
+		"capacity": 0,
+		"delivered": [],
+		"epic_progress": {},
+	})
+
+	if SprintState.get_roster().size() != primary_count + 1:
+		_fail("get_roster() n'agrège pas le roster de la seconde équipe.")
+	if SprintState.find_employee("test-squad-secondaire").is_empty():
+		_fail("Un employé de la seconde équipe est introuvable.")
+
+	SprintState.impact_wallet = 2000
+	if SprintState.fire_employee("test-squad-secondaire") != "":
+		_fail("Le licenciement de la seconde équipe a été refusé.")
+	if primary_roster.size() != primary_count:
+		_fail("Le licenciement de la seconde équipe a modifié le roster principal.")
+	if not secondary_roster.is_empty() or SprintState.get_roster().size() != primary_count:
+		_fail("Le licenciement n'a pas retiré l'employé de son roster propriétaire.")
+
+
+func _test_backlog_rules() -> void:
+	print("=== SMOKE TEST LOGIQUE — BACKLOG PROFOND ===")
+	var conf: Dictionary = GameData.balance.get("backlogDraw", {})
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+	var offer := SprintState.get_backlog_offer()
+	var items: Array = offer.get("items", [])
+	var minimum := int(conf.get("itemsPerSprintMin", 0))
+	var maximum := int(conf.get("itemsPerSprintMax", 0))
+	if items.size() < minimum or items.size() > maximum:
+		_fail("Le backlog propose %d items au lieu de %d-%d." % [items.size(), minimum, maximum])
+	if SprintState.get_backlog_offer() != offer:
+		_fail("Le backlog a été re-tiré en revisitant la Roadmap.")
+
+	var feature: Dictionary = GameData.backlog.get("features", [])[0]
+	SprintState.current_backlog_draw = {"sprint": SprintState.sprint_number, "items": [feature]}
+	if SprintState.backlog_attribute_revealed(feature.get("id", ""), "clients"):
+		_fail("L'effet client est révélé sans pratique ni plongée.")
+	var energy_before := SprintState.energy
+	if SprintState.do_feature_dive(feature.get("id", "")) != "":
+		_fail("Plonger dans une feature a été refusé sans raison.")
+	if not SprintState.backlog_attribute_revealed(feature.get("id", ""), "risk"):
+		_fail("Plonger n'a pas révélé tous les attributs de la feature.")
+	if SprintState.energy != energy_before - SprintState.get_personal_action_cost("featureDive"):
+		_fail("Plonger n'a pas débité le coût configuré en énergie.")
+	var report := SprintState.commit_backlog_plan([{"id": feature.get("id", ""), "points": feature.get("costPoints", 0)}])
+	if report.get("delivered", []).size() != 1 or int(report.get("clientPoints", -99)) != int(feature.get("clients", 0)):
+		_fail("La livraison n'a pas annoncé l'effet client de la feature.")
+	if not SprintState.completed_backlog_ids.has(feature.get("id", "")):
+		_fail("Une feature livrée n'a pas quitté le sac du backlog.")
+	report = SprintState.commit_backlog_plan([{"id": feature.get("id", ""), "points": feature.get("costPoints", 0)}])
+	if not report.get("delivered", []).is_empty() or int(report.get("clientPoints", -99)) != 0:
+		_fail("Une feature déjà livrée a pu être encaissée deux fois.")
+
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+	var epic: Dictionary = GameData.backlog.get("epics", [])[0]
+	SprintState.current_backlog_draw = {"sprint": SprintState.sprint_number, "items": [epic]}
+	var first_investment: int = min(3, int(epic.get("costPoints", 0)) - 1)
+	report = SprintState.commit_backlog_plan([{"id": epic.get("id", ""), "points": first_investment}])
+	if SprintState.get_epic_invested(epic.get("id", "")) != first_investment or not report.get("delivered", []).is_empty():
+		_fail("L'epic a livré avant sa complétion ou perdu sa progression.")
+	SprintState.sprint_number += 1
+	SprintState.current_backlog_draw.clear()
+	offer = SprintState.get_backlog_offer()
+	items = offer.get("items", [])
+	if items.size() > maximum or not _offer_has_item(items, epic.get("id", "")):
+		_fail("Un epic actif doit rester dans une offre plafonnée à %d items." % maximum)
+	if SprintState.abandon_epic(epic.get("id", "")) != "" or SprintState.get_epic_invested(epic.get("id", "")) != 0:
+		_fail("Abandonner un epic doit perdre sa progression sans remboursement.")
+	SprintState._backlog_bag.clear()
+	SprintState._refill_backlog_bag()
+	if not SprintState._backlog_bag.has(epic.get("id", "")):
+		_fail("Un epic abandonné n'est plus éligible au retour dans le sac.")
+	SprintState.current_backlog_draw = {"sprint": SprintState.sprint_number, "items": [epic]}
+	report = SprintState.commit_backlog_plan([{"id": epic.get("id", ""), "points": SprintState.get_epic_remaining(epic.get("id", ""))}])
+	if not SprintState.completed_backlog_ids.has(epic.get("id", "")) or report.get("delivered", []).size() != 1:
+		_fail("L'epic n'a pas livré ses effets à la complétion.")
+
+
+## 🔒 Le pivot de modèle économique (spec-clients-revenue.md §4.2). Le vrai
+## piège n'est pas le sprint de la décision — c'est le SUIVANT : vider le
+## segment gratuit une fois ne le ferme pas, et la première livraison le
+## repeuplerait si les arrivées n'étaient pas coupées avec. Une décision qui
+## promet une disparition et rend les clients trois minutes plus tard n'est pas
+## un pari, c'est un bug de présentation.
+func _test_business_model_pivot() -> void:
+	print("=== SMOKE TEST LOGIQUE — PIVOT DE MODELE ECONOMIQUE ===")
+	SprintState.reset_run("agile-transformation", "karavel-scaleup")
+	var entry_id := ""
+	var paying_id := ""
+	for segment in SprintState.get_segments():
+		if String(segment.get("role", "")) == "entry":
+			entry_id = segment.get("id", "")
+		elif String(segment.get("role", "")) == "paying":
+			paying_id = segment.get("id", "")
+	if entry_id == "" or paying_id == "":
+		_fail("Le modele freemium doit declarer un segment d'entree et un segment payant.")
+		return
+
+	var entry_before := SprintState.get_client_count(entry_id)
+	var paying_before := SprintState.get_client_count(paying_id)
+	var price_before := SprintState.resolved_segment_price(paying_id)
+	if entry_before <= 0.0 or paying_before <= 0.0:
+		_fail("Le test du pivot a besoin des deux populations de depart.")
+		return
+
+	SprintState.quarter_strategy_chosen = false
+	if SprintState.choose_strategy("fin-du-gratuit") != "":
+		_fail("« Fin du gratuit » doit pouvoir etre choisie.")
+		return
+
+	# Au moment de la decision : la porte se ferme, une fraction bascule, le
+	# prix des payants monte. La fraction est TIREE — on assere donc
+	# l'encadrement, jamais la valeur.
+	if SprintState.get_client_count(entry_id) != 0.0:
+		_fail("« Fin du gratuit » doit vider le segment d'entree (reste %d)." % int(SprintState.get_client_count(entry_id)))
+	var converted := SprintState.get_client_count(paying_id) - paying_before
+	var conversion_rule: Dictionary = GameData.scoring.get("global", {}).get("strategies", {}).get("fin-du-gratuit", {}).get("onChoice", {}).get("convertRoleRange", {})
+	var low := entry_before * float(conversion_rule.get("minRatio", 0.0))
+	var high := entry_before * float(conversion_rule.get("maxRatio", 1.0))
+	if converted < low - 0.001 or converted > high + 0.001:
+		_fail("La bascule doit rester dans la fourchette tiree de la carte : %f hors de [%f, %f]." % [converted, low, high])
+	if SprintState.resolved_segment_price(paying_id) <= price_before:
+		_fail("« Fin du gratuit » doit faire monter le prix des payants.")
+
+	# 🚪 Le sprint SUIVANT : une grosse livraison ne doit plus rouvrir la porte.
+	if not is_zero_approx(SprintState.clients_for_points(1.0) - SprintState.clients_for_points_by_segment(1.0)[1].get("value", 0.0)):
+		_fail("Apres le pivot, un point d'effet client ne doit plus rapporter que des payants.")
+	var generous := {"id": "pivot-test", "name": "Feature genereuse", "costPoints": 1, "clients": 6, "risk": 0, "quickWin": false, "tags": ["growth"], "eras": ["agile-transformation"]}
+	SprintState.current_backlog_draw = {"sprint": SprintState.sprint_number, "items": [generous]}
+	SprintState.commit_backlog_plan([{"id": "pivot-test", "points": 1}])
+	SprintState.apply_pending_and_check()
+	if SprintState.get_client_count(entry_id) > 0.0:
+		_fail("Le segment ferme s'est repeuple au sprint suivant (%d clients) — la decision promettait sa disparition." % int(SprintState.get_client_count(entry_id)))
+	if SprintState.get_client_count(paying_id) <= 0.0:
+		_fail("Le segment payant doit continuer d'encaisser les livraisons apres le pivot.")
+
+
+## Le rapport de score est la source unique de l'économie : les quick wins
+## n'ajoutent plus leur ancien +1 individuel, et les abonnements ne sont jamais
+## versés deux fois dans le Revenue.
+func _test_score_resolution_integration() -> void:
+	print("=== SMOKE TEST LOGIQUE — INTEGRATION SCORE ===")
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+	# Isole l'economie ScoreResolver du tirage aleatoire d'une exigence.
+	SprintState.quarter_requirement_ids = ["hiring-freeze"]
+	SprintState.quarter_requirement_id = "hiring-freeze"
+	SprintState.quarter_forced_strategy_id = ""
+	var quick_wins: Array = []
+	for feature in GameData.backlog.get("features", []):
+		if bool(feature.get("quickWin", false)):
+			quick_wins.append(feature)
+			if quick_wins.size() == 2:
+				break
+	if quick_wins.size() != 2:
+		_fail("Le test d'integration a besoin de deux quick wins dans le backlog.")
+		return
+
+	SprintState.current_backlog_draw = {"sprint": SprintState.sprint_number, "items": quick_wins}
+	var plan: Array = []
+	for feature in quick_wins:
+		plan.append({"id": feature.get("id", ""), "points": feature.get("costPoints", 0)})
+	SprintState.commit_backlog_plan(plan)
+	SprintState.add_pending({"impact": 3}, "Inbox test : Impact ponctuel")
+	var wallet_before := SprintState.impact_wallet
+	var revenue_before := SprintState.revenue
+	var charges := int(SprintState.get_recurring_charges().get("total", 0))
+	SprintState.apply_pending_and_check()
+
+	var report: Dictionary = SprintState.last_score_report
+	var conversion: Dictionary = report.get("conversion", {})
+	var wallet: Dictionary = conversion.get("wallet", {})
+	var client_report: Dictionary = conversion.get("clients", {})
+	var expected_quick_win := int(GameData.scoring.get("traction", {}).get("handBonuses", {}).get("quickWins", {}).get("impactBonus", 0))
+	if report.is_empty() or int(report.get("next_streak", 0)) != 1 or SprintState.streak != 1:
+		_fail("Un sprint avec livraisons doit produire un rapport et commencer la serie.")
+	if int(wallet.get("quick_win_bonus", 0)) != expected_quick_win:
+		_fail("Le rapport doit attribuer exactement +%d d'Impact aux deux quick wins." % expected_quick_win)
+	# 💥 Le portefeuille encaisse l'Impact du sprint tel quel : plus de racine
+	# carree, plus d'allocation plancher.
+	if int(wallet.get("gain", -1)) != int(report.get("global", {}).get("impact", 0)) + expected_quick_win:
+		_fail("Le gain de portefeuille doit valoir l'Impact du sprint plus le bonus quick wins, sans conversion.")
+	var expected_wallet := wallet_before + 3 + int(wallet.get("gain", 0))
+	if SprintState.impact_wallet != expected_wallet or SprintState.last_wallet_delta != expected_wallet - wallet_before:
+		_fail("Le portefeuille doit valoir %d et non %d." % [expected_wallet, SprintState.impact_wallet])
+	if SprintState.clients != client_report.get("after", {}):
+		_fail("La population du jeu doit etre exactement celle que le rapport a calculee.")
+	if int(round(float(conversion.get("revenue", {}).get("in", 0.0)))) != SprintState.last_revenue:
+		_fail("Ce qui est encaisse doit etre exactement ce que le rapport dit que les clients ont paye.")
+	# 💰 Le Revenue n'est pas borne : il encaisse ce que les clients paient et
+	# paie ses charges, une seule fois chacun.
+	var levied := SprintState.last_payroll + SprintState.last_licenses + SprintState.last_client_cost
+	var expected_revenue := revenue_before - float(levied) + float(SprintState.last_revenue)
+	if not is_equal_approx(SprintState.revenue, expected_revenue):
+		_fail("Le Revenue doit encaisser ses clients une seule fois et payer ses charges une seule fois (%s au lieu de %s)." % [SprintState.revenue, expected_revenue])
+	if levied != int(SprintState.get_recurring_charges().get("total", 0)):
+		_fail("Les charges prelevees doivent etre exactement celles que get_recurring_charges() affiche APRES resolution.")
+	# 🧾 Le support se facture sur la population que le sprint vient de
+	# produire, pas sur celle d'avant : encaisser sur la nouvelle base et
+	# facturer sur l'ancienne offrirait un sprint de support gratuit a toute
+	# acquisition, et ferait payer des clients deja partis.
+	if SprintState.last_client_cost != int(round(SprintState.get_client_support_cost())):
+		_fail("Le support des clients doit etre calcule sur la population resolue (%d au lieu de %d)." % [
+			SprintState.last_client_cost, int(round(SprintState.get_client_support_cost()))])
+	if charges == levied and SprintState.last_client_cost > 0:
+		print("  (note : la population n'a pas bouge ce sprint — la charge avant/apres est la meme)")
+
+	SprintState.sprint_number += 1
+	SprintState.apply_pending_and_check()
+	if int(SprintState.last_score_report.get("next_streak", -1)) != 0 or SprintState.streak != 0:
+		_fail("Un sprint vide doit remettre la serie a zero.")
+	SprintState.activated_cards = ["sprint-retro"]
+	SprintState.activated_card_sprints = {"sprint-retro": 1}
+	SprintState.sprint_number = 3
+	var snapshot := SprintState._build_score_snapshot()
+	var tools: Array = snapshot.get("active_tools", [])
+	if tools.is_empty() or tools[0].get("id", "") != "sprint-retro" or int(tools[0].get("active_sprints", 0)) != 3:
+		_fail("Le snapshot doit transmettre active_sprints pour les outils cumulatifs.")
+
+
+## Levier par employé de la ligne de score dont le libellé commence par
+## `label_prefix` (ex. "Notion") — 0.0 si l'outil n'a laissé aucune ligne.
+func _tool_lever_value(report: Dictionary, label_prefix: String) -> float:
+	for line in report.get("global", {}).get("lines", []):
+		if line.get("type", "") == "lever_add" and String(line.get("label", "")).begins_with(label_prefix):
+			return float(line.get("value", 0.0))
+	return 0.0
+
+
+## Lot 3 : Levier par employé (§7.1), slots d'outillage (§7.1.1/§7.1.2),
+## outillage hérité (§7.1.3) et décisions stratégiques (§7.2). Critère de
+## recette de l'issue #16 : la MÊME carte Notion doit donner un Levier
+## positif chez Karavel et négatif chez Meridia sans qu'aucune ligne du
+## moteur ne teste un `company_id` — seul le roster réel change le résultat.
+func _test_tool_families_and_strategy_lot3() -> void:
+	print("=== SMOKE TEST LOGIQUE — LOT 3 : FAMILLES DE DECISIONS ===")
+
+	SprintState.reset_run("agile-transformation", "karavel-scaleup")
+	if not SprintState.activated_cards.has("notion"):
+		_fail("Karavel doit hériter de Notion dès reset_run (companies.json → inheritedTools).")
+	SprintState.sprint_number = 10
+	var karavel_report := ScoreResolver.resolve(SprintState._build_score_snapshot(), {
+		"scoring": GameData.scoring, "hidden_traits": GameData.hidden_traits, "cards": GameData.cards,
+	})
+	var karavel_notion := _tool_lever_value(karavel_report, "Notion")
+	if karavel_notion <= 0.0:
+		_fail("Notion doit rester un Levier positif chez Karavel, équipe junior (obtenu %s)." % karavel_notion)
+
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+	if not SprintState.activated_cards.has("jira"):
+		_fail("Meridia doit hériter de Jira dès reset_run.")
+	if SprintState.activated_cards.has("notion"):
+		_fail("Meridia ne doit pas hériter de Notion.")
+	SprintState.activated_cards.append("notion")
+	SprintState.activated_card_sprints["notion"] = 1
+	SprintState.sprint_number = 10
+	var meridia_report := ScoreResolver.resolve(SprintState._build_score_snapshot(), {
+		"scoring": GameData.scoring, "hidden_traits": GameData.hidden_traits, "cards": GameData.cards,
+	})
+	var meridia_notion := _tool_lever_value(meridia_report, "Notion")
+	if meridia_notion >= 0.0:
+		_fail("Notion doit devenir un Levier négatif chez Meridia, équipe senior ancienne (obtenu %s)." % meridia_notion)
+
+	# Les slots : la base vient du niveau de carrière, +2 achetables à prix croissant.
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+	if SprintState.get_tool_slot_base() != 3:
+		_fail("La base de slots au niveau PM doit être 3 (spec §7.1.1).")
+	if SprintState.activated_cards.size() != 1 or SprintState.get_tool_slot_capacity() != 3:
+		_fail("Un run de PM démarre avec l'outillage hérité (1 slot pris) sur une base de 3.")
+	SprintState.impact_wallet = 2000
+	if SprintState.buy_tool_slot() != "" or SprintState.get_tool_slot_capacity() != 4:
+		_fail("Le premier slot supplémentaire doit coûter 12 💶 et porter la capacité à 4.")
+	if SprintState.buy_tool_slot() != "" or SprintState.get_tool_slot_capacity() != 5:
+		_fail("Le second slot supplémentaire doit coûter 20 💶 et porter la capacité à 5.")
+	if SprintState.buy_tool_slot() != "plafond":
+		_fail("Un troisième achat de slot doit être refusé (plafond de +2, spec §7.1.1).")
+
+	# Le coût de bascule (§7.1.2) : Cynisme +4 puis +7, Levier perdu tout de
+	# suite, compteur cumulatif remis à zéro, carte de retour dans le pool.
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+	SprintState.activated_cards.append("sprint-retro")
+	SprintState.activated_card_sprints["sprint-retro"] = 1
+	SprintState.sprint_number = 5
+	SprintState.resource_values["cynisme"] = 0.0
+	if SprintState.release_tool_slot("sprint-retro") != "":
+		_fail("La bascule sur un outil actif doit être acceptée.")
+	if SprintState.activated_cards.has("sprint-retro") or SprintState.activated_card_sprints.has("sprint-retro"):
+		_fail("Un outil libéré doit quitter activated_cards et perdre son compteur cumulatif.")
+	if int(SprintState.pending_deltas.get("cynisme", 0.0)) != 4:
+		_fail("La première bascule du mandat doit coûter 4 de Cynisme.")
+	SprintState.pending_deltas.clear()
+	if SprintState.release_tool_slot("jira") != "":
+		_fail("Libérer l'outillage hérité doit être une bascule comme une autre.")
+	if int(SprintState.pending_deltas.get("cynisme", 0.0)) != 7:
+		_fail("La deuxième bascule du mandat doit coûter 4 + 3 = 7 de Cynisme.")
+	if SprintState.swap_count != 2:
+		_fail("Le compteur de bascules doit suivre chaque libération de slot.")
+	if not GameData.cards.get("cards", []).map(func(c): return c.get("id", "")).has("sprint-retro") \
+			or SprintState.activated_cards.has("sprint-retro"):
+		_fail("Une carte libérée doit rester dans le catalogue et pouvoir revenir au tirage.")
+
+	# Décisions stratégiques (§7.2) : 1 par trimestre, permanente, jamais
+	# mélangée aux outils.
+	#
+	# Cas à couvrir sans dépendre de la chance : le tirage d'exigence T1 peut
+	# légitimement tomber sur board-injunction (1/8 des exigences de
+	# quotas.json), qui force une décision dès reset_run() et consomme le
+	# trimestre avant qu'on ait rien choisi soi-même — get_strategy_options()
+	# renvoie alors un catalogue vide, correctement. Un catalogue vide n'est
+	# accepté QUE dans ce cas précis (injonction déjà tranchée) ; toute autre
+	# raison reste un échec de test — c'était le bug avant ce lot : le test
+	# exigeait un catalogue non vide à 100 %, alors que la spec en autorise
+	# 7/8 (voir carnet §29, "le test était faux, pas le moteur").
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+	var options := SprintState.get_strategy_options(3)
+	var first_id: String
+	if options.is_empty():
+		if not SprintState.quarter_strategy_chosen or SprintState.quarter_forced_strategy_id == "":
+			_fail("Un catalogue de décisions stratégiques vide au premier trimestre ne doit venir que d'une injonction du board déjà consommée, jamais d'autre chose.")
+		first_id = SprintState.quarter_forced_strategy_id
+		if not SprintState.chosen_strategy_ids.has(first_id):
+			_fail("Une décision imposée par injonction doit rejoindre chosen_strategy_ids comme un choix volontaire.")
+	else:
+		first_id = options[0].get("id", "")
+		if SprintState.choose_strategy(first_id) != "":
+			_fail("Le premier choix stratégique du trimestre doit être accepté.")
+		if not SprintState.chosen_strategy_ids.has(first_id) or SprintState.activated_cards.has(first_id):
+			_fail("Une décision stratégique doit rejoindre chosen_strategy_ids, jamais activated_cards.")
+	if SprintState.choose_strategy(first_id) == "":
+		_fail("Une deuxième décision stratégique ne doit pas être acceptée dans le même trimestre.")
+	# Simule le passage au trimestre suivant sans dépendre du tirage aléatoire
+	# d'exigence (board-injunction en forcerait une seconde et rendrait le test friable).
+	SprintState.quarter_strategy_chosen = false
+	if not SprintState.chosen_strategy_ids.has(first_id):
+		_fail("Une décision stratégique choisie doit rester active au trimestre suivant (irréversible).")
+	var expected_remaining: int = GameData.strategy.get("strategies", []).size() - SprintState.chosen_strategy_ids.size()
+	if SprintState.get_strategy_options(10).size() != expected_remaining:
+		_fail("Le trimestre suivant doit reproposer tout le catalogue sauf ce qui est déjà choisi.")
+
+
+func _test_quarter_runtime() -> void:
+	print("=== SMOKE TEST LOGIQUE — QUOTAS TRIMESTRIELS ===")
+	# T1 : le compteur progresse une fois par Resolution et un run qui livre
+	# uniquement du travail interne visible par personne est remercie au T3.
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+	SprintState.quarter_requirement_ids = ["visibility-mandate"]
+	SprintState.quarter_requirement_id = "visibility-mandate"
+	for sprint in range(3):
+		SprintState.last_roadmap_report = {
+			"sprint": SprintState.sprint_number,
+			"plannedPoints": 1,
+			"capacity": 1,
+			"delivered": [{"id": "internal-%d" % sprint, "name": "Travail interne", "costPoints": 1, "clients": 0, "risk": 0, "quickWin": false, "tags": ["tech"]}],
+		}
+		var ending := SprintState.apply_pending_and_check()
+		if sprint < 2:
+			if SprintState.quarter_sprint != sprint + 1 or ending != "":
+				_fail("La progression T1 doit rester ouverte apres le sprint %d." % (sprint + 1))
+			SprintState.sprint_number += 1
+		elif ending != "remercie" or not SprintState.is_mandate_over:
+			_fail("Un trimestre de livraisons sans Traction doit mener a 'remercie' au plus tard au T3.")
+
+	# Les exigences runtime modifient les actions et le snapshot, sans UI.
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+	SprintState.quarter_requirement_ids = ["short-quarter"]
+	# Neutralise aussi la decision strategique tiree au hasard : depuis #42,
+	# Expansion internationale porte un quotaMultiplier et rendait cette
+	# assertion flaky une fois sur douze — meme piege qu'au carnet §29.
+	SprintState.chosen_strategy_ids.clear()
+	SprintState.quarter_strategy_chosen = false
+	SprintState.quarter_forced_strategy_id = ""
+	# 75 % du quota T1, quel que soit le chiffre de quotas.json — asserter la
+	# regle, pas la valeur d'equilibrage du jour.
+	var t1_quota := int(GameData.quotas.get("careerLevels", {}).get("pm", {}).get("quarterQuotas", [])[0])
+	if SprintState.get_quarter_length() != 2 or SprintState.get_current_quota() != int(round(t1_quota * 0.75)):
+		_fail("Le trimestre court doit valoir 2 sprints et 75 %% du quota T1 (%d, obtenu %d)." % [
+			int(round(t1_quota * 0.75)), SprintState.get_current_quota()
+		])
+	SprintState.quarter_requirement_ids = ["finance-watch"]
+	var base_payroll := SprintState.get_payroll()
+	SprintState._apply_recurring_charges()
+	if SprintState.last_payroll != base_payroll * 2:
+		_fail("L'exigence masse salariale doit doubler le prelevement.")
+	if SprintState.last_licenses != int(SprintState.get_recurring_charges().get("licenses", 0)):
+		_fail("Les licences prelevees doivent etre exactement celles annoncees par get_recurring_charges().")
+	SprintState.pending_deltas.clear()
+	SprintState.quarter_requirement_ids = ["hiring-freeze"]
+	if SprintState.hire_candidate(GameData.candidates[0]) != "quarter-requirement":
+		_fail("Le gel des embauches doit refuser hire_candidate.")
+	SprintState.quarter_requirement_ids = ["tool-freeze"]
+	if SprintState.activate_decision("rice") != "quarter-requirement":
+		_fail("Le gel des outils doit refuser les cartes outil/process.")
+	SprintState.quarter_requirement_ids = ["steering-committee"]
+	SprintState.impact_wallet = 500
+	var practice_id: String = GameData.practices[0].get("id", "")
+	SprintState.buy_practice(practice_id)
+	if int(SprintState.pending_deltas.get("cynisme", 0.0)) != 4:
+		_fail("Le comite de pilotage doit faire monter le Cynisme de 4 par pratique.")
+	SprintState.quarter_requirement_ids = ["board-injunction"]
+	SprintState._assign_forced_strategy()
+	var forced_snapshot := SprintState._build_score_snapshot()
+	if SprintState.quarter_forced_strategy_id == "" or not forced_snapshot.get("strategy_ids", []).has(SprintState.quarter_forced_strategy_id) or SprintState.activated_cards.has(SprintState.quarter_forced_strategy_id):
+		_fail("L'injonction doit injecter une strategie au score sans activer de carte.")
+
+	# Bonus qualitatif : une seule fois a la revue, en plus du gain ScoreResolver.
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+	SprintState.quarter_requirement_ids = ["hiring-freeze"]
+	SprintState.activated_cards = ["rice"]
+	for sprint in range(3):
+		SprintState.last_roadmap_report = {
+			"sprint": SprintState.sprint_number,
+			"plannedPoints": 40,
+			"capacity": 40,
+			"delivered": [{"id": "quota-%d" % sprint, "name": "Livraison quota", "costPoints": 40, "clients": 1, "risk": 0, "quickWin": false, "tags": ["growth"]}],
+		}
+		SprintState.apply_pending_and_check()
+		if sprint < 2:
+			SprintState.sprint_number += 1
+	var expected_qualitative := int(GameData.quotas.get("qualitativeBonusImpact", 0))
+	if int(SprintState.quarter_result.get("qualitativeBonus", 0)) != expected_qualitative:
+		_fail("Les objectifs qualitatifs tenus doivent accorder exactement %d d'Impact une fois." % expected_qualitative)
+	if SprintState.quarter_index != 2 or int(SprintState.quarter_result.get("quarter", 0)) != 1:
+		_fail("Le resultat T1 doit rester disponible pendant que T2 est deja prepare.")
+	var bonus_delta := int(SprintState.last_score_report.get("conversion", {}).get("wallet", {}).get("gain", 0)) + expected_qualitative
+	if SprintState.last_wallet_delta != bonus_delta:
+		_fail("Le bonus qualitatif doit etre ajoute une seule fois au dernier flux de portefeuille.")
+	SprintState.sprint_number += 1
+	SprintState.last_roadmap_report.clear()
+	SprintState.apply_pending_and_check()
+	if SprintState.last_wallet_delta != int(SprintState.last_score_report.get("conversion", {}).get("wallet", {}).get("gain", 0)):
+		_fail("Un sprint hors revue ne doit pas rejouer le bonus qualitatif.")
+	var review_entries := 0
+	for entry in SprintState.journal:
+		if String(entry.get("text", "")).contains("Revue trimestrielle"):
+			review_entries += 1
+	if review_entries != 1:
+		_fail("Le journal ne doit inscrire le bonus qualitatif qu'a sa revue unique.")
+
+	# T4 ne tranche plus seul la fin : rester ouvre T5 avec le quota long.
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+	SprintState.quarter_index = 4
+	SprintState.quarter_requirement_ids = ["hiring-freeze"]
+	SprintState.quarter_requirement_id = "hiring-freeze"
+	SprintState.quarter_sprint = SprintState.get_quarter_length() - 1
+	SprintState.impact_wallet = SprintState.get_current_quota()
+	SprintState.activated_cards = ["rice"]
+	SprintState.last_roadmap_report.clear()
+	SprintState.apply_pending_and_check()
+	if not SprintState.quarter_exit_choice_pending or SprintState.is_mandate_over or int(SprintState.quarter_result.get("quarter", 0)) != 4:
+		_fail("La reussite T4 doit attendre explicitement le choix de mandat.")
+	if SprintState.choose_mandate_path(true) != "" or not SprintState.long_mandate or SprintState.quarter_index != 5:
+		_fail("Le choix de rester doit ouvrir le mandat long au T5.")
+	if int(SprintState.quarter_result.get("quarter", 0)) != 4:
+		_fail("Le resultat T4 doit rester lisible apres la preparation du T5.")
+	if SprintState.quarter_requirement_ids.size() < 2:
+		_fail("Le mandat long doit ajouter une exigence au lieu d'ecraser celle du T4.")
+	SprintState.quarter_requirement_ids = ["hiring-freeze", "tool-freeze"]
+	SprintState.chosen_strategy_ids.clear()
+	SprintState.quarter_strategy_chosen = false
+	SprintState.quarter_forced_strategy_id = ""
+	# Le T5 long repart du quota T4 multiplie par longMandate.quotaMultiplier —
+	# la regle, jamais le chiffre du jour.
+	var quotas: Array = GameData.quotas.get("careerLevels", {}).get("pm", {}).get("quarterQuotas", [])
+	var expected_long := int(round(float(quotas[3]) * float(GameData.quotas.get("longMandate", {}).get("quotaMultiplier", 2.2))))
+	if SprintState.get_current_quota() != expected_long or SprintState.quarter_requirement_ids.size() < 2:
+		_fail("Le T5 long doit partir a %d et conserver les exigences accumulees (obtenu %d)." % [
+			expected_long, SprintState.get_current_quota()
+		])
+
+	# La revue de quota a la priorite sur un seuil fatal : une seule fin est emise.
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+	SprintState.quarter_sprint = 2
+	SprintState.impact_wallet = 0
+	SprintState.quarter_requirement_ids = ["hiring-freeze"]
+	SprintState.revenue = 0.0
+	var endings: Array = []
+	var on_ending := func(ending_id: String): endings.append(ending_id)
+	SprintState.ending_reached.connect(on_ending)
+	var quota_ending := SprintState.apply_pending_and_check()
+	SprintState.ending_reached.disconnect(on_ending)
+	if quota_ending != "remercie" or SprintState.ending_id != "remercie" or endings != ["remercie"]:
+		_fail("Un echec de quota concurrent d'un seuil fatal doit emettre une seule fin 'remercie'.")
+
+
+## Lot 4 (spec scoring §12) : chaque poste du Comité — achat accepté avec de
+## l'Impact, refus 'impact' à sec, plafonds des tables de prix. `committee_screen`
+## ne fait que lire ces fonctions ; c'est donc ici, pas dans un test UI, que
+## la logique doit être couverte.
+func _test_committee_lot4() -> void:
+	print("=== SMOKE TEST LOGIQUE — LOT 4 : COMITE D'INVESTISSEMENT ===")
+
+	# 🧭 Décision stratégique payante : refus à sec, achat au prix affiché,
+	# une seule par trimestre. On neutralise une éventuelle injonction du
+	# board tirée à T1 (déjà couverte ailleurs) pour rester déterministe.
+	SprintState.reset_run("agile-transformation", "karavel-scaleup")
+	SprintState.chosen_strategy_ids.clear()
+	SprintState.quarter_strategy_chosen = false
+	SprintState.quarter_forced_strategy_id = ""
+	SprintState.quarter_strategy_chosen = false
+	var strategy_options := SprintState.get_strategy_options(3)
+	if strategy_options.is_empty():
+		_fail("Un trimestre sans décision déjà choisie doit proposer un catalogue non vide.")
+	else:
+		var strategy_id: String = strategy_options[0].get("id", "")
+		SprintState.impact_wallet = 0
+		if SprintState.buy_strategy(strategy_id) != "impact":
+			_fail("Sans budget, buy_strategy() doit refuser 'impact'.")
+		SprintState.impact_wallet = 2000
+		var strategy_cost := SprintState.strategy_purchase_cost()
+		if SprintState.buy_strategy(strategy_id) != "":
+			_fail("Avec assez d'Impact, buy_strategy() doit accepter.")
+		if SprintState.impact_wallet != 2000 - strategy_cost:
+			_fail("buy_strategy() doit prélever exactement le coût affiché (%d)." % strategy_cost)
+		var second_id: String = strategy_options[1].get("id", "") if strategy_options.size() > 1 else strategy_id
+		if SprintState.buy_strategy(second_id) == "":
+			_fail("Une deuxième décision stratégique ne doit pas être acceptée au Comité dans le même trimestre.")
+
+	# 🪑 Ouvrir un poste : échelle de prix (investments.json → open-seat),
+	# plafond une fois la table épuisée.
+	SprintState.reset_run("agile-transformation", "karavel-scaleup")
+	var base_cap := SprintState.get_team_cap()
+	SprintState.impact_wallet = 0
+	if SprintState.buy_team_cap_seat() != "impact":
+		_fail("Sans budget, l'ouverture d'un poste doit refuser 'impact'.")
+	SprintState.impact_wallet = 5000
+	var seat_costs: Array = SprintState.find_investment_item("open-seat").get("costs", [])
+	for i in seat_costs.size():
+		if SprintState.buy_team_cap_seat() != "":
+			_fail("L'achat du poste n°%d doit être accepté avec assez de budget." % (i + 1))
+	if SprintState.get_team_cap() != base_cap + seat_costs.size():
+		_fail("Le cap d'effectif doit avoir gagné %d poste(s)." % seat_costs.size())
+	if SprintState.buy_team_cap_seat() != "plafond":
+		_fail("Au-delà de la table de prix, l'ouverture d'un poste doit refuser 'plafond'.")
+
+	# 📈 Promotion : refus 'introuvable' / 'deja-senior' / 'impact', effet réel
+	# sur la séniorité et le salaire.
+	SprintState.reset_run("agile-transformation", "karavel-scaleup")
+	var junior_id := ""
+	for employee in SprintState.get_roster():
+		if employee.get("seniority", "junior") == "junior":
+			junior_id = employee.get("id", "")
+			break
+	if junior_id == "":
+		_fail("Le roster de départ de Karavel doit compter au moins un junior à promouvoir.")
+	SprintState.impact_wallet = 0
+	if SprintState.promote_employee(junior_id) != "impact":
+		_fail("Sans budget, promote_employee() doit refuser 'impact'.")
+	SprintState.impact_wallet = 2000
+	if SprintState.promote_employee(junior_id) != "":
+		_fail("Avec budget, promote_employee() doit accepter un junior existant.")
+	var promoted := SprintState.find_employee(junior_id)
+	var senior_salary := int(GameData.balance.get("salaries", {}).get("senior", 2))
+	if promoted.get("seniority", "") != "senior" or int(promoted.get("salary", 0)) != senior_salary:
+		_fail("Une promotion doit passer la personne senior et aligner son salaire sur balance.json → salaries.senior.")
+	if SprintState.promote_employee(junior_id) != "deja-senior":
+		_fail("Promouvoir une personne déjà senior doit être refusé ('deja-senior').")
+	if SprintState.promote_employee("introuvable-xyz") != "introuvable":
+		_fail("Promouvoir un id inconnu doit être refusé ('introuvable').")
+
+	# 🚀 Palier de produit : échelle de prix, plafond, +1 feature proposée
+	# par sprint et par palier (_draw_backlog_offer).
+	SprintState.reset_run("agile-transformation", "karavel-scaleup")
+	SprintState.impact_wallet = 0
+	if SprintState.buy_product_tier() != "impact":
+		_fail("Sans budget, le palier de produit doit refuser 'impact'.")
+	SprintState.impact_wallet = 5000
+	var tier_costs: Array = SprintState.find_investment_item("product-tier").get("costs", [])
+	for i in tier_costs.size():
+		if SprintState.buy_product_tier() != "":
+			_fail("L'achat du palier n°%d doit être accepté avec assez de budget." % (i + 1))
+	if SprintState.product_tier != tier_costs.size():
+		_fail("product_tier doit valoir %d après avoir acheté tous les paliers." % tier_costs.size())
+	if SprintState.buy_product_tier() != "plafond":
+		_fail("Au-delà de la table de prix, le palier de produit doit refuser 'plafond'.")
+
+	# 🏝️ Séminaire d'équipe : Cynisme -15 posé en attente de Résolution.
+	SprintState.reset_run("agile-transformation", "karavel-scaleup")
+	SprintState.impact_wallet = 0
+	if SprintState.buy_team_seminar() != "impact":
+		_fail("Sans budget, le séminaire d'équipe doit refuser 'impact'.")
+	SprintState.impact_wallet = 2000
+	if SprintState.buy_team_seminar() != "":
+		_fail("Avec budget, le séminaire d'équipe doit être accepté.")
+	if int(SprintState.pending_deltas.get("cynisme", 0.0)) != -15:
+		_fail("Le séminaire d'équipe doit poser -15 de Cynisme en attente de Résolution.")
+
+	# 🧹 Sprint de remise à plat : Dette -20 en attente, 0 Traction à la
+	# Résolution qui suit — même si le roster livre réellement quelque chose.
+	SprintState.reset_run("agile-transformation", "karavel-scaleup")
+	SprintState.impact_wallet = 2000
+	if SprintState.buy_cleanup_sprint() != "":
+		_fail("Avec budget, le sprint de remise à plat doit être accepté.")
+	if int(SprintState.pending_deltas.get("dette-organisationnelle", 0.0)) != -20:
+		_fail("Le sprint de remise à plat doit poser -20 de Dette en attente de Résolution.")
+	if not SprintState.cleanup_sprint_pending:
+		_fail("cleanup_sprint_pending doit rester vrai jusqu'à la prochaine Résolution.")
+	var feature: Dictionary = GameData.backlog.get("features", [])[0]
+	SprintState.last_roadmap_report = {
+		"sprint": SprintState.sprint_number,
+		"plannedPoints": int(feature.get("costPoints", 1)),
+		"capacity": int(feature.get("costPoints", 1)),
+		"delivered": [feature],
+	}
+	SprintState.apply_pending_and_check()
+	if int(SprintState.last_score_report.get("global", {}).get("impact", -1)) != 0:
+		_fail("Le sprint de remise à plat doit neutraliser toute Traction, même avec une livraison réelle.")
+	if SprintState.cleanup_sprint_pending:
+		_fail("cleanup_sprint_pending doit être consommé après la Résolution qui suit l'achat.")
+
+	# 🤝 Rachat d'un concurrent : des abonnements repris (base récurrente,
+	# immédiate), +1 employé immédiat, +8 Dette en attente de Résolution.
+	SprintState.reset_run("agile-transformation", "karavel-scaleup")
+	var roster_before := SprintState.get_roster().size()
+	var clients_before := SprintState.get_client_total()
+	SprintState.impact_wallet = 0
+	if SprintState.buy_competitor_acquisition() != "impact":
+		_fail("Sans budget, le rachat d'un concurrent doit refuser 'impact'.")
+	SprintState.impact_wallet = 2000
+	if SprintState.buy_competitor_acquisition() != "":
+		_fail("Avec budget, le rachat d'un concurrent doit être accepté.")
+	var acquired := SprintState.clients_for_points(float(SprintState.find_investment_item("acquire-competitor").get("clientsGained", 7)))
+	if not is_equal_approx(SprintState.get_client_total(), clients_before + acquired):
+		_fail("Le rachat d'un concurrent doit faire entrer %d clients immédiatement." % int(round(acquired)))
+	if SprintState.get_roster().size() != roster_before + 1:
+		_fail("Le rachat d'un concurrent doit ajouter un employé au roster immédiatement.")
+	if int(SprintState.pending_deltas.get("dette-organisationnelle", 0.0)) != 8:
+		_fail("Le rachat d'un concurrent doit poser +8 de Dette en attente de Résolution.")
+
+	# 🎯 Chasseur de têtes : le prochain étal force au moins 4 candidats,
+	# traits cachés révélés — puis se consomme.
+	SprintState.reset_run("agile-transformation", "karavel-scaleup")
+	SprintState.impact_wallet = 0
+	if SprintState.buy_headhunter() != "impact":
+		_fail("Sans budget, le chasseur de têtes doit refuser 'impact'.")
+	SprintState.impact_wallet = 2000
+	if SprintState.buy_headhunter() != "":
+		_fail("Avec budget, le chasseur de têtes doit être accepté.")
+	var offer := SprintState.get_shop_offer()
+	var forced_candidates: Array = offer.get("candidates", [])
+	if forced_candidates.size() < 4:
+		_fail("Le chasseur de têtes doit forcer au moins 4 candidats au prochain étal (obtenu %d)." % forced_candidates.size())
+	for candidate in forced_candidates:
+		if not bool(candidate.get("hiddenRevealed", false)):
+			_fail("Le chasseur de têtes doit révéler le trait caché de chaque candidat forcé.")
+	if SprintState.headhunter_pending:
+		_fail("Le pari du chasseur de têtes doit se consommer dès le premier tirage d'étal.")
+
+	# 🏛️ Plan de redressement : rattrapage automatique d'un quota manqué,
+	# consommé une seule fois.
+	SprintState.reset_run("agile-transformation", "karavel-scaleup")
+	SprintState.impact_wallet = 0
+	if SprintState.buy_turnaround_plan() != "impact":
+		_fail("Sans budget, le plan de redressement doit refuser 'impact'.")
+	SprintState.impact_wallet = 2000
+	if SprintState.buy_turnaround_plan() != "":
+		_fail("Avec budget, le plan de redressement doit être accepté.")
+	SprintState.quarter_sprint = SprintState.get_quarter_length() - 1
+	SprintState.impact_wallet = 0
+	SprintState.last_score_report = {"global": {"impact": 0}}
+	SprintState._record_quarter_resolution()
+	if not bool(SprintState.quarter_result.get("passed", false)) or not bool(SprintState.quarter_result.get("turnaroundUsed", false)):
+		_fail("Un plan de redressement acheté doit rattraper automatiquement un quota manqué (0 très sous le quota T1).")
+	if SprintState.turnaround_plans_available != 0:
+		_fail("Le plan de redressement doit être consommé après avoir servi.")
+
+	# 🎲 Avance sur trimestre : le seul poste qui vend de l'Impact contre du
+	# Revenue. Les deux sens comptent — le cash monte ET le portefeuille
+	# descend, y compris sous zéro (une bourse vide n'est pas une défaite).
+	SprintState.reset_run("agile-transformation", "karavel-scaleup")
+	var advance: Dictionary = SprintState.find_investment_item("quarter-advance")
+	var advance_gain := int(advance.get("revenueGain", 26))
+	var advance_penalty := int(advance.get("impactPenalty", 95))
+	SprintState.impact_wallet = 10
+	var revenue_before_advance := SprintState.revenue
+	SprintState.buy_quarter_advance()
+	if not is_equal_approx(SprintState.revenue, revenue_before_advance + float(advance_gain)):
+		_fail("L'avance sur trimestre doit verser +%d de Revenue immédiatement." % advance_gain)
+	if SprintState.impact_wallet != 10 - advance_penalty:
+		_fail("L'avance sur trimestre doit débiter %d sur le portefeuille, y compris sous zéro (obtenu %d)." % [
+			advance_penalty, SprintState.impact_wallet
+		])
+
+
+## Lot 4 (spec §9.4) : les équipes subies sont fixées par l'entreprise,
+## jamais pilotables, transmises au score et à l'éligibilité des événements
+## Inbox ; plus le Compendium des synergies (spec §12.1), qui ne fait que
+## lire un rapport déjà résolu.
+func _test_support_teams_and_compendium_lot4() -> void:
+	print("=== SMOKE TEST LOGIQUE — LOT 4 : EQUIPES SUBIES ET COMPENDIUM ===")
+
+	# Comme au §29 du carnet : board-injunction (1/8 des exigences T1) peut
+	# forcer dès reset_run() une stratégie qui porte elle-même un effet de
+	# bord sur les équipes subies (ex. "arrêter de communiquer" -> PMM -1).
+	# On vérifie donc la déclaration brute de companies.json — jamais mutée
+	# en jeu — puis on réaligne SprintState.support_teams dessus avant de
+	# tester ce qui en dépend, pour ne jamais dépendre de ce tirage.
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+	var meridia_declared: Dictionary = SprintState.get_company().get("supportTeams", {})
+	if meridia_declared != {"sales": 4.0, "pmm": 2.0, "csm": 3.0}:
+		_fail("Meridia doit déclarer les équipes subies Sales 4 / PMM 2 / CSM 3 dans companies.json.")
+	SprintState.support_teams = meridia_declared.duplicate()
+	var meridia_snapshot := SprintState._build_score_snapshot()
+	if meridia_snapshot.get("support_teams", {}) != SprintState.support_teams:
+		_fail("Le snapshot de score doit transmettre support_teams tel quel — c'est ce qui débloquait le critère de recette de l'issue #17.")
+
+	SprintState.reset_run("agile-transformation", "karavel-scaleup")
+	var karavel_declared: Dictionary = SprintState.get_company().get("supportTeams", {})
+	if karavel_declared != {"sales": 2.0, "pmm": 4.0, "csm": 1.0}:
+		_fail("Karavel doit déclarer les équipes subies Sales 2 / PMM 4 / CSM 1 dans companies.json.")
+	SprintState.support_teams = karavel_declared.duplicate()
+
+	# Un niveau bas génère des crises, un niveau haut de la pression — jamais
+	# l'inverse (spec §9.4). On force les deux extrêmes sans passer par une
+	# entreprise réelle, pour ne dépendre d'aucun tirage.
+	SprintState.support_teams["sales"] = 0
+	var low_sales_ids: Array = []
+	for event in SprintState._eligible_inbox_events():
+		low_sales_ids.append(event.get("id", ""))
+	if not low_sales_ids.has("sales-deal-bloque") or low_sales_ids.has("sales-survente"):
+		_fail("Sales niveau 0 doit rendre éligible l'événement de crise, jamais celui de pression.")
+	SprintState.support_teams["sales"] = 5
+	var high_sales_ids: Array = []
+	for event in SprintState._eligible_inbox_events():
+		high_sales_ids.append(event.get("id", ""))
+	if not high_sales_ids.has("sales-survente") or high_sales_ids.has("sales-deal-bloque"):
+		_fail("Sales niveau 5 doit rendre éligible l'événement de pression, jamais celui de crise.")
+
+	# Effet de bord déclaratif d'une décision stratégique (dernier tiers du
+	# §9.4) : Open source -> PMM +1 / Sales -1. On ne les pilote toujours
+	# pas — la décision change le monde autour d'elles. On repart d'un
+	# support_teams et d'un chosen_strategy_ids remis à zéro explicitement :
+	# sans ça, une injonction du board qui aurait déjà choisi (et appliqué)
+	# open-source à ce même reset_run() ferait rejouer son effet une
+	# deuxième fois et fausserait la comparaison avant/après.
+	SprintState.reset_run("agile-transformation", "karavel-scaleup")
+	SprintState.support_teams = SprintState.get_company().get("supportTeams", {}).duplicate()
+	SprintState.chosen_strategy_ids.clear()
+	SprintState.quarter_strategy_chosen = false
+	SprintState.quarter_forced_strategy_id = ""
+	SprintState.quarter_strategy_chosen = false
+	var pmm_before := int(SprintState.support_teams.get("pmm", 3))
+	var sales_before := int(SprintState.support_teams.get("sales", 3))
+	if SprintState.choose_strategy("open-source") != "":
+		_fail("La stratégie open-source doit pouvoir être choisie dans ce test isolé.")
+	if int(SprintState.support_teams.get("pmm", 3)) != pmm_before + 1:
+		_fail("Open source doit faire +1 PMM en effet de bord (spec §9.4).")
+	if int(SprintState.support_teams.get("sales", 3)) != sales_before - 1:
+		_fail("Open source doit faire -1 Sales en effet de bord (spec §9.4).")
+
+	# 🧩 Compendium des synergies : la détection lit un rapport déjà résolu,
+	# elle ne retente aucune condition.
+	PlayerProfile.clear_all()
+	var catalog := PlayerProfile.get_combo_catalog()
+	if catalog.size() != 15:
+		_fail("Le Compendium doit lister exactement 15 combos (8 composition + 5 main + 2 inter-squad), obtenu %d." % catalog.size())
+	for entry in catalog:
+		if entry.get("discovered", false):
+			_fail("Un profil vidé ne doit révéler aucun combo au départ.")
+	var fake_report := {"squads": [{"lines": [{"icon": "🔺", "label": "Trio produit"}]}], "global": {"lines": []}}
+	PlayerProfile.record_score_report(fake_report)
+	if not PlayerProfile.is_combo_discovered("trio-produit"):
+		_fail("Une ligne de rapport correspondant à un combo doit le marquer découvert dans le Compendium.")
+	if PlayerProfile.is_combo_discovered("chaos-organise"):
+		_fail("Un combo absent du rapport ne doit pas être marqué découvert.")
+	PlayerProfile.clear_all()
+
+
+## Lot 5, palier 1 : déblocage strict (spec §13.4). Un profil neuf ne débloque
+## rien tout seul ; reset_run() retombe sur "pm" tant que le niveau demandé
+## n'est pas gagné, et les tables (slots, quotas) suivent bien career_level.
+func _test_career_progression_lot5() -> void:
+	print("=== SMOKE TEST LOGIQUE — LOT 5 : PROGRESSION DE CARRIERE ===")
+	PlayerProfile.clear_all()
+	if PlayerProfile.is_career_level_unlocked("lead-pm"):
+		_fail("Un profil neuf ne doit débloquer que 'pm'.")
+
+	SprintState.reset_run("agile-transformation", "meridia-corp", "lead-pm")
+	if SprintState.career_level != "pm" or SprintState.squads.size() != 1:
+		_fail("Un niveau non débloqué doit retomber silencieusement sur 'pm' à 1 équipe (obtenu '%s', %d équipe(s))." % [SprintState.career_level, SprintState.squads.size()])
+
+	PlayerProfile.unlock_career_level("lead-pm")
+	PlayerProfile.unlock_career_level("lead-pm")  # idempotent
+	if PlayerProfile.get_unlocked_career_levels().count("lead-pm") != 1:
+		_fail("Débloquer deux fois le même niveau ne doit pas dupliquer l'entrée.")
+
+	SprintState.reset_run("agile-transformation", "meridia-corp", "lead-pm")
+	var expected_squads := int(GameData.careers.get("levels", {}).get("lead-pm", {}).get("squadsMin", 0))
+	if SprintState.career_level != "lead-pm" or SprintState.squads.size() != expected_squads:
+		_fail("Un niveau débloqué doit être adopté par reset_run() avec le nombre d'équipes de careers.json (attendu %d, obtenu %d)." % [expected_squads, SprintState.squads.size()])
+	if SprintState.get_tool_slot_base() != int(GameData.balance.get("toolSlots", {}).get("careerLevels", {}).get("lead-pm", {}).get("base", -1)):
+		_fail("get_tool_slot_base() doit suivre career_level, pas rester bloqué sur 'pm'.")
+
+	# Neutralise l'exigence trimestrielle tirée par reset_run() : elle peut
+	# porter un quotaMultiplier/quarterLength aléatoire (ex. "trimestre
+	# court") qui rendrait cette assertion flaky — même piège que documenté
+	# au carnet §29.
+	SprintState.quarter_requirement_ids = []
+	SprintState.quarter_requirement_id = ""
+	SprintState.chosen_strategy_ids.clear()
+	SprintState.quarter_strategy_chosen = false
+	SprintState.quarter_forced_strategy_id = ""
+	var expected_quota := int(GameData.quotas.get("careerLevels", {}).get("lead-pm", {}).get("quarterQuotas", [])[0])
+	if SprintState.get_current_quota() != expected_quota:
+		_fail("get_current_quota() doit lire la table 'lead-pm' de quotas.json (attendu %d, obtenu %d)." % [expected_quota, SprintState.get_current_quota()])
+
+	# 🌍 Expansion internationale a DEUX consequences opposees : chaque client
+	# paie plus, et le quota monte. Tester une seule des deux ne distingue pas
+	# une indexation correcte d'un simple bonus (CLAUDE.md — une regle a double
+	# consequence se teste dans les deux sens).
+	var price_before := SprintState.resolved_segment_price(SprintState.get_segments()[0].get("id", ""))
+	SprintState.quarter_strategy_chosen = false
+	if SprintState.choose_strategy("expansion-internationale") != "":
+		_fail("Expansion internationale doit pouvoir etre choisie au T1.")
+	var expansion: Dictionary = GameData.scoring.get("global", {}).get("strategies", {}).get("expansion-internationale", {})
+	if SprintState.get_current_quota() != int(round(expected_quota * float(expansion.get("quotaMultiplier", 1.0)))):
+		_fail("Expansion internationale doit relever le quota de %s (attendu %d, obtenu %d)." % [
+			expansion.get("quotaMultiplier", 1.0), int(round(expected_quota * float(expansion.get("quotaMultiplier", 1.0)))), SprintState.get_current_quota()])
+	if SprintState.get_client_revenue() <= 0.0:
+		_fail("Le test d'Expansion internationale a besoin d'une population qui paie.")
+	var price_after := SprintState.resolved_segment_price(SprintState.get_segments()[0].get("id", ""))
+	if not is_equal_approx(price_after, price_before * float(expansion.get("priceMultiplier", 1.0))):
+		_fail("Expansion internationale doit aussi faire monter le prix par client (attendu %s, obtenu %s)." % [
+			price_before * float(expansion.get("priceMultiplier", 1.0)), price_after])
+	# Le vrai piege : monter le prix ET le quota du meme facteur ne serait
+	# qu'une inflation. Le quota monte de 20 %, le prix de 25 % — le pari est
+	# que la difference paie l'ecart.
+	if is_equal_approx(float(expansion.get("priceMultiplier", 1.0)), float(expansion.get("quotaMultiplier", 1.0))):
+		_fail("Un prix et un quota indexes du meme facteur ne changent rien : ce serait une inflation pure.")
+
+	# Franchir le 4e trimestre débloque le niveau suivant, quel que soit le
+	# choix ensuite (spec §13.4 : "un mandat complet en 4 trimestres").
+	SprintState.quarter_index = 4
+	SprintState.long_mandate = false
+	SprintState.impact_wallet = SprintState.get_current_quota()
+	SprintState.quarter_sprint = SprintState.get_quarter_length() - 1
+	SprintState._record_quarter_resolution()
+	if not SprintState.quarter_exit_choice_pending:
+		_fail("Un T4 réussi doit ouvrir le choix de sortie/mandat long.")
+	if SprintState.newly_unlocked_career_level != "director" or not PlayerProfile.is_career_level_unlocked("director"):
+		_fail("Franchir le T4 en 'lead-pm' doit débloquer 'director'.")
+
+	PlayerProfile.clear_all()
+
+
+## Lot 5, palier 2 : backlog et capacité séparés par équipe (spec §13.2) —
+## aucun transfert de points, et le recrutement sans équipe explicite
+## équilibre plutôt que d'empiler sur l'équipe historique.
+func _test_multi_squad_backlog_isolation_lot5() -> void:
+	print("=== SMOKE TEST LOGIQUE — LOT 5 : BACKLOG PAR EQUIPE ===")
+	PlayerProfile.clear_all()
+	PlayerProfile.unlock_career_level("lead-pm")
+	SprintState.reset_run("agile-transformation", "meridia-corp", "lead-pm")
+	if SprintState.squads.size() < 2:
+		_fail("Ce test suppose au moins 2 équipes (niveau lead-pm).")
+		return
+	# Neutralise l'exigence trimestrielle tirée par reset_run() : "Gel des
+	# embauches" (1/8) refuserait les deux embauches ci-dessous une fois sur
+	# huit — même piège de flaky documenté au carnet §29.
+	SprintState.quarter_requirement_ids = []
+	SprintState.quarter_requirement_id = ""
+
+	var primary_id: String = SprintState.get_primary_squad().get("id", "")
+	var squad_b_id: String = SprintState.squads[1].get("id", "")
+	var primary_count_before: int = SprintState.get_primary_squad().get("roster", []).size()
+
+	var candidate: Dictionary = GameData.candidates[0].duplicate()
+	candidate["id"] = "test-lot5-squad-b-hire"
+	SprintState.impact_wallet = 2000
+	if SprintState.hire_candidate(candidate, squad_b_id) != "":
+		_fail("L'embauche ciblée sur une équipe précise a été refusée.")
+	if SprintState.squads[1].get("roster", []).size() != 1 or SprintState.get_primary_squad().get("roster", []).size() != primary_count_before:
+		_fail("hire_candidate(target_squad_id) doit faire atterrir la recrue dans l'équipe ciblée, sans toucher aux autres.")
+
+	var candidate2: Dictionary = GameData.candidates[1].duplicate() if GameData.candidates.size() > 1 else GameData.candidates[0].duplicate()
+	candidate2["id"] = "test-lot5-auto-balance-hire"
+	SprintState.hire_candidate(candidate2)  # sans cible : doit rejoindre l'équipe la moins fournie
+	if SprintState.get_primary_squad().get("roster", []).size() != primary_count_before:
+		_fail("Une embauche sans équipe ciblée ne doit jamais atterrir sur l'équipe historique tant qu'une autre équipe est moins fournie.")
+
+	# Isolation du backlog : un ticket livré par l'équipe B ne doit apparaître
+	# ni dans les compteurs globaux de l'équipe historique, ni bloquer un
+	# futur tirage de celle-ci sur le même id.
+	var squad_b: Dictionary = SprintState._find_squad(squad_b_id)
+	squad_b["roster"] = [{
+		"id": "test-lot5-dev-b", "name": "Dev Test B", "role": "dev", "seniority": "junior",
+		"salary": 1, "trait": "", "hidden_trait": "", "hiddenRevealed": true, "hiredSprint": 1,
+	}]
+	# Le tirage mélange features et epics ; ne trouver aucune feature simple
+	# parmi 4-5 tickets tirés sur 18 features + 4 epics est possible mais
+	# infinitésimal (~1/8000) — quelques retirages (nouveau sprint, donc
+	# nouveau tirage) éliminent ce risque de flaky sans jamais fausser le test.
+	var feature_b: Dictionary = {}
+	var draw_attempts := 0
+	while feature_b.is_empty() and draw_attempts < 5:
+		draw_attempts += 1
+		SprintState.sprint_number = draw_attempts
+		squad_b["backlog_draw"] = {}
+		var offer_b := SprintState.get_backlog_offer_for_squad(squad_b_id)
+		for item in offer_b.get("items", []):
+			if not SprintState.is_backlog_epic(item):
+				feature_b = item
+				break
+	if feature_b.is_empty():
+		_fail("Le tirage de l'équipe B n'a proposé aucune feature simple à livrer après plusieurs essais.")
+		return
+	var report_b := SprintState.commit_backlog_plan_for_squad(squad_b_id, [{"id": feature_b.get("id", ""), "points": feature_b.get("costPoints", 0)}])
+	if report_b.get("delivered", []).is_empty():
+		_fail("commit_backlog_plan_for_squad() doit livrer la feature planifiée.")
+	if SprintState.completed_backlog_ids.has(feature_b.get("id", "")):
+		_fail("Une livraison de l'équipe B ne doit jamais toucher completed_backlog_ids (le compteur de l'équipe historique).")
+	if not squad_b.get("completed_ids", []).has(feature_b.get("id", "")):
+		_fail("L'équipe B doit garder trace de sa propre livraison dans son completed_ids propre.")
+
+	var total_capacity := SprintState.get_effective_capacity()
+	var summed_capacity := 0
+	for squad in SprintState.squads:
+		summed_capacity += int(squad.get("capacity", 0))
+	if total_capacity != summed_capacity:
+		_fail("get_effective_capacity() doit rester la somme exacte des capacités par équipe (%d != %d)." % [total_capacity, summed_capacity])
+
+	PlayerProfile.clear_all()
+
+
+## Lot 5, palier 2 : les deux combos inter-squads n'existent qu'à N >= 3 et
+## doivent être réellement atteignables — composition forcée pour ne dépendre
+## d'aucun tirage (même principe que _test_multi_squad_roster : on fabrique
+## le roster à la main plutôt que de jouer un recrutement aléatoire).
+func _test_inter_squad_combos_reachable_lot5() -> void:
+	print("=== SMOKE TEST LOGIQUE — LOT 5 : COMBOS INTER-SQUADS ===")
+	PlayerProfile.clear_all()
+	PlayerProfile.unlock_career_level("lead-pm")
+	PlayerProfile.unlock_career_level("director")
+	SprintState.reset_run("agile-transformation", "meridia-corp", "director")
+	if SprintState.squads.size() < 5:
+		_fail("Ce test suppose au moins 5 équipes (niveau director).")
+		return
+
+	# 🏛️ Standardisation : 3 équipes partagent la même composition (1 dev).
+	for squad_index in range(3):
+		SprintState.squads[squad_index]["roster"] = [{
+			"id": "test-lot5-std-%d" % squad_index, "name": "Standard %d" % squad_index, "role": "dev",
+			"seniority": "junior", "salary": 1, "trait": "", "hidden_trait": "", "hiddenRevealed": true, "hiredSprint": 1,
+		}]
+	for squad_index in range(3, SprintState.squads.size()):
+		SprintState.squads[squad_index]["roster"] = [{
+			"id": "test-lot5-diff-%d" % squad_index, "name": "Autre %d" % squad_index, "role": "designer",
+			"seniority": "junior", "salary": 1, "trait": "", "hidden_trait": "", "hiddenRevealed": true, "hiredSprint": 1,
+		}]
+	var standard_report := ScoreResolver.resolve(SprintState._build_score_snapshot(), {
+		"scoring": GameData.scoring, "hidden_traits": GameData.hidden_traits, "cards": GameData.cards,
+	})
+	if not _has_global_line(standard_report, "Standardisation"):
+		_fail("3 équipes de même composition doivent déclencher 🏛️ Standardisation au niveau global.")
+
+	# 🌀 Chaos organisé : les 5 équipes ont chacune une composition différente.
+	var roles := ["dev", "designer", "pm", "ops"]
+	for squad_index in range(SprintState.squads.size()):
+		var role_id: String = roles[squad_index % roles.size()]
+		var count: int = 1 + (squad_index / roles.size())
+		var roster: Array = []
+		for member_index in range(count):
+			roster.append({
+				"id": "test-lot5-chaos-%d-%d" % [squad_index, member_index], "name": "Chaos %d.%d" % [squad_index, member_index],
+				"role": role_id, "seniority": "junior", "salary": 1, "trait": "", "hidden_trait": "", "hiddenRevealed": true, "hiredSprint": 1,
+			})
+		SprintState.squads[squad_index]["roster"] = roster
+	SprintState.activated_cards.clear()
+	var chaos_report := ScoreResolver.resolve(SprintState._build_score_snapshot(), {
+		"scoring": GameData.scoring, "hidden_traits": GameData.hidden_traits, "cards": GameData.cards,
+	})
+	if not _has_global_line(chaos_report, "Chaos organisé"):
+		_fail("5 équipes de composition toutes différentes doivent déclencher 🌀 Chaos organisé au niveau global.")
+
+	PlayerProfile.clear_all()
+
+
+func _has_global_line(report: Dictionary, label_prefix: String) -> bool:
+	for line in report.get("global", {}).get("lines", []):
+		if String(line.get("label", "")).begins_with(label_prefix):
+			return true
+	return false
+
+
+## Le run à N>1 explicitement demandé par l'issue #18 : un mandat complet
+## joué à N=2 (lead-pm), chaque équipe planifiant et livrant sur son propre
+## backlog, résolu par le même apply_pending_and_check() qu'à N=1.
+func _test_multi_squad_mandate_playthrough_lot5() -> void:
+	print("=== SMOKE TEST LOGIQUE — LOT 5 : MANDAT A N>1 (LEAD-PM) ===")
+	PlayerProfile.clear_all()
+	PlayerProfile.unlock_career_level("lead-pm")
+	SprintState.reset_run("agile-transformation", "karavel-scaleup", "lead-pm")
+	if SprintState.squads.size() < 2:
+		_fail("Ce test suppose au moins 2 équipes (niveau lead-pm).")
+		return
+
+	var squad_b: Dictionary = SprintState.squads[1]
+	squad_b["roster"] = [
+		{"id": "test-lot5-mandate-dev-1", "name": "Dev Mandat 1", "role": "dev", "seniority": "junior", "salary": 1, "trait": "", "hidden_trait": "", "hiddenRevealed": true, "hiredSprint": 1},
+		{"id": "test-lot5-mandate-dev-2", "name": "Dev Mandat 2", "role": "dev", "seniority": "junior", "salary": 1, "trait": "", "hidden_trait": "", "hiddenRevealed": true, "hiredSprint": 1},
+	]
+	var squad_ids: Array = []
+	for squad in SprintState.squads:
+		squad_ids.append(squad.get("id", ""))
+
+	var sprint_count := 0
+	while not SprintState.is_mandate_over and sprint_count < 30:
+		sprint_count += 1
+		for squad_id in squad_ids:
+			_commit_greedy_plan_for_squad_lot5(squad_id)
+		var ending := SprintState.apply_pending_and_check()
+		if SprintState.quarter_exit_choice_pending:
+			SprintState.choose_mandate_path(false)
+		if ending == "":
+			SprintState.sprint_number += 1
+
+	if not SprintState.is_mandate_over:
+		_fail("Le mandat multi-équipe (lead-pm) n'a jamais atteint de fin après 30 sprints.")
+
+	for resource_id in SprintState.resource_values.keys():
+		var value: float = SprintState.resource_values[resource_id]
+		if value < -0.001 or value > 100.001:
+			_fail("Ressource %s hors bornes en mandat multi-équipe : %f" % [resource_id, value])
+
+	if SprintState.last_score_report.get("squads", []).size() != SprintState.squads.size():
+		_fail("Le rapport de score doit produire un sous-total par équipe même à N>1 (obtenu %d sous-totaux pour %d équipes)." % [
+			SprintState.last_score_report.get("squads", []).size(), SprintState.squads.size()
+		])
+	print("  → mandat lead-pm terminé au sprint %d, fin='%s'%s" % [
+		SprintState.sprint_number, SprintState.ending_id,
+		" — director débloqué" if PlayerProfile.is_career_level_unlocked("director") else ""
+	])
+
+	PlayerProfile.clear_all()
+
+
+## Planification gourmande minimale pour un test à N>1 : remplit la capacité
+## de l'équipe sans la dépasser, uniquement des features simples (pas
+## d'epic — hors du périmètre de ce test). Équipe historique = chemin
+## historique inchangé ; les autres passent par le chemin par équipe.
+func _commit_greedy_plan_for_squad_lot5(squad_id: String) -> void:
+	var capacity := SprintState.get_squad_capacity(squad_id)
+	var is_primary: bool = squad_id == SprintState.get_primary_squad().get("id", "")
+	var offer: Dictionary = SprintState.get_backlog_offer() if is_primary else SprintState.get_backlog_offer_for_squad(squad_id)
+	var plan: Array = []
+	var used := 0
+	for item in offer.get("items", []):
+		if SprintState.is_backlog_epic(item):
+			continue
+		var points: int = int(item.get("costPoints", 0))
+		if used + points <= capacity:
+			plan.append({"id": item.get("id", ""), "points": points})
+			used += points
+	if is_primary:
+		SprintState.commit_backlog_plan(plan)
+	else:
+		SprintState.commit_backlog_plan_for_squad(squad_id, plan)
+
+
+func _offer_has_item(items: Array, item_id: String) -> bool:
+	for item in items:
+		if item.get("id", "") == item_id:
+			return true
+	return false
+
+
+## Vérifications déterministes du tirage des Investissements (carnet §21) :
+## les grandes décisions sont tirées comme le reste de l'offre, une carte
+## activée ne revient jamais, et le re-tirage se paie de plus en plus cher.
+func _test_investment_draw_rules() -> void:
+	print("=== SMOKE TEST LOGIQUE — TIRAGE DES INVESTISSEMENTS ===")
+	var draw_conf: Dictionary = GameData.balance.get("shopDraw", {})
+	var reroll_conf: Dictionary = draw_conf.get("reroll", {})
+	var base_cost := int(reroll_conf.get("baseCost", 1))
+	var increment := int(reroll_conf.get("costIncrement", 1))
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+	# Isole les activations de décision du tirage aléatoire d'exigence (§21) —
+	# sinon un "Outillage gelé" tiré par malchance refuse toute activation et
+	# rend ce test friable, comme _test_score_resolution_integration le fait déjà.
+	SprintState.quarter_requirement_ids = ["hiring-freeze"]
+	SprintState.quarter_requirement_id = "hiring-freeze"
+
+	var offer := SprintState.get_shop_offer()
+	var decisions: Array = offer.get("decisions", [])
+	if decisions.is_empty():
+		_fail("L'offre du sprint 1 ne propose aucune grande décision.")
+	if _has_duplicate(decisions):
+		_fail("L'offre propose deux fois la même grande décision : %s." % [decisions])
+	if SprintState.get_shop_offer().get("decisions", []) != decisions:
+		_fail("Le rayon des décisions a été re-tiré en revisitant l'écran.")
+
+	# Le prix du re-tirage part de sa base et monte à chaque usage du sprint.
+	if SprintState.shop_reroll_cost() != base_cost:
+		_fail("Premier re-tirage à %d 💥 au lieu de %d." % [SprintState.shop_reroll_cost(), base_cost])
+	SprintState.impact_wallet = 200
+	var wallet_before := SprintState.impact_wallet
+	if SprintState.reroll_shop_offer() != "":
+		_fail("Re-tirage refusé alors que l'Impact suffit.")
+	if SprintState.impact_wallet != wallet_before - base_cost:
+		_fail("Le re-tirage a coûté %d 💥 au lieu de %d." % [wallet_before - SprintState.impact_wallet, base_cost])
+	if SprintState.shop_reroll_cost() != base_cost + increment:
+		_fail("Deuxième re-tirage à %d 💥 au lieu de %d." % [SprintState.shop_reroll_cost(), base_cost + increment])
+	SprintState.reroll_shop_offer()
+	if SprintState.shop_reroll_cost() != base_cost + 2 * increment:
+		_fail("Troisième re-tirage à %d 💥 au lieu de %d." % [SprintState.shop_reroll_cost(), base_cost + 2 * increment])
+
+	# À sec, on ne re-tire pas.
+	SprintState.impact_wallet = 0
+	if SprintState.reroll_shop_offer() != "impact":
+		_fail("Re-tirage accepté sans Impact.")
+
+	# Le prix repart à sa base au sprint suivant.
+	SprintState.sprint_number += 1
+	if SprintState.shop_reroll_cost() != base_cost:
+		_fail("Le prix du re-tirage n'est pas reparti à %d au sprint suivant (%d)." % [base_cost, SprintState.shop_reroll_cost()])
+
+	# Une grande décision se paie comme le reste du rayon.
+	var priced_id: String = SprintState.get_shop_offer().get("decisions", [""])[0]
+	var price := SprintState.decision_cost(priced_id)
+	if price <= 0:
+		_fail("La décision « %s » ne coûte rien — elle est hors du modèle du shop." % priced_id)
+	SprintState.impact_wallet = max(0, price - 1)
+	if SprintState.activate_decision(priced_id) != "impact":
+		_fail("« %s » s'est activée avec %d 💥 pour un prix de %d." % [priced_id, SprintState.impact_wallet, price])
+	if SprintState.activated_cards.has(priced_id):
+		_fail("« %s » a été marquée activée malgré le refus pour Impact insuffisant." % priced_id)
+
+	# Une décision activée sort du tirage : elle ne doit plus jamais reparaître.
+	SprintState.impact_wallet = 500
+	var activated_id: String = SprintState.get_shop_offer().get("decisions", [""])[0]
+	var wallet_at_activation := SprintState.impact_wallet
+	var activation_cost := SprintState.decision_cost(activated_id)
+	if SprintState.activate_decision(activated_id) != "":
+		_fail("Activation refusée pour « %s » alors qu'un slot est libre." % activated_id)
+	if SprintState.impact_wallet != wallet_at_activation - activation_cost:
+		_fail("L'activation de « %s » a coûté %d 💥 au lieu de %d." % [
+			activated_id, wallet_at_activation - SprintState.impact_wallet, activation_cost])
+	for sprint in range(30):
+		SprintState.sprint_number += 1
+		if SprintState.get_shop_offer().get("decisions", []).has(activated_id):
+			_fail("La décision activée « %s » est ressortie au tirage du sprint %d." % [activated_id, SprintState.sprint_number])
+			break
+
+	_test_mixed_shelf()
+	_test_rarity_weights()
+	_test_reservation()
+	_test_gated_card_lease()
+
+	print("Tirage des Investissements : OK (%d emplacements par sprint, re-tirage %d 💥 +%d)" % [
+		int(draw_conf.get("slotsPerSprint", 6)), base_cost, increment])
+
+
+## Le rayon unique : les trois types se partagent `slotsPerSprint`
+## emplacements, avec un minimum garanti par type. C'est le garde-fou qui
+## empêche un sprint entièrement inutile — et la seule entorse au hasard pur.
+func _test_mixed_shelf() -> void:
+	var conf: Dictionary = GameData.balance.get("shopDraw", {})
+	var total := int(conf.get("slotsPerSprint", 6))
+	var guaranteed: Dictionary = conf.get("guaranteedPerSprint", {})
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+
+	var seen_mix := {}
+	for sprint in range(200):
+		SprintState.sprint_number = sprint + 1
+		var offer := SprintState.get_shop_offer()
+		var slots: Array = offer.get("slots", [])
+		if slots.size() != total:
+			_fail("Le rayon propose %d emplacements au lieu de %d au sprint %d." % [
+				slots.size(), total, SprintState.sprint_number])
+			return
+
+		var counts := {"candidate": 0, "practice": 0, "decision": 0}
+		for slot in slots:
+			counts[slot.get("kind", "")] = int(counts.get(slot.get("kind", ""), 0)) + 1
+		for kind in counts.keys():
+			if counts[kind] < int(guaranteed.get(kind, 0)):
+				_fail("Minimum garanti non tenu au sprint %d : %d %s pour %d attendu(s)." % [
+					SprintState.sprint_number, counts[kind], kind, int(guaranteed.get(kind, 0))])
+				return
+
+		# Les trois listes par type doivent rester le reflet exact des slots.
+		if offer.get("candidates", []).size() != counts["candidate"] \
+				or offer.get("practices", []).size() != counts["practice"] \
+				or offer.get("decisions", []).size() != counts["decision"]:
+			_fail("Les listes par type ne correspondent pas aux emplacements au sprint %d." % SprintState.sprint_number)
+			return
+
+		seen_mix["%d-%d-%d" % [counts["candidate"], counts["practice"], counts["decision"]]] = true
+
+	# Le mélange doit vraiment varier : si un seul dosage sort sur 200 sprints,
+	# le "hasard entre types" n'en est pas un.
+	if seen_mix.size() < 4:
+		_fail("Seulement %d dosages de rayon différents sur 200 sprints — le tirage entre types ne varie pas assez." % seen_mix.size())
+	print("  dosages de rayon observés sur 200 sprints (candidats-pratiques-décisions) : %d combinaisons" % seen_mix.size())
+
+
+## Les taux d'apparition : une carte `rare` doit sortir nettement moins souvent
+## qu'une `commune`, et le coefficient d'époque doit peser. Test statistique —
+## la marge est large exprès, il vérifie un ordre de grandeur, pas une valeur.
+func _test_rarity_weights() -> void:
+	# Karavel (pas Meridia) : Meridia hérite de Jira dès le départ (§7.1.3),
+	# qui ne rejoint donc plus jamais le tirage — ce test mesure justement la
+	# fréquence de sortie de Jira, il lui faut une entreprise qui ne l'a pas déjà.
+	SprintState.reset_run("agile-transformation", "karavel-scaleup")
+	var weights: Dictionary = GameData.balance.get("shopDraw", {}).get("rarityWeights", {})
+
+	var counts: Dictionary = {}
+	for sprint in range(600):
+		SprintState.sprint_number = sprint + 1
+		for card_id in SprintState.get_shop_offer().get("decisions", []):
+			counts[card_id] = int(counts.get(card_id, 0)) + 1
+
+	# rice (commune, poids 100) contre shape-up (rare, poids 12).
+	var commune := int(counts.get("rice", 0))
+	var rare := int(counts.get("shape-up", 0))
+	if commune <= rare:
+		_fail("La carte rare « shape-up » (%d sorties) n'est pas plus rare que « rice » (%d) sur 600 sprints." % [rare, commune])
+	if rare == 0:
+		_fail("La carte rare « shape-up » n'est jamais sortie sur 600 sprints — poids nul ?")
+
+	# jira est `notable` (poids 40) mais double son poids en Transformation
+	# agile (eraWeights) : il doit sortir plus qu'une notable sans coefficient.
+	if int(counts.get("jira", 0)) <= int(counts.get("sprint-retro", 0)):
+		_fail("Le coefficient d'époque de « jira » (%d sorties) ne pèse pas face à « sprint-retro » (%d)." % [
+			int(counts.get("jira", 0)), int(counts.get("sprint-retro", 0))])
+	print("  taux observés sur 600 sprints (poids %s) : %s" % [weights, counts])
+
+
+## 📌 Réserver : l'Actif punaisé traverse un re-tirage et le sprint suivant,
+## puis la punaise tombe. Décoller rembourse l'Impact.
+func _test_reservation() -> void:
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+	SprintState.impact_wallet = 200
+	var cost := SprintState.reserve_cost()
+	var offer := SprintState.get_shop_offer()
+	var pinned_id: String = offer.get("decisions", [""])[0]
+
+	var wallet_before := SprintState.impact_wallet
+	if SprintState.toggle_reservation("decision", pinned_id, SprintState.find_card(pinned_id)) != "":
+		_fail("Réservation refusée alors que l'Impact suffit.")
+	if SprintState.impact_wallet != wallet_before - cost:
+		_fail("La réservation a coûté %d 💥 au lieu de %d." % [wallet_before - SprintState.impact_wallet, cost])
+	if not SprintState.is_reserved("decision", pinned_id):
+		_fail("« %s » n'est pas marquée réservée après la punaise." % pinned_id)
+
+	# Un re-tirage ne doit pas emporter ce qu'on a payé pour garder.
+	SprintState.reroll_shop_offer()
+	if not SprintState.get_shop_offer().get("decisions", []).has(pinned_id):
+		_fail("Le re-tirage a emporté la carte réservée « %s »." % pinned_id)
+
+	# Elle traverse le sprint suivant...
+	SprintState.sprint_number += 1
+	if not SprintState.get_shop_offer().get("decisions", []).has(pinned_id):
+		_fail("La carte réservée « %s » a disparu au sprint suivant." % pinned_id)
+
+	# ...puis la punaise tombe : elle n'est plus garantie.
+	SprintState.sprint_number += 1
+	SprintState.get_shop_offer()
+	if SprintState.is_reserved("decision", pinned_id):
+		_fail("La réservation de « %s » a survécu deux sprints — elle doit tenir un sprint." % pinned_id)
+
+	# Décoller la punaise rembourse.
+	var other_id: String = SprintState.get_shop_offer().get("decisions", [""])[0]
+	wallet_before = SprintState.impact_wallet
+	SprintState.toggle_reservation("decision", other_id, SprintState.find_card(other_id))
+	SprintState.toggle_reservation("decision", other_id, SprintState.find_card(other_id))
+	if SprintState.impact_wallet != wallet_before:
+		_fail("Décoller la punaise n'a pas remboursé l'Impact (%d → %d)." % [wallet_before, SprintState.impact_wallet])
+	if SprintState.is_reserved("decision", other_id):
+		_fail("« %s » est restée réservée après avoir décollé la punaise." % other_id)
+
+
+## 🔒 Une carte à prérequis prend un bail dès qu'elle sort : elle reste sur le
+## rayon le trimestre entier, verrouillée tant que la condition est fausse.
+func _test_gated_card_lease() -> void:
+	# Karavel : équipe 100 % junior, donc le prérequis « 2 seniors » de
+	# Shape Up est faux au départ — c'est tout l'intérêt de la carte gatée.
+	SprintState.reset_run("agile-transformation", "karavel-scaleup")
+	SprintState.quarter_requirement_ids = ["hiring-freeze"]
+	SprintState.quarter_requirement_id = "hiring-freeze"
+	var lease := int(GameData.balance.get("shopDraw", {}).get("lockedLeaseSprints", 6))
+	var gated := SprintState.find_card("shape-up")
+	if gated.get("requires", {}).is_empty():
+		_fail("La carte « shape-up » n'a plus de prérequis — le test du bail ne vaut plus rien.")
+		return
+
+	# On force sa sortie en tirant jusqu'à ce qu'elle tombe.
+	var drawn_at := 0
+	for sprint in range(400):
+		SprintState.sprint_number = sprint + 1
+		if SprintState.get_shop_offer().get("decisions", []).has("shape-up"):
+			drawn_at = SprintState.sprint_number
+			break
+	if drawn_at == 0:
+		_fail("« shape-up » n'est jamais sortie en 400 sprints.")
+		return
+
+	if SprintState.get_lease_expiry("shape-up") != drawn_at + lease:
+		_fail("Bail de « shape-up » jusqu'au sprint %d au lieu de %d." % [
+			SprintState.get_lease_expiry("shape-up"), drawn_at + lease])
+
+	# Verrouillée : le roster de départ n'a pas 2 seniors.
+	if SprintState.card_requirement_state(gated).get("ok", true):
+		_fail("« shape-up » est activable alors que le prérequis n'est pas rempli.")
+	if SprintState.activate_decision("shape-up") != "prerequis":
+		_fail("« shape-up » s'est activée malgré son prérequis non rempli.")
+
+	# Elle reste punaisée sur toute la durée du bail, même sans être tirée.
+	for sprint in range(lease):
+		SprintState.sprint_number = drawn_at + sprint
+		if not SprintState.get_leased_decision_ids().has("shape-up"):
+			_fail("« shape-up » a quitté le rayon au sprint %d, avant la fin de son bail." % SprintState.sprint_number)
+			break
+
+	# Le prérequis rempli — et l'Impact en poche, une décision s'achète — elle
+	# s'active.
+	SprintState.sprint_number = drawn_at + 1
+	SprintState.impact_wallet = 500
+	SprintState.get_primary_squad().get("roster", []).append({"id": "t1", "name": "Test", "role": "dev", "seniority": "senior", "salary": 2, "trait": "", "hidden_trait": "", "hiddenRevealed": true, "hiredSprint": 1})
+	SprintState.get_primary_squad().get("roster", []).append({"id": "t2", "name": "Test2", "role": "dev", "seniority": "senior", "salary": 2, "trait": "", "hidden_trait": "", "hiddenRevealed": true, "hiredSprint": 1})
+	if not SprintState.card_requirement_state(gated).get("ok", false):
+		_fail("« shape-up » reste verrouillée avec 2 seniors au roster.")
+	if SprintState.activate_decision("shape-up") != "":
+		_fail("« shape-up » refuse de s'activer alors que son prérequis est rempli.")
+	if SprintState.get_leased_decision_ids().has("shape-up"):
+		_fail("« shape-up » reste punaisée après activation.")
+
+	# Le bail expire : au-delà, la carte n'est plus garantie sur le rayon.
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+	SprintState.quarter_requirement_ids = ["hiring-freeze"]
+	SprintState.quarter_requirement_id = "hiring-freeze"
+	SprintState.leased_decisions["shape-up"] = 4
+	SprintState.sprint_number = 5
+	if SprintState.get_leased_decision_ids().has("shape-up"):
+		_fail("Le bail de « shape-up » n'a pas expiré au sprint 5 (échéance 4).")
+
+
+func _has_duplicate(ids: Array) -> bool:
+	var seen: Array = []
+	for id in ids:
+		if seen.has(id):
+			return true
+		seen.append(id)
+	return false
+
+
+## Vérifications déterministes des règles d'Énergie (spec profondeur §7) :
+## départ, modulation de la régén par le Moral, coûts et effets des quatre
+## actions personnelles, blocage par Souffler, remap du burn-out.
+func _test_energy_rules() -> void:
+	print("=== SMOKE TEST LOGIQUE — RÈGLES D'ÉNERGIE (Phase B) ===")
+	var conf: Dictionary = GameData.balance.get("energy", {})
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+
+	if SprintState.energy != int(conf.get("start", 70)):
+		_fail("Énergie de départ %d au lieu de %d." % [SprintState.energy, int(conf.get("start", 70))])
+
+	# Modulation de la régénération par le Moral (×1 / ×0.5 / ×0).
+	SprintState.resource_values["moral"] = 80.0
+	if SprintState.get_energy_regen_factor() != 1.0:
+		_fail("Facteur de régén attendu ×1 à Moral 80, obtenu ×%s." % SprintState.get_energy_regen_factor())
+	SprintState.resource_values["moral"] = 45.0
+	if SprintState.get_energy_regen_factor() != 0.5:
+		_fail("Facteur de régén attendu ×0.5 à Moral 45, obtenu ×%s." % SprintState.get_energy_regen_factor())
+	SprintState.resource_values["moral"] = 10.0
+	if SprintState.get_energy_regen_factor() != 0.0:
+		_fail("Facteur de régén attendu ×0 à Moral 10, obtenu ×%s." % SprintState.get_energy_regen_factor())
+	SprintState.resource_values["moral"] = 60.0
+
+	# 🔧 Faire le taf soi-même : capacité en plus, Énergie en moins.
+	var self_conf: Dictionary = conf.get("actions", {}).get("selfWork", {})
+	var capacity_before := SprintState.get_effective_capacity()
+	var energy_expected := SprintState.energy - int(self_conf.get("cost", 25))
+	if SprintState.do_self_work() != "":
+		_fail("do_self_work() refusé alors que l'Énergie est pleine.")
+	if SprintState.get_effective_capacity() != capacity_before + int(self_conf.get("capacityBonus", 2)):
+		_fail("Le taf soi-même n'a pas ajouté %d points de capacité." % int(self_conf.get("capacityBonus", 2)))
+	if SprintState.energy != energy_expected:
+		_fail("Le taf soi-même a laissé l'Énergie à %d au lieu de %d." % [SprintState.energy, energy_expected])
+
+	# 🏛️ Rallonge : du Revenue immédiat (jamais d'Impact — ça remplit la caisse,
+	# ça ne produit rien), Capital politique au panier du sprint.
+	var ext_conf: Dictionary = conf.get("actions", {}).get("extension", {})
+	var revenue_before := SprintState.revenue
+	var wallet_before_extension := SprintState.impact_wallet
+	energy_expected = SprintState.energy - int(ext_conf.get("cost", 10))
+	if SprintState.do_negotiate_extension() != "":
+		_fail("do_negotiate_extension() refusé alors que l'Énergie le permet.")
+	if not is_equal_approx(SprintState.revenue, revenue_before + float(ext_conf.get("revenue", 14))):
+		_fail("La rallonge n'a pas versé %d de Revenue immédiat." % int(ext_conf.get("revenue", 14)))
+	if SprintState.impact_wallet != wallet_before_extension:
+		_fail("La rallonge ne doit jamais produire d'Impact : elle remplit la caisse, elle ne produit rien.")
+	if int(SprintState.pending_deltas.get("capital-politique", 0.0)) != int(ext_conf.get("capitalPolitique", -8)):
+		_fail("La rallonge n'a pas mis %d de Capital politique au panier." % int(ext_conf.get("capitalPolitique", -8)))
+	if SprintState.energy != energy_expected:
+		_fail("La rallonge a laissé l'Énergie à %d au lieu de %d." % [SprintState.energy, energy_expected])
+
+	# 🤝 1:1 sur un candidat du Marché : révélation avant embauche.
+	var offer := SprintState.get_shop_offer()
+	var offer_candidates: Array = offer.get("candidates", [])
+	if offer_candidates.is_empty():
+		_fail("Le Marché n'a proposé aucun candidat pour le test du 1:1.")
+	else:
+		var candidate: Dictionary = offer_candidates[0]
+		energy_expected = SprintState.energy - int(conf.get("actions", {}).get("oneOnOne", {}).get("cost", 10))
+		if SprintState.do_one_on_one(candidate) != "":
+			_fail("do_one_on_one() refusé sur un candidat non révélé.")
+		if not candidate.get("hiddenRevealed", false):
+			_fail("Le 1:1 n'a pas révélé le trait caché du candidat.")
+		if SprintState.energy != energy_expected:
+			_fail("Le 1:1 a laissé l'Énergie à %d au lieu de %d." % [SprintState.energy, energy_expected])
+		if SprintState.do_one_on_one(candidate) != "deja-revele":
+			_fail("Un second 1:1 sur le même candidat aurait dû être refusé (deja-revele).")
+
+	# 🧘 Souffler : bloque les actions, bonus de régén à la Résolution
+	# suivante — même quand le Moral effondré annule la régén de base.
+	if SprintState.plan_breather() != "":
+		_fail("plan_breather() refusé au premier appel.")
+	if SprintState.plan_breather() != "deja-planifie":
+		_fail("plan_breather() devrait refuser un second appel (deja-planifie).")
+	if SprintState.do_self_work() != "souffler":
+		_fail("Souffler doit bloquer les actions personnelles jusqu'à la prochaine Résolution.")
+	SprintState.resource_values["moral"] = 10.0
+	SprintState.apply_pending_and_check()
+	var report: Dictionary = SprintState.last_energy_report
+	if int(report.get("regen", -1)) != 0:
+		_fail("Régén attendue nulle sous Moral 30, obtenue %d." % int(report.get("regen", -1)))
+	if int(report.get("breatherBonus", 0)) != int(conf.get("breatherRegenBonus", 10)):
+		_fail("Le bonus de Souffler (%d) n'a pas été versé à la Résolution." % int(conf.get("breatherRegenBonus", 10)))
+	if SprintState.breather_planned:
+		_fail("Le flag Souffler doit être consommé à la Résolution.")
+	if SprintState.personal_action_refusal() != "":
+		_fail("Les actions personnelles doivent être de nouveau jouables après la Résolution du sprint de Souffler.")
+
+	# 🔥 Burn-out remappé (spec §8.3) : Énergie ≤ 0 à la Résolution = fin.
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+	SprintState.resource_values["moral"] = 10.0  # régén nulle
+	SprintState.energy = 3
+	SprintState.do_self_work()  # puise les 3 derniers points : jauge à 0
+	if SprintState.energy != 0:
+		_fail("La dépense d'Énergie devrait plancher à 0, obtenu %d." % SprintState.energy)
+	var ending := SprintState.apply_pending_and_check()
+	if ending != "burnout-fondateur":
+		_fail("Énergie 0 + régén nulle devrait finir en burn-out, obtenu '%s'." % ending)
+	print("Règles d'Énergie : %s" % ("OK" if failures == 0 else "ÉCHEC"))
+
+
+func _play_one_mandate(run_index: int, strategy: String, company_id: String) -> void:
+	SprintState.reset_run("agile-transformation", company_id)
+	print("\n--- Run %d (%s) — %s — 💥 %d, 👥 %d/%d, capacité %d — Départ : %s ---" % [
+		run_index, strategy, company_id, SprintState.impact_wallet,
+		SprintState.get_roster().size(), SprintState.get_team_cap(),
+		SprintState.get_effective_capacity(), SprintState.resource_values
+	])
+
+	var sprint_count := 0
+	while not SprintState.is_mandate_over and sprint_count < 30:
+		sprint_count += 1
+		_play_sprint(strategy)
+		if SprintState.quarter_exit_choice_pending:
+			SprintState.choose_mandate_path(false)
+
+	if not SprintState.is_mandate_over:
+		_fail("Run %d (%s, %s) n'a jamais atteint de fin après 30 sprints — probable bug de seuils." % [run_index, strategy, company_id])
+
+	# 💰 Le Revenue est imprimé avec sa base d'abonnements et sa facture : sans
+	# ça, le banc ne dit rien de la seule question qui compte pour lui — est-ce
+	# que la caisse contraint encore, ou est-ce qu'elle a décollé toute seule ?
+	print("Run %d (%s, %s) terminé — sprint %d, fin='%s', 💥 %d, 💰 %d (clients paient %d, charges %d), ⚡ %d, 👥 %d, revue de board='%s', ressources finales=%s" % [
+		run_index, strategy, company_id, SprintState.sprint_number, SprintState.ending_id,
+		SprintState.impact_wallet, int(round(SprintState.revenue)), int(round(SprintState.get_client_revenue())),
+		int(SprintState.get_recurring_charges().get("total", 0)),
+		SprintState.energy, SprintState.get_roster().size(), SprintState.board_review_state,
+		SprintState.resource_values
+	])
+
+	for resource_id in SprintState.resource_values.keys():
+		var value: float = SprintState.resource_values[resource_id]
+		if value < -0.001 or value > 100.001:
+			_fail("Ressource %s hors bornes : %f" % [resource_id, value])
+	if SprintState.impact_wallet < 0:
+		_fail("Pièces négatives : %d" % SprintState.impact_wallet)
+	if SprintState.energy < 0 or SprintState.energy > SprintState.get_energy_max():
+		_fail("Énergie hors bornes : %d" % SprintState.energy)
+	if SprintState.get_roster().size() > SprintState.get_team_cap():
+		_fail("Roster au-dessus du cap : %d/%d" % [SprintState.get_roster().size(), SprintState.get_team_cap()])
+
+	# Critère de recette Phase A : "careful" (ne rien faire) doit perdre
+	# avant la fin du mandat — pas de fin positive, pas de survie.
+	if strategy == "careful" and SprintState.ending_id in GOOD_ENDINGS:
+		_fail("Run %d (careful, %s) a survécu au mandat (fin '%s' au sprint %d) — 'ne rien faire' doit perdre." % [
+			run_index, company_id, SprintState.ending_id, SprintState.sprint_number
+		])
+
+
+func _play_sprint(strategy: String) -> void:
+	# Phase 1 — Inbox (pioche sac réelle). "stress" prend systématiquement
+	# le choix le plus toxique pour le Moral — la spirale commence là.
+	var event: Dictionary = SprintState.draw_inbox_event()
+	if not event.is_empty():
+		var choices: Array = event.get("choices", [])
+		var choice: Dictionary = choices[0]
+		if strategy == "careful" or strategy == "levier":
+			choice = _least_costly_choice(choices)
+		elif strategy == "stress":
+			choice = _worst_moral_choice(choices)
+		elif strategy == "economie":
+			choice = _best_client_choice(choices)
+		# Le même point d'entrée que l'écran : sinon les bascules de segment
+		# (`clientConversion`) ne sont jamais jouées par le banc.
+		SprintState.apply_inbox_choice(choice, "%s → %s" % [event.get("subject", ""), choice.get("label", "")])
+
+	# Actions personnelles Roadmap (Phase B) : "stress" fait le taf soi-même
+	# tant qu'il reste de l'Énergie (la réserve part avant la capacité) ;
+	# "greedy" ne puise que quand la jauge est confortable.
+	if strategy == "stress":
+		var guard := 0
+		while SprintState.personal_action_refusal() == "" and guard < 4:
+			SprintState.do_self_work()
+			guard += 1
+	elif strategy in ["greedy", "economie", "levier"] and SprintState.energy >= 50 and SprintState.personal_action_refusal() == "":
+		SprintState.do_self_work()
+
+	# Phase 2 — Roadmap : le vrai tirage persistant du backlog remplace les
+	# données de démo. Greedy reste sous la capacité; stress pousse tout.
+	var capacity := SprintState.get_effective_capacity()
+	var plan: Array = []
+	var roadmap_offer := SprintState.get_backlog_offer()
+	var used := 0
+	# 💰 « économie » trie par effet client, 📊 « Levier » par taille : deux
+	# lectures du même tirage, et c'est tout ce qui les sépare côté Roadmap.
+	var items: Array = roadmap_offer.get("items", []).duplicate()
+	if strategy == "economie":
+		items.sort_custom(func(a, b): return int(a.get("clients", 0)) > int(b.get("clients", 0)))
+	elif strategy == "levier":
+		items.sort_custom(func(a, b): return int(a.get("costPoints", 0)) > int(b.get("costPoints", 0)))
+	for item in items:
+		var points := SprintState.get_epic_remaining(item.get("id", "")) if SprintState.is_backlog_epic(item) else int(item.get("costPoints", 0))
+		# « économie » refuse ce qui fait fuir les clients, sauf s'il lui reste
+		# de la capacité à ne pas gâcher : produire reste la seule source
+		# d'Impact, même pour qui joue la caisse.
+		if strategy == "economie" and int(item.get("clients", 0)) < 0 and used * 2 < capacity:
+			continue
+		if strategy == "stress" or (strategy in ["greedy", "economie", "levier"] and used + points <= capacity):
+			plan.append({"id": item.get("id", ""), "points": points})
+			used += points
+	if strategy != "careful":
+		SprintState.commit_backlog_plan(plan)
+
+	# Phase 3 — Investissements : une seule offre pour les deux rayons, tirée
+	# une fois par sprint (revisiter l'écran ne re-tire pas).
+	var offer := SprintState.get_shop_offer()
+	var offer_again := SprintState.get_shop_offer()
+	if not _same_offer(offer, offer_again):
+		_fail("L'offre a été re-tirée deux fois au sprint %d — elle doit être stockée." % SprintState.sprint_number)
+
+	# 🎲 Re-tirage : "greedy" retente sa chance au sprint 3 s'il a les moyens —
+	# le chemin payant du re-tirage reste couvert, prix croissant compris.
+	if strategy == "greedy" and SprintState.sprint_number == 3 and SprintState.impact_wallet >= SprintState.shop_reroll_cost() + 3:
+		SprintState.reroll_shop_offer()
+		offer = SprintState.get_shop_offer()
+
+	# Rayon 🃏 — on ne peut activer que ce qui a été **tiré** : depuis que les
+	# décisions sortent au hasard, aucune stratégie ne peut plus compter sur une
+	# carte précise, et les deux profils ont dû apprendre à faire avec l'offre.
+	#  · "greedy" prend ce qui passe aux sprints 2 et 4 (pressé, mais pas au
+	#    point de brûler la trésorerie en cartes) ;
+	#  · "stress" cherche la carte qui abîme le plus le Moral et n'en active
+	#    qu'une — la spirale du burn-out a besoin d'un Moral cassé tôt (régén
+	#    ×0), et la trésorerie doit survivre assez longtemps pour y arriver.
+	#    Il ré-essaie chaque sprint tant qu'il n'a rien trouvé.
+	if strategy == "stress" and SprintState.activated_cards.is_empty():
+		var worst := _worst_moral_decision(offer)
+		if worst != "":
+			SprintState.activate_decision(worst)
+	elif strategy == "greedy" and SprintState.sprint_number in [2, 4]:
+		for card_id in offer.get("decisions", []):
+			if SprintState.activate_decision(card_id) == "":
+				break
+	elif strategy == "levier":
+		# Le profil Levier prend tout ce qu'il peut : c'est sa thèse, et c'est
+		# aussi ce qui fait monter sa facture de licences.
+		for card_id in offer.get("decisions", []):
+			if SprintState.activate_decision(card_id) == "":
+				break
+
+	# 📌 "greedy" punaise ce qu'il ne peut pas encore payer : au sprint 5, s'il
+	# reste un candidat trop cher sur l'étal, il le réserve pour le sprint
+	# suivant plutôt que de le perdre au tirage.
+	if strategy == "greedy" and SprintState.sprint_number == 5 and SprintState.impact_wallet >= SprintState.reserve_cost():
+		for candidate in offer.get("candidates", []):
+			if int(candidate.get("costPieces", 0)) > SprintState.impact_wallet:
+				SprintState.toggle_reservation("candidate", candidate.get("id", ""), candidate)
+				break
+
+	if strategy == "stress":
+		# Plus d'achats compulsifs : ce CPO-là compense tout de sa personne —
+		# et licencie quelqu'un chaque sprint à partir du 2e (le chemin de
+		# licenciement reste couvert, et le Moral en prend un coup de plus).
+		if SprintState.sprint_number >= 2 and SprintState.get_roster().size() > 1:
+			var last_employee: Dictionary = SprintState.get_roster()[-1]
+			SprintState.fire_employee(last_employee.get("id", ""))
+	elif strategy == "economie":
+		# Nourrir la boîte, ce n'est pas se priver : c'est n'engager une charge
+		# que quand la caisse la porte. Ce profil achète comme les autres —
+		# simplement jamais à découvert, et il négocie une rallonge avant de
+		# couler plutôt qu'après.
+		var economy_room := SprintState.revenue - float(SprintState.get_recurring_charges().get("total", 0)) * 1.5
+		if economy_room > 0.0:
+			var economy_candidates: Array = offer.get("candidates", [])
+			if not economy_candidates.is_empty():
+				SprintState.hire_candidate(economy_candidates[0])
+			var economy_practices: Array = offer.get("practices", [])
+			if not economy_practices.is_empty():
+				SprintState.buy_practice(economy_practices[0])
+			for card_id in offer.get("decisions", []):
+				if SprintState.activate_decision(card_id) == "":
+					break
+		if SprintState.revenue < 30.0 and SprintState.personal_action_refusal() == "":
+			SprintState.do_negotiate_extension()
+	elif strategy == "levier":
+		# Jouer l'organisation : une pratique dès qu'elle passe, un recrutement
+		# dès qu'il passe. La caisse n'est jamais un critère.
+		var lever_practices: Array = offer.get("practices", [])
+		if not lever_practices.is_empty():
+			SprintState.buy_practice(lever_practices[0])
+		var lever_candidates: Array = offer.get("candidates", [])
+		if not lever_candidates.is_empty():
+			SprintState.hire_candidate(lever_candidates[0])
+	elif strategy == "greedy":
+		# ~1 achat par sprint : une pratique les sprints pairs, sinon une
+		# embauche — précédée d'un 1:1 quand l'Énergie le permet : on ne
+		# signe pas un pari les yeux fermés.
+		if SprintState.sprint_number % 2 == 0:
+			var practices: Array = offer.get("practices", [])
+			if not practices.is_empty():
+				SprintState.buy_practice(practices[0])
+		else:
+			var candidates: Array = offer.get("candidates", [])
+			if not candidates.is_empty():
+				var candidate: Dictionary = candidates[0]
+				if not candidate.get("hiddenRevealed", false) and SprintState.energy >= 30 and SprintState.personal_action_refusal() == "":
+					SprintState.do_one_on_one(candidate)
+				var polarity: String = SprintState.get_hidden_trait(candidate.get("hidden_trait", "")).get("polarity", "")
+				if not (candidate.get("hiddenRevealed", false) and polarity == "negative"):
+					SprintState.hire_candidate(candidate)
+		# Rallonge si le budget d'action est à sec et que le crédit au board le permet.
+		if SprintState.impact_wallet < 2 and SprintState.resource_values.get("capital-politique", 0.0) > 40.0 and SprintState.personal_action_refusal() == "":
+			SprintState.do_negotiate_extension()
+
+	# Phase 4 — Résolution.
+	var ending := SprintState.apply_pending_and_check()
+	if ending != "":
+		return
+	# 🧘 Souffler se décide à la Résolution : "greedy" lève le pied quand la
+	# jauge est basse (le prochain sprint se jouera sans action personnelle).
+	if strategy in ["greedy", "economie", "levier"] and SprintState.energy < 30:
+		SprintState.plan_breather()
+	SprintState.sprint_number += 1
+
+
+func _same_offer(a: Dictionary, b: Dictionary) -> bool:
+	if a.get("practices", []) != b.get("practices", []):
+		return false
+	var ids_a: Array = []
+	var ids_b: Array = []
+	for candidate in a.get("candidates", []):
+		ids_a.append(candidate.get("id", ""))
+	for candidate in b.get("candidates", []):
+		ids_b.append(candidate.get("id", ""))
+	return ids_a == ids_b
+
+
+## Le choix le plus destructeur pour le Moral (celui d'un CPO en pilotage
+## automatique qui sacrifie l'équipe à chaque arbitrage).
+func _worst_moral_choice(choices: Array) -> Dictionary:
+	var worst: Dictionary = choices[0]
+	var worst_moral := INF
+	for choice in choices:
+		var moral := float(choice.get("effects", {}).get("moral", 0))
+		if moral < worst_moral:
+			worst_moral = moral
+			worst = choice
+	return worst
+
+
+## 👥 Le choix qui amène le plus de clients — l'heuristique du profil
+## « économie ». À égalité d'effet client, on retombe sur le moins coûteux :
+## nourrir la boîte, ce n'est pas se ruiner ailleurs.
+func _best_client_choice(choices: Array) -> Dictionary:
+	var best: Dictionary = _least_costly_choice(choices)
+	var best_clients := -INF
+	for choice in choices:
+		var value := float(choice.get("effects", {}).get("clients", 0))
+		if value > best_clients:
+			best_clients = value
+			best = choice
+	return best
+
+
+## La décision tirée qui abîme le plus le Moral, cartes verrouillées écartées.
+## Le pendant de _worst_moral_choice() pour le rayon 🃏 : "stress" ne choisit
+## plus une carte connue d'avance, il prend la pire de ce que l'offre propose.
+func _worst_moral_decision(offer: Dictionary) -> String:
+	var worst_id := ""
+	var worst_moral := INF
+	for card_id in offer.get("decisions", []):
+		if SprintState.activated_cards.has(card_id):
+			continue
+		if not SprintState.card_requirement_state(SprintState.find_card(card_id)).get("ok", true):
+			continue
+		var deltas := EffectResolver.resolve_card_activation(card_id, SprintState.team_profile, SprintState.era_id)
+		var moral := float(deltas.get("moral", 0.0))
+		if moral < worst_moral:
+			worst_moral = moral
+			worst_id = card_id
+	return worst_id
+
+
+## Heuristique simple : la somme des deltas négatifs la moins pénalisante
+## (ignore les gains, ne compare que "combien ça fait mal").
+func _least_costly_choice(choices: Array) -> Dictionary:
+	var best: Dictionary = choices[0]
+	var best_penalty := INF
+	for choice in choices:
+		var penalty := 0.0
+		for value in choice.get("effects", {}).values():
+			if value < 0:
+				penalty += -value
+		if penalty < best_penalty:
+			best_penalty = penalty
+			best = choice
+	return best
+
+
+## 🎯 L'attention (Lot 5 palier 3, spec §13.3). Deux propriétés à tenir : à
+## N=1 le jeu est exactement celui d'avant le multi-équipe (aucune équipe n'est
+## jamais auto-pilotée), et au-delà la qualité du plan qu'une équipe se donne
+## toute seule suit sa composition — un PM senior arbitre, personne n'arbitre
+## sans PM.
+func _test_attention_and_autopilot_lot5() -> void:
+	PlayerProfile.clear_all()
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+
+	if SprintState.get_attention_slots() != 1:
+		_fail("À PM, le joueur doit piloter sa seule équipe.")
+	if SprintState.get_piloted_squad_ids().size() != 1:
+		_fail("À N=1 l'unique équipe doit être pilotée.")
+	if not SprintState.resolve_unpiloted_squads().is_empty():
+		_fail("À N=1 aucune équipe ne doit jamais être auto-pilotée : un run PM doit rester strictement celui d'avant le multi-équipe.")
+
+	PlayerProfile.unlock_career_level("lead-pm")
+	SprintState.reset_run("agile-transformation", "meridia-corp", "lead-pm")
+	if SprintState.squads.size() < 2:
+		_fail("Lead PM doit démarrer avec au moins deux équipes.")
+	if SprintState.get_attention_slots() >= SprintState.squads.size():
+		_fail("Au-delà de PM, l'attention doit être strictement inférieure au nombre d'équipes — sinon la délégation n'existe jamais.")
+
+	var second: Dictionary = SprintState.squads[1]
+	var second_id: String = second.get("id", "")
+	if SprintState.is_squad_piloted(second_id):
+		_fail("Avec moins de slots que d'équipes, la seconde équipe ne doit pas être pilotée par défaut.")
+	if SprintState.set_piloted_squads([second_id, SprintState.squads[0].get("id", "")]) != "slots":
+		_fail("Piloter plus d'équipes que de slots d'attention doit être refusé.")
+
+	if SprintState.auto_pilot_profile_id(second) != "none":
+		_fail("Une équipe neuve, sans PM, doit tomber sur le profil sans PM.")
+	second["roster"].append({
+		"id": "pm-auto", "name": "PM auto", "role": "pm", "seniority": "senior",
+		"salary": 3, "trait": "", "visible_trait_id": "", "hidden_trait": "",
+		"hiddenRevealed": true, "hiredSprint": 0,
+	})
+	if SprintState.auto_pilot_profile_id(second) != "senior":
+		_fail("Un PM senior doit donner le meilleur profil d'auto-pilotage.")
+
+	var capacity := SprintState.get_squad_capacity(second_id)
+	var plan := SprintState.build_auto_plan_for_squad(second_id)
+	# Un plan vide est parfois la bonne réponse, et le tirage du backlog est
+	# aléatoire : une équipe de deux personnes ne se lance pas dans une feature
+	# qui coûte plus que sa capacité du sprint. Ce n'est un défaut que s'il
+	# restait quelque chose d'abordable sur la table — c'est cette propriété-là
+	# qu'on teste, pas « le plan est non vide ».
+	if plan.is_empty() and capacity > 0:
+		for offered in SprintState.get_backlog_offer_for_squad(second_id).get("items", []):
+			if SprintState.is_backlog_epic(offered):
+				continue
+			var offered_cost := int(offered.get("costPoints", 0))
+			if offered_cost > 0 and offered_cost <= capacity:
+				_fail("Une feature tenait dans la capacité de l'équipe : elle devait se la donner toute seule.")
+	if SprintState.backlog_plan_points(plan) > capacity:
+		_fail("Un plan auto-piloté ne doit jamais dépasser la capacité de l'équipe.")
+	# Deux appels de suite doivent donner le même plan : la prévisualisation
+	# affichée et le plan réellement joué sont un seul et même calcul.
+	if SprintState.backlog_plan_points(SprintState.build_auto_plan_for_squad(second_id)) != SprintState.backlog_plan_points(plan):
+		_fail("Le plan auto-piloté doit être stable entre deux lectures, sinon l'écran afficherait autre chose que ce qui sera joué.")
+
+	var reports := SprintState.resolve_unpiloted_squads()
+	if reports.is_empty():
+		_fail("Les équipes non pilotées doivent jouer leur sprint toutes seules.")
+	for report in reports:
+		if not bool(report.get("autoPiloted", false)):
+			_fail("Le rapport d'une équipe non pilotée doit être marqué comme auto-piloté.")
+		if int(report.get("plannedPoints", 0)) > int(report.get("capacity", 0)):
+			_fail("Une équipe auto-pilotée ne doit jamais livrer au-delà de sa capacité.")
+
+	PlayerProfile.clear_all()
+	SprintState.reset_run("agile-transformation", "meridia-corp")

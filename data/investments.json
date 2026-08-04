@@ -1,0 +1,131 @@
+{
+  "_comment": "Le Comité d'investissement (spec scoring §12, Lot 4) — tout ce qui se décide entre deux trimestres, jamais à l'étal du sprint. Chaque entrée est un poste du Comité : `kind` dispatche vers la fonction SprintState qui l'applique (voir sprint_state.gd, section '--- Le Comité d'investissement ---'), les coûts et magnitudes vivent ici pour que rééquilibrer ne demande aucune modification de script. `costs[]` est une échelle croissante consommée dans l'ordre (index = nombre d'achats déjà faits ce mandat) ; une fois épuisée, le poste refuse ('plafond'). `cost` est un prix plat, ré-achetable sans limite tant que le portefeuille d'Impact suit. **Tous les prix sont en 💥 Impact** (spec-impact-monnaie.md §3.1) et se lisent par SprintState.resolved_price(), jamais en direct depuis ce fichier. `licenseFlatPerTier`/`licensePerSeat` sont les charges de 💰 Revenue que le poste engage à chaque sprint, pour toujours. Consommé uniquement par game/ (committee_screen.gd) — landing/ n'a pas de Comité.",
+  "items": [
+    {
+      "id": "strategic-decision",
+      "icon": "🧭",
+      "name": "Décision stratégique",
+      "kind": "strategy",
+      "costRange": [
+        150,
+        300
+      ],
+      "tagline": "Une par trimestre. Irréversible pour tout le reste du mandat.",
+      "description": "Redéfinit ce que le produit est pour le marché — jamais l'équipe. Catalogue et effets : data/strategy.json et scoring.json → global.strategies."
+    },
+    {
+      "id": "tool-slot",
+      "icon": "🔧",
+      "name": "Ouvrir un slot d'outillage",
+      "kind": "tool-slot",
+      "tagline": "+1 slot de grande décision. 2 maximum par run.",
+      "description": "Le prix et le plafond viennent de balance.json → toolSlots.extraSlotCosts (110 puis 190 💥)."
+    },
+    {
+      "id": "release-tool-slot",
+      "icon": "♻️",
+      "name": "Libérer un slot",
+      "kind": "tool-slot-release",
+      "tagline": "Retire un outil actif — son Levier disparaît immédiatement.",
+      "description": "Coût de bascule en 🎭 Cynisme, croissant à chaque libération du mandat (balance.json → toolSlots.swap). La carte réintègre le pool de tirage de l'étal."
+    },
+    {
+      "id": "open-seat",
+      "icon": "🪑",
+      "name": "Ouvrir un poste",
+      "kind": "team-cap",
+      "costs": [
+        60,
+        110,
+        180,
+        270
+      ],
+      "capIncrement": 1,
+      "tagline": "+1 au cap d'effectif, aujourd'hui figé par l'entreprise.",
+      "description": "Le cap d'effectif devient un objet de jeu : virer un Fantôme pour libérer un poste et déclencher un combo est une décision gagnante, pas un aveu d'échec."
+    },
+    {
+      "id": "promotion",
+      "icon": "📈",
+      "name": "Promotion",
+      "kind": "promotion",
+      "cost": 55,
+      "tagline": "Un junior devient senior : salaire +1, contribution senior.",
+      "description": "S'applique à une personne du roster au choix — sans effet si plus aucun junior n'est disponible."
+    },
+    {
+      "id": "product-tier",
+      "icon": "🚀",
+      "name": "Palier de produit",
+      "kind": "product-tier",
+      "costs": [
+        130,
+        270,
+        480
+      ],
+      "licenseFlatPerTier": 3,
+      "tagline": "+0,5 Levier permanent, +1 feature proposée par sprint — et 3 💰/sprint d'infrastructure, par palier.",
+      "description": "Le Levier vit dans scoring.json → global.productTier (leverPerTier). 3 paliers maximum par run."
+    },
+    {
+      "id": "team-seminar",
+      "icon": "🏝️",
+      "name": "Séminaire d'équipe",
+      "kind": "seminar",
+      "cost": 80,
+      "cynismeDelta": -15,
+      "tagline": "🎭 Cynisme −15.",
+      "description": "Un ballon d'oxygène ponctuel, appliqué à la prochaine Résolution comme tout achat du Comité."
+    },
+    {
+      "id": "cleanup-sprint",
+      "icon": "🧹",
+      "name": "Sprint de remise à plat",
+      "kind": "cleanup-sprint",
+      "cost": 60,
+      "detteDelta": -20,
+      "tagline": "🧱 Dette −20, mais 0 Traction le sprint suivant — un sprint entier consommé.",
+      "description": "Le sprint qui suit l'achat ne produit aucune Traction, quoi que le roster livre : la remise à plat prime sur la production."
+    },
+    {
+      "id": "acquire-competitor",
+      "icon": "🤝",
+      "name": "Rachat d'un concurrent",
+      "kind": "acquisition",
+      "cost": 320,
+      "clientsGained": 7,
+      "detteDelta": 8,
+      "tagline": "Leur base de clients rejoint la vôtre, +1 employé aléatoire, +8 Dette.",
+      "description": "On n'achète pas du cash mais des clients : leur population vient grossir la vôtre segment par segment, puis vit sa vie — elle paie chaque sprint, elle coûte du support, et elle churne comme le reste. L'employé rejoint le roster sur le champ (avec son salaire), la Dette du rachat se paie à la prochaine Résolution."
+    },
+    {
+      "id": "headhunter",
+      "icon": "🎯",
+      "name": "Chasseur de têtes",
+      "kind": "headhunter",
+      "cost": 85,
+      "nextShopCandidates": 4,
+      "tagline": "Le prochain étal du sprint force 4 candidats, traits cachés révélés.",
+      "description": "Consommé au prochain tirage de l'étal (get_shop_offer) — ne s'accumule pas si acheté plusieurs fois d'affilée."
+    },
+    {
+      "id": "turnaround-plan",
+      "icon": "🏛️",
+      "name": "Plan de redressement",
+      "kind": "turnaround-plan",
+      "cost": 220,
+      "tagline": "Un rattrapage de quota dans le mandat.",
+      "description": "Consommé automatiquement la première fois qu'un trimestre manquerait son quota — le mandat continue au lieu de se terminer. Rachetable plusieurs fois pour empiler les rattrapages."
+    },
+    {
+      "id": "quarter-advance",
+      "icon": "🎲",
+      "name": "Avance sur trimestre",
+      "kind": "quarter-advance",
+      "revenueGain": 26,
+      "impactPenalty": 95,
+      "tagline": "+26 💰 de Revenue immédiats contre −95 💥 sur le portefeuille.",
+      "description": "Le seul poste qui va dans l'autre sens : il vend de l'Impact pour du cash. Répétable — et le portefeuille peut passer sous zéro, c'est le prix du pari."
+    }
+  ]
+}

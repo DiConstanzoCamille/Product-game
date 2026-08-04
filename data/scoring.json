@@ -1,0 +1,111 @@
+{
+  "version": 1,
+  "_comment": "Source de vérité de Traction × Levier = Impact (docs/spec-scoring-sprint.md). Depuis le Lot 3, le Levier par outil (perEmployee/eligibility/refractory/adoptionCondition/cumulative/flatModifiers) ne vit plus ici : il est déclaré sur la carte elle-même dans cards.json, pour que ScoreResolver et l'écran d'Investissements lisent la même donnée sans la dupliquer. global.strategies reste ici — data/strategy.json n'est que le catalogue affiché au Comité, ScoreResolver ne connaît que cette table.",
+  "traction": {
+    "feature": { "pointsMultiplier": 4 },
+    "epic": { "pointsMultiplier": 6 },
+    "handBonuses": {
+      "perfectSprint": { "capacityTolerance": 1, "multiplier": 1.25, "icon": "🎯", "label": "Sprint parfait" },
+      "focus": { "minimumDelivered": 2, "multiplier": 1.3, "icon": "🔎", "label": "Focus" },
+      "bundle": { "minimumDelivered": 3, "tractionBonus": 10, "icon": "🧩", "label": "Livraison groupée" },
+      "quickWins": { "minimumDelivered": 2, "impactBonus": 14, "icon": "⚡", "label": "Quick wins en série" },
+      "completedEpic": { "multiplier": 1.5, "icon": "📦", "label": "Epic bouclée" }
+    }
+  },
+  "streak": { "leverPerSprint": 0.05, "maxLever": 0.5, "icon": "🔥", "label": "Série de livraisons" },
+  "local": {
+    "baseLever": 1.0,
+    "roles": {
+      "designer": { "tractionPerDelivered": 2, "icon": "🎨", "label": "Designer" },
+      "pm": { "leverPerMember": 0.05, "maxLever": 0.2, "icon": "📋", "label": "PM" },
+      "ops": { "debtReliefPerMember": 1, "maxDebtRelief": 2, "icon": "🛠️", "label": "Ops" }
+    },
+    "organizationCombos": [
+      { "id": "trio-produit", "icon": "🔺", "label": "Trio produit", "lever": 0.3, "condition": { "roles": { "pm": 1, "dev": 1, "designer": 1 } } },
+      { "id": "equipe-complete", "icon": "🛡️", "label": "Equipe complète", "lever": 0.6, "replaces": "trio-produit", "condition": { "roles": { "pm": 1, "dev": 1, "designer": 1, "ops": 1 } } },
+      { "id": "force-de-frappe", "icon": "🔨", "label": "Force de frappe", "lever": 0.4, "condition": { "roles": { "dev": 3 } } },
+      { "id": "binome-senior", "icon": "🎓", "label": "Binôme senior", "lever": 0.25, "condition": { "sameRoleSeniority": { "seniority": "senior", "minimum": 2 } } },
+      { "id": "sang-neuf", "icon": "🌱", "label": "Sang neuf", "lever": 0.25, "condition": { "recentHires": { "withinSprints": 3, "minimum": 2 } } },
+      { "id": "vieille-garde", "icon": "🗿", "label": "Vieille garde", "lever": 0.35, "condition": { "hiredAtOrBefore": { "sprint": 1, "minimum": 3 } } },
+      { "id": "theatre", "icon": "🎭", "label": "Théâtre", "lever": -0.5, "condition": { "roles": { "pm": 2, "dev": 0 } } },
+      { "id": "tour-ivoire", "icon": "👑", "label": "Tour d'ivoire", "lever": -0.3, "condition": { "rosterMinimum": 6, "roles": { "ops": 0 } } }
+    ]
+  },
+  "global": {
+    "baseLever": 1.0,
+    "productTier": { "leverPerTier": 0.5, "icon": "🏗️", "label": "Palier produit" },
+    "practices": {
+      "discovery": { "lever": 0.05, "icon": "🔍", "label": "Discovery" },
+      "ux-research": { "lever": 0.05, "icon": "🎨", "label": "UX research" },
+      "tech-radar": { "lever": 0.05, "icon": "🧭", "label": "Tech radar" },
+      "product-analytics": { "lever": 0.1, "icon": "📊", "label": "Product analytics" },
+      "segmentation-clients": { "lever": 0.05, "icon": "💼", "label": "Segmentation clients" },
+      "okr": { "lever": 0.05, "icon": "🎯", "label": "OKR" },
+      "retros-sinceres": { "lever": 0.1, "icon": "🫶", "label": "Rétrospectives sincères" }
+    },
+    "strategies": {
+      "open-source": { "tractionMultiplier": 1.4, "arrivalMultiplier": 1.6, "priceMultiplier": 0.45, "supportTeamDeltas": { "pmm": 1, "sales": -1 }, "icon": "🔓", "label": "Open source" },
+      "freemium": { "churnMultiplier": 1.5, "arrivalMultiplier": 1.3, "segmentConversion": { "from": "entry", "to": "paying", "ratio": 0.02 }, "icon": "💳", "label": "Freemium" },
+      "enterprise-first": { "featureTractionMultiplier": 2, "featureCondition": { "clientsMinimum": 3 }, "quickWinTractionMultiplier": 0, "icon": "🏢", "label": "Enterprise first" },
+      "plateforme-api-publique": { "leverPerProductTier": 0.15, "icon": "🔌", "label": "Plateforme API publique" },
+      "expansion-internationale": { "priceMultiplier": 1.25, "quotaMultiplier": 1.2, "icon": "🌍", "label": "Expansion internationale" },
+      "arreter-de-communiquer": { "lever": 0.4, "supportTeamDeltas": { "pmm": -1 }, "icon": "🤫", "label": "Arrêter de communiquer" },
+      "annee-de-consolidation": { "tractionMultiplier": 0.7, "icon": "🧯", "label": "Année de consolidation" },
+      "fin-du-gratuit": {
+        "_comment": "Le pivot de modèle économique (spec-clients-revenue.md §4.2), noté au carnet §15 et jamais implémenté faute de sens. `onChoice` s'applique UNE FOIS, à la décision : c'est le seul endroit du jeu où le prix d'un segment change. `roleMultipliers` vide la population une fois ; `roleArrivalMultipliers` **referme la porte pour de bon** — sans lui, la livraison du sprint suivant repeuplerait le segment gratuit et la décision mentirait. La fraction convertie est TIRÉE dans une fourchette — le joueur sait qu'il perd sa base, il ne sait pas combien le suivront (question 5 de la vision : on ne rend pas un pari déterministe pour qu'il soit plus juste).",
+        "onChoice": {
+          "convertRoleRange": { "from": "entry", "to": "paying", "minRatio": 0.03, "maxRatio": 0.09 },
+          "roleMultipliers": { "entry": 0 },
+          "roleArrivalMultipliers": { "entry": 0 },
+          "rolePriceMultipliers": { "paying": 1.35 }
+        },
+        "churnMultiplier": 1.3,
+        "icon": "🔒",
+        "label": "Fin du gratuit"
+      }
+    },
+    "interSquadCombos": {
+      "standardisation": { "minimumSquads": 3, "lever": 0.4, "icon": "🏛️", "label": "Standardisation" },
+      "chaos-organise": { "minimumSquads": 3, "lever": -0.3, "cancelledByTools": ["jira", "design-system"], "icon": "🌀", "label": "Chaos organisé" }
+    }
+  },
+  "visibleTraitRules": {
+    "political-shortcuts": { "kind": "always_local_lever", "lever": 0.05, "icon": "🏛️", "label": "Raccourcis politiques" },
+    "module-fragile": { "kind": "risk_threshold_local_lever", "riskThreshold": 4, "safeLever": 0.2, "riskyLever": -0.3, "icon": "⚠️", "safeLabel": "Module fragile préservé", "riskyLabel": "Module fragile exposé" },
+    "context-dependent": { "kind": "always_local_lever", "lever": 0.05, "icon": "🧠", "label": "Lecture du contexte" },
+    "production-watch": { "kind": "always_local_lever", "lever": 0.1, "icon": "🛠️", "label": "Production sous surveillance" },
+    "design-consistency": { "kind": "always_local_lever", "lever": 0.1, "icon": "🎨", "label": "Cohérence visuelle" },
+    "spreadsheet-backlog": { "kind": "always_local_lever", "lever": -0.05, "icon": "📋", "label": "Backlog tableur" },
+    "friday-deployer": { "kind": "always_local_lever", "lever": 0.05, "icon": "🚀", "label": "Optimisme de déploiement" },
+    "framework-rewriter": { "kind": "always_local_lever", "lever": 0.05, "icon": "🔧", "label": "Apprentissage par réécriture" },
+    "multilingual-comments": { "kind": "always_local_lever", "lever": 0.05, "icon": "💬", "label": "Commentaires multilingues" },
+    "rapid-prototyper": { "kind": "always_local_lever", "lever": 0.1, "icon": "⚡", "label": "Prototypage rapide" },
+    "meeting-minimalist": { "kind": "always_local_lever", "lever": -0.05, "icon": "⏱️", "label": "Réunions écourtées" },
+    "documentation-maximalist": { "kind": "always_local_lever", "lever": 0.05, "icon": "📝", "label": "Documentation exhaustive" },
+    "fast-and-fragile": { "kind": "always_local_lever", "lever": 0.05, "icon": "⚡", "label": "Vitesse sans relecture" },
+    "tool-enthusiast": { "kind": "always_local_lever", "lever": 0.05, "icon": "🧰", "label": "Enthousiasme outillage" },
+    "hard-questions": { "kind": "always_local_lever", "lever": 0.05, "icon": "❓", "label": "Questions difficiles" },
+    "friendly-no": { "kind": "always_local_lever", "lever": 0.1, "icon": "🛑", "label": "Non bienveillant" },
+    "estimate-believer": { "kind": "always_local_lever", "lever": -0.05, "icon": "📐", "label": "Estimations promises" },
+    "process-skeptic": { "kind": "always_local_lever", "lever": -0.05, "icon": "🙄", "label": "Scepticisme process" },
+    "user-advocate": { "kind": "always_local_lever", "lever": 0.1, "icon": "🫶", "label": "Défense utilisateur" },
+    "on-call-veteran": { "kind": "always_local_lever", "lever": 0.1, "icon": "📟", "label": "Astreinte aguerrie" },
+    "always-on": { "kind": "always_local_lever", "lever": -0.05, "icon": "🌙", "label": "Disponibilité permanente" }
+  },
+  "frictions": {
+    "cynisme": { "resource": "cynisme", "threshold": 40, "divisor": 120, "icon": "🎭", "label": "Cynisme" },
+    "dette": { "resource": "dette-organisationnelle", "threshold": 40, "divisor": 150, "icon": "🧱", "label": "Dette organisationnelle" },
+    "overheat": { "multiplier": 0.6, "icon": "🔥", "label": "Surchauffe" },
+    "moralCap": { "resource": "moral", "threshold": 30, "maxLever": 1.5, "icon": "💔", "label": "Moral au plancher" }
+  },
+  "conversion": {
+    "_comment": "Ce que le sprint produit une fois l'Impact calculé. Depuis #42, PLUS AUCUNE RÈGLE ICI NE FABRIQUE DU 💰 REVENUE À PARTIR DE L'IMPACT (docs/spec-impact-monnaie.md §3.8) : l'ancien `impactToMrr` a disparu, et avec lui la fuite `Impact → Valeur perçue → Revenue`. Ce qui reste part de l'Impact ne va que vers ceux qui jugent LE JOUEUR : le board (🎯 Capital politique). Ce que les utilisateurs pensent du produit (📈 Réputation produit) et ce que les clients paient (💰 Revenue) viennent tous deux des LIVRAISONS — jamais du score (§5.1.1). Les trois équipes subies gardent leur rôle et changent d'entrée : Sales sur les clients qui arrivent, CSM sur ceux qui partent, Product marketing sur ce que les livraisons font à la réputation.",
+    "teams": {
+      "sales": { "icon": "💼", "label": "Sales", "effect": "clients gagnés", "multipliers": { "0": 0.5, "1": 0.65, "2": 0.8, "3": 1.0, "4": 1.2, "5": 1.4 } },
+      "pmm": { "icon": "📣", "label": "Product marketing", "effect": "réputation produit", "multipliers": { "0": 0.5, "1": 0.65, "2": 0.8, "3": 1.0, "4": 1.2, "5": 1.4 } },
+      "csm": { "icon": "🎧", "label": "CSM / Support", "effect": "churn", "multipliers": { "0": 1.6, "1": 1.4, "2": 1.2, "3": 1.0, "4": 0.8, "5": 0.6 } }
+    },
+    "churnCrisis": { "moralBelow": 30, "debtAtLeast": 70, "minChurn": 0.15, "icon": "💔", "label": "Le produit se dégrade — les clients le sentent" },
+    "politicalCapital": { "impactPerPoint": 150, "icon": "🎯", "label": "Capital politique" }
+  }
+}

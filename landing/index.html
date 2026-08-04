@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Product Tycoon — concept de jeu</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-inner">
+    <div class="logo">
+      <div class="logo-mark">PT</div>
+      <div class="logo-text">PRODUCT&nbsp;TYCOON</div>
+      <div class="badge-concept">CONCEPT</div>
+    </div>
+    <div class="nav-links">
+      <span class="nav-link" title="Module non disponible dans cette démo">Feuille de route</span>
+      <span class="nav-link" title="Module non disponible dans cette démo">Équipe</span>
+      <span class="nav-link" title="Module non disponible dans cette démo">Facturation</span>
+    </div>
+    <div class="workspace-pill">Espace : Le Garage SAS ▾</div>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="wrap">
+    <span class="eyebrow">Module 00 — Onboarding</span>
+    <div class="toast">🎉 Félicitations. Vous êtes nommé·e CPO à partir d'aujourd'hui.</div>
+    <h1 class="hero-title">Chaque bonne pratique a un prix. Vous allez le découvrir en le payant.</h1>
+    <p class="hero-sub">Product Tycoon est un roguelike où vous reprenez la direction produit d'une organisation que vous n'avez pas construite. Contexte tiré au sort, équipe héritée, décisions rarement réversibles.</p>
+    <div class="stat-ticker">
+      <div class="stat-chip">💰 Runway <b>14 mois</b></div>
+      <div class="stat-chip">🫠 Moral équipe <b>62%</b></div>
+      <div class="stat-chip">🧱 Dette organisationnelle <b>38%</b></div>
+      <div class="stat-chip">🎯 Confiance du board <b>71%</b></div>
+    </div>
+    <div class="cta-row">
+      <a class="btn btn-primary" href="#ressources">Voir les ressources ↓</a>
+      <a class="btn btn-ghost" href="#mecanique">Comment ça marche ↓</a>
+      <a class="btn btn-ghost" href="#ecrans">Voir les écrans ↓</a>
+      <a class="btn btn-ghost" href="#epoques">Découvrir les contextes ↓</a>
+    </div>
+  </div>
+</header>
+
+<section class="section">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">Module 01 — Brief de mission</span>
+      <h2 class="section-title">Vous ne partez jamais d'une page blanche.</h2>
+      <p class="section-lead">À chaque run, un contexte est tiré au sort : les débuts de la Silicon Valley, une transformation agile imposée par le siège, ou un futur où l'IA prend de plus en plus de décisions. Vous héritez d'une équipe existante — âges, ancienneté et rapport au changement différents à chaque fois — et d'un Revenue qui ne pardonne pas grand-chose.</p>
+    </div>
+    <div class="loop-row" id="run-loop">
+      <div class="loop-step"><div class="n">01</div><div class="t">Contexte</div><div class="d">Une époque est tirée au sort, avec ses règles et ses modes.</div></div>
+      <div class="loop-arrow">→</div>
+      <div class="loop-step"><div class="n">02</div><div class="t">Équipe héritée</div><div class="d">Âges et maturités variables. Chaque profil réagit différemment.</div></div>
+      <div class="loop-arrow">→</div>
+      <div class="loop-step"><div class="n">03</div><div class="t">Décisions / sprint</div><div class="d">Vous déployez outils, process et rituels, sprint après sprint.</div></div>
+      <div class="loop-arrow">→</div>
+      <div class="loop-step"><div class="n">04</div><div class="t">Fin de mandat</div><div class="d">IPO, faillite, burn-out, ou pire. Rarement ce que vous aviez prévu.</div></div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="ressources">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">Module 02 — Ressources du mandat</span>
+      <h2 class="section-title">Six jauges. Aucune à optimiser seule.</h2>
+      <p class="section-lead">Les axes des cartes (coût humain, financier, time-to-market, productivité) sont la loupe : ce qu'une décision précise coûte dans l'instant. Les ressources ci-dessous sont le baromètre : ce que ces décisions, cumulées sprint après sprint, font à l'organisation dans son ensemble.</p>
+    </div>
+
+    <div class="resource-grid" id="resource-grid"></div>
+
+    <div class="tension-list" id="tension-list"></div>
+
+    <div class="hud" id="hud"></div>
+
+    <p class="demo-caption">Interface indicative — les seuils de déclenchement (zombie, exode, rachat hostile...) restent à équilibrer en playtest.</p>
+  </div>
+</section>
+
+<section class="section section-alt" id="mecanique">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">Module 03 — Le cœur du jeu</span>
+      <h2 class="section-title">Une carte, deux visages.</h2>
+      <p class="section-lead">Chaque pratique affiche une promesse théorique. Cliquez sur une carte pour la retourner et voir son effet réel — qui dépend de qui la reçoit. Changez le profil d'équipe ci-dessous pour voir les cartes se recalibrer. Une fois activée, chacune de ces cartes devient une <strong>Fondation</strong> qui vit sur le plateau au-delà du sprint — voir le plateau en bas de la page suivante.</p>
+    </div>
+
+    <div class="team-toggle" id="team-toggle" role="group" aria-label="Choisir la maturité de l'équipe"></div>
+    <div class="legend"><span><span class="dot green"></span>Bénéfice</span><span><span class="dot red"></span>Coût</span></div>
+
+    <div class="cards-grid" id="cards-grid"></div>
+    <p class="demo-caption">Exemple de calibrage, pas encore équilibré — les valeurs finales dépendront des tests de jeu.</p>
+  </div>
+</section>
+
+<section class="section" id="ecrans">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">Module 04 — Aperçu des écrans</span>
+      <h2 class="section-title">À quoi ressemble un sprint, concrètement.</h2>
+      <p class="section-lead">Trois moments d'un même sprint. Cliquez, sélectionnez, changez d'époque — tout est manipulable.</p>
+    </div>
+
+    <div class="screen-panel">
+      <div class="screen-label"><span class="live-dot"></span>Phase 1 — Inbox</div>
+      <div id="inbox-container"></div>
+    </div>
+
+    <div class="screen-panel">
+      <div class="screen-label"><span class="live-dot"></span>Phase 2 — Roadmap</div>
+      <div class="capacity-row">
+        <span>Capacité de l'équipe ce sprint</span>
+        <span id="capacity-count"></span>
+      </div>
+      <div class="capacity-bar"><div class="capacity-fill" id="capacity-fill"></div></div>
+      <div class="capacity-warning" id="capacity-warning">⚠️ Surchauffe — capacité dépassée : 🧱 Dette et 🎭 Cynisme vont grimper ce sprint.</div>
+      <div class="feature-grid" id="feature-grid"></div>
+    </div>
+
+    <div class="screen-panel">
+      <div class="screen-label"><span class="live-dot"></span>Phase 4 — Recrutement</div>
+      <div class="shop-toggle" id="shop-toggle" role="group" aria-label="Choisir l'habillage du shop"></div>
+      <div id="shop-panels"></div>
+    </div>
+
+    <div class="screen-panel">
+      <div class="screen-label"><span class="live-dot"></span>Toujours visible — Plateau des Fondations</div>
+      <p style="font-size:13px; color:var(--ink-soft); margin-bottom:16px;">Pas un compte à rebours : soit une décision est déjà active, soit elle attend une condition précise sur le plateau — jamais un simple minuteur.</p>
+      <div class="fondation-grid" id="fondation-grid"></div>
+    </div>
+
+    <p class="demo-caption">Écrans indicatifs — la mise en page finale dépendra du moteur de jeu choisi.</p>
+  </div>
+</section>
+
+<section class="section" id="epoques">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">Module 05 — Contextes de run</span>
+      <h2 class="section-title">Le contexte change les règles du jeu.</h2>
+      <p class="section-lead">Même carte, même joueur·se, résultat différent selon l'époque dans laquelle vous atterrissez.</p>
+    </div>
+    <div class="era-grid" id="era-grid"></div>
+  </div>
+</section>
+
+<section class="section section-alt">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">Module 06 — Sorties de run</span>
+      <h2 class="section-title">Il y a plus d'une façon de perdre. Et de gagner.</h2>
+    </div>
+    <div class="ending-grid" id="ending-grid"></div>
+  </div>
+</section>
+
+<footer class="footer">
+  <div class="wrap">
+    <div class="footer-title">PRODUCT TYCOON</div>
+    <p class="footer-note">Document de travail, pas un produit fini — cette page sert de base de réflexion sur le gameplay. RICE est un framework de priorisation public ; Notion et Jira sont cités à titre de référence, sans affiliation. Aucune métrique n'a été blessée pendant la conception de cette page — beaucoup d'egos, en revanche.</p>
+  </div>
+</footer>
+
+<script type="module" src="js/main.js"></script>
+
+</body>
+</html>

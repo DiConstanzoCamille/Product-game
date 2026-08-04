@@ -1,0 +1,63 @@
+{
+  "skins": [
+    {
+      "id": "moderne",
+      "label": "🏙️ Époque moderne",
+      "type": "candidates",
+      "candidates": [
+        {
+          "id": "sofia-pm-senior",
+          "avatar": "🧑‍💼",
+          "name": "Sofia — PM Senior",
+          "role": "Employée, temps plein",
+          "badges": ["Culture fit : élevé", "Préavis : 1 mois"],
+          "cost": "€€€ / sprint",
+          "action": "Embaucher"
+        },
+        {
+          "id": "contractuel-dev-backend",
+          "avatar": "🧑‍💻",
+          "name": "Contractuel — Dev Backend",
+          "role": "Consultant, mission courte",
+          "badges": ["Sans engagement long terme"],
+          "cost": "€€€€ / sprint",
+          "action": "Mandater"
+        },
+        {
+          "id": "kevin-ops-junior",
+          "avatar": "🧑",
+          "name": "Kevin — Ops Junior",
+          "role": "Employé, temps plein",
+          "badges": ["Culture fit : moyen"],
+          "cost": "€ / sprint",
+          "action": "Embaucher"
+        }
+      ]
+    },
+    {
+      "id": "annonces",
+      "label": "🗞️ Petites annonces — garage days",
+      "type": "ads",
+      "ads": [
+        {
+          "id": "codeur-motive",
+          "title": "Cherche codeur motivé",
+          "text": "Stock-options en lieu de salaire. Nuits courtes tolérées. Se présenter avant vendredi, garage au fond de l'impasse.",
+          "action": "Répondre à l'annonce"
+        },
+        {
+          "id": "consultant-disponible",
+          "title": "Consultant disponible",
+          "text": "Ancien de chez GrosCorp. Facture à la journée. Slides PowerPoint fournies. Résultats non garantis.",
+          "action": "Répondre à l'annonce"
+        },
+        {
+          "id": "stagiaire-experience",
+          "title": "Stagiaire cherche expérience",
+          "text": "Apprend vite, coûte presque rien, repart dans six mois avec toute la mémoire du projet.",
+          "action": "Répondre à l'annonce"
+        }
+      ]
+    }
+  ]
+}

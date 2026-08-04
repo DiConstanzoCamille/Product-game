@@ -1,0 +1,228 @@
+{
+  "_comment": "Données de simulation — consommées uniquement par game/ (pas par landing/). Toutes les valeurs sont indicatives, à ajuster en playtest. Décisions documentées dans docs/carnet-de-regles.md §14-19. Phase C ajoute le backlog profond ; le contenu de ses features et epics vit dans backlog.json.",
+
+  "startingResources": {
+    "moral": 60,
+    "dette-organisationnelle": 15,
+    "capital-politique": 55,
+    "reputation-produit": 50,
+    "cynisme": 10
+  },
+
+  "startingResourceOverrides": {},
+
+  "resourceBounds": { "min": 0, "max": 100 },
+
+  "revenue": {
+    "_comment": "💰 Le Revenue (spec-impact-monnaie.md §3) — la caisse de l'entreprise. Valeur SANS plafond : elle ne vit donc pas dans resources.json et n'a pas de jauge. Elle encaisse ce que les clients paient (spec-clients-revenue.md §2) et paie chaque sprint les salaires, les licences et le support des clients. À zéro, c'est la faillite (endingThresholds). Ce n'est PAS un stock d'abonnements : le stock, ce sont les clients eux-mêmes (businessModels → segments).",
+    "start": 46,
+    "startOverrides": { "karavel-scaleup": 30 }
+  },
+
+  "resourceDirection": {
+    "revenue": "high-good",
+    "moral": "high-good",
+    "capital-politique": "high-good",
+    "reputation-produit": "high-good",
+    "dette-organisationnelle": "low-good",
+    "cynisme": "low-good"
+  },
+
+  "stateThresholds": { "goodMin": 60, "dangerMax": 25 },
+
+  "trimesterLengthSprints": 3,
+
+  "endingThresholds": [
+    { "resource": "revenue", "comparison": "lte", "value": 0, "ending": "faillite" },
+    { "resource": "moral", "comparison": "lte", "value": 0, "ending": "exode-equipe" },
+    { "resource": "dette-organisationnelle", "comparison": "gte", "value": 100, "ending": "entreprise-zombie" },
+    { "resource": "capital-politique", "comparison": "lte", "value": 0, "ending": "rachat-hostile" },
+    { "resource": "cynisme", "comparison": "gte", "value": 100, "ending": "remplace-par-ia" },
+    { "resource": "energie", "comparison": "lte", "value": 0, "ending": "burnout-fondateur" }
+  ],
+
+  "endingThresholdOverrides": {
+    "garage": { "cynisme": 130 },
+    "ai-era": { "capital-politique": 12 }
+  },
+
+  "goodEnding": {
+    "_comment": "Deux fins positives, deux juges différents (spec-clients-revenue.md §5.1.1) — on ne moyenne plus une perception produit et une perception joueur. 🚀 L'IPO se gagne sur ce que vaut le PRODUIT : 📈 Réputation produit au-dessus du seuil, et une base de clients réellement là. 🤝 Le rachat est le reste : quelqu'un achète l'entreprise (et vous avec), ce qui n'exige rien du produit.",
+    "ipo": {
+      "resource": "reputation-produit",
+      "threshold": 62,
+      "clientRevenueAtLeastCharges": 1.0
+    },
+    "highEnding": "ipo",
+    "lowEnding": "rachat"
+  },
+
+  "cardAxisResourceMap": {
+    "humain": { "resource": "moral", "invert": false },
+    "financier": { "resource": "revenue", "invert": false },
+    "ttm": { "resource": "reputation-produit", "invert": false },
+    "productivite": { "resource": "dette-organisationnelle", "invert": true }
+  },
+
+  "toolSlots": {
+    "_comment": "Spec §7.1.1 et §13.4 (Lot 5). Base indexee par niveau de carriere - les 4 lignes ajoutees par le Lot 5 suivent la table de careers.json (3 -> 4 -> 5 -> 6 -> 7). Le plafond arbitraire structuralDecisionMaxActivations:4 disparait : la capacite se gagne (carriere) ou s'achete (extraSlotCosts), elle n'est plus une constante unique.",
+    "careerLevels": {
+      "pm": { "base": 3 },
+      "lead-pm": { "base": 4 },
+      "director": { "base": 5 },
+      "cpo": { "base": 6 },
+      "ceo": { "base": 7 }
+    },
+    "extraSlotCosts": [110, 190],
+    "swap": { "cynisme": 4, "cynismePerPreviousSwap": 3 }
+  },
+
+  "playableEras": ["agile-transformation"],
+
+  "businessModels": {
+    "_comment": "💰 Le Revenue n'est pas un stock, c'est une population qui paie (docs/spec-clients-revenue.md §2). Un modèle déclare 2 à 3 `segments`, jamais plus (§4.0) : c'est le minimum pour que « passer en payant » s'écrive sans règle spéciale, et le maximum lisible sur une ligne de panneau. Chaque sprint : `clients ← clients − churn + arrivées ± conversions`, puis `Revenue ← Revenue + Σ(clients × prix) − charges`. `clientsPerPoint` convertit l'effet client d'une feature (backlog.json → `clients`, une échelle de −6 à +6 partagée par tous les modèles) en clients réels de CE segment : la même feature amène 72 inscrits en freemium et 0,8 compte en B2B, sans qu'on écrive deux backlogs. `unitCost` est ce qu'un client coûte en support et en infra à chaque sprint — c'est lui qui rend une base gratuite dangereuse (§5.3). `price` est une CONSTANTE DU RUN (§5.2) : seule une décision stratégique explicite la change, jamais un événement. L'échelle de prix, elle, vient du scénario (eras.json → priceScale, §4.0.1). `role` (`entry`/`paying`) est ce qui rend les conversions écrivables sans connaître les ids : « faire passer des entrants en payants » est la même règle dans les deux modèles.",
+    "freemium-volume": {
+      "label": "Freemium — beaucoup de monde, peu d'argent",
+      "description": "Des milliers d'inscrits, une poignée qui paie. Chaque utilisateur coûte du support même quand il ne rapporte rien : la base grandit plus vite que la caisse, et c'est exactement le piège.",
+      "segments": [
+        { "id": "gratuits", "role": "entry", "label": "utilisateurs gratuits", "singular": "utilisateur gratuit", "shortLabel": "gratuits", "icon": "👥", "start": 760, "price": 0, "unitCost": 0.014, "churn": 0.07, "clientsPerPoint": 24 },
+        { "id": "payants", "role": "paying", "label": "abonnés", "singular": "abonné", "shortLabel": "abonnés", "icon": "💳", "start": 58, "price": 0.5, "unitCost": 0.04, "churn": 0.045, "clientsPerPoint": 1.5 }
+      ]
+    },
+    "grands-comptes": {
+      "label": "Grands comptes — peu de clients, chacun énorme",
+      "description": "Quelques dizaines de comptes qui signent à l'année. En perdre un se voit sur la ligne du sprint ; en signer un change le trimestre. Le pilote qui traîne coûte cher et ne paie presque rien.",
+      "segments": [
+        { "id": "pilotes", "role": "entry", "label": "comptes en pilote", "singular": "compte en pilote", "shortLabel": "pilotes", "icon": "🧪", "start": 15, "price": 0.28, "unitCost": 0.13, "churn": 0.13, "clientsPerPoint": 1.1 },
+        { "id": "comptes", "role": "paying", "label": "comptes signés", "singular": "compte signé", "shortLabel": "signés", "icon": "🏛️", "start": 25, "price": 1.2, "unitCost": 0.26, "churn": 0.03, "clientsPerPoint": 0.3 }
+      ]
+    },
+    "waterfall-release": {
+      "label": "Vente à la version (waterfall)",
+      "description": "Pas de population récurrente — de gros paliers de revenu tombent à la sortie d'une version. Déclaré et vide : le scénario Garage l'attend.",
+      "segments": []
+    }
+  },
+
+  "eraCardEffectMultipliers": {
+    "garage": {},
+    "agile-transformation": { "cynisme": 1.5 },
+    "ai-era": { "dette-organisationnelle": 1.15, "moral": 1.2, "revenue": 0.85 }
+  },
+
+  "salaries": { "junior": 1, "senior": 2 },
+
+  "roles": {
+    "dev": {
+      "label": "Dev",
+      "icon": "💻",
+      "capacityPerEmployee": { "junior": 2, "senior": 3 },
+      "fullYieldCount": 4,
+      "extraYieldFactor": 0.5
+    },
+    "pm": {
+      "label": "PM",
+      "icon": "📋",
+      "capacityPerEmployee": { "junior": 1, "senior": 1 },
+      "fullYieldCount": 3,
+      "extraYieldFactor": 0.5,
+      "overloadReductionPerPm": 0.25,
+      "overloadReductionMax": 0.5
+    },
+    "designer": {
+      "label": "Designer",
+      "icon": "🎨",
+      "capacityPerEmployee": { "junior": 0, "senior": 0 },
+      "reputationPerFeatureDelivered": 1,
+      "reputationPerFeatureDeliveredMax": 2,
+      "reputationEffectsDivisorIfAbsent": 2
+    },
+    "ops": {
+      "label": "Ops",
+      "icon": "🛠️",
+      "capacityPerEmployee": { "junior": 0, "senior": 0 },
+      "dettePerOps": -1,
+      "detteReliefMax": -2,
+      "dettePerSprintIfAbsent": 2
+    }
+  },
+
+  "firing": {
+    "severanceImpact": 18,
+    "moral": -4,
+    "cynismePerExtraFiring": 3
+  },
+
+  "trialPeriodSprints": 2,
+
+  "licenses": {
+    "_comment": "💰 Charges récurrentes (spec-impact-monnaie.md §3.6) — comptées PAR SIÈGE, jamais au forfait : grandir augmente mécaniquement la facture, et une organisation qui grossit sans produire se met en danger toute seule. `perSeat` est un coût de Revenue par sprint et par personne du roster ; `flat` un abonnement fixe. Chaque poste porte sa propre valeur (cards.json, practices.json, strategy.json, investments.json) ; ce bloc n'en donne que le défaut quand le poste n'en déclare pas.",
+    "defaultToolPerSeat": 0.4,
+    "defaultPracticePerSeat": 0.2,
+    "defaultStrategyFlat": 0
+  },
+
+  "shopDraw": {
+    "slotsPerSprint": 6,
+    "guaranteedPerSprint": {
+      "candidate": 1,
+      "decision": 1,
+      "practice": 0
+    },
+    "typeWeights": {
+      "candidate": 34,
+      "practice": 33,
+      "decision": 33
+    },
+    "practiceCynisme": 2,
+    "reroll": {
+      "baseCost": 8,
+      "costIncrement": 8
+    },
+    "reserveCostImpact": 10,
+    "rarityWeights": {
+      "commune": 100,
+      "notable": 40,
+      "rare": 12
+    },
+    "lockedLeaseSprints": 6
+  },
+
+  "energy": {
+    "start": 70,
+    "max": 100,
+    "regenPerSprint": 12,
+    "moralRegenTiers": [
+      { "moralMin": 60, "factor": 1.0 },
+      { "moralMin": 30, "factor": 0.5 },
+      { "moralMin": 0, "factor": 0.0 }
+    ],
+    "breatherRegenBonus": 10,
+    "actions": {
+      "oneOnOne": { "cost": 10 },
+      "selfWork": { "cost": 25, "capacityBonus": 2 },
+      "extension": { "cost": 10, "capitalPolitique": -8, "revenue": 14 },
+      "featureDive": { "cost": 15 },
+      "breather": { "cost": 0 }
+    }
+  },
+
+  "pressure": {
+    "reputationDecayPerSprint": 2,
+    "boardReview": {
+      "successCapitalPolitique": 8,
+      "failCapitalPolitique": -12
+    }
+  },
+
+  "roadmap": {
+    "overCapacityPenalty": { "dette-organisationnelle": 10, "cynisme": 6, "moral": -4 }
+  },
+
+  "backlogDraw": {
+    "itemsPerSprintMin": 4,
+    "itemsPerSprintMax": 5,
+    "strongClientsThreshold": 2,
+    "okrCapitalPolitiqueBonus": 2
+  }
+}

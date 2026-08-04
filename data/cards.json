@@ -1,0 +1,201 @@
+{
+  "_comment": "Grandes décisions structurelles (spec scoring §7.1/§7.1.1/§7.1.2). `costImpact` est le prix d'activation en 💥 Impact ; `licensePerSeat` la licence en 💰 Revenue prélevée chaque sprint **par personne du roster** tant que l'outil occupe son slot (spec-impact-monnaie.md §3.6) : le même chiffre gouverne le gain (Levier par employé) et la facture. Les axes/effects historiques restent le feedback immédiat sur les jauges à l'activation (par teamProfile). Depuis le Lot 3, un outil (family outil-process/methodologie-orga) déclare en plus perEmployee/eligibility/refractory/adoptionCondition/flatModifiers/cumulative/slotBonus : le Levier continu que ScoreResolver applique chaque sprint tant que la carte reste active, calculé sur le roster réel — jamais une valeur figée par entreprise. slotBonus n'existe que sur les outils cumulatifs (ils rendent leur place, §7.1.1.b). Chaque carte outil-process/methodologie-orga du catalogue déclare perEmployee ou cumulative (une carte payante et slottée sans aucun des deux serait un piège pur) ; score_resolver_cases.gd → _test_every_tool_card_has_a_lever le vérifie.",
+  "axes": [
+    { "id": "humain", "label": "Coût humain" },
+    { "id": "financier", "label": "Coût financier" },
+    { "id": "ttm", "label": "Time-to-market" },
+    { "id": "productivite", "label": "Productivité" }
+  ],
+  "teamProfiles": [
+    { "id": "junior", "label": "🌱 Équipe junior — startup, 18 mois", "shortLabel": "équipe junior" },
+    { "id": "senior", "label": "🏛️ Équipe senior — grand groupe, 12 ans", "shortLabel": "équipe senior" }
+  ],
+  "cards": [
+    {
+      "id": "rice",
+      "costImpact": 24,
+      "licensePerSeat": 0.3,
+      "refId": "PRD-014",
+      "family": "outil-process",
+      "category": "Module priorisation",
+      "rarity": "commune",
+      "name": "RICE Scoring",
+      "icon": "🧮",
+      "tagline": "Reach × Impact × Confidence ÷ Effort. La science contre le petit doigt mouillé.",
+      "perEmployee": 0.08,
+      "eligibility": { "roles": ["pm", "designer"] },
+      "adoptionCondition": { "multiplier": 2, "condition": { "rejectedFeaturesMinimum": 3 } },
+      "effects": {
+        "junior": {
+          "humain": { "value": 25, "note": "Cadre qui rassure une équipe qui manque encore de repères." },
+          "financier": { "value": -5, "note": "Quasi nul — un tableur suffit." },
+          "ttm": { "value": -15, "note": "Premier sprint ralenti le temps d'apprendre la grille." },
+          "productivite": { "value": 30, "note": "Priorisation plus lisible, moins de débats sans fin." }
+        },
+        "senior": {
+          "humain": { "value": -35, "note": "Perçu comme un contrôle sur un instinct qui marchait déjà bien." },
+          "financier": { "value": -5, "note": "Toujours quasi nul." },
+          "ttm": { "value": -25, "note": "Réunions interminables pour négocier les scores." },
+          "productivite": { "value": 10, "note": "Léger gain d'alignement, si tout le monde joue vraiment le jeu." }
+        }
+      }
+    },
+    {
+      "id": "notion",
+      "costImpact": 32,
+      "licensePerSeat": 0.5,
+      "refId": "DOC-002",
+      "family": "outil-process",
+      "category": "Module documentation",
+      "rarity": "commune",
+      "name": "Notion",
+      "icon": "📓",
+      "tagline": "Un espace blanc infini. Tout y est possible, y compris s'y perdre.",
+      "perEmployee": 0.08,
+      "eligibility": { "anyOf": [{ "seniority": "junior" }, { "hiredWithinSprints": 4 }] },
+      "refractory": { "condition": { "seniority": "senior", "hiredBeforeSprints": 8 }, "perEmployee": -0.05 },
+      "adoptionCondition": { "multiplier": 2, "condition": { "noMatch": { "seniority": "senior", "hiredBeforeSprints": 8 } } },
+      "effects": {
+        "junior": {
+          "humain": { "value": 30, "note": "Équipe conquise par la liberté de mise en page." },
+          "financier": { "value": -10, "note": "Abonnement modéré par utilisateur." },
+          "ttm": { "value": 15, "note": "Mise en place en une après-midi." },
+          "productivite": { "value": -10, "note": "Premiers signes de pages orphelines et de doublons." }
+        },
+        "senior": {
+          "humain": { "value": -10, "note": "La conformité s'inquiète de l'absence de structure." },
+          "financier": { "value": -10, "note": "Coût comparable, mais moins bien justifié en interne." },
+          "ttm": { "value": -5, "note": "Il faut poser des règles de gouvernance avant d'ouvrir les vannes." },
+          "productivite": { "value": -30, "note": "Perte de traçabilité sur un historique critique." }
+        }
+      }
+    },
+    {
+      "id": "jira",
+      "costImpact": 48,
+      "licensePerSeat": 0.7,
+      "refId": "DOC-003",
+      "family": "outil-process",
+      "category": "Module suivi & doc",
+      "rarity": "notable",
+      "eraWeights": { "agile-transformation": 2.0 },
+      "name": "Jira",
+      "icon": "🗂️",
+      "tagline": "Chaque ticket a un statut. Chaque statut a un mensonge.",
+      "perEmployee": 0.05,
+      "eligibility": {},
+      "flatModifiers": [{ "when": { "rosterMaximum": 4 }, "value": -0.15 }],
+      "adoptionCondition": { "multiplier": 2, "condition": { "rosterMinimum": 8 } },
+      "effects": {
+        "junior": {
+          "humain": { "value": -30, "note": "Vécu comme une mise sous surveillance d'une équipe de six personnes." },
+          "financier": { "value": -20, "note": "Licences qui pèsent lourd pour un budget serré." },
+          "ttm": { "value": -20, "note": "Paramétrage des workflows avant la première ligne de code." },
+          "productivite": { "value": 15, "note": "Un vrai gain, une fois la friction initiale passée." }
+        },
+        "senior": {
+          "humain": { "value": 5, "note": "Une routine connue, personne n'est surpris." },
+          "financier": { "value": -15, "note": "Coût récurrent, mais déjà budgété depuis longtemps." },
+          "ttm": { "value": 5, "note": "L'équipe sait déjà s'en servir." },
+          "productivite": { "value": 35, "note": "Traçabilité qui rassure l'audit et la direction." }
+        }
+      }
+    },
+    {
+      "id": "daily-standup",
+      "costImpact": 16,
+      "licensePerSeat": 0.2,
+      "refId": "RIT-001",
+      "family": "methodologie-orga",
+      "category": "Rituel quotidien",
+      "rarity": "commune",
+      "name": "Daily Standup",
+      "icon": "🔁",
+      "leverLabel": "Sprint planning",
+      "tagline": "Quinze minutes debout, en théorie. La réalité dépend beaucoup de qui parle en premier.",
+      "eras": ["agile-transformation"],
+      "perEmployee": 0.06,
+      "eligibility": { "roles": ["dev", "pm"] },
+      "adoptionCondition": { "multiplier": 2, "condition": { "previousPerfectSprint": true } },
+      "effects": {
+        "junior": {
+          "humain": { "value": 20, "note": "Un repère quotidien qui rassure une équipe qui manque encore de rythme." },
+          "financier": { "value": -2, "note": "Quasi nul." },
+          "ttm": { "value": -5, "note": "Petit coût d'installation du rituel." },
+          "productivite": { "value": 15, "note": "Meilleure synchro, moins de blocages découverts trop tard." }
+        },
+        "senior": {
+          "humain": { "value": -15, "note": "Perçu comme du micromanagement sur une équipe qui se coordonnait déjà." },
+          "financier": { "value": -2, "note": "Quasi nul." },
+          "ttm": { "value": 0, "note": "Ni gain ni perte notable." },
+          "productivite": { "value": 5, "note": "Léger gain, l'équipe se parlait déjà informellement." }
+        }
+      }
+    },
+    {
+      "id": "sprint-retro",
+      "costImpact": 16,
+      "licensePerSeat": 0.2,
+      "refId": "RIT-002",
+      "family": "methodologie-orga",
+      "category": "Rituel de fin de sprint",
+      "rarity": "notable",
+      "name": "Sprint Rétro",
+      "icon": "🪞",
+      "tagline": "Le seul moment où on a le droit de dire que ça ne va pas — encore faut-il que quelqu'un ose.",
+      "eras": ["agile-transformation"],
+      "cumulative": { "perSprint": 0.05 },
+      "slotBonus": 1,
+      "adoptionCondition": { "multiplier": 2, "condition": { "resourceMaximum": { "cynisme": 30 } } },
+      "effects": {
+        "junior": {
+          "humain": { "value": 15, "note": "Premier espace où la parole circule sans hiérarchie." },
+          "financier": { "value": -2, "note": "Quasi nul." },
+          "ttm": { "value": -8, "note": "Un sprint qui semble « perdu » à discuter plutôt que livrer." },
+          "productivite": { "value": 10, "note": "Premiers ajustements, encore timides." }
+        },
+        "senior": {
+          "humain": { "value": 10, "note": "Bien reçu, si les retours sont pris au sérieux au sprint suivant." },
+          "financier": { "value": -2, "note": "Quasi nul." },
+          "ttm": { "value": -5, "note": "Coût récurrent mais prévisible." },
+          "productivite": { "value": 20, "note": "Vraie amélioration continue chez une équipe déjà mature." }
+        }
+      }
+    },
+    {
+      "id": "shape-up",
+      "costImpact": 40,
+      "licensePerSeat": 0.4,
+      "refId": "ORG-021",
+      "family": "methodologie-orga",
+      "category": "Refonte du cycle produit",
+      "rarity": "rare",
+      "name": "Passage en Shape Up",
+      "icon": "🤝",
+      "tagline": "Six semaines, un appétit, personne qui vient demander où on en est le mardi.",
+      "requires": {
+        "type": "roster-seniority-min",
+        "seniority": "senior",
+        "value": 2,
+        "label": "2 profils seniors dans l'équipe pour tenir un cycle sans chef de projet"
+      },
+      "perEmployee": 0.08,
+      "eligibility": { "roles": ["dev"], "seniority": "junior" },
+      "adoptionCondition": { "multiplier": 2, "condition": { "roleSeniorityMinimum": { "role": "dev", "seniority": "junior", "minimum": 2 } } },
+      "effects": {
+        "junior": {
+          "humain": { "value": -20, "note": "Trop d'autonomie d'un coup pour une équipe qui cherche encore ses repères." },
+          "financier": { "value": -5, "note": "Rien à acheter, tout à réapprendre." },
+          "ttm": { "value": -25, "note": "Deux cycles perdus avant que le rythme s'installe." },
+          "productivite": { "value": 20, "note": "Vrai gain une fois le premier cycle bouclé — s'il l'est." }
+        },
+        "senior": {
+          "humain": { "value": 30, "note": "On rend enfin le cycle à ceux qui le vivent ; le soulagement est net." },
+          "financier": { "value": -5, "note": "Rien à acheter." },
+          "ttm": { "value": -10, "note": "Un cycle d'adaptation, pas plus." },
+          "productivite": { "value": 40, "note": "L'équipe arrête d'être interrompue et livre par appétits entiers." }
+        }
+      }
+    }
+  ]
+}

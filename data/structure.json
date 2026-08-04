@@ -1,0 +1,47 @@
+{
+  "temporalScales": [
+    { "id": "sprint", "duration": "~2 semaines", "role": "Unité de jeu de base — un tour complet" },
+    { "id": "trimestre", "duration": "3 sprints", "role": "Quota d'Impact et exigence du board, événement « boss »" },
+    { "id": "mandat", "duration": "4 trimestres puis optionnellement sans limite", "role": "Le run entier, de la nomination à la sortie ou au mandat long" }
+  ],
+  "sprintPhases": [
+    { "order": 1, "id": "inbox", "name": "Inbox", "description": "Un événement aléatoire tombe (le « chaos humain ») et force un choix avant toute planification." },
+    { "order": 2, "id": "roadmap", "name": "Roadmap", "description": "2 à 4 features proposées, sélection limitée par la capacité de l'équipe. Dépasser sa capacité déclenche une surchauffe (dette + cynisme en hausse)." },
+    { "order": 3, "id": "investissements", "name": "Investissements", "description": "Un seul écran, un seul rayon : 6 emplacements tirés une fois par sprint dans un pool commun aux trois types d'Actif (candidats, pratiques, grandes décisions), avec un minimum garanti par type. Tout est optionnel — mettre les acquisitions en concurrence dans le même champ de vision, avec la même pièce et le même tour, est l'arbitrage du tour. On peut payer pour rejouer l'offre (re-tirage) ou pour en garder une carte (punaise)." },
+    { "order": 4, "id": "resolution", "name": "Résolution", "description": "Application des effets, delta affiché." }
+  ],
+  "cardSystem": {
+    "tactical": {
+      "id": "decisions-tactiques",
+      "description": "Une main piochée chaque sprint dans un deck — arbitrages du quotidien (priorisation ponctuelle, réponse à un incident, micro-ajustement). C'est la couche aléatoire, façon deckbuilder."
+    },
+    "structural": {
+      "id": "grandes-decisions-structurelles",
+      "description": "Tirées au rayon des Investissements comme le reste de l'offre (2 par sprint, tirage pondéré par la rareté et le scénario, sans mémoire d'un sprint à l'autre ; une carte activée sort du tirage définitivement), et limitées à 3-4 activations par mandat, avec un vrai coût de bascule. Passer son tour sur une carte, c'est parier qu'elle reviendra — on peut payer pour la garder (punaise) ou pour rejouer l'offre (re-tirage). Une carte à prérequis reste affichée un trimestre, verrouillée tant que sa condition est fausse.",
+      "families": [
+        { "id": "outil-process", "label": "Outils / process", "example": "RICE, Notion, Jira", "affects": "Effet direct sur les jauges" },
+        { "id": "stack-technique", "label": "Stack technique / produit", "example": "React", "affects": "Effet sur le shop de recrutement, pas sur les jauges" },
+        { "id": "methodologie-orga", "label": "Méthodologie d'orga", "example": "Shape Up", "affects": "Gatée par prérequis, n'apporte rien tant que les bonnes conditions ne sont pas réunies" }
+      ]
+    }
+  },
+  "persistentEffectsRules": {
+    "defaultRule": "Toute grande décision (outil, feature, recrutement) applique son coût immédiatement. Son effet — bonus ou malus durable — est actif dès le sprint suivant. Un seul palier de décalage, prévisible, pas de grind.",
+    "contextualFriction": "Un coût ou un délai supplémentaire ne se justifie que lorsqu'une décision ne correspond pas au terrain — pas comme règle générale. Exemple : Notion adopté par une équipe senior habituée au PowerPoint coûte déjà plus cher, et son bonus met un sprint de plus à se stabiliser. Sur une équipe junior : aucun délai supplémentaire.",
+    "prerequisites": "Une Fondation ambitieuse peut rester inactive tant qu'une condition sur le plateau n'est pas remplie — pas un minuteur, une vérification continue. Affichée comme « en attente » tant que ce n'est pas vrai ; s'active au sprint suivant dès que la condition l'est.",
+    "crossSystemStacks": "Certaines grandes décisions n'affectent pas les jauges directement, mais modifient un autre système — typiquement le shop de recrutement."
+  },
+  "unifiedEffectModel": {
+    "description": "Un seul objet « effet » partout : ressource ciblée + magnitude + condition (profil d'équipe / époque) + durée (ponctuel ou tant que l'employé/la carte est actif). Les modificateurs s'empilent comme des remises cumulées sur un prix.",
+    "applicationOrder": ["carte", "employe", "epoque", "arrondi"],
+    "example": {
+      "scenario": "Activer RICE en pleine Transformation Agile, avec un Ex-consultant McKinsey dans l'équipe, profil senior.",
+      "steps": [
+        { "step": "Effet de base (équipe senior)", "result": "Coût humain −35" },
+        { "step": "Trait employé : réduit de moitié le coût humain sur les cartes de framework", "result": "Coût humain −18" },
+        { "step": "Multiplicateur d'époque sur l'effet cynisme des cartes rituelles (×1.5)", "result": "Effet secondaire cynisme +7 devient +11" }
+      ],
+      "displayedToPlayer": "Coût humain −18, Cynisme +11 en petit texte dans le journal du sprint."
+    }
+  }
+}
