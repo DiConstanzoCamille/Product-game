@@ -1,4 +1,4 @@
-[gd_resource type="Theme" load_steps=8 format=3]
+[gd_resource type="Theme" load_steps=10 format=3]
 
 ; Thème clair, direction « Post-it & Feutre » (docs/proposition-ui-interface.md §6,
 ; piste 1). Le monde de jeu est clair — papier, tableau blanc, fiches cartonnées ;
@@ -7,6 +7,11 @@
 ; filet d'encre épais, l'encre s'inverse à l'appui.
 
 [ext_resource type="FontFile" path="res://assets/fonts/IBMPlexSans-Variable.ttf" id="1_body_font"]
+[ext_resource type="FontFile" path="res://assets/fonts/ProductIcons.ttf" id="2_icon_font"]
+
+[sub_resource type="FontVariation" id="FontVariation_body_with_icons"]
+base_font = ExtResource("1_body_font")
+fallbacks = Array[Font]([ExtResource("2_icon_font")])
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_button_normal"]
 bg_color = Color(1, 1, 1, 1)
@@ -105,7 +110,7 @@ corner_radius_bottom_right = 4
 corner_radius_bottom_left = 4
 
 [resource]
-default_font = ExtResource("1_body_font")
+default_font = SubResource("FontVariation_body_with_icons")
 default_font_size = 16
 Button/styles/normal = SubResource("StyleBoxFlat_button_normal")
 Button/styles/hover = SubResource("StyleBoxFlat_button_hover")

@@ -276,7 +276,7 @@
     {
       "id": "traduction-allemand",
       "name": "Traduction allemande",
-      "icon": "🇩🇪",
+      "icon": "🌍",
       "description": "Le marché allemand attend une seule chose pour signer : que le produit lui parle allemand. Aucune innovation, aucun risque, juste du travail.",
       "costPoints": 3,
       "clients": 3,
