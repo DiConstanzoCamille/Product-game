@@ -71,6 +71,7 @@ const SHADOW_OFFSET_HOVER := Vector2(2, 6)
 const FONT_SPACE_GROTESK := preload("res://assets/fonts/SpaceGrotesk-Variable.ttf")
 const FONT_MONO_MEDIUM := preload("res://assets/fonts/IBMPlexMono-Medium.ttf")
 const FONT_MONO_SEMIBOLD := preload("res://assets/fonts/IBMPlexMono-SemiBold.ttf")
+const FONT_PRODUCT_ICONS := preload("res://assets/fonts/ProductIcons.ttf")
 
 const ICON_DIR := "res://assets/icons/"
 const AVATAR_DIR := "res://assets/avatars/"
@@ -244,6 +245,7 @@ static func make_bar_background_style() -> StyleBoxFlat:
 static func heading_font(weight: float = 600.0) -> FontVariation:
 	var variation := FontVariation.new()
 	variation.base_font = FONT_SPACE_GROTESK
+	variation.fallbacks = [FONT_PRODUCT_ICONS]
 	variation.variation_opentype = {"wght": weight}
 	return variation
 
@@ -255,7 +257,10 @@ static func apply_heading(label: Label, size: int = 20, weight: float = 600.0) -
 
 ## Police mono (IBM Plex Mono) pour les labels de type "eyebrow" / compteurs.
 static func apply_mono(label: Label, size: int = 12, semibold: bool = false) -> void:
-	label.add_theme_font_override("font", FONT_MONO_SEMIBOLD if semibold else FONT_MONO_MEDIUM)
+	var variation := FontVariation.new()
+	variation.base_font = FONT_MONO_SEMIBOLD if semibold else FONT_MONO_MEDIUM
+	variation.fallbacks = [FONT_PRODUCT_ICONS]
+	label.add_theme_font_override("font", variation)
 	label.add_theme_font_size_override("font_size", size)
 
 

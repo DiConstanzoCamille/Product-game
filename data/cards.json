@@ -1,5 +1,5 @@
 {
-  "_comment": "Grandes décisions structurelles (spec scoring §7.1/§7.1.1/§7.1.2). `costImpact` est le prix d'activation en 💥 Impact ; `licensePerSeat` la licence en 💰 Revenue prélevée chaque sprint **par personne du roster** tant que l'outil occupe son slot (spec-impact-monnaie.md §3.6) : le même chiffre gouverne le gain (Levier par employé) et la facture. Les axes/effects historiques restent le feedback immédiat sur les jauges à l'activation (par teamProfile). Depuis le Lot 3, un outil (family outil-process/methodologie-orga) déclare en plus perEmployee/eligibility/refractory/adoptionCondition/flatModifiers/cumulative/slotBonus : le Levier continu que ScoreResolver applique chaque sprint tant que la carte reste active, calculé sur le roster réel — jamais une valeur figée par entreprise. slotBonus n'existe que sur les outils cumulatifs (ils rendent leur place, §7.1.1.b). Chaque carte outil-process/methodologie-orga du catalogue déclare perEmployee ou cumulative (une carte payante et slottée sans aucun des deux serait un piège pur) ; score_resolver_cases.gd → _test_every_tool_card_has_a_lever le vérifie.",
+  "_comment": "Grandes décisions structurelles (spec scoring §7.1/§7.1.1/§7.1.2). `costImpact` est le prix d'activation en 💥 Impact ; `licensePerSeat` la licence en 💰 Revenue prélevée chaque sprint **par personne du roster** tant que l'outil occupe son slot (spec-impact-monnaie.md §3.6) : le même chiffre gouverne le gain (Levier par employé) et la facture. Les axes/effects historiques restent le feedback immédiat sur les jauges à l'activation (par teamProfile). Un outil (family outil-process/methodologie-orga) peut déclarer une base additive (perEmployee/eligibility/refractory/adoptionCondition/flatModifiers/cumulative) et, depuis #37, une troisième couche `leverMultiplier` fixe ou pilotée par un compteur data-driven. ScoreResolver applique toujours la somme avant le produit. slotBonus n'existe que sur les outils cumulatifs (ils rendent leur place, §7.1.1.b). Chaque carte du catalogue déclare au moins un additif ou un multiplicateur ; score_resolver_cases.gd → _test_every_tool_card_has_a_lever le vérifie.",
   "axes": [
     { "id": "humain", "label": "Coût humain" },
     { "id": "financier", "label": "Coût financier" },
@@ -194,6 +194,36 @@
           "financier": { "value": -5, "note": "Rien à acheter." },
           "ttm": { "value": -10, "note": "Un cycle d'adaptation, pas plus." },
           "productivite": { "value": 40, "note": "L'équipe arrête d'être interrompue et livre par appétits entiers." }
+        }
+      }
+    },
+    {
+      "id": "socle-technique-commun",
+      "costImpact": 90,
+      "licensePerSeat": 0.5,
+      "refId": "PLT-001",
+      "family": "outil-process",
+      "category": "Plateforme interne",
+      "rarity": "rare",
+      "name": "Socle technique commun",
+      "icon": "🧰",
+      "tagline": "Chaque nouvel outil cesse d'être une île. Seul, ce socle ne sert presque à rien.",
+      "leverMultiplier": {
+        "perCount": 1.6,
+        "counter": { "kind": "active_tools", "maxCount": 3, "label": "outils actifs (3 max.)" }
+      },
+      "effects": {
+        "junior": {
+          "humain": { "value": -10, "note": "La plateforme impose des conventions avant que l'équipe en ressente le bénéfice." },
+          "financier": { "value": -35, "note": "Une licence par siège qui ne se justifie qu'avec plusieurs outils." },
+          "ttm": { "value": -25, "note": "La première intégration ralentit franchement le sprint." },
+          "productivite": { "value": 35, "note": "Chaque outil suivant profite du même socle." }
+        },
+        "senior": {
+          "humain": { "value": 5, "note": "Les conventions communes réduisent les guerres d'outillage." },
+          "financier": { "value": -35, "note": "Le coût par siège grossit avec l'organisation." },
+          "ttm": { "value": -20, "note": "Il faut raccorder l'existant avant d'accélérer." },
+          "productivite": { "value": 45, "note": "Une équipe expérimentée compose mieux les outils autour du socle." }
         }
       }
     }

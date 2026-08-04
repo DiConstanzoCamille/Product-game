@@ -1680,3 +1680,137 @@ ce lot vient de démonter.
   **pas dans le pool de l'injonction du board** : imposer un changement de
   modèle économique irréversible sans le choisir n'est pas un pari, c'est une
   punition.
+
+---
+
+## 33. Le Levier sait enfin multiplier (issue #37)
+
+Le contrat de score accepte désormais une troisième couche :
+
+```
+Levier final = (base + somme des additifs) × produit des multiplicateurs
+```
+
+`leverMultiplier` est une donnée, jamais une branche d'id dans le resolver. Il
+peut être fixe (`1.8`) ou dépendre d'un compteur (`perCount` + `counter`) ; les
+compteurs disponibles couvrent les outils actifs, un sous-ensemble du roster
+et le palier produit. `offset` retire une base et `maxCount` borne le degré.
+Les outils, pratiques, stratégies, paliers produit, combos locaux et combos
+inter-équipes partagent exactement cette grammaire.
+
+Le rapport sépare explicitement la base additive, chaque facteur et le résultat
+effectif. La Résolution rejoue ces lignes dans l'ordre, et le panneau permanent
+conserve la chaîne du **dernier sprint** : c'est une explication du passé, pas
+une promesse sur le prochain tirage. Avec plusieurs équipes, les facteurs
+locaux restent dans leur section ; le panneau global ne les remultiplie pas à
+tort après leur agrégation pondérée.
+
+### 33.1 Deux premières pièces, deux lignes de jeu
+
+- 🧰 **Socle technique commun** : outil rare à 90 💥 et 0,5 💰 par siège,
+  `×1,6` par outil actif, borné à trois facteurs (`×4,10`). Le plafond explicite
+  garde le degré 3 spectaculaire sans faire diverger la courbe entre PM et CEO.
+- 🛡️ **Équipe complète** : l'ancien `+0,6` devient `×1,8`, avec quatre rôles
+  couverts **et au moins six personnes**. Les données ne contiennent que quatre
+  rôles ; tester uniquement les rôles aurait activé le multiplicateur sur les
+  deux entreprises de départ et transformé un combo rare en rente gratuite.
+
+Le Socle reste un pari : il coûte un slot, de l'Impact et une licence, ne donne
+presque rien sans base additive, et son tirage rare ne peut pas être garanti.
+L'Équipe complète demande au contraire d'acheter et de payer un effectif. Les
+deux voies se renforcent différemment et aucune ne remplace l'autre.
+
+### 33.2 Ce que mesure le banc
+
+40 exécutions headless, soit 160 mandats par profil :
+
+| Profil | Fins positives | Part | Faillites |
+|---|---:|---:|---:|
+| `careful` | 0 / 160 | 0 % | 0 |
+| `outillage` | 41 / 160 | 25,6 % | 28 |
+| `generaliste` | 38 / 160 | 23,8 % | 9 |
+| `levier` | 31 / 160 | 19,4 % | 47 |
+| `economie` | 29 / 160 | 18,1 % | 2 |
+| `greedy` | 24 / 160 | 15,0 % | 8 |
+
+Le Socle apparaît dans 95 des 160 mandats `outillage`. Les deux nouvelles lignes
+finissent en tête sans s'échapper : 25,6 % et 23,8 %, contre 19,4 % pour
+`levier`. L'outillage paie sa puissance par 28 faillites ; `generaliste` paie
+un effectif mais reste plus stable. `careful` perd toujours. Ce banc valide la
+viabilité et l'absence de domination sur cet échantillon ; il ne prétend pas
+remplacer un playtest humain sur la lisibilité ou le plaisir du décollage.
+
+### 33.3 Garde-fous de régression
+
+Le banc déterministe vérifie que les additifs passent avant les facteurs, que
+deux `×1,5` composent `×2,25`, que `maxCount` borne le degré et que le rapport
+conserve les facteurs locaux et globaux. Le smoke UI instancie les onze écrans,
+fait apparaître un vrai Socle dans la Résolution et exige la chaîne permanente
+du panneau. Une carte qui consomme un slot sans déclarer additif ni
+`leverMultiplier` reste interdite.
+
+---
+
+## 34. Les pictogrammes ne dépendent plus du système (issue #47)
+
+Les emojis visibles ont cessé d'être une dépendance implicite à macOS,
+Windows ou à la distribution Linux qui lance le jeu. Leurs caractères restent
+dans les données — ils sont pratiques comme identifiants compacts et ne
+participent à aucune règle — mais leur dessin vient désormais de
+`game/assets/fonts/ProductIcons.ttf`, un asset vectoriel monochrome généré à
+partir du set Lucide déjà utilisé par le HUD.
+
+IBM Plex Sans, IBM Plex Mono et Space Grotesk déclarent tous cet asset comme
+fallback explicite et désactivent le fallback système. Une même chaîne produit
+donc le même signe, la même couleur de texte et les mêmes métriques sur toutes
+les plateformes comme dans Xvfb. Les sélecteurs invisibles des anciennes
+chaînes emoji sont absorbés avec une avance nulle ; le libellé `◆◆ RARE`, qui
+avait révélé le problème, est lui aussi couvert.
+
+Ce choix conserve les textes et les données existantes tout en supprimant les
+deux défauts observés : les carrés de remplacement en capture headless et le
+mélange de styles colorés propre à chaque OS.
+
+### 34.1 Une liste blanche ne protège que ce à quoi on a pensé
+
+Le premier garde-fou demandait « ce caractère est-il un pictogramme ? » avant
+de vérifier sa couverture, et répondait avec une liste de codepoints écrite à
+la main. Il est resté vert pendant que `▸`, `◂`, `○`, `●` et `✗` — cinq signes
+bien présents à l'écran, dans les choix de l'Inbox, le bouton *Replier*, les
+objectifs et les en-têtes de panneau — se dessinaient en carrés dès que la
+police système était coupée. Personne ne les avait déclarés « pictogrammes »,
+donc personne ne les vérifiait : le test protégeait exactement ce qu'on savait
+déjà.
+
+Le contrôle prend maintenant le problème par l'autre bout, et n'a plus de
+liste du tout : **tout caractère non-ASCII écrit dans une chaîne de `game/` ou
+de `data/` doit être dessiné par au moins une des six polices embarquées.** Il
+ne peut donc plus rater un signe qu'on n'avait pas anticipé — c'est la
+propriété qui compte, pas l'exhaustivité de la liste. Deux précisions le
+rendent utilisable :
+
+- il ne lit que les **chaînes**, pas les commentaires. Les `①②③` qui découpent
+  les zones d'une carte et les filets `─` des séparateurs ne finissent jamais à
+  l'écran ; les scanner ferait échouer le test sur du texte que personne ne
+  voit ;
+- il interroge **les six polices**, pas seulement celle d'icônes. `✓`, `←`,
+  `→` viennent d'IBM Plex ; exiger qu'ils soient dans l'asset d'icônes serait
+  faux.
+
+### 34.2 Un binaire sans source n'est pas maintenable
+
+La police était livrée compilée, sans le mapping ni le générateur : impossible
+de savoir quel tracé dessinait quel caractère, donc impossible d'en ajouter un
+sans tout refaire. `tools/icons/` versionne désormais les trois pièces —
+`manifest.json` (le caractère → son tracé), les SVG Lucide amont figés à la
+version 0.469.0, et `build_product_icons.py` qui reconstruit l'asset de façon
+déterministe. Deux tracés (`○` et `●`) sont écrits pour le jeu sur la même
+grille 24×24, faute d'équivalent Lucide à la bonne taille optique.
+
+Le smoke UI compare la police à son manifeste : déclarer un caractère sans
+régénérer échoue. `build_product_icons.py --check` fait l'inverse en dehors de
+Godot — il refuse un asset qui ne correspond plus à sa source.
+
+Un effet de bord vaut d'être noté : l'ancien asset dessinait `💥` (l'Impact) et
+`⚡` (l'Énergie) avec le même éclair. Deux grandeurs qui ne se comparent pas
+partageaient un signe. Le manifeste les sépare.

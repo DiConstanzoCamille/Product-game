@@ -19,6 +19,10 @@ Trois documents, trois rôles — en cas de contradiction, cet ordre tranche :
 Deux specs descendaient d'un cran là où une grandeur abstraite ne raconte rien.
 [`spec-clients-revenue.md`](docs/spec-clients-revenue.md) (le Revenue cache des
 clients qui paient) est **implémentée** — issue #42, carnet §32.
+La couche multiplicative du Levier de
+[`spec-impact-monnaie.md`](docs/spec-impact-monnaie.md) §5 est également
+**implémentée** — issue #37, carnet §33 :
+`Levier final = (base + Σ additifs) × Π multiplicateurs`.
 [`spec-equipe-individuelle.md`](docs/spec-equipe-individuelle.md) (le Moral
 cache des personnes avec un caractère) est **validée et non implémentée** :
 c'est le lot suivant, et il ne se fait pas en même temps qu'un autre lot qui

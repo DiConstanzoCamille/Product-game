@@ -22,7 +22,7 @@
     },
     "organizationCombos": [
       { "id": "trio-produit", "icon": "🔺", "label": "Trio produit", "lever": 0.3, "condition": { "roles": { "pm": 1, "dev": 1, "designer": 1 } } },
-      { "id": "equipe-complete", "icon": "🛡️", "label": "Equipe complète", "lever": 0.6, "replaces": "trio-produit", "condition": { "roles": { "pm": 1, "dev": 1, "designer": 1, "ops": 1 } } },
+      { "id": "equipe-complete", "icon": "🛡️", "label": "Equipe complète", "leverMultiplier": 1.8, "replaces": "trio-produit", "condition": { "rosterMinimum": 6, "roles": { "pm": 1, "dev": 1, "designer": 1, "ops": 1 } } },
       { "id": "force-de-frappe", "icon": "🔨", "label": "Force de frappe", "lever": 0.4, "condition": { "roles": { "dev": 3 } } },
       { "id": "binome-senior", "icon": "🎓", "label": "Binôme senior", "lever": 0.25, "condition": { "sameRoleSeniority": { "seniority": "senior", "minimum": 2 } } },
       { "id": "sang-neuf", "icon": "🌱", "label": "Sang neuf", "lever": 0.25, "condition": { "recentHires": { "withinSprints": 3, "minimum": 2 } } },

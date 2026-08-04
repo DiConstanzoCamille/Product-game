@@ -28,9 +28,10 @@ static func resolve(snapshot: Dictionary, tables: Dictionary = {}) -> Dictionary
 	var local_total := 0.0
 	var delivered_count := 0
 	var traction_total := 0.0
+	var active_tools := _active_tool_entries(snapshot)
 
 	for squad in squads:
-		var squad_report := _resolve_squad(squad, snapshot, rules, hidden_traits, strategy_ids, strategy_rules, overheated)
+		var squad_report := _resolve_squad(squad, snapshot, rules, hidden_traits, strategy_ids, strategy_rules, overheated, active_tools)
 		squad_reports.append(squad_report)
 		local_total += float(squad_report.get("subtotal", 0.0))
 		delivered_count += int(squad_report.get("delivered_count", 0))
@@ -40,19 +41,26 @@ static func resolve(snapshot: Dictionary, tables: Dictionary = {}) -> Dictionary
 
 	var global_lines: Array = []
 	var global_lever := float(global_rules.get("baseLever", 1.0))
+	var global_additive_lever := global_lever
+	var global_lever_multiplier := 1.0
+	var global_multiplier_sources: Array = []
 	var global_traction_multiplier := 1.0
 	var step := 4
 
-	var active_tools := _active_tool_entries(snapshot)
 	for tool_entry in active_tools:
 		var tool_id: String = tool_entry.get("id", "")
 		var card := _find_card(cards, tool_id)
 		if not _card_has_lever(card):
 			continue
 		var tool_value := _tool_lever(card, tool_entry, all_roster, snapshot, resources, hidden_traits)
-		var tool_before := global_lever
-		global_lever += tool_value
-		global_lines.append(_line(step, "global", card.get("icon", "🛠️"), _tool_label(card, tool_entry, all_roster, snapshot, hidden_traits), "lever_add", tool_value, tool_before, global_lever))
+		# Un additif à zéro reste explicatif (ex. Notion sans personne éligible).
+		# Un outil exclusivement multiplicatif n'ajoute en revanche pas une
+		# fausse ligne « +0 » avant son vrai facteur.
+		if not is_zero_approx(tool_value) or card.has("perEmployee") or card.has("cumulative"):
+			var tool_before := global_lever
+			global_lever += tool_value
+			global_lines.append(_line(step, "global", card.get("icon", "🛠️"), _tool_label(card, tool_entry, all_roster, snapshot, hidden_traits), "lever_add", tool_value, tool_before, global_lever))
+		_append_multiplier_source(global_multiplier_sources, card.get("leverMultiplier", null), card.get("icon", "🛠️"), card.get("multiplierLabel", card.get("name", tool_id)), all_roster, snapshot, resources, hidden_traits, active_tools)
 
 	step = 5
 	for strategy_id in strategy_ids:
@@ -76,6 +84,7 @@ static func resolve(snapshot: Dictionary, tables: Dictionary = {}) -> Dictionary
 			var tier_before := global_lever
 			global_lever += tier_lever
 			global_lines.append(_line(step, "global", strategy_icon, strategy_label, "lever_add", tier_lever, tier_before, global_lever))
+		_append_multiplier_source(global_multiplier_sources, strategy.get("leverMultiplier", null), strategy_icon, strategy_label, all_roster, snapshot, resources, hidden_traits, active_tools)
 
 	step = 6
 	for practice_id in _ids_from(snapshot.get("owned_practices", snapshot.get("practices", []))):
@@ -83,11 +92,11 @@ static func resolve(snapshot: Dictionary, tables: Dictionary = {}) -> Dictionary
 		if practice.is_empty():
 			continue
 		var practice_lever := float(practice.get("lever", 0.0))
-		if is_zero_approx(practice_lever):
-			continue
-		var practice_before := global_lever
-		global_lever += practice_lever
-		global_lines.append(_line(step, "global", practice.get("icon", "🧠"), practice.get("label", practice_id), "lever_add", practice_lever, practice_before, global_lever))
+		if not is_zero_approx(practice_lever):
+			var practice_before := global_lever
+			global_lever += practice_lever
+			global_lines.append(_line(step, "global", practice.get("icon", "🧠"), practice.get("label", practice_id), "lever_add", practice_lever, practice_before, global_lever))
+		_append_multiplier_source(global_multiplier_sources, practice.get("leverMultiplier", null), practice.get("icon", "🧠"), practice.get("label", practice_id), all_roster, snapshot, resources, hidden_traits, active_tools)
 
 	var tier_rule: Dictionary = global_rules.get("productTier", {})
 	var product_tier := int(snapshot.get("product_tier", 0))
@@ -96,18 +105,32 @@ static func resolve(snapshot: Dictionary, tables: Dictionary = {}) -> Dictionary
 		var product_tier_before := global_lever
 		global_lever += product_tier_lever
 		global_lines.append(_line(step, "global", tier_rule.get("icon", "🏗️"), tier_rule.get("label", "Palier produit"), "lever_add", product_tier_lever, product_tier_before, global_lever))
+	_append_multiplier_source(global_multiplier_sources, tier_rule.get("leverMultiplier", null), tier_rule.get("icon", "🏗️"), tier_rule.get("label", "Palier produit"), all_roster, snapshot, resources, hidden_traits, active_tools)
 
 	var inter_squad := _inter_squad_lever(squads, active_tools, global_rules.get("interSquadCombos", {}))
 	if not inter_squad.is_empty():
-		var inter_before := global_lever
-		global_lever += float(inter_squad.get("lever", 0.0))
-		global_lines.append(_line(step, "global", inter_squad.get("icon", "🏛️"), inter_squad.get("label", "Organisation"), "lever_add", inter_squad.get("lever", 0.0), inter_before, global_lever))
+		if inter_squad.has("lever"):
+			var inter_before := global_lever
+			global_lever += float(inter_squad.get("lever", 0.0))
+			global_lines.append(_line(step, "global", inter_squad.get("icon", "🏛️"), inter_squad.get("label", "Organisation"), "lever_add", inter_squad.get("lever", 0.0), inter_before, global_lever))
+		_append_multiplier_source(global_multiplier_sources, inter_squad.get("leverMultiplier", null), inter_squad.get("icon", "🏛️"), inter_squad.get("label", "Organisation"), all_roster, snapshot, resources, hidden_traits, active_tools)
+
+	# Les multiplicateurs arrivent APRES toute la base additive. C'est ce qui
+	# fait d'un x1,5 une recherche de combo plutôt qu'un bonus plat déguisé.
+	global_additive_lever = global_lever
+	for source in global_multiplier_sources:
+		var factor := float(source.get("value", 1.0))
+		var multiplier_before := global_lever
+		global_lever *= factor
+		global_lever_multiplier *= factor
+		global_lines.append(_line(step, "global", source.get("icon", "✖️"), source.get("label", "Multiplicateur"), "lever_multiplier", factor, multiplier_before, global_lever))
 
 	var friction_rules: Dictionary = rules.get("frictions", {})
 	var moral_cap: Dictionary = friction_rules.get("moralCap", {})
 	var moral: float = float(resources.get(moral_cap.get("resource", "moral"), 100.0))
 	var weighted_local_lever: float = local_total / traction_total if traction_total > 0.0 else 0.0
 	var effective_lever: float = weighted_local_lever * global_lever
+	var uncapped_effective_lever := effective_lever
 	var moral_factor: float = 1.0
 	if not moral_cap.is_empty() and moral < float(moral_cap.get("threshold", 0)):
 		var capped_lever: float = min(effective_lever, float(moral_cap.get("maxLever", effective_lever)))
@@ -144,6 +167,9 @@ static func resolve(snapshot: Dictionary, tables: Dictionary = {}) -> Dictionary
 			"lines": global_lines,
 			"pre_friction": before_frictions,
 			"lever": global_lever,
+			"additive_lever": global_additive_lever,
+			"lever_multiplier": global_lever_multiplier,
+			"uncapped_effective_lever": uncapped_effective_lever,
 			"effective_lever": effective_lever,
 			"impact": impact,
 			"unrounded_impact": resolved_impact,
@@ -153,9 +179,10 @@ static func resolve(snapshot: Dictionary, tables: Dictionary = {}) -> Dictionary
 	}
 
 
-static func _resolve_squad(squad: Dictionary, snapshot: Dictionary, rules: Dictionary, hidden_traits: Dictionary, strategy_ids: Array, strategy_rules: Dictionary, overheated: bool) -> Dictionary:
+static func _resolve_squad(squad: Dictionary, snapshot: Dictionary, rules: Dictionary, hidden_traits: Dictionary, strategy_ids: Array, strategy_rules: Dictionary, overheated: bool, active_tools: Array) -> Dictionary:
 	var squad_id: String = squad.get("id", "equipe-principale")
 	var lines: Array = []
+	var resources: Dictionary = snapshot.get("resources", snapshot.get("resource_values", {}))
 	var delivered := _completed_deliveries(squad.get("delivered", squad.get("delivered_items", [])))
 	var traction := 0.0
 	var feature_rule: Dictionary = rules.get("traction", {}).get("feature", {})
@@ -188,6 +215,7 @@ static func _resolve_squad(squad: Dictionary, snapshot: Dictionary, rules: Dicti
 	var roster: Array = squad.get("roster", [])
 	var local_rule: Dictionary = rules.get("local", {})
 	var local_lever := float(local_rule.get("baseLever", 1.0))
+	var local_multiplier_sources: Array = []
 	var streak_rule: Dictionary = rules.get("streak", {})
 	var streak_lever := 0.0
 	if not delivered.is_empty() and not overheated:
@@ -214,10 +242,12 @@ static func _resolve_squad(squad: Dictionary, snapshot: Dictionary, rules: Dicti
 		lines.append(_line(3, "local", pm_rule.get("icon", "📋"), pm_rule.get("label", "PM"), "lever_add", pm_lever, pm_before, local_lever, squad_id))
 
 	for combo in _active_local_combos(roster, snapshot, local_rule.get("organizationCombos", []), hidden_traits):
-		var combo_before := local_lever
-		var combo_lever := float(combo.get("lever", 0.0))
-		local_lever += combo_lever
-		lines.append(_line(3, "local", combo.get("icon", "✨"), combo.get("label", combo.get("id", "Combo")), "lever_add", combo_lever, combo_before, local_lever, squad_id))
+		if combo.has("lever"):
+			var combo_before := local_lever
+			var combo_lever := float(combo.get("lever", 0.0))
+			local_lever += combo_lever
+			lines.append(_line(3, "local", combo.get("icon", "✨"), combo.get("label", combo.get("id", "Combo")), "lever_add", combo_lever, combo_before, local_lever, squad_id))
+		_append_multiplier_source(local_multiplier_sources, combo.get("leverMultiplier", null), combo.get("icon", "✨"), combo.get("label", combo.get("id", "Combo")), roster, snapshot, resources, hidden_traits, active_tools)
 
 	var visible_rules: Dictionary = rules.get("visibleTraitRules", {})
 	for member in roster:
@@ -244,6 +274,15 @@ static func _resolve_squad(squad: Dictionary, snapshot: Dictionary, rules: Dicti
 		local_lever += hidden_lever
 		lines.append(_line(3, "local", hidden_rule.get("icon", "✨"), hidden_rule.get("name", "Trait caché"), "lever_add", hidden_lever, hidden_before, local_lever, squad_id))
 
+	var local_additive_lever := local_lever
+	var local_lever_multiplier := 1.0
+	for source in local_multiplier_sources:
+		var factor := float(source.get("value", 1.0))
+		var multiplier_before := local_lever
+		local_lever *= factor
+		local_lever_multiplier *= factor
+		lines.append(_line(3, "local", source.get("icon", "✖️"), source.get("label", "Multiplicateur"), "lever_multiplier", factor, multiplier_before, local_lever, squad_id))
+
 	var subtotal := traction * local_lever
 	lines.append(_line(3, "local", "📌", "Sous-total", "subtotal", subtotal, 0.0, subtotal, squad_id))
 
@@ -252,6 +291,8 @@ static func _resolve_squad(squad: Dictionary, snapshot: Dictionary, rules: Dicti
 		"lines": lines,
 		"traction": traction,
 		"local_lever": local_lever,
+		"local_additive_lever": local_additive_lever,
+		"local_lever_multiplier": local_lever_multiplier,
 		"subtotal": subtotal,
 		"delivered_count": delivered.size(),
 		"quick_win_impact": quick_win_impact,
@@ -507,7 +548,7 @@ static func _ids_from(source: Variant) -> Array:
 ## entreprise : rien ici ne branche sur un id d'entreprise, seul le roster
 ## réel change le résultat (§7.1, "Notion sur Karavel / Notion sur Meridia").
 static func _card_has_lever(card: Dictionary) -> bool:
-	return card.has("perEmployee") or card.has("cumulative")
+	return card.has("perEmployee") or card.has("cumulative") or card.has("leverMultiplier")
 
 
 static func _tool_lever(card: Dictionary, entry: Dictionary, roster: Array, snapshot: Dictionary, resources: Dictionary, hidden_traits: Dictionary) -> float:
@@ -539,6 +580,58 @@ static func _tool_label(card: Dictionary, entry: Dictionary, roster: Array, snap
 	if card.has("refractory"):
 		refractory = _matching_employee_count(roster, card.get("refractory", {}).get("condition", {}), snapshot, hidden_traits)
 	return "%s · %s éligibles, %s réfractaires" % [name, _count_label(eligible), _count_label(refractory)]
+
+
+## Résout la troisième couche du Levier sans connaître aucun id de contenu.
+## La règle peut être un nombre fixe (`1.4`) ou un objet entièrement déclaré
+## dans les JSON : `value` pour un facteur fixe, ou `perCount` + `counter`
+## pour un facteur qui scale. Deux règles x1,5 sont ensuite composées par
+## l'appelant (x2,25), jamais additionnées.
+static func _append_multiplier_source(sources: Array, rule: Variant, icon: String, label: String, roster: Array, snapshot: Dictionary, resources: Dictionary, hidden_traits: Dictionary, active_tools: Array) -> void:
+	var resolved := _resolved_lever_multiplier(rule, roster, snapshot, resources, hidden_traits, active_tools)
+	var factor := float(resolved.get("value", 1.0))
+	if is_equal_approx(factor, 1.0):
+		return
+	var resolved_label := label
+	if int(resolved.get("count", -1)) >= 0 and str(resolved.get("counter_label", "")) != "":
+		resolved_label += " · %d %s" % [int(resolved.get("count", 0)), str(resolved.get("counter_label", ""))]
+	sources.append({"value": factor, "icon": icon, "label": resolved_label})
+
+
+static func _resolved_lever_multiplier(rule: Variant, roster: Array, snapshot: Dictionary, resources: Dictionary, hidden_traits: Dictionary, active_tools: Array) -> Dictionary:
+	if rule == null:
+		return {"value": 1.0}
+	if rule is float or rule is int:
+		return {"value": maxf(0.0, float(rule))}
+	if not rule is Dictionary:
+		return {"value": 1.0}
+	var config: Dictionary = rule
+	var condition: Dictionary = config.get("condition", {})
+	if not condition.is_empty() and not _matches_global_condition(condition, roster, snapshot, resources, hidden_traits):
+		return {"value": 1.0}
+	if config.has("value"):
+		return {"value": maxf(0.0, float(config.get("value", 1.0)))}
+
+	var counter: Dictionary = config.get("counter", {})
+	var count := 0.0
+	match str(counter.get("kind", "")):
+		"active_tools":
+			count = float(active_tools.size())
+		"roster_match":
+			count = _matching_employee_count(roster, counter.get("condition", {}), snapshot, hidden_traits)
+		"product_tier":
+			count = float(snapshot.get("product_tier", 0))
+		_:
+			return {"value": 1.0}
+	count = maxf(0.0, count - float(counter.get("offset", 0.0)))
+	if counter.has("maxCount"):
+		count = minf(count, maxf(0.0, float(counter.get("maxCount", 0.0))))
+	var per_count := maxf(0.0, float(config.get("perCount", 1.0)))
+	return {
+		"value": pow(per_count, count),
+		"count": int(round(count)),
+		"counter_label": str(counter.get("label", "")),
+	}
 
 
 static func _find_card(cards: Dictionary, card_id: String) -> Dictionary:

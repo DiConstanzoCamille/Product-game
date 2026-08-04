@@ -38,6 +38,8 @@ var failures: int = 0
 func _ready() -> void:
 	print("=== SMOKE TEST UI ===")
 	_test_ui_scale_settings()
+	_test_embedded_icon_coverage()
+	_test_icon_font_matches_manifest()
 	SprintState.reset_run()
 	SprintState.activated_cards.append("notion")
 	SprintState.activated_card_sprints["notion"] = 1
@@ -82,6 +84,120 @@ func _test_ui_scale_settings() -> void:
 		_fail("L'UI doit etre rendue de 1600x900 vers une fenetre 1920x1080.")
 	if ProjectSettings.get_setting("display/window/stretch/mode", "") != "canvas_items":
 		_fail("Le mode canvas_items doit garder l'interface lisible au redimensionnement.")
+
+
+## Le jeu n'a plus le droit de demander un glyphe au système : les six polices
+## importées coupent `allow_system_fallback`. Tout caractère affiché qu'aucune
+## d'elles ne sait dessiner devient donc un carré — sur la machine du joueur
+## comme dans les captures.
+##
+## Ce contrôle refuse la liste blanche : elle avait laissé passer ▸ ◂ ○ ● ✗,
+## que personne n'avait pensé à déclarer « pictogrammes ». Il prend le problème
+## par l'autre bout — **tout** caractère non-ASCII écrit dans une chaîne de
+## `game/` ou de `data/` doit être couvert par au moins une police embarquée —
+## et ne peut donc plus rater un signe qu'on n'avait pas anticipé.
+const EMBEDDED_FONTS := [
+	preload("res://assets/fonts/IBMPlexSans-Variable.ttf"),
+	preload("res://assets/fonts/SpaceGrotesk-Variable.ttf"),
+	preload("res://assets/fonts/IBMPlexMono-Regular.ttf"),
+	preload("res://assets/fonts/IBMPlexMono-Medium.ttf"),
+	preload("res://assets/fonts/IBMPlexMono-SemiBold.ttf"),
+	preload("res://assets/fonts/ProductIcons.ttf"),
+]
+
+
+func _test_embedded_icon_coverage() -> void:
+	var missing: Dictionary = {}
+	var game_dir := ProjectSettings.globalize_path("res://").trim_suffix("/")
+	var data_dir := game_dir.get_base_dir().path_join("data")
+	for root in ["res://", data_dir]:
+		_scan_displayed_codepoints(root, missing)
+	if missing.is_empty():
+		return
+	var labels: Array = []
+	for codepoint in missing.keys():
+		labels.append("U+%04X (%s, %s)" % [
+			int(codepoint), String.chr(int(codepoint)), missing[codepoint]
+		])
+	labels.sort()
+	_fail("Aucune police embarquée ne dessine : %s" % ", ".join(labels))
+
+
+## Le manifeste `tools/icons/manifest.json` est la source de l'asset : c'est lui
+## qui dit quel tracé Lucide dessine quel caractère. Le binaire, lui, ne se
+## relit pas. Si les deux divergent — un caractère ajouté au manifeste sans
+## régénérer la police — le jeu affiche un carré que rien d'autre ne signale.
+func _test_icon_font_matches_manifest() -> void:
+	var repo_dir := ProjectSettings.globalize_path("res://").trim_suffix("/").get_base_dir()
+	var manifest_path := repo_dir.path_join("tools/icons/manifest.json")
+	var file := FileAccess.open(manifest_path, FileAccess.READ)
+	if file == null:
+		_fail("Le manifeste des icônes est introuvable : %s" % manifest_path)
+		return
+	var manifest: Variant = JSON.parse_string(file.get_as_text())
+	if typeof(manifest) != TYPE_DICTIONARY or not manifest.has("glyphs"):
+		_fail("Le manifeste des icônes est illisible : %s" % manifest_path)
+		return
+	var absents: Array = []
+	for entry in manifest["glyphs"]:
+		var codepoint := int(String(entry.get("codepoint", "U+0")).substr(2).hex_to_int())
+		if not UIHelpers.FONT_PRODUCT_ICONS.has_char(codepoint):
+			absents.append("U+%04X" % codepoint)
+	if not absents.is_empty():
+		_fail("ProductIcons.ttf ne suit plus son manifeste (%s) — régénérer avec tools/icons/build_product_icons.py" % ", ".join(absents))
+
+
+func _scan_displayed_codepoints(directory: String, missing: Dictionary) -> void:
+	for child in DirAccess.get_directories_at(directory):
+		if child.begins_with("."):
+			continue
+		_scan_displayed_codepoints(directory.path_join(child), missing)
+	for file_name in DirAccess.get_files_at(directory):
+		var extension := file_name.get_extension()
+		if not extension in ["gd", "tscn", "json"]:
+			continue
+		var path := directory.path_join(file_name)
+		var file := FileAccess.open(path, FileAccess.READ)
+		if file == null:
+			continue
+		for codepoint in _string_literal_codepoints(file.get_as_text(), extension == "gd"):
+			if _is_drawable(int(codepoint)):
+				continue
+			if not missing.has(codepoint):
+				missing[codepoint] = path.get_file()
+
+
+## Seul le contenu des chaînes finit à l'écran. Les commentaires, eux, ont le
+## droit d'employer des caractères que les polices ignorent (les ① ② ③ qui
+## découpent les zones d'une carte, les filets ─ des séparateurs) : les scanner
+## produirait un échec pour du texte que personne ne verra jamais.
+func _string_literal_codepoints(text: String, has_hash_comments: bool) -> Array:
+	var codepoints: Array = []
+	var quote := 0
+	var index := 0
+	while index < text.length():
+		var codepoint := text.unicode_at(index)
+		if quote == 0:
+			if has_hash_comments and codepoint == 0x23:  # '#'
+				while index < text.length() and text.unicode_at(index) != 0x0A:
+					index += 1
+			elif codepoint == 0x22 or codepoint == 0x27:  # '"' ou "'"
+				quote = codepoint
+		elif codepoint == 0x5C:  # '\' : l'échappement neutralise le caractère suivant
+			index += 1
+		elif codepoint == quote or codepoint == 0x0A:
+			quote = 0
+		elif codepoint >= 0x80:
+			codepoints.append(codepoint)
+		index += 1
+	return codepoints
+
+
+func _is_drawable(codepoint: int) -> bool:
+	for font in EMBEDDED_FONTS:
+		if font.has_char(codepoint):
+			return true
+	return false
 
 
 ## Joue les deux gestes spécifiques à la Roadmap profonde : révéler une carte
@@ -208,6 +324,9 @@ func _test_investments_interactions() -> void:
 func _test_resolution_replay() -> void:
 	print("  → lecture animee de la Resolution")
 	SprintState.reset_run("agile-transformation", "meridia-corp")
+	SprintState.activated_cards.append_array(["socle-technique-commun", "notion"])
+	SprintState.activated_card_sprints["socle-technique-commun"] = 1
+	SprintState.activated_card_sprints["notion"] = 1
 	var feature: Dictionary = GameData.backlog.get("features", [])[0]
 	SprintState.current_backlog_draw = {"sprint": SprintState.sprint_number, "items": [feature]}
 	SprintState.commit_backlog_plan([{"id": feature.get("id", ""), "points": feature.get("costPoints", 0)}])
@@ -222,6 +341,25 @@ func _test_resolution_replay() -> void:
 	if SprintState.last_score_report.is_empty() or screen._score_events.is_empty():
 		_fail("La Resolution doit afficher le rapport de score deja resolu.")
 	else:
+		if float(SprintState.last_score_report.get("global", {}).get("lever_multiplier", 1.0)) <= 1.0:
+			_fail("Le rapport UI doit conserver la couche multiplicative du Socle technique.")
+		var has_multiplier_event := false
+		var multiplier_is_visible := false
+		for event in screen._score_events:
+			if "Socle technique commun" in str(event.get("detail", "")) and "×" in str(event.get("detail", "")):
+				has_multiplier_event = true
+			if "Socle technique commun" in str(event.get("display", "")) and "×" in str(event.get("display", "")):
+				multiplier_is_visible = true
+		if not has_multiplier_event:
+			_fail("La Resolution doit rejouer les multiplicateurs comme une etape visible.")
+		if not multiplier_is_visible:
+			_fail("Le multiplicateur principal ne doit pas etre masque derriere « +N autres ».")
+		var panel: Control = load("res://scenes/components/side_panel.tscn").instantiate()
+		viewport.add_child(panel)
+		await get_tree().process_frame
+		if panel.find_child("LeverChain", true, false) == null:
+			_fail("Le panneau lateral doit afficher en permanence la chaine de Levier.")
+		panel.queue_free()
 		screen._accelerate_score_replay()
 		if screen._score_replay_speed != 4.0:
 			_fail("Le premier geste de Resolution n'accelere pas l'animation.")

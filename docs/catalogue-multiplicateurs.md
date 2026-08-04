@@ -1,11 +1,12 @@
 # Catalogue — les multiplicateurs qui cassent le jeu
 
-**Statut : propositions de contenu, en attente de relecture.** Annexe à
+**Statut : socle technique livré par l'issue #37 ; reste du catalogue à arbitrer.** Annexe à
 [`spec-impact-monnaie.md`](spec-impact-monnaie.md) §5, qui pose la couche
 technique. Ce document propose ce qu'on met dedans.
 
-Rien n'est implémenté. Les chiffres sont des points de départ à caler au banc
-de trajectoires (spec §7), pas des valeurs validées.
+La grammaire `leverMultiplier`, le 🧰 Socle technique commun et le combo
+🛡️ Équipe complète sont implémentés. Les autres lignes restent des points de
+départ à caler au banc de trajectoires (spec §7), pas des valeurs validées.
 
 ---
 
@@ -49,16 +50,15 @@ une rente.
 |---|---|---|
 | 🤖 **Plateforme d'automatisation** | `×1,5` Levier global | Seulement si **aucune décision stratégique n'a été prise ce trimestre**. L'automatisation demande de la stabilité — et prive le joueur d'un autre levier fort. |
 | 🧪 **Plateforme d'expérimentation** | `×1,3`, et `×1,8` si Valeur perçue > 70 | Deux paliers : il devient fort quand le produit marche déjà. Riche-devient-plus-riche assumé. |
-| 🧰 **Socle technique commun** | **`×1,15` par outil possédé** *(degré 3)* | Cher, et sans effet quand on n'a rien. Au plafond PM (5 outils) : `×2,01`. La pièce autour de laquelle se construit un run. |
+| 🧰 **Socle technique commun** | **`×1,6` par outil actif, borné à 3** *(degré 3, livré #37)* | Rare, 90 💥, 0,5 💰 par siège. La courbe plafonne à `×4,10` : puissante si elle est trouvée tôt, mais elle ne diverge pas avec les niveaux de carrière. |
 | 📚 **Documentation vivante** | `×1,05` par employé senior *(degré 3)* | Se marie avec les builds « tout senior » — qui coûtent une fortune en Revenue. |
 
 ⚠️ **Un effet « par outil » se calibre sur un plafond qu'il faut connaître.**
 `balance.json → toolSlots` donne **3 slots de base au PM + 2 achetables = 5 au
-maximum** (7+2=9 au CEO). À `×1,08`, le Socle technique ne vaudrait donc que
-`×1,47` au mieux — pas de quoi justifier son prix ni parler de « casser le
-jeu ». D'où `×1,15`. Si on préfère un taux plus doux, il faut **relever le
-plafond de slots**, mais c'est alors une décision d'équilibrage à part entière
-qui touche tous les niveaux de carrière.
+maximum**, puis davantage aux niveaux suivants. La première proposition à
+`×1,15` sur tous les slots restait trop faible au PM et divergeait au CEO. Le
+lot #37 introduit donc `counter.maxCount` : taux franc, degré borné à 3, même
+plafond de puissance à tous les niveaux.
 
 *Retiré après relecture : un outil « 📐 Design system » (×1,4 si ≥2 designers)
 figurait ici. Un Design system existe déjà dans `spec-scoring-sprint.md` §7.1,
@@ -109,7 +109,7 @@ change la nature de la construction d'équipe.
 
 | Combo | Aujourd'hui | Proposition |
 |---|---|---|
-| **L'équipe complète** (les 6 rôles présents) | — | `×1,5` — très dur à réunir, et incompatible avec les builds spécialisés |
+| **L'équipe complète** (4 rôles + 6 personnes) | `+0,6` | `×1,8` *(livré #37)* — les données n'ont que quatre rôles ; le seuil d'effectif empêche le bonus d'être actif dès le départ |
 | **La squad 100 % senior** | — | `×1,4` — le coût est dans le Revenue, pas dans l'Impact |
 | **Standardisation** (≥3 squads même archétype) | `+0,4` | `×1,3` — récompense enfin le jeu à grande échelle |
 | **Trio produit** (PM + Dev + Designer) | `+0,3` | rester additif — c'est le combo d'entrée, il doit rester accessible |
@@ -130,11 +130,11 @@ la course est de franchir l'objectif avant la faillite.
 
 ### « L'accumulateur »
 
-Socle technique commun (`×1,15` par outil) + les deux slots d'outillage
-achetables pris en priorité. **Au plafond PM, 5 outils : `×2,01`**, et chaque
-outil apporte en plus son additif. Le run est lent à démarrer et devient absurde
-en fin de mandat — à condition de survivre aux deux premiers trimestres, où on
-n'a rien.
+Socle technique commun (`×1,6` par outil, trois facteurs maximum) + les slots
+d'outillage achetables pris au bon moment. **À trois outils : `×4,10`** ; les
+slots suivants élargissent le choix mais n'augmentent plus la courbe. Le run est
+lent à démarrer et devient brutal en fin de mandat — à condition de survivre
+aux premiers trimestres et au coût récurrent.
 
 Ces deux lignes doivent être **jouables mais pas évidentes**, et surtout **pas
 les meilleures à tous les coups** : c'est le rôle du banc de trajectoires

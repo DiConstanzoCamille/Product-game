@@ -31,6 +31,10 @@ extends Node
 ##                sans jamais optimiser la caisse. Les deux existent pour le
 ##                critère de recette 2 de l'issue #42 : deux trajectoires
 ##                gagnantes, aucune dominante.
+##  - "outillage": construit autour du Socle technique commun et remplit ses
+##                slots avant d'engager de nouveaux salaires.
+##  - "generaliste": recrute d'abord les rôles manquants pour viser Équipe
+##                complète, sans dépendre d'un outil précis du tirage.
 ##  - "careful" : joueur immobile — choix Inbox le moins coûteux, aucune
 ##                feature livrée, aucune embauche, aucun achat, aucune
 ##                action personnelle. Depuis la Phase A ("la pression"),
@@ -59,7 +63,7 @@ func _ready() -> void:
 	_test_attention_and_autopilot_lot5()
 
 	var quarters_reached: Dictionary = {}
-	for strategy in ["stress", "greedy", "economie", "levier", "careful"]:
+	for strategy in ["stress", "greedy", "economie", "levier", "outillage", "generaliste", "careful"]:
 		print("\n=== SMOKE TEST LOGIQUE — %s ===" % strategy.to_upper())
 		var endings: Array = []
 		var run_index := 0
@@ -98,6 +102,9 @@ func _ready() -> void:
 	if lever_quarter < 2:
 		_fail("La trajectoire « Levier » ne passe plus aucun verdict de board sur 4 mandats (T%d) — jouer l'organisation doit rester un chemin viable." % lever_quarter)
 	print("\nTrajectoires — économie : meilleur T%d · Levier : meilleur T%d (critère de recette 2 de #42 ; la comparaison des deux se lit sur 40 runs, pas ici)" % [economy_quarter, lever_quarter])
+	print("Archétypes #37 — outillage : meilleur T%d · généraliste : meilleur T%d (la domination se mesure sur 40 runs)" % [
+		int(quarters_reached.get("outillage", 0)), int(quarters_reached.get("generaliste", 0))
+	])
 
 	if failures > 0:
 		print("\n=== SMOKE TEST LOGIQUE : ÉCHEC — %d assertion(s) en erreur ===" % failures)
@@ -1609,11 +1616,11 @@ func _play_one_mandate(run_index: int, strategy: String, company_id: String) -> 
 	# 💰 Le Revenue est imprimé avec sa base d'abonnements et sa facture : sans
 	# ça, le banc ne dit rien de la seule question qui compte pour lui — est-ce
 	# que la caisse contraint encore, ou est-ce qu'elle a décollé toute seule ?
-	print("Run %d (%s, %s) terminé — sprint %d, fin='%s', 💥 %d, 💰 %d (clients paient %d, charges %d), ⚡ %d, 👥 %d, revue de board='%s', ressources finales=%s" % [
+	print("Run %d (%s, %s) terminé — sprint %d, fin='%s', 💥 %d, 💰 %d (clients paient %d, charges %d), ⚡ %d, 👥 %d, outils=%s, revue de board='%s', ressources finales=%s" % [
 		run_index, strategy, company_id, SprintState.sprint_number, SprintState.ending_id,
 		SprintState.impact_wallet, int(round(SprintState.revenue)), int(round(SprintState.get_client_revenue())),
 		int(SprintState.get_recurring_charges().get("total", 0)),
-		SprintState.energy, SprintState.get_roster().size(), SprintState.board_review_state,
+		SprintState.energy, SprintState.get_roster().size(), SprintState.activated_cards, SprintState.board_review_state,
 		SprintState.resource_values
 	])
 
@@ -1643,7 +1650,7 @@ func _play_sprint(strategy: String) -> void:
 	if not event.is_empty():
 		var choices: Array = event.get("choices", [])
 		var choice: Dictionary = choices[0]
-		if strategy == "careful" or strategy == "levier":
+		if strategy in ["careful", "levier", "outillage", "generaliste"]:
 			choice = _least_costly_choice(choices)
 		elif strategy == "stress":
 			choice = _worst_moral_choice(choices)
@@ -1661,7 +1668,7 @@ func _play_sprint(strategy: String) -> void:
 		while SprintState.personal_action_refusal() == "" and guard < 4:
 			SprintState.do_self_work()
 			guard += 1
-	elif strategy in ["greedy", "economie", "levier"] and SprintState.energy >= 50 and SprintState.personal_action_refusal() == "":
+	elif strategy in ["greedy", "economie", "levier", "outillage", "generaliste"] and SprintState.energy >= 50 and SprintState.personal_action_refusal() == "":
 		SprintState.do_self_work()
 
 	# Phase 2 — Roadmap : le vrai tirage persistant du backlog remplace les
@@ -1675,7 +1682,7 @@ func _play_sprint(strategy: String) -> void:
 	var items: Array = roadmap_offer.get("items", []).duplicate()
 	if strategy == "economie":
 		items.sort_custom(func(a, b): return int(a.get("clients", 0)) > int(b.get("clients", 0)))
-	elif strategy == "levier":
+	elif strategy in ["levier", "outillage"]:
 		items.sort_custom(func(a, b): return int(a.get("costPoints", 0)) > int(b.get("costPoints", 0)))
 	for item in items:
 		var points := SprintState.get_epic_remaining(item.get("id", "")) if SprintState.is_backlog_epic(item) else int(item.get("costPoints", 0))
@@ -1684,7 +1691,7 @@ func _play_sprint(strategy: String) -> void:
 		# d'Impact, même pour qui joue la caisse.
 		if strategy == "economie" and int(item.get("clients", 0)) < 0 and used * 2 < capacity:
 			continue
-		if strategy == "stress" or (strategy in ["greedy", "economie", "levier"] and used + points <= capacity):
+		if strategy == "stress" or (strategy in ["greedy", "economie", "levier", "outillage", "generaliste"] and used + points <= capacity):
 			plan.append({"id": item.get("id", ""), "points": points})
 			used += points
 	if strategy != "careful":
@@ -1724,6 +1731,31 @@ func _play_sprint(strategy: String) -> void:
 		# Le profil Levier prend tout ce qu'il peut : c'est sa thèse, et c'est
 		# aussi ce qui fait monter sa facture de licences.
 		for card_id in offer.get("decisions", []):
+			if SprintState.activate_decision(card_id) == "":
+				break
+	elif strategy == "outillage":
+		# Le Socle vaut peu seul : ce profil le prend en priorité quand il est
+		# tiré. Tant qu'il ne l'a pas trouvé, il garde un slot libre : remplir
+		# le plateau avec trois communs avant de voir la pièce centrale ne
+		# testerait pas l'archétype, seulement l'ordre du tirage.
+		var tool_ids: Array = offer.get("decisions", []).duplicate()
+		tool_ids.sort_custom(func(a, b):
+			if a == "socle-technique-commun":
+				return true
+			if b == "socle-technique-commun":
+				return false
+			return str(a) < str(b)
+		)
+		for card_id in tool_ids:
+			if card_id != "socle-technique-commun" and not SprintState.activated_cards.has("socle-technique-commun") and SprintState.activated_cards.size() >= SprintState.get_tool_slot_capacity() - 1:
+				continue
+			# Une voie d'investissement n'est viable que si elle sait protéger le
+			# verdict qui arrive. Le banc conserve donc le quota courant avant de
+			# payer un outil ; sinon il confondrait « outillage risqué » et achat
+			# volontairement suicidaire la veille du board.
+			var card_cost := int(SprintState.find_card(card_id).get("costImpact", 0))
+			if SprintState.impact_wallet - card_cost < SprintState.get_current_quota() * 0.5:
+				continue
 			if SprintState.activate_decision(card_id) == "":
 				break
 
@@ -1770,6 +1802,30 @@ func _play_sprint(strategy: String) -> void:
 		var lever_candidates: Array = offer.get("candidates", [])
 		if not lever_candidates.is_empty():
 			SprintState.hire_candidate(lever_candidates[0])
+	elif strategy == "outillage":
+		# Une base additive sous le multiplicateur : les pratiques donnent du
+		# Levier sans diluer la thèse ni ajouter de salaire.
+		var tool_practices: Array = offer.get("practices", [])
+		if not tool_practices.is_empty():
+			SprintState.buy_practice(tool_practices[0])
+	elif strategy == "generaliste":
+		var present_roles: Dictionary = {}
+		for member in SprintState.get_roster():
+			present_roles[member.get("role", "")] = true
+		var hired_missing_role := false
+		for candidate in offer.get("candidates", []):
+			if not present_roles.has(candidate.get("role", "")):
+				hired_missing_role = SprintState.hire_candidate(candidate) == ""
+				break
+		# Une fois la couverture obtenue, l'équipe continue de grandir : le
+		# x1,8 doit amplifier une organisation construite, pas une base figée.
+		if not hired_missing_role:
+			var generalist_candidates: Array = offer.get("candidates", [])
+			if not generalist_candidates.is_empty():
+				SprintState.hire_candidate(generalist_candidates[0])
+		var generalist_practices: Array = offer.get("practices", [])
+		if not generalist_practices.is_empty():
+			SprintState.buy_practice(generalist_practices[0])
 	elif strategy == "greedy":
 		# ~1 achat par sprint : une pratique les sprints pairs, sinon une
 		# embauche — précédée d'un 1:1 quand l'Énergie le permet : on ne
@@ -1797,7 +1853,7 @@ func _play_sprint(strategy: String) -> void:
 		return
 	# 🧘 Souffler se décide à la Résolution : "greedy" lève le pied quand la
 	# jauge est basse (le prochain sprint se jouera sans action personnelle).
-	if strategy in ["greedy", "economie", "levier"] and SprintState.energy < 30:
+	if strategy in ["greedy", "economie", "levier", "outillage", "generaliste"] and SprintState.energy < 30:
 		SprintState.plan_breather()
 	SprintState.sprint_number += 1
 

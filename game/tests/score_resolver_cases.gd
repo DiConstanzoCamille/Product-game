@@ -27,6 +27,7 @@ func _initialize() -> void:
 	_test_notion_lever_by_company_roster()
 	_test_shape_up_lever()
 	_test_every_tool_card_has_a_lever()
+	_test_lever_multipliers()
 	_test_streak_and_friction_rules()
 	_test_quarter_visible_board_and_technical_audit()
 	_test_moral_cap_and_ops_snapshot()
@@ -186,9 +187,48 @@ func _test_every_tool_card_has_a_lever() -> void:
 	for card in cards_data.get("cards", []):
 		if card.get("family", "") in ["outil-process", "methodologie-orga"]:
 			_assert_true(
-				card.has("perEmployee") or card.has("cumulative"),
-				"La carte « %s » (%s) coûte des pièces et un slot mais ne déclare ni perEmployee ni cumulative." % [card.get("id", ""), card.get("name", "")]
+				card.has("perEmployee") or card.has("cumulative") or card.has("leverMultiplier"),
+				"La carte « %s » (%s) coûte de l'Impact et un slot mais ne déclare ni additif ni multiplicateur de Levier." % [card.get("id", ""), card.get("name", "")]
 			)
+
+
+## Issue #37 : les additifs sont tous résolus avant les multiplicateurs, deux
+## x1,5 composent x2,25, et un compteur déclaré dans les données peut scaler
+## sans branche d'id dans ScoreResolver.
+func _test_lever_multipliers() -> void:
+	var rules := _rules_without_streak()
+	rules["local"]["organizationCombos"] = [
+		{"id": "complet", "label": "Equipe complète", "icon": "🛡️", "leverMultiplier": 1.5, "condition": {"roles": {"pm": 1, "dev": 1, "designer": 1, "ops": 1}}},
+		{"id": "structure", "label": "Structure dense", "icon": "🎓", "leverMultiplier": 1.5, "condition": {"rosterMinimum": 4}},
+	]
+	rules["global"]["strategies"]["multiplicative-test"] = {"lever": 0.5, "leverMultiplier": 1.4, "icon": "🚀", "label": "Stratégie test"}
+	var roster := [
+		{"id": "pm", "role": "pm", "seniority": "senior", "hiredSprint": 0},
+		{"id": "dev", "role": "dev", "seniority": "senior", "hiredSprint": 0},
+		{"id": "design", "role": "designer", "seniority": "senior", "hiredSprint": 0},
+		{"id": "ops", "role": "ops", "seniority": "senior", "hiredSprint": 0},
+	]
+	var report := _resolve([_squad("a", [_traction_feature(1)], roster)], {"strategy_ids": ["multiplicative-test"]}, rules)
+	var local: Dictionary = report.get("squads", [])[0]
+	_assert_equal(float(local.get("local_additive_lever", 0.0)), 1.05, "Le PM doit rester dans la base additive avant les combos.")
+	_assert_equal(float(local.get("local_lever_multiplier", 0.0)), 2.25, "Deux multiplicateurs locaux x1,5 doivent composer x2,25.")
+	_assert_equal(float(local.get("local_lever", 0.0)), 2.3625000000000003, "La base locale 1,05 doit ensuite recevoir x2,25.")
+	_assert_equal(float(report.get("global", {}).get("additive_lever", 0.0)), 1.5, "L'additif de stratégie doit construire la base globale.")
+	_assert_equal(float(report.get("global", {}).get("lever_multiplier", 0.0)), 1.4, "Le multiplicateur de stratégie doit rester une couche séparée.")
+	_assert_equal(_line_type_count(local.get("lines", []), "lever_multiplier"), 2, "La chaîne locale doit exposer chaque multiplicateur séparément.")
+	_assert_equal(_line_type_count(report.get("global", {}).get("lines", []), "lever_multiplier"), 1, "La chaîne globale doit exposer le multiplicateur de stratégie.")
+
+	var snapshot := {
+		"squads": [_squad("a", [_traction_feature(1)])],
+		"resources": {"moral": 60, "cynisme": 0, "dette-organisationnelle": 0},
+		"active_tools": ["socle-technique-commun", "notion", "jira"],
+	}
+	report = ScoreResolverScript.resolve(snapshot, {"scoring": _rules_without_streak(), "hidden_traits": hidden_traits_data, "cards": cards_data})
+	_assert_equal(float(report.get("global", {}).get("lever_multiplier", 0.0)), pow(1.6, 3), "Le compteur active_tools doit appliquer x1,6 par outil depuis les données.")
+	_assert_true(_has_label_prefix(report.get("global", {}).get("lines", []), "Socle technique commun · 3 outils actifs (3 max.)"), "Le rapport doit expliquer le compteur qui fait scaler le multiplicateur.")
+	snapshot["active_tools"].append("rice")
+	report = ScoreResolverScript.resolve(snapshot, {"scoring": _rules_without_streak(), "hidden_traits": hidden_traits_data, "cards": cards_data})
+	_assert_equal(float(report.get("global", {}).get("lever_multiplier", 0.0)), pow(1.6, 3), "maxCount doit borner la courbe du Socle au degré 3.")
 
 
 func _test_streak_and_friction_rules() -> void:
@@ -480,6 +520,14 @@ func _label_count(lines: Array, label: String) -> int:
 	var count := 0
 	for line in lines:
 		if line.get("label", "") == label:
+			count += 1
+	return count
+
+
+func _line_type_count(lines: Array, line_type: String) -> int:
+	var count := 0
+	for line in lines:
+		if line.get("type", "") == line_type:
 			count += 1
 	return count
 
