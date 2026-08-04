@@ -1,9 +1,0 @@
-.DS_Store
-node_modules/
-*.log
-
-# Cache d'import de Godot : régénéré au premier lancement, jamais versionné.
-game/.godot/
-
-# Worktrees des agents de dev lancés depuis le dépôt — scratch, pas du code.
-.claude/worktrees/
