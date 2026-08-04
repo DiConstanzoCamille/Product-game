@@ -1748,3 +1748,27 @@ conserve les facteurs locaux et globaux. Le smoke UI instancie les onze écrans,
 fait apparaître un vrai Socle dans la Résolution et exige la chaîne permanente
 du panneau. Une carte qui consomme un slot sans déclarer additif ni
 `leverMultiplier` reste interdite.
+
+---
+
+## 34. Les pictogrammes ne dépendent plus du système (issue #47)
+
+Les emojis visibles ont cessé d'être une dépendance implicite à macOS,
+Windows ou à la distribution Linux qui lance le jeu. Leurs caractères restent
+dans les données — ils sont pratiques comme identifiants compacts et ne
+participent à aucune règle — mais leur dessin vient désormais de
+`game/assets/fonts/ProductIcons.ttf`, un asset vectoriel monochrome généré à
+partir du set Lucide déjà utilisé par le HUD.
+
+IBM Plex Sans, IBM Plex Mono et Space Grotesk déclarent tous cet asset comme
+fallback explicite et désactivent le fallback système. Une même chaîne produit
+donc le même signe, la même couleur de texte et les mêmes métriques sur toutes
+les plateformes comme dans Xvfb. Les sélecteurs invisibles des anciennes
+chaînes emoji sont absorbés avec une avance nulle ; le libellé `◆◆ RARE`, qui
+avait révélé le problème, est lui aussi couvert.
+
+Ce choix conserve les textes et les données existantes tout en supprimant les
+deux défauts observés : les carrés de remplacement en capture headless et le
+mélange de styles colorés propre à chaque OS. Un test parcourt les scripts,
+scènes et JSON à chaque smoke UI et échoue dès qu'un nouveau pictogramme n'est
+pas embarqué dans la police d'icônes.

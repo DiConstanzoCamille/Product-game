@@ -9,8 +9,17 @@ Tous les assets de ce dossier sont libres d'usage commercial. Le fichier de lice
 | `SpaceGrotesk-Variable.ttf` | Space Grotesk (variable, wght) | [OFL 1.1](fonts/OFL-SpaceGrotesk.txt) | [Google Fonts](https://fonts.google.com/specimen/Space+Grotesk) |
 | `IBMPlexSans-Variable.ttf` | IBM Plex Sans (variable, wdth+wght) | [OFL 1.1](fonts/OFL-IBMPlexSans.txt) | [Google Fonts](https://fonts.google.com/specimen/IBM+Plex+Sans) |
 | `IBMPlexMono-Regular.ttf` / `-Medium.ttf` / `-SemiBold.ttf` | IBM Plex Mono | [OFL 1.1](fonts/OFL-IBMPlexMono.txt) | [Google Fonts](https://fonts.google.com/specimen/IBM+Plex+Mono) |
+| `ProductIcons.ttf` | Font d'icônes vectorielles générée à partir de Lucide | [ISC](icons/LICENSE-lucide.txt) | [Lucide](https://lucide.dev/) |
 
 Mêmes familles que la landing page (`landing/index.html`), pour cohérence visuelle entre les deux.
+
+`ProductIcons.ttf` n'est pas une police de texte ni une police emoji tierce :
+les tracés SVG Lucide ont été compilés localement sur les codepoints déjà
+présents dans les données du jeu. Elle est le fallback explicite des trois
+familles typographiques. Les sélecteurs Unicode invisibles `U+FE0F` et
+`U+200D` ont une avance nulle ; aucun système hôte n'est consulté pour dessiner
+les pictogrammes. Le smoke UI vérifie mécaniquement que chaque pictogramme
+utilisé par `game/` et `data/` est couvert par cet asset.
 
 ## Icônes — `icons/`
 

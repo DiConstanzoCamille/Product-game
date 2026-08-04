@@ -38,6 +38,7 @@ var failures: int = 0
 func _ready() -> void:
 	print("=== SMOKE TEST UI ===")
 	_test_ui_scale_settings()
+	_test_embedded_icon_coverage()
 	SprintState.reset_run()
 	SprintState.activated_cards.append("notion")
 	SprintState.activated_card_sprints["notion"] = 1
@@ -82,6 +83,53 @@ func _test_ui_scale_settings() -> void:
 		_fail("L'UI doit etre rendue de 1600x900 vers une fenetre 1920x1080.")
 	if ProjectSettings.get_setting("display/window/stretch/mode", "") != "canvas_items":
 		_fail("Le mode canvas_items doit garder l'interface lisible au redimensionnement.")
+
+
+## Les pictogrammes du jeu sont conservés comme caractères dans les données et
+## les chaînes existantes, mais leur dessin vient exclusivement de l'asset
+## ProductIcons.ttf. Ce scan empêche qu'un nouvel emoji retombe silencieusement
+## sur la police du système — et redevienne un carré dans les captures Linux.
+func _test_embedded_icon_coverage() -> void:
+	var missing: Dictionary = {}
+	var game_dir := ProjectSettings.globalize_path("res://").trim_suffix("/")
+	var data_dir := game_dir.get_base_dir().path_join("data")
+	for root in ["res://", data_dir]:
+		_scan_icon_codepoints(root, missing)
+	if missing.is_empty():
+		return
+	var labels: Array = []
+	for codepoint in missing.keys():
+		labels.append("U+%04X" % int(codepoint))
+	labels.sort()
+	_fail("La police ProductIcons ne couvre pas : %s" % ", ".join(labels))
+
+
+func _scan_icon_codepoints(directory: String, missing: Dictionary) -> void:
+	for child in DirAccess.get_directories_at(directory):
+		if child.begins_with("."):
+			continue
+		_scan_icon_codepoints(directory.path_join(child), missing)
+	for file_name in DirAccess.get_files_at(directory):
+		if not file_name.get_extension() in ["gd", "tscn", "json"]:
+			continue
+		var file := FileAccess.open(directory.path_join(file_name), FileAccess.READ)
+		if file == null:
+			continue
+		var text := file.get_as_text()
+		for index in text.length():
+			var codepoint := text.unicode_at(index)
+			if _is_icon_codepoint(codepoint) and not UIHelpers.FONT_PRODUCT_ICONS.has_char(codepoint):
+				missing[codepoint] = true
+
+
+func _is_icon_codepoint(codepoint: int) -> bool:
+	if codepoint >= 0x1F000 and codepoint <= 0x1FAFF:
+		return true
+	return codepoint in [
+		0x200D, 0x2194, 0x23F1, 0x23F3, 0x25C6, 0x2601, 0x267B,
+		0x267F, 0x2696, 0x2699, 0x26A0, 0x26A1, 0x2702, 0x2705,
+		0x2708, 0x2716, 0x2728, 0x2753, 0xFE0F,
+	]
 
 
 ## Joue les deux gestes spécifiques à la Roadmap profonde : révéler une carte
