@@ -24,12 +24,13 @@ func _ready() -> void:
 	out_dir = OS.get_environment("SHOT_DIR")
 	print("=== CAPTURES — sortie : %s ===" % out_dir)
 	SprintState.reset_run("agile-transformation", "meridia-corp")
-	# Rendre visible le cas nominal d'alerte sans bricoler les scènes : le
-	# panneau doit garder une alerte lisible, sans étaler quatre jauges par ligne.
-	var roster := SprintState.get_roster()
-	if not roster.is_empty():
-		SprintState.employee_wellbeing(roster[0])["confiance"] = 12
-		SprintState._refresh_team_moral()
+	# La capture de recette peut rendre visible le cas d'alerte sans bricoler les
+	# scènes. Sans variable, elle conserve l'état nominal du premier sprint.
+	if OS.get_environment("TEAM_ALERT_CAPTURE") == "1":
+		var roster := SprintState.get_roster()
+		if not roster.is_empty():
+			SprintState.employee_wellbeing(roster[0])["confiance"] = 12
+			SprintState._refresh_team_moral()
 	await _shoot_all()
 	print("=== CAPTURES : TERMINÉ ===")
 	get_tree().quit()
