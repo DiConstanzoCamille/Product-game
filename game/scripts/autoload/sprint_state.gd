@@ -137,6 +137,7 @@ var _backlog_bag: Array = []           # sac des propositions de Roadmap, filtr�
 var _quarter_requirement_bag: Array = []
 var _last_quarter_requirement_id: String = ""
 var pending_team_crises: Array = []    # [{employee_id, criterion}] — priorité Inbox au sprint suivant
+var pending_team_concerns: Array = []  # mêmes entrées, au seuil d'alerte avant la rupture
 
 
 ## À appeler au lancement d'un nouveau mandat, une fois le niveau de carrière,
@@ -205,6 +206,7 @@ func reset_run(chosen_era_id: String = "", chosen_company_id: String = "", chose
 	_quarter_requirement_bag.clear()
 	_last_quarter_requirement_id = ""
 	pending_team_crises.clear()
+	pending_team_concerns.clear()
 	current_shop_offer.clear()
 	energy = int(get_energy_conf().get("start", 70))
 	cpo_wellbeing = get_individual_team_conf().get("cpoStart", {}).duplicate(true)
@@ -1369,6 +1371,10 @@ func _employee_from_source(source: Dictionary, hired_sprint: int, trait_revealed
 		"personalityRevealed": bool(source.get("personalityRevealed", false)),
 		"wellbeing": wellbeing,
 		"contributionBlocked": false,
+		"timeOffSprint": -1,
+		"managementActions": {},
+		"pendingConcerns": [],
+		"pendingCrises": [],
 	}
 
 
@@ -1514,6 +1520,78 @@ func apply_people_effect_for_employee(employee: Dictionary, deltas: Dictionary) 
 	_refresh_team_moral()
 
 
+func employee_management_refusal(employee: Dictionary, action: String) -> String:
+	if employee.is_empty() or find_employee(String(employee.get("id", ""))).is_empty():
+		return "introuvable"
+	if bool(get_individual_team_conf().get("managementActions", {}).get("oncePerSprint", true)):
+		if int(employee.get("managementActions", {}).get(action, -1)) == sprint_number:
+			return "deja-ce-sprint"
+	if action == "ownership":
+		var ownership_cost := int(get_individual_team_conf().get("managementActions", {}).get("ownership", {}).get("cpoEnergyCost", 0))
+		if energy < ownership_cost:
+			return "epuise"
+	return ""
+
+
+func _record_management_action(employee: Dictionary, action: String) -> void:
+	var actions: Dictionary = employee.get("managementActions", {}).duplicate()
+	actions[action] = sprint_number
+	employee["managementActions"] = actions
+
+
+func grant_time_off(employee_id: String) -> String:
+	var employee := find_employee(employee_id)
+	var refusal := employee_management_refusal(employee, "time-off")
+	if refusal != "":
+		return refusal
+	_apply_time_off(employee)
+	_record_management_action(employee, "time-off")
+	pending_journal_lines.append("⚡ %s prend le sprint pour récupérer — sa contribution est indisponible ce sprint." % employee.get("name", employee_id))
+	return ""
+
+
+func _apply_time_off(employee: Dictionary) -> void:
+	employee["timeOffSprint"] = sprint_number
+	apply_people_effect_for_employee(employee, get_individual_team_conf().get("managementActions", {}).get("timeOff", {}))
+
+
+func grant_salary_raise(employee_id: String) -> String:
+	var employee := find_employee(employee_id)
+	var refusal := employee_management_refusal(employee, "salary-raise")
+	if refusal != "":
+		return refusal
+	_apply_salary_raise(employee)
+	_record_management_action(employee, "salary-raise")
+	pending_journal_lines.append("💸 Augmentation : %s gagne désormais %d 💰/sprint." % [employee.get("name", employee_id), int(employee.get("salary", 0))])
+	return ""
+
+
+func _apply_salary_raise(employee: Dictionary) -> void:
+	var conf: Dictionary = get_individual_team_conf().get("managementActions", {}).get("salaryRaise", {})
+	employee["salary"] = int(employee.get("salary", 0)) + int(conf.get("salaryStep", 1))
+	apply_people_effect_for_employee(employee, {
+		"salaire": float(conf.get("salaire", 0)),
+		"confiance": float(conf.get("confiance", 0)),
+	})
+
+
+func grant_ownership(employee_id: String) -> String:
+	var employee := find_employee(employee_id)
+	var refusal := employee_management_refusal(employee, "ownership")
+	if refusal != "":
+		return refusal
+	_apply_ownership(employee)
+	_record_management_action(employee, "ownership")
+	pending_journal_lines.append("🧭 %s reçoit un périmètre clair et la responsabilité qui va avec." % employee.get("name", employee_id))
+	return ""
+
+
+func _apply_ownership(employee: Dictionary) -> void:
+	var conf: Dictionary = get_individual_team_conf().get("managementActions", {}).get("ownership", {})
+	apply_people_effect_for_employee(employee, conf)
+	apply_people_effect("vous", {"energie": -float(conf.get("cpoEnergyCost", 0))})
+
+
 func _apply_pending_people_effects() -> void:
 	for effect in pending_people_effects:
 		apply_people_effect(String(effect.get("target", "tous")), effect.get("deltas", {}))
@@ -1529,19 +1607,26 @@ func _sync_cpo_energy() -> void:
 ## contribution tout de suite, parce que la rupture est déjà visible au travail.
 func _inspect_team_crises() -> void:
 	var leave_at := int(get_individual_team_conf().get("leaveAt", 0))
+	var alert_at := int(get_individual_team_conf().get("alertAt", 25))
 	for employee in get_roster():
 		var wellbeing := employee_wellbeing(employee)
+		var employee_crises: Array = employee.get("pendingCrises", []).duplicate()
+		var employee_concerns: Array = employee.get("pendingConcerns", []).duplicate()
 		for criterion in get_individual_team_conf().get("criteria", []):
 			var key := String(criterion)
-			if key == "confiance" and int(wellbeing.get(key, 100)) <= leave_at:
+			var value := int(wellbeing.get(key, 100))
+			if key == "confiance" and value <= leave_at:
 				employee["contributionBlocked"] = true
-			if int(wellbeing.get(key, 100)) > leave_at:
+			if value <= leave_at:
+				if not employee_crises.has(key):
+					employee_crises.append(key)
+					pending_team_crises.append({"employee_id": employee.get("id", ""), "criterion": key})
 				continue
-			if String(employee.get("pendingCrisis", "")) == key:
-				continue
-			employee["pendingCrisis"] = key
-			pending_team_crises.append({"employee_id": employee.get("id", ""), "criterion": key})
-			break
+			if value <= alert_at and not employee_concerns.has(key):
+				employee_concerns.append(key)
+				pending_team_concerns.append({"employee_id": employee.get("id", ""), "criterion": key})
+		employee["pendingCrises"] = employee_crises
+		employee["pendingConcerns"] = employee_concerns
 
 
 func _team_crisis_event(crisis: Dictionary) -> Dictionary:
@@ -1549,6 +1634,9 @@ func _team_crisis_event(crisis: Dictionary) -> Dictionary:
 	if employee.is_empty():
 		return {}
 	var criterion := String(crisis.get("criterion", "moral"))
+	if int(employee_wellbeing(employee).get(criterion, 100)) > int(get_individual_team_conf().get("leaveAt", 0)):
+		_remove_employee_pending(employee, "pendingCrises", criterion)
+		return {}
 	var conf: Dictionary = get_individual_team_conf().get("crises", {}).get(criterion, {})
 	var name := String(employee.get("name", "Cette personne"))
 	return {
@@ -1587,7 +1675,7 @@ func _resolve_team_crisis(choice: Dictionary) -> void:
 		return
 	var action := String(crisis.get("action", ""))
 	if action == "restore":
-		employee["pendingCrisis"] = ""
+		_remove_employee_pending(employee, "pendingCrises", String(crisis.get("criterion", "")))
 		if String(crisis.get("criterion", "")) == "confiance":
 			employee["contributionBlocked"] = false
 		return
@@ -1601,10 +1689,89 @@ func _resolve_team_crisis(choice: Dictionary) -> void:
 	_refresh_team_moral()
 
 
+func _remove_employee_pending(employee: Dictionary, field: String, criterion: String) -> void:
+	var entries: Array = employee.get(field, []).duplicate()
+	entries.erase(criterion)
+	employee[field] = entries
+
+
+func _team_concern_event(concern: Dictionary) -> Dictionary:
+	var employee := find_employee(String(concern.get("employee_id", "")))
+	if employee.is_empty():
+		return {}
+	var criterion := String(concern.get("criterion", "moral"))
+	var value := int(employee_wellbeing(employee).get(criterion, 100))
+	var alert_at := int(get_individual_team_conf().get("alertAt", 25))
+	var leave_at := int(get_individual_team_conf().get("leaveAt", 0))
+	if value > alert_at or value <= leave_at:
+		_remove_employee_pending(employee, "pendingConcerns", criterion)
+		return {}
+	var conf: Dictionary = get_individual_team_conf().get("concerns", {}).get(criterion, {})
+	var choices: Array = []
+	for template in conf.get("choices", []):
+		choices.append({
+			"id": "team-concern-%s-%s-%s" % [employee.get("id", ""), criterion, template.get("id", "choix")],
+			"label": template.get("label", "Répondre"),
+			"reveal": template.get("reveal", "La demande reçoit une réponse."),
+			"teamConcern": {
+				"employee_id": employee.get("id", ""),
+				"criterion": criterion,
+				"action": template.get("action", ""),
+				"employeeDeltas": template.get("employeeDeltas", {}),
+				"cpoDeltas": template.get("cpoDeltas", {}),
+			},
+		})
+	return {
+		"id": "team-concern-%s-%s" % [employee.get("id", ""), criterion],
+		"from": employee.get("name", "Équipe produit"),
+		"channel": "#equipe-produit",
+		"status": "urgent",
+		"subject": "%s %s" % [employee.get("name", "Cette personne"), conf.get("subject", "demande à vous parler")],
+		"text": "%s\n\n%s est à %d/100 en %s : c'est encore une alerte, pas une rupture." % [
+			conf.get("body", "Le sujet ne peut plus attendre."), employee.get("name", "Cette personne"), value,
+			{"moral": "Moral", "confiance": "Confiance", "energie": "Énergie", "salaire": "satisfaction salariale"}.get(criterion, criterion),
+		],
+		"choices": choices,
+	}
+
+
+func _resolve_team_concern(choice: Dictionary) -> void:
+	var concern: Dictionary = choice.get("teamConcern", {})
+	if concern.is_empty():
+		return
+	var employee := find_employee(String(concern.get("employee_id", "")))
+	if employee.is_empty():
+		return
+	match String(concern.get("action", "")):
+		"time-off":
+			_apply_time_off(employee)
+			_record_management_action(employee, "time-off")
+		"salary-raise":
+			_apply_salary_raise(employee)
+			_record_management_action(employee, "salary-raise")
+		"ownership":
+			_apply_ownership(employee)
+			_record_management_action(employee, "ownership")
+	apply_people_effect_for_employee(employee, concern.get("employeeDeltas", {}))
+	apply_people_effect("vous", concern.get("cpoDeltas", {}))
+	_remove_employee_pending(employee, "pendingConcerns", String(concern.get("criterion", "")))
+	pending_journal_lines.append("👥 Demande de %s traitée : %s." % [employee.get("name", "une personne"), choice.get("label", "réponse")])
+
+
+func has_pending_team_events() -> bool:
+	return not pending_team_crises.is_empty() or not pending_team_concerns.is_empty()
+
+
+func pending_team_event_count() -> int:
+	return pending_team_crises.size() + pending_team_concerns.size()
+
+
 ## Facteur de contribution d'un employé : 1.0 par défaut, réduit par un
 ## trait caché révélé de type Fantôme (contributionFactor).
 func employee_contribution_factor(employee: Dictionary) -> float:
 	if bool(employee.get("contributionBlocked", false)):
+		return 0.0
+	if int(employee.get("timeOffSprint", -1)) == sprint_number:
 		return 0.0
 	if not employee.get("hiddenRevealed", false):
 		return 1.0
@@ -1775,6 +1942,10 @@ func do_one_on_one(person: Dictionary) -> String:
 	var was_revealed := bool(person.get("hiddenRevealed", false))
 	if not is_employee and person.get("hiddenRevealed", false):
 		return "deja-revele"
+	if is_employee:
+		var management_refusal := employee_management_refusal(person, "one-on-one")
+		if management_refusal != "":
+			return management_refusal
 
 	var cost := get_personal_action_cost("oneOnOne")
 	_spend_energy(cost)
@@ -1795,6 +1966,7 @@ func do_one_on_one(person: Dictionary) -> String:
 	var extra := ""
 	if is_employee:  # employé du roster (un candidat n'a pas encore de sprint d'embauche)
 		apply_people_effect_for_employee(person, {"confiance": float(get_individual_team_conf().get("oneOnOneConfiance", 0))})
+		_record_management_action(person, "one-on-one")
 		if not was_revealed:
 			extra = _apply_trait_triggers(person)
 	pending_journal_lines.append("🤝 1:1 avec %s (−%d ⚡) : %s%s" % [
@@ -2988,7 +3160,15 @@ func hire_candidate(candidate: Dictionary, target_squad_id: String = "") -> Stri
 		discount_note = " (réseau : −%d 💥)" % next_hire_discount
 		next_hire_discount = 0
 
-	_target_roster(target_squad_id).append(_employee_from_source(candidate, sprint_number, bool(candidate.get("hiddenRevealed", false))))
+	var target_roster := _target_roster(target_squad_id)
+	var newcomer := _employee_from_source(candidate, sprint_number, bool(candidate.get("hiddenRevealed", false)))
+	var newcomer_salary := int(newcomer.get("salary", 0))
+	var newcomer_effect := float(get_individual_team_conf().get("systemicEffects", {}).get("betterPaidNewcomer", 0))
+	for existing_employee in target_roster:
+		if int(existing_employee.get("salary", 0)) < newcomer_salary:
+			apply_people_effect_for_employee(existing_employee, {"salaire": newcomer_effect})
+	target_roster.append(newcomer)
+	_refresh_team_moral()
 	_hired_candidate_ids.append(candidate.get("id", ""))
 	release_reservation("candidate", candidate.get("id", ""))
 	candidate["hired"] = true
@@ -3052,6 +3232,9 @@ func buy_practice(practice_id: String) -> String:
 		practice.get("icon", ""), practice.get("name", ""), cost,
 		" · %d 💰/sprint de licence" % charge if charge > 0 else ""
 	])
+	var purchase_people: Dictionary = practice.get("onPurchasePeopleEffects", {})
+	if not purchase_people.is_empty():
+		queue_people_effect(String(purchase_people.get("target", "tous")), purchase_people.get("deltas", {}))
 
 	# Entretiens structurés : les candidats déjà sur l'étal arrivent révélés aussi.
 	if practice_id == "entretiens-structures":
@@ -3077,6 +3260,10 @@ func draw_inbox_event() -> Dictionary:
 		var crisis_event := _team_crisis_event(pending_team_crises.pop_front())
 		if not crisis_event.is_empty():
 			return crisis_event
+	while not pending_team_concerns.is_empty():
+		var concern_event := _team_concern_event(pending_team_concerns.pop_front())
+		if not concern_event.is_empty():
+			return concern_event
 	var eligible: Array = _eligible_inbox_events()
 	if eligible.is_empty():
 		return {}
@@ -3152,6 +3339,7 @@ func apply_inbox_choice(choice: Dictionary, note: String = "") -> void:
 	var people_effect: Dictionary = choice.get("peopleEffects", {})
 	if not people_effect.is_empty():
 		queue_people_effect(String(people_effect.get("target", "tous")), people_effect.get("deltas", {}))
+	_resolve_team_concern(choice)
 	_resolve_team_crisis(choice)
 	var conversion: Dictionary = choice.get("clientConversion", {})
 	if conversion.is_empty():
@@ -3288,6 +3476,8 @@ func _apply_per_sprint_effects() -> void:
 			add_pending({"dette-organisationnelle": relief})
 
 	for employee in get_roster():
+		if sprint_number - int(employee.get("hiredSprint", sprint_number)) >= int(people_systems.get("salaryDriftAfterSprints", 99)):
+			apply_people_effect_for_employee(employee, {"salaire": float(people_systems.get("salaryDriftPerSprint", 0))})
 		if not employee.get("hiddenRevealed", false):
 			continue
 		var hidden_trait := get_hidden_trait(employee.get("hidden_trait", ""))
@@ -3300,6 +3490,9 @@ func _apply_per_sprint_effects() -> void:
 		var per_sprint: Dictionary = practice.get("perSprint", {})
 		if not per_sprint.is_empty():
 			add_pending(per_sprint)
+		var people_per_sprint: Dictionary = practice.get("perSprintPeopleEffects", {})
+		if not people_per_sprint.is_empty():
+			queue_people_effect(String(people_per_sprint.get("target", "tous")), people_per_sprint.get("deltas", {}))
 
 	var decay := float(GameData.balance.get("pressure", {}).get("reputationDecayPerSprint", 2))
 	if decay != 0.0:
@@ -3328,6 +3521,9 @@ func _apply_team_sprint_energy() -> void:
 			delta = float(energy_conf.get("atCapacity", 0))
 		for employee in squad.get("roster", []):
 			apply_people_effect_for_employee(employee, {"energie": delta})
+		if spent > 0 and spent <= capacity:
+			for employee in squad.get("roster", []):
+				apply_people_effect_for_employee(employee, {"moral": float(energy_conf.get("successfulDeliveryMoral", 0))})
 
 
 ## Snapshot immuable du sprint. Les deltas de contenu et de pratiques ont

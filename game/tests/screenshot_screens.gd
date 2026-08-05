@@ -23,6 +23,15 @@ var out_dir: String = ""
 func _ready() -> void:
 	out_dir = OS.get_environment("SHOT_DIR")
 	print("=== CAPTURES — sortie : %s ===" % out_dir)
+	_prepare_team_state()
+	await _shoot_all()
+	_prepare_team_state()
+	await _shoot_team_management()
+	print("=== CAPTURES : TERMINÉ ===")
+	get_tree().quit()
+
+
+func _prepare_team_state() -> void:
 	SprintState.reset_run("agile-transformation", "meridia-corp")
 	# La capture de recette peut rendre visible le cas d'alerte sans bricoler les
 	# scènes. Sans variable, elle conserve l'état nominal du premier sprint.
@@ -30,10 +39,9 @@ func _ready() -> void:
 		var roster := SprintState.get_roster()
 		if not roster.is_empty():
 			SprintState.employee_wellbeing(roster[0])["confiance"] = 12
+			SprintState.employee_wellbeing(roster[0])["salaire"] = 20
+			SprintState._inspect_team_crises()
 			SprintState._refresh_team_moral()
-	await _shoot_all()
-	print("=== CAPTURES : TERMINÉ ===")
-	get_tree().quit()
 
 
 func _shoot_all() -> void:
@@ -56,3 +64,24 @@ func _shoot_all() -> void:
 		print("  %s %s (%dx%d)" % ["✓" if err == OK else "✗", name, image.get_width(), image.get_height()])
 		screen.queue_free()
 		await get_tree().process_frame
+
+
+func _shoot_team_management() -> void:
+	var screen: Control = load("res://scenes/screens/roadmap_screen.tscn").instantiate()
+	add_child(screen)
+	for i in range(12):
+		await get_tree().process_frame
+	var open_button: Button = screen.find_child("OpenTeamManagement", true, false)
+	if open_button == null:
+		print("  ✗ bouton Gérer l'équipe introuvable")
+	else:
+		open_button.pressed.emit()
+		for i in range(12):
+			await get_tree().process_frame
+		await RenderingServer.frame_post_draw
+		var image: Image = get_viewport().get_texture().get_image()
+		var target: String = "%s/team_management_screen.png" % out_dir
+		var err: int = image.save_png(target)
+		print("  %s team_management_screen (%dx%d)" % ["✓" if err == OK else "✗", image.get_width(), image.get_height()])
+	screen.queue_free()
+	await get_tree().process_frame

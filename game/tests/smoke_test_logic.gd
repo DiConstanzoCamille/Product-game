@@ -1643,6 +1643,14 @@ func _test_individual_team_rules() -> void:
 		_fail("Un 1:1 avec un employé doit rester jouable pour rétablir la Confiance.")
 	if int(SprintState.employee_wellbeing(dev).get("confiance", 0)) <= confidence_before_one_on_one:
 		_fail("Le 1:1 n'a pas remonté la Confiance de la personne choisie.")
+	var energy_before_ownership := SprintState.energy
+	if SprintState.grant_ownership(String(dev.get("id", ""))) != "":
+		_fail("Confier un périmètre doit être jouable depuis la fiche d'équipe.")
+	var ownership_cost := int(GameData.balance.get("individualTeam", {}).get("managementActions", {}).get("ownership", {}).get("cpoEnergyCost", 0))
+	if SprintState.energy != energy_before_ownership - ownership_cost:
+		_fail("Confier un périmètre doit coûter %d d'Énergie au CPO." % ownership_cost)
+	if SprintState.grant_ownership(String(dev.get("id", ""))) != "deja-ce-sprint":
+		_fail("Une même action de management ne doit pas être répétable sur une personne dans le même sprint.")
 
 	var moral_before := SprintState.get_team_moral()
 	SprintState.add_pending({"moral": -10})
@@ -1698,6 +1706,54 @@ func _test_individual_team_rules() -> void:
 			_fail("Le départ choisi dans une crise doit retirer la personne du roster.")
 	else:
 		_fail("Une crise de Moral doit pouvoir mener au départ explicite d'une personne.")
+
+	# Deux signaux faibles produisent deux conversations successives au sprint
+	# suivant. La demande salariale engage une charge récurrente ; le repos
+	# restaure l'Énergie mais retire réellement la contribution du sprint.
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+	var salary_employee: Dictionary = SprintState.get_roster()[0]
+	var tired_employee: Dictionary = SprintState.get_roster()[1]
+	SprintState.employee_wellbeing(salary_employee)["salaire"] = 20
+	SprintState.employee_wellbeing(tired_employee)["energie"] = 18
+	SprintState._inspect_team_crises()
+	if SprintState.pending_team_event_count() != 2:
+		_fail("Deux alertes individuelles doivent programmer deux demandes Inbox, obtenu %d." % SprintState.pending_team_event_count())
+	var salary_event := SprintState.draw_inbox_event()
+	if not String(salary_event.get("id", "")).ends_with("-salaire") or salary_event.get("choices", []).size() != 3:
+		_fail("Une satisfaction salariale basse doit produire une demande à trois arbitrages.")
+	else:
+		var salary_before := int(salary_employee.get("salary", 0))
+		SprintState.apply_inbox_choice(salary_event.get("choices", [])[0])
+		if int(salary_employee.get("salary", 0)) != salary_before + 1:
+			_fail("Accepter la demande salariale doit augmenter la masse salariale récurrente.")
+	var energy_event := SprintState.draw_inbox_event()
+	if not String(energy_event.get("id", "")).ends_with("-energie") or energy_event.get("choices", []).size() != 3:
+		_fail("Une Énergie basse doit produire sa propre demande au même passage Inbox.")
+	else:
+		SprintState.apply_inbox_choice(energy_event.get("choices", [])[0])
+		if SprintState.employee_contribution_factor(tired_employee) != 0.0:
+			_fail("Le repos accordé depuis l'Inbox doit retirer la personne de la capacité du sprint.")
+		if int(SprintState.employee_wellbeing(tired_employee).get("energie", 0)) <= 18:
+			_fail("Le repos accordé depuis l'Inbox doit restaurer l'Énergie.")
+	if SprintState.has_pending_team_events():
+		_fail("Les deux demandes traitées ne doivent pas rester en attente.")
+
+	# Les investissements d'équipe ont un effet réel à l'achat puis à chaque
+	# Résolution, et ne se limitent pas au texte de leur carte.
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+	SprintState.impact_wallet = 999
+	var practice_employee: Dictionary = SprintState.get_roster()[0]
+	var trust_before := int(SprintState.employee_wellbeing(practice_employee).get("confiance", 0))
+	if SprintState.buy_practice("barometre-equipe") != "":
+		_fail("Le Baromètre d'équipe doit être achetable dans la boutique.")
+	SprintState._apply_pending_people_effects()
+	var trust_after_purchase := int(SprintState.employee_wellbeing(practice_employee).get("confiance", 0))
+	if trust_after_purchase <= trust_before:
+		_fail("Le Baromètre d'équipe doit restaurer la Confiance à son adoption.")
+	SprintState._apply_per_sprint_effects()
+	SprintState._apply_pending_people_effects()
+	if int(SprintState.employee_wellbeing(practice_employee).get("confiance", 0)) <= trust_after_purchase:
+		_fail("Le Baromètre d'équipe doit continuer d'agir à chaque sprint.")
 	print("Équipe individuelle : %s" % ("OK" if failures == 0 else "ÉCHEC"))
 
 

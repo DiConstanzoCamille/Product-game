@@ -1843,6 +1843,36 @@ sa contribution, mais elle ne disparaît jamais sans ce choix. Le panneau latér
 montre un point par personne au repos, une alerte nommée quand un seuil est bas,
 et les quatre niveaux seulement au survol ou après ouverture du détail.
 
-Le smoke logique couvre les quatre états, les cibles, le CPO, les 1:1 et les
-deux issues d'une crise. Le smoke UI conserve le contrôle des onze écrans et du
-panneau permanent.
+### 35.1 Surveiller, comprendre, agir
+
+Le bouton permanent **Gérer et faire grandir l'équipe** ouvre un hub sans
+quitter la phase courante. La liste garde une lecture compacte ; la fiche d'une
+personne explique séparément les quatre niveaux, leur cause et leur remède,
+montre le caractère révélé et annonce les demandes déjà prévues dans l'Inbox.
+Elle permet de faire un 1:1, confier un périmètre contre de l'Énergie du CPO, accorder un sprint de repos,
+augmenter, promouvoir ou licencier. Les actions de management ne sont jouables
+qu'une fois par personne et par sprint. Le repos rend réellement sa
+contribution indisponible ; l'augmentation accroît réellement la masse
+salariale récurrente.
+
+À la Résolution, chaque critère compris entre 1 et 25 programme sa propre
+conversation pour l'Inbox suivante. Plusieurs personnes ou plusieurs sujets
+peuvent donc produire plusieurs événements successifs : une demande salariale
+ne masque pas un épuisement. Chaque scène offre trois arbitrages — traiter la
+cause, transférer un coût vers le CPO ou laisser empirer — tandis que le zéro
+reste une crise à deux issues, réparation ou départ explicite.
+
+La boucle longue fait évoluer ces états : une livraison tenue restaure un peu
+le Moral, la pleine charge érode l'Énergie, la satisfaction salariale dérive
+après trois sprints et l'arrivée d'une personne mieux payée rend la comparaison
+visible. La boutique propose aussi trois investissements dédiés — Baromètre
+d'équipe, Budget formation et Garde-fou de charge — avec un effet à l'adoption,
+un effet par sprint et une licence récurrente. Gérer l'équipe est donc un
+arbitrage entre capacité immédiate, Énergie du CPO, Impact et Revenue, pas un
+bouton cosmétique.
+
+Le smoke logique couvre les quatre états, les cibles, le CPO, les 1:1, les
+alertes multiples, les demandes, la capacité perdue au repos, les pratiques
+persistantes et les deux issues d'une crise. Le smoke UI ouvre le hub depuis le
+vrai panneau permanent, vérifie ses quatre diagnostics et joue une augmentation
+qui modifie le salaire.

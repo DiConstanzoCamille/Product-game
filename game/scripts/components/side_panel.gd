@@ -39,6 +39,7 @@ const RAIL_WIDTH := 62
 var collapsed := false
 
 var _dossier: Control = null
+var _team_management: Control = null
 var _fire_dialog: ConfirmationDialog = null
 var _pending_fire_id: String = ""
 
@@ -497,6 +498,13 @@ func _build_team(vbox: VBoxContainer) -> void:
 	head.add_child(stats)
 	vbox.add_child(_spaced(head, 10, 6))
 
+	var manage := Button.new()
+	manage.name = "OpenTeamManagement"
+	manage.text = "👥  Gérer et faire grandir l'équipe"
+	manage.tooltip_text = "Diagnostiquer Moral, Confiance, Énergie et Satisfaction salariale, puis agir personne par personne."
+	manage.pressed.connect(_open_team_management)
+	vbox.add_child(manage)
+
 	if roster.is_empty():
 		vbox.add_child(_label("Plus personne. Une organisation parfaitement silencieuse.", 10, UIHelpers.PANEL_MUTED, true))
 		return
@@ -593,39 +601,28 @@ func _alert_icon(criterion: String) -> String:
 	return "!"
 
 
-## Un clic sur une ligne de roster ouvre le mini-menu d'actions : plus besoin
-## d'ouvrir un overlay puis de scroller (retour n°5 de Camille).
+## La ligne ouvre directement la fiche correspondante dans le hub complet.
+## Le bouton au-dessus reste le point d'entrée évident pour le premier usage.
 func _on_team_row_input(event: InputEvent, employee_id: String) -> void:
 	if not (event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed):
 		return
-	var employee := SprintState.find_employee(employee_id)
-	if employee.is_empty():
+	_open_team_management(employee_id)
+
+
+func _open_team_management(employee_id: String = "") -> void:
+	if _team_management != null and is_instance_valid(_team_management):
+		_team_management.open_for(employee_id)
 		return
-
-	var menu := PopupMenu.new()
-	add_child(menu)
-
-	var one_on_one_cost := SprintState.get_personal_action_cost("oneOnOne")
-	var refusal := SprintState.personal_action_refusal()
-	menu.add_item("🤝 1:1 — rétablir la confiance (%d ⚡)" % one_on_one_cost, 0)
-	if refusal != "":
-		menu.set_item_disabled(menu.get_item_index(0), true)
-
-	var severance := SprintState.resolved_price("severance")
-	menu.add_item("🚪 Licencier (%d 💥)" % severance, 1)
-	if SprintState.impact_wallet < severance:
-		menu.set_item_disabled(menu.get_item_index(1), true)
-
-	menu.id_pressed.connect(func(id: int):
-		if id == 0:
-			_on_one_on_one(employee_id)
-		elif id == 1:
-			_confirm_fire(employee_id)
+	var scene: PackedScene = load("res://scenes/components/team_management_dialog.tscn")
+	_team_management = scene.instantiate()
+	var host := get_parent()
+	host.add_child(_team_management)
+	_team_management.open_for(employee_id)
+	_team_management.state_changed.connect(func():
+		refresh()
+		state_changed.emit()
 	)
-	menu.popup_hide.connect(menu.queue_free)
-	# Un PopupMenu se place en coordonnées écran, pas en coordonnées de canvas.
-	menu.position = Vector2i(get_screen_position() + get_local_mouse_position()) + Vector2i(-8, 6)
-	menu.popup()
+	_team_management.tree_exited.connect(func(): _team_management = null)
 
 
 func _on_one_on_one(employee_id: String) -> void:

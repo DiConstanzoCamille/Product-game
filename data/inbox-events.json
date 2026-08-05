@@ -32,8 +32,9 @@
         {
           "id": "temporiser",
           "peopleTarget": "un-au-hasard",
+          "peopleEffects": { "target": "un-au-hasard", "deltas": { "confiance": -12 } },
           "label": "Ne rien changer, temporiser",
-          "reveal": "🎯 Capital politique −3 · 🫶 Moral −8 — il part dans trois semaines.",
+          "reveal": "🎯 Capital politique −3 · 🫶 Moral −8 · 🤝 Confiance −12 sur une personne — il part dans trois semaines.",
           "effects": {
             "capital-politique": -3,
             "moral": -8
@@ -104,8 +105,9 @@
         {
           "id": "couper-budget",
           "peopleTarget": "role:dev",
+          "peopleEffects": { "target": "role:dev", "deltas": { "energie": -6 } },
           "label": "Couper 20% du budget outillage",
-          "reveal": "💰 Revenue +6 · 🧱 Dette +5 · 🫶 Moral −3 — l'équipe compense avec des raccourcis.",
+          "reveal": "💰 Revenue +6 · 🧱 Dette +5 · 🫶 Moral −3 · ⚡ Énergie −6 sur les devs — l'équipe compense avec des raccourcis.",
           "effects": {
             "revenue": 6,
             "dette-organisationnelle": 5,
@@ -156,8 +158,9 @@
         {
           "id": "tenir-encore",
           "peopleTarget": "le-plus-fragile",
+          "peopleEffects": { "target": "le-plus-fragile", "deltas": { "energie": -14 } },
           "label": "Lui demander de tenir encore un sprint",
-          "reveal": "🫶 Moral −7 · 🧱 Dette +3 · ⚡ Énergie −4 — il tient, mais le compteur tourne. Vous vérifiez les alertes à sa place, la nuit.",
+          "reveal": "🫶 Moral −7 · 🧱 Dette +3 · ⚡ Énergie −14 sur la personne la plus fragile et −4 pour vous — il tient, mais le compteur tourne.",
           "effects": {
             "moral": -7,
             "dette-organisationnelle": 3,
@@ -187,8 +190,9 @@
         {
           "id": "accelerer-urgence",
           "peopleTarget": "tous",
+          "peopleEffects": { "target": "tous", "deltas": { "energie": -12 } },
           "label": "Accélérer en urgence, quitte à bâcler",
-          "reveal": "📈 Réputation produit +5 · 🧱 Dette +8 · 🫶 Moral −5 — livré à temps, personne ne sait comment. 👥 +1 en clients.",
+          "reveal": "📈 Réputation produit +5 · 🧱 Dette +8 · 🫶 Moral −5 · ⚡ Énergie −12 pour l'équipe — livré à temps, personne ne sait comment. 👥 +1 en clients.",
           "effects": {
             "reputation-produit": 5,
             "dette-organisationnelle": 8,
@@ -220,8 +224,9 @@
         {
           "id": "mobiliser-urgence",
           "peopleTarget": "role:dev",
+          "peopleEffects": { "target": "role:dev", "deltas": { "energie": -9 } },
           "label": "Mobiliser l'équipe en urgence",
-          "reveal": "🧱 Dette −8 · 🫶 Moral −4 · 🎯 Capital politique +3 · ⚡ Énergie −6 — propre, mais ça a coûté un sprint de travail au chausse-pied, war room pilotée par vos soins.",
+          "reveal": "🧱 Dette −8 · 🫶 Moral −4 · 🎯 Capital politique +3 · ⚡ Énergie −9 pour les devs et −6 pour vous — propre, mais ça a coûté un sprint au chausse-pied.",
           "effects": {
             "dette-organisationnelle": -8,
             "moral": -4,
@@ -401,8 +406,9 @@
         {
           "id": "redistribuer-charge",
           "peopleTarget": "tous",
+          "peopleEffects": { "target": "tous", "deltas": { "energie": -7 } },
           "label": "Redistribuer la charge en interne",
-          "reveal": "🫶 Moral −6 — le poste reste vacant, l'équipe absorbe.",
+          "reveal": "🫶 Moral −6 · ⚡ Énergie −7 pour l'équipe — le poste reste vacant, l'équipe absorbe.",
           "effects": {
             "moral": -6
           }
@@ -477,8 +483,9 @@
         {
           "id": "internaliser-role",
           "peopleTarget": "tous",
+          "peopleEffects": { "target": "le-plus-fragile", "deltas": { "energie": -10, "confiance": -5 } },
           "label": "Internaliser le rôle sur un lead existant",
-          "reveal": "🧱 Dette −3 · 🫶 Moral −4 — moins cher, mais un lead de plus qui porte trop de casquettes.",
+          "reveal": "🧱 Dette −3 · 🫶 Moral −4 · ⚡ Énergie −10 et 🤝 Confiance −5 sur la personne la plus fragile — moins cher, mais un lead porte trop de casquettes.",
           "effects": {
             "dette-organisationnelle": -3,
             "moral": -4
@@ -619,8 +626,9 @@
         {
           "id": "prioriser-pour-campagne",
           "peopleTarget": "role:dev",
+          "peopleEffects": { "target": "role:dev", "deltas": { "energie": -8, "confiance": -4 } },
           "label": "Prioriser la feature pour tenir la date",
-          "reveal": "🧱 Dette +4 · 🫶 Moral −3 — l'équipe sprint pour une date qu'elle n'a pas choisie.",
+          "reveal": "🧱 Dette +4 · 🫶 Moral −3 · ⚡ Énergie −8 et 🤝 Confiance −4 sur les devs — l'équipe sprint pour une date qu'elle n'a pas choisie.",
           "effects": {
             "dette-organisationnelle": 4,
             "moral": -3

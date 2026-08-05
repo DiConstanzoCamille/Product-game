@@ -49,6 +49,8 @@ func _ready() -> void:
 
 	await _test_roadmap_interactions()
 	await _test_investments_interactions()
+	await _test_team_management_interactions()
+	await _test_multiple_team_requests_inbox()
 	await _test_resolution_replay()
 	await _test_resolution_multi_team_replay()
 	await _test_quarter_result_uses_global_sprint()
@@ -314,6 +316,90 @@ func _test_investments_interactions() -> void:
 		_fail("Le bouton de repli n'a pas replié le Panneau de bord.")
 	if panel.size.x > UIHelpers.SIDE_PANEL_WIDTH / 2:
 		_fail("Le panneau replié fait encore %d px de large." % int(panel.size.x))
+
+	screen.queue_free()
+	viewport.queue_free()
+	await get_tree().process_frame
+
+
+## Ouvre le vrai hub depuis le bouton permanent, vérifie les quatre diagnostics
+## puis joue une augmentation depuis la fiche d'une personne.
+func _test_team_management_interactions() -> void:
+	print("  → gestion d'équipe de bout en bout")
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+	var employee: Dictionary = SprintState.get_roster()[0]
+	SprintState.employee_wellbeing(employee)["salaire"] = 20
+	SprintState._refresh_team_moral()
+
+	var viewport := SubViewport.new()
+	viewport.size = Vector2i(1600, 900)
+	add_child(viewport)
+	var screen: Control = load("res://scenes/screens/roadmap_screen.tscn").instantiate()
+	viewport.add_child(screen)
+	for i in 8:
+		await get_tree().process_frame
+
+	var open_button: Button = screen.find_child("OpenTeamManagement", true, false)
+	if open_button == null:
+		_fail("Le panneau permanent n'expose pas le bouton Gérer l'équipe.")
+	else:
+		open_button.pressed.emit()
+		for i in 4:
+			await get_tree().process_frame
+		var dialog: Control = screen.find_child("TeamManagementDialog", true, false)
+		if dialog == null:
+			_fail("Le bouton Gérer l'équipe n'ouvre pas le hub dédié.")
+		else:
+			for criterion in ["moral", "confiance", "energie", "salaire"]:
+				if dialog.find_child("Wellbeing_%s" % criterion, true, false) == null:
+					_fail("La fiche d'équipe n'affiche pas la jauge '%s'." % criterion)
+			var salary_before := int(employee.get("salary", 0))
+			var salary_action: Button = dialog.find_child("SalaryRaiseAction", true, false)
+			if salary_action == null or salary_action.disabled:
+				_fail("L'augmentation salariale doit être une action jouable depuis la fiche.")
+			else:
+				salary_action.pressed.emit()
+				for i in 3:
+					await get_tree().process_frame
+				if int(employee.get("salary", 0)) != salary_before + 1:
+					_fail("Le bouton d'augmentation n'a pas modifié la charge salariale récurrente.")
+				if int(SprintState.employee_wellbeing(employee).get("salaire", 0)) <= 20:
+					_fail("L'augmentation n'a pas restauré la satisfaction salariale.")
+
+	screen.queue_free()
+	viewport.queue_free()
+	await get_tree().process_frame
+
+
+## Une Inbox ne doit pas sacrifier la deuxième alerte au premier choix : le
+## bouton Suivant recharge la conversation suivante avant la Roadmap.
+func _test_multiple_team_requests_inbox() -> void:
+	print("  → demandes d'équipe successives dans l'Inbox")
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+	SprintState.employee_wellbeing(SprintState.get_roster()[0])["salaire"] = 20
+	SprintState.employee_wellbeing(SprintState.get_roster()[1])["energie"] = 18
+	SprintState._inspect_team_crises()
+
+	var viewport := SubViewport.new()
+	viewport.size = Vector2i(1600, 900)
+	add_child(viewport)
+	var screen: Control = load("res://scenes/screens/inbox_screen.tscn").instantiate()
+	viewport.add_child(screen)
+	for i in 6:
+		await get_tree().process_frame
+	var first_event_id := String(screen.event.get("id", ""))
+	if screen.choice_buttons.is_empty():
+		_fail("La première demande d'équipe n'affiche aucun arbitrage dans l'Inbox.")
+	else:
+		screen.choice_buttons[0].pressed.emit()
+		await get_tree().process_frame
+		if not String(screen.next_button.text).begins_with("Traiter la demande suivante"):
+			_fail("Après une première alerte, l'Inbox ne signale pas la demande suivante.")
+		screen.next_button.pressed.emit()
+		for i in 3:
+			await get_tree().process_frame
+		if String(screen.event.get("id", "")) == first_event_id or screen.choice_buttons.is_empty():
+			_fail("Le bouton suivant n'a pas chargé la deuxième demande d'équipe.")
 
 	screen.queue_free()
 	viewport.queue_free()

@@ -23,7 +23,7 @@ var side_panel: Control = null
 
 func _ready() -> void:
 	back_button.pressed.connect(func(): get_tree().change_scene_to_file(START_SCREEN_SCENE))
-	next_button.pressed.connect(func(): get_tree().change_scene_to_file(NEXT_SCENE))
+	next_button.pressed.connect(_on_next_pressed)
 	next_button.disabled = true
 
 	UIHelpers.apply_mono(sprint_label, 12)
@@ -155,7 +155,23 @@ func _on_choice_pressed(choice: Dictionary) -> void:
 
 	var note := "%s → %s" % [event.get("subject", ""), choice.get("label", "")]
 	SprintState.apply_inbox_choice(choice, note)
+	if SprintState.has_pending_team_events():
+		next_button.text = "Traiter la demande suivante (%d) →" % SprintState.pending_team_event_count()
+	else:
+		next_button.text = "Suivant : Roadmap →"
 	call_deferred("_scroll_to_latest")
+
+
+func _on_next_pressed() -> void:
+	if not SprintState.has_pending_team_events():
+		get_tree().change_scene_to_file(NEXT_SCENE)
+		return
+	UIHelpers.clear_children(messages_container)
+	choice_buttons.clear()
+	choice_made = false
+	next_button.disabled = true
+	next_button.text = "Suivant : Roadmap →"
+	_load_event()
 
 
 func _append_outgoing_message(text: String) -> void:
