@@ -19,18 +19,24 @@ extends Control
 
 signal state_changed
 
-const CLOSED_RECT := Rect2(Vector2(466, 340), Vector2(668, 404))
-## La dalle ouverte tient **entre** les papiers du mur : le journal s'arrête à
-## x=558, la feuille d'objectif commence à x=1358. Une première version prenait
-## 1380 de large et recouvrait les trois — on ne voyait plus ni l'équipe, ni le
-## journal, ni l'objectif pendant qu'on jouait une phase, ce qui annule tout
-## l'intérêt du hub. Le moniteur reste un objet posé sur un bureau, pas un
-## écran plein cadre déguisé.
-const OPEN_RECT := Rect2(Vector2(586, 128), Vector2(762, 664))
-const BEZEL := 13.0
+## `macbook-decision-frame.svg` : cadre 1600×1040 dont **le milieu est
+## transparent** — il est dessiné pour qu'une UI vive derrière. Sa dalle occupe
+## x 136→1464 et y 91→815 dans le viewBox, d'où les ratios ci-dessous. Le
+## cadre était dans le dépôt depuis le lot 1, marqué « conservé comme référence
+## mais non utilisé » : le dessiner à la main était un gâchis.
+const FRAME := preload("res://assets/decor/macbook-decision-frame.svg")
+const FRAME_ASPECT := 1040.0 / 1600.0
+const SCREEN_INSET := Vector2(136.0 / 1600.0, 91.0 / 1040.0)
+const SCREEN_SIZE := Vector2(1328.0 / 1600.0, 724.0 / 1040.0)
+
+## Largeur du **cadre**, pas de la dalle. Ouvert, la dalle doit tenir entre les
+## papiers du mur (le journal s'arrête à x=558, l'objectif commence à x=1358) :
+## un cadre plus large recouvrirait le bureau et annulerait l'intérêt du hub.
+const CLOSED_WIDTH := 660.0
+const OPEN_WIDTH := 918.0
+
 
 const SCREEN_BG := Color("#141a26")
-const BEZEL_COLOR := Color("#3a4150")
 const APP_BG := Color(1, 1, 1, 0.06)
 const APP_BORDER := Color(1, 1, 1, 0.14)
 
@@ -44,7 +50,8 @@ var apps: Array = []
 var _open_id := ""
 var _hosted: Control = null
 var _body: Control = null
-var _rect := CLOSED_RECT
+var _frame: TextureRect = null
+var _rect := Rect2()
 
 
 func _ready() -> void:
@@ -53,12 +60,21 @@ func _ready() -> void:
 	size = Vector2(1600, 900)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 
+	_frame = TextureRect.new()
+	_frame.texture = FRAME
+	# Sans EXPAND_IGNORE_SIZE, le TextureRect impose la taille native du SVG et
+	# le cadre déborde de l'écran (piège relevé dans le spike prototype_2d).
+	_frame.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_frame.stretch_mode = TextureRect.STRETCH_SCALE
+	_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_frame)
+
 	_body = Control.new()
 	_body.name = "Body"
 	_body.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_body)
 
-	_apply_rect(CLOSED_RECT)
+	_apply_frame(CLOSED_WIDTH, Vector2(800, 620))
 	_show_apps()
 
 
@@ -66,44 +82,40 @@ func is_open() -> bool:
 	return _open_id != ""
 
 
-# ── La dalle ─────────────────────────────────────────────────────────────
-func _apply_rect(rect: Rect2) -> void:
-	_rect = rect
-	_body.position = rect.position + Vector2(BEZEL, BEZEL)
-	_body.size = rect.size - Vector2(BEZEL, BEZEL) * 2.0
+# ── La dalle se déduit du cadre, jamais l'inverse ────────────────────────
+## `anchor` est le centre de la dalle voulue : c'est elle qu'on compose, le
+## cadre se place autour.
+func _apply_frame(frame_width: float, anchor: Vector2) -> void:
+	var frame_size := Vector2(frame_width, frame_width * FRAME_ASPECT)
+	var screen_size := frame_size * SCREEN_SIZE
+	var screen_position := anchor - screen_size * 0.5
+
+	_frame.position = screen_position - frame_size * SCREEN_INSET
+	_frame.size = frame_size
+
+	_rect = Rect2(screen_position, screen_size)
+	_body.position = screen_position
+	_body.size = screen_size
 	queue_redraw()
 
 
 func _draw() -> void:
-	var outer := Rect2(_rect.position - Vector2(BEZEL, BEZEL), _rect.size + Vector2(BEZEL, BEZEL) * 2.0)
-	draw_rect(outer, BEZEL_COLOR)
+	# Seule la dalle est peinte : tout le reste — coque, charnière, base,
+	# ombre portée — vient du SVG.
 	draw_rect(_rect, SCREEN_BG)
-
-	# Le pied et le clavier ne se dessinent qu'au repos : dalle agrandie, ils
-	# seraient sous l'application et ne raconteraient plus rien.
-	if is_open():
-		return
-	var center := _rect.position.x + _rect.size.x * 0.5
-	var base := _rect.end.y + BEZEL
-	draw_rect(Rect2(Vector2(center - 118, base), Vector2(236, 10)), Color("#2f353f"))
-	draw_rect(Rect2(Vector2(center - 82, base + 10), Vector2(164, 28)), BEZEL_COLOR)
-	draw_rect(Rect2(Vector2(center - 210, base + 62), Vector2(420, 54)), Color("#dfe2e4"))
-	draw_rect(Rect2(Vector2(center - 210, base + 62), Vector2(420, 54)), UIHelpers.COLOR_INK, false, 2.0)
-	for i in range(17):
-		draw_rect(Rect2(Vector2(center - 198 + i * 24, base + 71), Vector2(18, 36)), Color("#c6cbcf"))
 
 
 # ── Le bureau du poste : trois tuiles ────────────────────────────────────
 func _show_apps() -> void:
 	UIHelpers.clear_children(_body)
-	_apply_rect(CLOSED_RECT)
+	_apply_frame(CLOSED_WIDTH, Vector2(800, 620))
 
 	_body.add_child(_os_bar("POSTE DE TRAVAIL", false))
 
 	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 16)
-	row.position = Vector2(0, 90)
-	row.size = Vector2(_body.size.x, 200)
+	row.add_theme_constant_override("separation", 12)
+	row.position = Vector2(0, 62)
+	row.size = Vector2(_body.size.x, _body.size.y - 74)
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	_body.add_child(row)
 
@@ -124,10 +136,10 @@ func _app_tile(app: Dictionary) -> Control:
 	style.set_corner_radius_all(9)
 	style.content_margin_left = 15
 	style.content_margin_right = 15
-	style.content_margin_top = 19
-	style.content_margin_bottom = 19
+	style.content_margin_top = 14
+	style.content_margin_bottom = 14
 	tile.add_theme_stylebox_override("panel", style)
-	tile.custom_minimum_size = Vector2(182, 0)
+	tile.custom_minimum_size = Vector2(156, 0)
 	tile.mouse_filter = Control.MOUSE_FILTER_STOP
 
 	var box := VBoxContainer.new()
@@ -135,7 +147,7 @@ func _app_tile(app: Dictionary) -> Control:
 	box.alignment = BoxContainer.ALIGNMENT_CENTER
 
 	var icon := Control.new()
-	icon.custom_minimum_size = Vector2(56, 50)
+	icon.custom_minimum_size = Vector2(56, 44)
 	icon.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	icon.set_script(preload("res://scripts/components/app_glyph.gd"))
@@ -154,7 +166,7 @@ func _app_tile(app: Dictionary) -> Control:
 	status_label.text = String(status.get("text", ""))
 	status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	status_label.custom_minimum_size = Vector2(150, 0)
+	status_label.custom_minimum_size = Vector2(128, 0)
 	status_label.add_theme_font_size_override("font_size", 11)
 	status_label.add_theme_color_override("font_color",
 		UIHelpers.PANEL_DANGER if bool(status.get("hot", false)) else UIHelpers.PANEL_MUTED)
@@ -217,7 +229,7 @@ func open_app(id: String) -> void:
 		return
 	_open_id = id
 	UIHelpers.clear_children(_body)
-	_apply_rect(OPEN_RECT)
+	_apply_frame(OPEN_WIDTH, Vector2(967, 336))
 
 	var title := "Poste de travail"
 	for app in apps:
