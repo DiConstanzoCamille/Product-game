@@ -23,6 +23,7 @@ const START_SCREEN_SCENE := "res://scenes/screens/start_screen.tscn"
 @onready var continue_button: Button = $Margin/VBox/BottomBar/ContinueButton
 
 var side_panel: Control = null
+var next_quarter_label: Label = null
 
 
 func _ready() -> void:
@@ -35,6 +36,19 @@ func _ready() -> void:
 	sprint_label.text = "Sprint %d — Comité d'investissement · Trimestre %d" % [
 		SprintState.sprint_number, SprintState.quarter_index
 	]
+
+	# Ce qui attend le joueur pendant qu'il dépense. La donnée est déjà tirée —
+	# le verdict appelle `_prepare_quarter()` avant d'ouvrir le Comité — elle
+	# n'était simplement affichée nulle part : on engageait un portefeuille qui
+	# ne se reconstitue plus par un cliquet, sans voir la barre à franchir.
+	next_quarter_label = Label.new()
+	next_quarter_label.name = "NextQuarterLabel"
+	next_quarter_label.autowrap_mode = TextServer.AUTOWRAP_WORD
+	UIHelpers.apply_mono(next_quarter_label, 12)
+	next_quarter_label.add_theme_color_override("font_color", UIHelpers.COLOR_AMBER)
+	var vbox := budget_label.get_parent()
+	vbox.add_child(next_quarter_label)
+	vbox.move_child(next_quarter_label, budget_label.get_index() + 1)
 
 	side_panel = UIHelpers.attach_side_panel(self)
 	side_panel.state_changed.connect(_refresh)
@@ -52,6 +66,7 @@ func _refresh() -> void:
 		SprintState.impact_wallet, int(round(SprintState.revenue)), int(charges.get("total", 0))
 	]
 	budget_label.tooltip_text = "Tout s'achète en 💥 Impact. Ce qui reste allumé après l'achat se paie en 💰 Revenue, à chaque sprint, jusqu'à la fin du mandat."
+	_refresh_next_quarter()
 	UIHelpers.clear_children(content)
 
 	_build_strategy_section()
@@ -68,6 +83,25 @@ func _refresh() -> void:
 
 	if side_panel != null:
 		side_panel.refresh()
+
+
+## Ce que le trimestre qui s'ouvre demandera. C'est de l'information sur la
+## **règle**, pas sur le hasard : le tirage des événements et des cartes reste
+## entier, on montre seulement la barre et l'exigence déjà décidées. Sans ça,
+## on peut dépenser au Comité et découvrir trois sprints plus tard qu'on était
+## mathématiquement mort en signant.
+func _refresh_next_quarter() -> void:
+	if next_quarter_label == null:
+		return
+	var quota := SprintState.get_current_quota()
+	var requirement := SprintState.get_quarter_requirement_text()
+	var missing := quota - SprintState.impact_wallet
+	next_quarter_label.text = "Trimestre %d qui s'ouvre : objectif %d 💥 · %s%s" % [
+		SprintState.quarter_index, quota,
+		"il vous manque %d 💥" % missing if missing > 0 else "déjà atteint avec ce que vous gardez",
+		" · %s" % requirement if requirement != "" else "",
+	]
+	next_quarter_label.tooltip_text = "Le board jugera le SOLDE de votre portefeuille à la fin de ce trimestre, pas ce que vous aurez produit : ce que vous dépensez ici recule d'autant vers l'objectif. Les prix de l'étal suivent l'escalade, mais moins vite qu'elle."
 
 
 # ── 🧭 Décision stratégique ───────────────────────────────────────────────

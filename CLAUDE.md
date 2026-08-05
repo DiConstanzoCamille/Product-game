@@ -25,7 +25,7 @@ La couche multiplicative du Levier de
 `Levier final = (base + Σ additifs) × Π multiplicateurs`.
 [`spec-equipe-individuelle.md`](docs/spec-equipe-individuelle.md) (le Moral
 cache des personnes avec un caractère) est **implémentée** — issue #43,
-carnet §35.
+carnet §36.
 
 Un principe en sort, à ne jamais remélanger : **trois entités perçoivent
 quelque chose**, et chacune a sa grandeur. Les *utilisateurs* jugent le produit
