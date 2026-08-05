@@ -1,0 +1,393 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Product Tycoon — maquette d'intention : le bureau</title>
+<style>
+  :root{
+    --paper:#f4f6f3; --ink:#2a2f38; --muted:#79808d;
+    --panel:#141a26; --panel-fg:#e8ecf5; --panel-muted:#8b97b0;
+    --good:#2f9e63; --warn:#b8801d; --bad:#c4452f;
+    --wood:#c9b59b; --wood-dark:#a58d73; --wall:#eceee9;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#e6e9e4;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--ink);
+       display:flex;flex-direction:column;align-items:center;padding:18px;gap:12px}
+  .stage{width:1600px;height:900px;position:relative;overflow:hidden;border:2px solid var(--ink);
+         transform-origin:top center;flex:0 0 auto;
+         background:linear-gradient(var(--wall) 0 52%, #e3e5e0 52%, #e3e5e0 52.4%, var(--wood) 52.4%, var(--wood-dark) 100%)}
+
+  /* ── LES ZONES — posées sur le fond clair, jamais pleine largeur ──── */
+  .zone{position:absolute;background:rgba(255,255,255,.9);border:1.5px solid #cfd5d2;
+        border-radius:10px;box-shadow:0 2px 0 rgba(0,0,0,.05)}
+
+  .vitals{left:34px;top:26px;padding:13px 20px;display:flex;align-items:center;gap:22px}
+  .stat{display:flex;align-items:center;gap:9px;font-size:17px;font-weight:650;
+        font-variant-numeric:tabular-nums;color:var(--ink)}
+  .stat .ico{font-size:13px;opacity:.6}
+  .stat small{font-size:11px;font-weight:500;color:var(--muted)}
+  .stat small.up{color:var(--good)}
+  /* l'Impact est une PROGRESSION : l'objectif est là sans être un 2e chiffre */
+  .track{height:4px;width:86px;background:#dfe3e0;border-radius:2px;position:relative}
+  .track i{position:absolute;inset:0 auto 0 0;background:var(--good);border-radius:2px}
+  .vsep{width:1px;height:26px;background:#dfe3e0}
+
+  .sprintchip{right:34px;top:26px;padding:12px 17px;font-size:11px;letter-spacing:.14em;
+              color:var(--muted);font-weight:700;font-variant-numeric:tabular-nums}
+
+  /* la remontée par exception — rien tant que tout va bien */
+  .alerts{position:absolute;left:34px;top:98px;display:flex;gap:9px;z-index:12}
+  .alert{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.94);
+         border:1.5px solid var(--bad);color:var(--bad);padding:8px 15px;border-radius:20px;
+         font-size:12px;font-weight:650;white-space:nowrap;box-shadow:0 2px 0 rgba(0,0,0,.05)}
+  .alert.warn{border-color:var(--warn);color:var(--warn)}
+  .dot{width:7px;height:7px;border-radius:50%;background:currentColor;flex:0 0 7px}
+
+  /* ── AU MUR : le papier ──────────────────────────────────────────── */
+  .pin{position:absolute;background:#fff;border:2px solid var(--ink);border-radius:3px;
+       box-shadow:3px 4px 0 rgba(0,0,0,.12);cursor:pointer}
+  .pin h4{font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);
+          font-weight:700;margin-bottom:9px}
+
+  .team{left:38px;top:166px;width:286px;padding:13px 15px;transform:rotate(-.8deg)}
+  .who{display:flex;align-items:center;gap:10px;padding:5px 0;border-bottom:1px solid #eef1f3;font-size:12.5px}
+  .who:last-child{border-bottom:none}
+  .who .nm{flex:1;font-weight:520}
+  .who .rl{font-size:9px;color:var(--muted);letter-spacing:.07em;font-weight:700}
+  .who .flag{font-size:9.5px;color:var(--bad);font-weight:700}
+
+  .ledger{left:352px;top:172px;width:206px;padding:12px 14px;background:#fffdf3;
+          font-size:11.5px;font-variant-numeric:tabular-nums;transform:rotate(1deg)}
+  .ledger div{display:flex;justify-content:space-between;padding:2.5px 0}
+  .ledger .p{color:var(--good);font-weight:700}
+  .ledger .n{color:var(--bad);font-weight:700}
+
+  .goal{right:44px;top:110px;width:198px;padding:14px 15px;text-align:center;transform:rotate(.9deg)}
+  .goal .big{font-size:23px;font-weight:700;font-variant-numeric:tabular-nums;margin:8px 0 3px}
+  .goal .sub{font-size:10px;color:var(--muted);font-weight:600;letter-spacing:.05em}
+
+  /* ── LE PLATEAU ──────────────────────────────────────────────────── */
+  .obj{position:absolute;cursor:pointer;transition:transform .16s ease;z-index:5}
+  .obj:hover{transform:translateY(-8px)}
+  .cap{position:absolute;left:50%;transform:translateX(-50%);bottom:-22px;font-size:10px;
+       letter-spacing:.11em;color:#584732;text-transform:uppercase;white-space:nowrap;font-weight:700}
+  .mug{left:224px;bottom:150px}
+  .keyboard{position:absolute;left:50%;transform:translateX(-50%);bottom:54px;width:420px;height:54px;
+            background:#dfe2e4;border:2px solid var(--ink);border-radius:7px;z-index:4}
+  .keyboard:after{content:"";position:absolute;inset:9px 12px;border-radius:4px;
+                  background:repeating-linear-gradient(90deg,#c6cbcf 0 22px,#dfe2e4 22px 26px)}
+
+  /* ── L'ORDINATEUR : mail, roadmap, dashboard sont des logiciels ──── */
+  .monitor{position:absolute;left:50%;transform:translateX(-50%);bottom:134px;z-index:6}
+  .screen{width:668px;height:404px;background:var(--panel);border:13px solid #3a4150;
+          border-radius:11px;overflow:hidden;color:var(--panel-fg);display:flex;flex-direction:column}
+  .stand{width:236px;height:10px;background:#2f353f;margin:0 auto;border-radius:5px}
+  .foot{width:164px;height:28px;background:#3a4150;margin:0 auto;border-radius:0 0 9px 9px}
+  .osbar{height:28px;background:rgba(255,255,255,.06);display:flex;align-items:center;
+         padding:0 14px;gap:9px;font-size:10px;letter-spacing:.14em;color:var(--panel-muted);font-weight:700}
+  .osbar .back{color:#8fb0ff}
+  .osbody{flex:1;padding:20px 22px;overflow:hidden}
+  .apps{display:flex;gap:16px;height:100%;align-items:center;justify-content:center}
+  .app{width:182px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);
+       border-radius:9px;padding:19px 15px;text-align:center;cursor:pointer;position:relative}
+  .app:hover{background:rgba(255,255,255,.11);border-color:#5a7ad0}
+  .app .nm{font-size:13px;font-weight:600;margin-top:11px}
+  .app .st{font-size:10.5px;color:var(--panel-muted);margin-top:6px;line-height:1.45}
+  .app .st.hot{color:#ffb9a8;font-weight:600}
+  .app .bdg{position:absolute;top:-9px;right:-9px;width:25px;height:25px;border-radius:50%;
+            background:var(--bad);color:#fff;font-size:12px;font-weight:700;display:flex;
+            align-items:center;justify-content:center;border:2px solid var(--panel)}
+  .msg{background:rgba(255,255,255,.07);border-left:3px solid #5a7ad0;padding:12px 14px;
+       border-radius:0 6px 6px 0;margin-bottom:12px}
+  .msg .from{font-size:9.5px;color:var(--panel-muted);letter-spacing:.13em;margin-bottom:5px;font-weight:700}
+  .msg .body{font-size:12.5px;line-height:1.55}
+  .replies{display:flex;flex-direction:column;gap:7px}
+  .reply{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.16);border-radius:6px;
+         padding:9px 12px;font-size:12px}
+  .skip{margin-top:11px;font-size:11px;color:#ffb9a8;text-align:right;font-weight:600}
+
+  /* ── LES OBJETS QUI ENTRENT DANS LE CADRE ────────────────────────── */
+  /* Au repos ils dépassent du bord ; au clic ils glissent dans la scène.
+     Chaque mécanique a son objet, et l'objet dit ce qu'elle est. */
+  .prop{position:absolute;z-index:14;transition:transform .34s cubic-bezier(.2,.8,.25,1)}
+  .prop .hint{position:absolute;top:46%;font-size:10px;letter-spacing:.12em;font-weight:700;
+              color:#6b5a45;text-transform:uppercase;white-space:nowrap}
+
+  /* la tablette : la boutique. Ça se consulte n'importe quand, ça se repousse. */
+  .pad{right:-322px;bottom:34px;transform:rotate(-2deg)}
+  .pad.in{transform:translateX(-364px) rotate(-2deg)}
+  .padbody{width:334px;height:456px;background:#2b3240;border:12px solid #454d5c;border-radius:22px;
+           box-shadow:-14px 10px 28px rgba(0,0,0,.26);padding:16px;color:#e8ecf5;overflow:hidden}
+  .pad .hint{left:-98px}
+  .padh{font-size:10px;letter-spacing:.15em;color:#8b97b0;font-weight:700;margin-bottom:12px}
+  .padcard{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);border-radius:8px;
+           padding:11px 12px;margin-bottom:9px}
+  .padcard .t{font-size:12.5px;font-weight:650}
+  .padcard .d{font-size:10.5px;color:#8b97b0;margin-top:4px;line-height:1.4}
+  .padcard .c{font-size:11.5px;font-weight:700;color:#ffd08a;margin-top:6px}
+
+  /* la planche à pince : la clôture. On signe debout, une fois, et c'est parti. */
+  .board{left:-276px;bottom:26px;transform:rotate(2.5deg)}
+  .board.in{transform:translateX(318px) rotate(2.5deg)}
+  .boardbody{width:306px;height:426px;background:#8a6a45;border:3px solid #5e4830;border-radius:8px;
+             box-shadow:14px 10px 28px rgba(0,0,0,.26);padding:26px 16px 16px;position:relative}
+  .clip{position:absolute;top:-13px;left:50%;transform:translateX(-50%);width:104px;height:26px;
+        background:#b9bec6;border:3px solid #5e4830;border-radius:5px}
+  .sheet{background:#fffdf6;border:1px solid #d8d2c2;border-radius:3px;padding:14px 15px;height:100%}
+  .sheet h5{font-size:9.5px;letter-spacing:.15em;color:var(--muted);font-weight:700;margin-bottom:11px}
+  .sheet .li{display:flex;justify-content:space-between;font-size:12px;padding:5px 0;
+             border-bottom:1px dotted #ded8c8;font-variant-numeric:tabular-nums}
+  .sign{margin-top:18px;text-align:center;border:2px solid var(--good);border-radius:6px;
+        padding:11px;color:var(--good);font-weight:700;font-size:13px;letter-spacing:.06em}
+  .board .hint{right:-124px}
+
+  /* le parapheur du Comité : il n'est là qu'en fin de trimestre. */
+  /* Il n'arrive pas du bord : on le DÉPOSE sur la table. Un sprint sur trois. */
+  .folder{right:172px;bottom:34px;z-index:13;transform:rotate(-4deg)}
+  .folderbody{width:274px;height:186px;background:#7b3f3f;border:3px solid #4e2727;
+              border-radius:5px 12px 12px 5px;box-shadow:-6px 12px 22px rgba(0,0,0,.28);
+              padding:18px 20px;color:#f3e4e4;position:relative}
+  .folderbody:before{content:"";position:absolute;left:9px;top:9px;bottom:9px;width:3px;
+                     background:rgba(0,0,0,.22);border-radius:2px}
+  .folderbody .t{font-size:13px;font-weight:700;letter-spacing:.08em;line-height:1.45}
+  .folderbody .s{font-size:11px;margin-top:11px;opacity:.82;line-height:1.55}
+  .folder .hint{top:-26px;left:6px;color:#7b3f3f}
+
+  .tools{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+  .tools button{font:inherit;font-size:12.5px;padding:9px 15px;border:2px solid var(--ink);background:#fff;
+                border-radius:5px;cursor:pointer;color:var(--ink);font-weight:550}
+  .tools button[aria-pressed="true"]{background:var(--ink);color:#fff}
+  .note{max-width:1140px;text-align:center;font-size:13.5px;color:#454b53;line-height:1.7;min-height:46px}
+</style>
+</head>
+<body>
+
+<div class="tools">
+  <button data-view="calme" aria-pressed="true">1 · Le bureau au calme</button>
+  <button data-view="alerte" aria-pressed="false">2 · Ça remonte tout seul</button>
+  <button data-view="app" aria-pressed="false">3 · Une application</button>
+  <button data-view="pad" aria-pressed="false">4 · La boutique entre</button>
+  <button data-view="board" aria-pressed="false">5 · La clôture entre</button>
+  <button data-view="comite" aria-pressed="false">6 · La fin de trimestre</button>
+</div>
+<p class="note" id="note"></p>
+
+<div class="stage" id="stage">
+
+  <!-- les zones : posées sur le fond clair, jamais pleine largeur -->
+  <div class="zone vitals">
+    <span class="stat"><span class="ico">💥</span>184<span class="track"><i style="width:61%"></i></span></span>
+    <span class="vsep"></span>
+    <span class="stat"><span class="ico">💰</span>42 k<small>€</small></span>
+    <span class="vsep"></span>
+    <span class="stat"><span class="ico">👥</span>12 400 <small class="up">+840</small></span>
+  </div>
+  <div class="zone sprintchip">SPRINT 7 · T3</div>
+  <div class="alerts" id="alerts"></div>
+
+  <!-- au mur : le papier -->
+  <div class="pin team">
+    <h4>Équipe · 4</h4>
+    <div class="who"><span id="f0"></span><span class="nm">Nadia</span><span class="rl">DEV SR</span></div>
+    <div class="who"><span id="f1"></span><span class="nm">Théo</span><span class="rl">DEV JR</span></div>
+    <div class="who"><span id="f2"></span><span class="nm">Inès</span><span class="rl">DESIGN</span><span class="flag" id="flag"></span></div>
+    <div class="who"><span id="f3"></span><span class="nm">Marc</span><span class="rl">DATA</span></div>
+  </div>
+
+  <div class="pin ledger">
+    <h4>Sprint 6 — le journal</h4>
+    <div><span>Livraisons</span><span class="p">+38</span></div>
+    <div><span>Levier ×1,4</span><span class="p">+15</span></div>
+    <div><span>Salaires</span><span class="n">−12 k€</span></div>
+    <div><span>Churn</span><span class="n">−210</span></div>
+  </div>
+
+  <div class="pin goal">
+    <h4>Objectif · T3</h4>
+    <svg width="52" height="52" viewBox="0 0 52 52">
+      <circle cx="26" cy="26" r="23" fill="none" stroke="#2a2f38" stroke-width="3"/>
+      <circle cx="26" cy="26" r="13" fill="none" stroke="#c4452f" stroke-width="3"/>
+      <circle cx="26" cy="26" r="4" fill="#c4452f"/>
+    </svg>
+    <div class="big">184<span style="font-size:15px;color:#79808d"> / 300</span></div>
+    <div class="sub">2 sprints restants</div>
+  </div>
+
+  <!-- le plateau -->
+  <div class="obj mug">
+    <svg width="112" height="94" viewBox="0 0 118 98">
+      <path d="M84 30 h12 a16 16 0 0 1 0 32 h-12" fill="none" stroke="#2a2f38" stroke-width="4"/>
+      <path d="M10 12 h76 v46 a30 30 0 0 1 -76 0 z" id="cupbody" fill="#fff" stroke="#2a2f38" stroke-width="3"/>
+      <text x="48" y="58" text-anchor="middle" font-size="27" font-weight="700" fill="#2a2f38"
+            font-family="system-ui" id="energy">10</text>
+    </svg>
+    <span class="cap">Énergie</span>
+  </div>
+  <div class="keyboard"></div>
+
+  <div class="monitor">
+    <div class="screen">
+      <div class="osbar" id="osbar"></div>
+      <div class="osbody" id="osbody"></div>
+    </div>
+    <div class="stand"></div>
+    <div class="foot"></div>
+  </div>
+
+  <!-- les objets qui entrent dans le cadre -->
+  <div class="prop folder" id="folder">
+    <div class="folderbody">
+      <div class="t">COMITÉ D'INVESTISSEMENT</div>
+      <div class="s">Trimestre 3 franchi · 💥 62 à engager<br>
+        1 décision stratégique, irréversible.<br>Le prochain quota double.</div>
+    </div>
+    <span class="hint">▾ Déposé sur votre table</span>
+  </div>
+
+  <div class="prop pad" id="pad">
+    <div class="padbody">
+      <div class="padh">ÉTAL DU SPRINT · 4 OFFRES</div>
+      <div class="padcard"><div class="t">Lina · Designer senior</div>
+        <div class="d">🔒 Un trait encore inconnu</div><div class="c">💥 18 · salaire 3 k€/sprint</div></div>
+      <div class="padcard"><div class="t">Discovery continue</div>
+        <div class="d">Révèle une colonne du backlog</div><div class="c">💥 12</div></div>
+      <div class="padcard"><div class="t">Shape Up</div>
+        <div class="d">Levier ×1,15 · +4 🎭 Cynisme</div><div class="c">💥 22 · 1 slot</div></div>
+      <div class="padcard" style="opacity:.45"><div class="t">Rachat d'un concurrent</div>
+        <div class="d">Prérequis non rempli</div><div class="c">💥 60</div></div>
+    </div>
+    <span class="hint">◂ Boutique</span>
+  </div>
+
+  <div class="prop board" id="board">
+    <div class="boardbody">
+      <div class="clip"></div>
+      <div class="sheet">
+        <h5>Clôture du sprint 7</h5>
+        <div class="li"><span>Tickets engagés</span><span>4 / 5 capacité</span></div>
+        <div class="li"><span>Événements non traités</span><span style="color:#c4452f">1</span></div>
+        <div class="li"><span>Achats du sprint</span><span>2</span></div>
+        <div class="li"><span>Énergie restante</span><span>⚡ 2</span></div>
+        <div style="font-size:10.5px;color:#79808d;margin-top:13px;line-height:1.5">
+          Après signature, plus rien n'est modifiable.</div>
+        <div class="sign">SIGNER ET LANCER</div>
+      </div>
+    </div>
+    <span class="hint">Fin de sprint ▸</span>
+  </div>
+</div>
+
+<script>
+function face(mood){
+  const skin = mood==="ok" ? "#dfe6ea" : mood==="meh" ? "#efe6d5" : "#f6dcd4";
+  const mouth = mood==="ok" ? "M9 20 q7 6 14 0" : mood==="meh" ? "M9 21 h14" : "M9 23 q7 -7 14 0";
+  const brow = mood==="bad" ? '<path d="M7 9 l7 3 M25 9 l-7 3" stroke="#2a2f38" stroke-width="2" fill="none"/>' : "";
+  return `<svg width="30" height="30" viewBox="0 0 32 32" style="flex:0 0 30px">
+    <circle cx="16" cy="16" r="14" fill="${skin}" stroke="#2a2f38" stroke-width="2"/>
+    <circle cx="11" cy="14" r="1.9" fill="#2a2f38"/><circle cx="21" cy="14" r="1.9" fill="#2a2f38"/>
+    ${brow}<path d="${mouth}" stroke="#2a2f38" stroke-width="2" fill="none" stroke-linecap="round"/></svg>`;
+}
+
+const ICON = {
+  mail:`<svg width="50" height="38" viewBox="0 0 52 40"><rect x="2" y="2" width="48" height="36" rx="4"
+        fill="none" stroke="#c8d2e8" stroke-width="3"/><path d="M2 6 L26 24 L50 6" fill="none"
+        stroke="#c8d2e8" stroke-width="3"/></svg>`,
+  road:`<svg width="44" height="42" viewBox="0 0 46 44"><rect x="2" y="2" width="18" height="40" rx="3"
+        fill="none" stroke="#c8d2e8" stroke-width="3"/><rect x="26" y="2" width="18" height="24" rx="3"
+        fill="none" stroke="#c8d2e8" stroke-width="3"/></svg>`,
+  dash:`<svg width="48" height="38" viewBox="0 0 50 40"><polyline points="3,34 15,26 25,18 34,12 47,4"
+        fill="none" stroke="#6ed49b" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg>`
+};
+
+function apps(v){
+  return `<div class="apps">
+    <div class="app">${v.mail>0?`<span class="bdg">${v.mail}</span>`:""}${ICON.mail}
+      <div class="nm">Boîte mail</div><div class="st${v.mail>0?" hot":""}">${v.mailSt}</div></div>
+    <div class="app">${ICON.road}
+      <div class="nm">Roadmap</div><div class="st${v.jam?" hot":""}">${v.roadSt}</div></div>
+    <div class="app">${ICON.dash}
+      <div class="nm">Tableau de bord</div><div class="st">${v.dashSt}</div></div>
+  </div>`;
+}
+
+const MAILAPP = `
+  <div class="msg">
+    <div class="from">DIRECTION · SPRINT 7</div>
+    <div class="body">Un concurrent vient de sortir la feature que vous aviez repoussée deux fois.
+      Le board demande une réponse d'ici la fin du trimestre.</div>
+  </div>
+  <div class="replies">
+    <div class="reply">Bloquer le sprint dessus &nbsp;·&nbsp; l'équipe encaisse</div>
+    <div class="reply">Assumer le retard &nbsp;·&nbsp; le board encaisse</div>
+    <div class="reply">🔒 Demander l'avis de l'équipe &nbsp;·&nbsp; coûte ⚡</div>
+  </div>
+  <div class="skip">Ne pas répondre → se résout au pire, à la clôture</div>`;
+
+const BASE = {mail:2, mailSt:"2 messages", roadSt:"6 tickets au backlog", dashSt:"12 400 utilisateurs",
+              moods:["ok","ok","ok","ok"], flag:"", jam:false, energy:10, alerts:[], open:null,
+              pad:false, board:false, folder:false};
+
+const VIEWS = {
+  calme:{...BASE,
+    note:"Plus de bandeau ni de rail : des zones posées sur le fond clair, qui ne prennent ni toute la largeur ni toute la hauteur. Trois chiffres, une pastille de sprint, et c'est tout. Le Moral, la Dette, le Capital politique, le Cynisme, le Levier : tout tourne, rien n'est écrit. La tablette et la planche attendent au bord du cadre."
+  },
+  alerte:{...BASE,
+    note:"Rien n'a été cliqué : c'est le jeu qui vient prévenir, et l'alerte est une pastille claire posée sous les chiffres, pas une bande. Inès décroche — son visage change au mur avant qu'un seul chiffre soit affiché. Les seuils vivent dans balance.json ; le motif est déjà livré par #43 (get_employee_alert, alertAt: 25).",
+    alerts:[["bad","Inès décroche"],["warn","Dette · livraisons ralenties"]],
+    moods:["ok","meh","bad","meh"], flag:"décroche", jam:true, energy:2,
+    mailSt:"2 messages · 1 urgent", roadSt:"Congestionnée · −2 pts", dashSt:"Croissance qui fléchit"
+  },
+  app:{...BASE,
+    note:"Les logiciels restent dans l'ordinateur : boîte mail, roadmap, tableau de bord. Ce sont les seules choses qui s'ouvrent « dans un écran » — parce que ce sont vraiment des écrans. Le bureau continue d'exister autour : on ferme, on va vérifier son backlog, on revient.",
+    alerts:[["bad","Inès décroche"]], moods:["ok","meh","bad","meh"], flag:"décroche",
+    jam:true, energy:2, open:"Boîte mail"
+  },
+  pad:{...BASE,
+    note:"La boutique n'est pas un écran de plus : c'est une tablette qui glisse depuis la droite et se pose par-dessus la scène. On la feuillette, on la repousse. Elle est disponible en permanence — l'étal du sprint reste ouvert tout du long.",
+    alerts:[["bad","Inès décroche"]], moods:["ok","meh","bad","meh"], flag:"décroche",
+    jam:true, energy:2, pad:true
+  },
+  board:{...BASE,
+    note:"La clôture arrive par la gauche, sur une planche à pince : on signe debout, une fois, et c'est parti. C'est le seul point de non-retour du sprint — et la feuille dit ce qu'on emporte, y compris l'événement qu'on a choisi d'ignorer.",
+    alerts:[["bad","Inès décroche"]], moods:["ok","meh","bad","meh"], flag:"décroche",
+    jam:true, energy:2, board:true
+  },
+  comite:{...BASE,
+    note:"En fin de trimestre, un troisième objet apparaît au bord du cadre : le parapheur du Comité. Il n'est là qu'un sprint sur trois, et il ne ressemble à rien d'autre. La résolution du trimestre est un moment à part — l'interface le dit par la forme, pas par une phrase.",
+    moods:["ok","ok","meh","ok"], energy:6, mail:0, mailSt:"Rien en attente", folder:true
+  }
+};
+
+function apply(name){
+  const v = VIEWS[name];
+  document.getElementById("note").textContent = v.note;
+  document.getElementById("alerts").innerHTML =
+    v.alerts.map(([c,t])=>`<span class="alert ${c==="warn"?"warn":""}"><i class="dot"></i>${t}</span>`).join("");
+  v.moods.forEach((m,i)=>{ document.getElementById("f"+i).innerHTML = face(m); });
+  document.getElementById("flag").textContent = v.flag;
+  document.getElementById("energy").textContent = v.energy;
+  document.getElementById("cupbody").setAttribute("fill", v.energy <= 3 ? "#f2e2dd" : "#fff");
+  document.getElementById("osbar").innerHTML = v.open
+    ? `<span class="back">◂ POSTE DE TRAVAIL</span><span>·</span><span>${v.open.toUpperCase()}</span>`
+    : `<span>POSTE DE TRAVAIL</span>`;
+  document.getElementById("osbody").innerHTML = v.open ? MAILAPP : apps(v);
+  document.getElementById("pad").classList.toggle("in", v.pad);
+  document.getElementById("board").classList.toggle("in", v.board);
+  document.getElementById("folder").style.display = v.folder ? "" : "none";
+  document.querySelectorAll(".tools button").forEach(b=>
+    b.setAttribute("aria-pressed", String(b.dataset.view===name)));
+}
+document.querySelectorAll(".tools button").forEach(b=>
+  b.addEventListener("click",()=>apply(b.dataset.view)));
+apply("calme");
+
+function fit(){
+  const s=document.getElementById("stage");
+  const k=Math.min(1,(window.innerWidth-44)/1600);
+  s.style.transform=`scale(${k})`;
+  s.style.height=`${900*k}px`;
+}
+window.addEventListener("resize",fit); fit();
+</script>
+</body>
+</html>
