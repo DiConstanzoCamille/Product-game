@@ -26,19 +26,19 @@ const SLIDE_SECONDS := 0.34
 const SHAPES := {
 	"shop": {
 		"rest": Rect2(Vector2(1560, 300), Vector2(334, 456)),
-		"open": Rect2(Vector2(420, 96), Vector2(1120, 760)),
+		"open": Rect2(Vector2(700, 150), Vector2(640, 700)),
 		"body": Color("#2b3240"), "frame": Color("#454d5c"), "radius": 22,
 		"hint": "◂ Boutique", "hint_at": Vector2(-104, 168),
 	},
 	"closing": {
 		"rest": Rect2(Vector2(-266, 380), Vector2(306, 426)),
-		"open": Rect2(Vector2(120, 120), Vector2(560, 690)),
+		"open": Rect2(Vector2(330, 210), Vector2(420, 620)),
 		"body": Color("#8a6a45"), "frame": Color("#5e4830"), "radius": 8,
 		"hint": "Fin de sprint ▸", "hint_at": Vector2(48, 154),
 	},
 	"committee": {
 		"rest": Rect2(Vector2(1150, 660), Vector2(274, 186)),
-		"open": Rect2(Vector2(300, 96), Vector2(1000, 760)),
+		"open": Rect2(Vector2(600, 170), Vector2(740, 660)),
 		"body": Color("#7b3f3f"), "frame": Color("#4e2727"), "radius": 8,
 		"hint": "Déposé sur votre table", "hint_at": Vector2(6, -26),
 	},

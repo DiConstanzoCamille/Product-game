@@ -20,7 +20,13 @@ extends Control
 signal state_changed
 
 const CLOSED_RECT := Rect2(Vector2(466, 340), Vector2(668, 404))
-const OPEN_RECT := Rect2(Vector2(110, 128), Vector2(1380, 700))
+## La dalle ouverte tient **entre** les papiers du mur : le journal s'arrête à
+## x=558, la feuille d'objectif commence à x=1358. Une première version prenait
+## 1380 de large et recouvrait les trois — on ne voyait plus ni l'équipe, ni le
+## journal, ni l'objectif pendant qu'on jouait une phase, ce qui annule tout
+## l'intérêt du hub. Le moniteur reste un objet posé sur un bureau, pas un
+## écran plein cadre déguisé.
+const OPEN_RECT := Rect2(Vector2(586, 128), Vector2(762, 664))
 const BEZEL := 13.0
 
 const SCREEN_BG := Color("#141a26")
