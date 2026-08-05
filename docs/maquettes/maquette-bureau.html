@@ -1,0 +1,331 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Product Tycoon — maquette d'intention : le bureau</title>
+<style>
+  :root{
+    --paper:#f4f6f3; --ink:#2a2f38; --muted:#79808d;
+    --panel:#10151f; --panel-fg:#e8ecf5; --panel-muted:#8b97b0;
+    --accent:#23408e; --good:#2f9e63; --warn:#d99a2b; --bad:#d3543f;
+    --wood:#c9b59b; --wood-dark:#a58d73; --wall:#eceee9;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#e6e9e4;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--ink);
+       display:flex;flex-direction:column;align-items:center;padding:18px;gap:12px}
+  .stage{width:1600px;height:900px;position:relative;background:var(--paper);
+         border:2px solid var(--ink);overflow:hidden;transform-origin:top center;flex:0 0 auto}
+
+  /* ── LE BANDEAU : trois valeurs, et rien d'autre par défaut ──────── */
+  .hud{position:absolute;top:0;left:0;right:0;height:80px;background:var(--panel);
+       display:flex;align-items:center;padding:0 28px;gap:32px;z-index:30}
+  .stat{display:flex;flex-direction:column;gap:5px;min-width:172px}
+  .stat .k{font-size:10px;letter-spacing:.15em;color:var(--panel-muted);text-transform:uppercase;font-weight:600}
+  .stat .v{font-size:26px;font-weight:650;color:var(--panel-fg);font-variant-numeric:tabular-nums;
+           display:flex;align-items:baseline;gap:7px;line-height:1.05}
+  .stat .v small{font-size:12px;font-weight:500;color:var(--panel-muted)}
+  .stat .v small.up{color:var(--good)}
+  /* l'Impact est une PROGRESSION : l'objectif est là sans être un 2e chiffre */
+  .track{height:6px;background:rgba(255,255,255,.13);border-radius:3px;width:176px;position:relative}
+  .track i{position:absolute;inset:0 auto 0 0;background:var(--good);border-radius:3px}
+  .hud .sep{width:1px;height:44px;background:rgba(255,255,255,.14)}
+  .hud .spacer{flex:1}
+  .sprint{font-size:11px;color:var(--panel-muted);letter-spacing:.12em;font-variant-numeric:tabular-nums;font-weight:600}
+
+  /* la remontée par exception — invisible tant que tout va bien */
+  .alerts{display:flex;gap:9px}
+  .alert{display:flex;align-items:center;gap:8px;background:rgba(211,84,63,.17);
+         border:1px solid rgba(211,84,63,.6);color:#ffb9a8;padding:8px 14px;border-radius:16px;
+         font-size:12.5px;font-weight:600;white-space:nowrap}
+  .alert.warn{background:rgba(217,154,43,.16);border-color:rgba(217,154,43,.6);color:#ffd792}
+  .dot{width:7px;height:7px;border-radius:50%;background:currentColor;flex:0 0 7px}
+
+  /* ── LA PIÈCE ────────────────────────────────────────────────────── */
+  .room{position:absolute;top:80px;left:0;right:0;bottom:0;background:var(--wall)}
+  .desk{position:absolute;left:0;right:0;bottom:0;height:46%;
+        background:linear-gradient(var(--wood),var(--wood-dark));border-top:3px solid #8d7358}
+
+  /* le trombinoscope au mur — le Moral n'est pas une barre, ce sont des gens */
+  .team{position:absolute;left:44px;top:36px;width:300px;background:#fff;border:2px solid var(--ink);
+        border-radius:7px;padding:13px 14px;cursor:pointer}
+  .team h4{font-size:10px;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);
+           margin-bottom:10px;font-weight:700}
+  .who{display:flex;align-items:center;gap:11px;padding:6px 0;border-bottom:1px solid #edf0f2;font-size:13px}
+  .who:last-child{border-bottom:none}
+  .who .nm{flex:1;font-weight:520}
+  .who .rl{font-size:9.5px;color:var(--muted);letter-spacing:.07em;font-weight:600}
+  .who .flag{font-size:10px;color:var(--bad);font-weight:700;letter-spacing:.03em}
+
+  /* la boutique : visible, éteinte hors Comité */
+  .shelf{position:absolute;right:206px;top:36px;width:372px;height:124px;background:#e9e4da;
+         border:3px solid var(--wood-dark);display:flex;align-items:center;justify-content:center;gap:24px}
+  .shelf.locked{filter:grayscale(1);opacity:.46}
+  .prod{width:88px;height:84px;background:#fff;border:2px solid var(--ink);border-radius:5px;
+        display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;font-size:25px}
+  .prod span{font-size:9px;letter-spacing:.09em;color:var(--muted);font-weight:700}
+  .shelf-tag{position:absolute;right:206px;top:168px;width:372px;text-align:center;font-size:10.5px;
+             letter-spacing:.13em;color:var(--muted);text-transform:uppercase;font-weight:600}
+
+  .target{position:absolute;right:52px;top:44px;width:104px;height:104px;border-radius:50%;
+          background:repeating-radial-gradient(circle,#fff 0 12px,#d3543f 12px 24px);
+          border:3px solid var(--ink)}
+  .target-tag{position:absolute;right:14px;top:158px;width:180px;text-align:center;font-size:10px;
+              letter-spacing:.12em;color:var(--muted);text-transform:uppercase;line-height:1.6;font-weight:600}
+
+  /* ── LES OBJETS DU PLATEAU ───────────────────────────────────────── */
+  .obj{position:absolute;cursor:pointer;transition:transform .16s ease;z-index:5}
+  .obj:hover{transform:translateY(-8px)}
+  .cap{position:absolute;left:50%;transform:translateX(-50%);bottom:-23px;font-size:10px;
+       letter-spacing:.11em;color:#584732;text-transform:uppercase;white-space:nowrap;font-weight:700}
+
+  /* l'écran d'ordinateur : c'est là que vivent TOUTES les étapes */
+  .monitor{left:50%;transform:translateX(-50%);bottom:214px;z-index:6}
+  .monitor:hover{transform:translateX(-50%) translateY(-8px)}
+  .screen{width:568px;height:326px;background:var(--panel);border:12px solid #3a4150;
+          border-radius:10px;padding:22px;color:var(--panel-fg);overflow:hidden}
+  .foot{width:158px;height:26px;background:#3a4150;margin:0 auto;border-radius:0 0 8px 8px}
+  .screen h3{font-size:12px;letter-spacing:.15em;color:var(--panel-muted);text-transform:uppercase;
+             margin-bottom:15px;font-weight:700}
+  .idle{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:16px}
+  .idle p{color:var(--panel-muted);font-size:14.5px;text-align:center;line-height:1.65}
+  .msg{background:rgba(255,255,255,.07);border-left:3px solid #5a7ad0;padding:12px 14px;
+       border-radius:0 6px 6px 0;margin-bottom:13px}
+  .msg .from{font-size:9.5px;color:var(--panel-muted);letter-spacing:.13em;margin-bottom:5px;font-weight:700}
+  .msg .body{font-size:13px;line-height:1.55}
+  .replies{display:flex;flex-direction:column;gap:8px}
+  .reply{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.17);border-radius:6px;
+         padding:10px 13px;font-size:12.5px}
+  .skip{margin-top:12px;font-size:11.5px;color:#ffb9a8;text-align:right;font-weight:600}
+
+  .mail{left:118px;bottom:150px}
+  .roadmap{left:330px;bottom:140px}
+  .dash{right:330px;bottom:146px}
+  .mug{right:196px;bottom:152px}
+  .stamp{right:56px;bottom:146px}
+
+  /* le journal +/− posé à plat : la Résolution du Lot C, en germe */
+  .ledger{position:absolute;left:374px;top:36px;width:222px;background:#fffdf3;
+          border:2px solid var(--ink);border-radius:4px;padding:11px 13px;font-size:12px;
+          font-variant-numeric:tabular-nums;z-index:5;box-shadow:3px 4px 0 rgba(0,0,0,.14);
+          transform:rotate(-1.2deg)}
+  .ledger h4{font-size:9px;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);
+             margin-bottom:8px;font-weight:700}
+  .ledger div{display:flex;justify-content:space-between;padding:3px 0}
+  .ledger .p{color:var(--good);font-weight:700}
+  .ledger .n{color:var(--bad);font-weight:700}
+
+  .tools{display:flex;gap:9px;flex-wrap:wrap;justify-content:center}
+  .tools button{font:inherit;font-size:13px;padding:9px 17px;border:2px solid var(--ink);background:#fff;
+                border-radius:5px;cursor:pointer;color:var(--ink);font-weight:550}
+  .tools button[aria-pressed="true"]{background:var(--ink);color:#fff}
+  .note{max-width:1120px;text-align:center;font-size:13.5px;color:#454b53;line-height:1.7;min-height:48px}
+</style>
+</head>
+<body>
+
+<div class="tools">
+  <button data-view="calme" aria-pressed="true">1 · Le bureau au calme</button>
+  <button data-view="alerte" aria-pressed="false">2 · Ça remonte tout seul</button>
+  <button data-view="ecran" aria-pressed="false">3 · Une étape dans l'écran</button>
+</div>
+<p class="note" id="note"></p>
+
+<div class="stage" id="stage">
+
+  <div class="hud">
+    <div class="stat">
+      <span class="k">Impact</span>
+      <span class="v">184</span>
+      <span class="track"><i style="width:61%"></i></span>
+    </div>
+    <div class="sep"></div>
+    <div class="stat">
+      <span class="k">Trésorerie</span>
+      <span class="v">42 k<small>€</small></span>
+    </div>
+    <div class="sep"></div>
+    <div class="stat">
+      <span class="k">Utilisateurs</span>
+      <span class="v">12 400 <small class="up">+840</small></span>
+    </div>
+    <div class="spacer"></div>
+    <div class="alerts" id="alerts"></div>
+    <div class="sprint">SPRINT 7 · T3</div>
+  </div>
+
+  <div class="room">
+    <div class="team">
+      <h4>Équipe · 4</h4>
+      <div class="who"><span id="f0"></span><span class="nm">Nadia</span><span class="rl">DEV SR</span></div>
+      <div class="who"><span id="f1"></span><span class="nm">Théo</span><span class="rl">DEV JR</span></div>
+      <div class="who"><span id="f2"></span><span class="nm">Inès</span><span class="rl">DESIGN</span><span class="flag" id="flag"></span></div>
+      <div class="who"><span id="f3"></span><span class="nm">Marc</span><span class="rl">DATA</span></div>
+    </div>
+
+    <div class="shelf locked">
+      <div class="prod">🧰<span>OUTILS</span></div>
+      <div class="prod">🧭<span>STRATÉGIE</span></div>
+      <div class="prod">⚙️<span>STACK</span></div>
+    </div>
+    <div class="shelf-tag">Boutique — rouvre au Comité (T4)</div>
+
+    <div class="target"></div>
+    <div class="target-tag">Objectif du trimestre</div>
+
+    <div class="desk"></div>
+
+    <!-- courrier -->
+    <div class="obj mail">
+      <svg width="128" height="94" viewBox="0 0 128 94">
+        <rect x="2" y="2" width="124" height="90" rx="5" fill="#fff" stroke="#2a2f38" stroke-width="3"/>
+        <path d="M2 8 L64 54 L126 8" fill="none" stroke="#2a2f38" stroke-width="3"/>
+        <circle cx="116" cy="14" r="15" fill="#d3543f" stroke="#f4f6f3" stroke-width="3"/>
+        <text x="116" y="20" text-anchor="middle" font-size="16" font-weight="700" fill="#fff"
+              font-family="system-ui">2</text>
+      </svg>
+      <span class="cap">Événements</span>
+    </div>
+
+    <!-- roadmap -->
+    <div class="obj roadmap">
+      <svg width="112" height="136" viewBox="0 0 112 136" id="binder">
+        <rect x="2" y="2" width="108" height="132" rx="5" class="bnd" fill="#4a6fbf" stroke="#2a2f38" stroke-width="3"/>
+        <text x="56" y="42" text-anchor="middle" font-size="25" font-weight="700" fill="#fff"
+              font-family="system-ui" letter-spacing="1">RM</text>
+        <g class="rows" fill="rgba(255,255,255,.78)">
+          <rect x="26" y="62" width="60" height="7" rx="3"/>
+          <rect x="26" y="78" width="60" height="7" rx="3"/>
+          <rect x="26" y="94" width="60" height="7" rx="3"/>
+          <rect x="26" y="110" width="60" height="7" rx="3"/>
+        </g>
+      </svg>
+      <span class="cap">Roadmap</span>
+    </div>
+
+    <!-- tableau de bord -->
+    <div class="obj dash">
+      <svg width="136" height="106" viewBox="0 0 136 106">
+        <rect x="2" y="2" width="132" height="102" rx="6" fill="#fff" stroke="#2a2f38" stroke-width="3"/>
+        <polyline points="16,86 40,76 62,62 84,50 106,30 122,20" fill="none" stroke="#2f9e63" stroke-width="5"
+                  stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <span class="cap">Tableau de bord</span>
+    </div>
+
+    <!-- énergie -->
+    <div class="obj mug">
+      <svg width="118" height="98" viewBox="0 0 118 98">
+        <path d="M84 30 h12 a16 16 0 0 1 0 32 h-12" fill="none" stroke="#2a2f38" stroke-width="4"/>
+        <path d="M10 12 h76 v46 a30 30 0 0 1 -76 0 z" id="cupbody" fill="#fff" stroke="#2a2f38" stroke-width="3"/>
+        <text x="48" y="58" text-anchor="middle" font-size="27" font-weight="700" fill="#2a2f38"
+              font-family="system-ui" id="energy">10</text>
+      </svg>
+      <span class="cap">Énergie</span>
+    </div>
+
+    <!-- fin de sprint : l'objet manquant du croquis -->
+    <div class="obj stamp">
+      <svg width="116" height="98" viewBox="0 0 116 98">
+        <rect x="14" y="34" width="88" height="58" rx="5" fill="#2f9e63" stroke="#2a2f38" stroke-width="3"/>
+        <rect x="44" y="10" width="28" height="26" rx="4" fill="#3a4150" stroke="#2a2f38" stroke-width="3"/>
+        <text x="58" y="72" text-anchor="middle" font-size="15" font-weight="700" fill="#fff"
+              font-family="system-ui" letter-spacing="1">CLORE</text>
+      </svg>
+      <span class="cap">Fin de sprint</span>
+    </div>
+
+    <!-- écran d'ordinateur -->
+    <div class="obj monitor">
+      <div class="screen" id="screen"></div>
+      <div class="foot"></div>
+    </div>
+
+    <div class="ledger">
+      <h4>Sprint 6 — le journal</h4>
+      <div><span>Livraisons</span><span class="p">+38</span></div>
+      <div><span>Levier ×1,4</span><span class="p">+15</span></div>
+      <div><span>Salaires</span><span class="n">−12 k€</span></div>
+      <div><span>Churn</span><span class="n">−210</span></div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* Un visage dessiné, pas un emoji : la nuance content / pas content doit se
+   lire sans dépendre d'une police à emoji couleur. */
+function face(mood){
+  const skin = mood === "ok" ? "#dfe6ea" : mood === "meh" ? "#efe6d5" : "#f6dcd4";
+  const mouth = mood === "ok" ? "M9 20 q7 6 14 0" : mood === "meh" ? "M9 21 h14" : "M9 23 q7 -7 14 0";
+  const brow  = mood === "bad" ? '<path d="M7 9 l7 3 M25 9 l-7 3" stroke="#2a2f38" stroke-width="2" fill="none"/>' : "";
+  return `<svg width="32" height="32" viewBox="0 0 32 32" style="flex:0 0 32px">
+    <circle cx="16" cy="16" r="14" fill="${skin}" stroke="#2a2f38" stroke-width="2"/>
+    <circle cx="11" cy="14" r="1.9" fill="#2a2f38"/><circle cx="21" cy="14" r="1.9" fill="#2a2f38"/>
+    ${brow}<path d="${mouth}" stroke="#2a2f38" stroke-width="2" fill="none" stroke-linecap="round"/>
+  </svg>`;
+}
+
+const IDLE = `<div class="idle"><svg width="70" height="56" viewBox="0 0 70 56" opacity=".3">
+    <rect x="2" y="2" width="66" height="42" rx="4" fill="none" stroke="#8b97b0" stroke-width="4"/>
+    <rect x="26" y="48" width="18" height="6" rx="2" fill="#8b97b0"/></svg>
+  <p>Toutes les étapes s'ouvrent ici.<br>Dans l'ordre que vous voulez — ou pas du tout.</p></div>`;
+
+const INBOX = `
+  <h3>Événements — 2 en attente</h3>
+  <div class="msg">
+    <div class="from">DIRECTION · SPRINT 7</div>
+    <div class="body">Un concurrent vient de sortir la feature que vous aviez repoussée deux fois.
+      Le board demande une réponse d'ici la fin du trimestre.</div>
+  </div>
+  <div class="replies">
+    <div class="reply">Bloquer le sprint dessus &nbsp;·&nbsp; l'équipe encaisse</div>
+    <div class="reply">Assumer le retard &nbsp;·&nbsp; le board encaisse</div>
+    <div class="reply">🔒 Demander l'avis de l'équipe &nbsp;·&nbsp; coûte ⚡</div>
+  </div>
+  <div class="skip">Ne pas répondre → se résout au pire, à la clôture</div>`;
+
+const VIEWS = {
+  calme:{
+    note:"Trois chiffres, et rien d'autre. Le Moral, la Dette, le Capital politique, le Cynisme, le Levier, les charges : tout existe et tourne, rien n'est écrit. L'étagère est visible mais éteinte — on voit ce qu'on convoite, on ne peut pas y toucher avant le Comité.",
+    alerts:[], moods:["ok","ok","ok","ok"], flag:"", jam:false, energy:10, low:false, screen:IDLE
+  },
+  alerte:{
+    note:"Rien n'a été cliqué : c'est le jeu qui vient prévenir. Inès décroche — son visage change avant qu'un seul chiffre soit affiché ; la dette congestionne le classeur de roadmap ; la tasse est presque vide. Les seuils vivent dans balance.json, et le motif existe déjà dans le code de #43 (get_employee_alert, alertAt: 25).",
+    alerts:[["bad","Inès décroche"],["warn","Dette · livraisons ralenties"]],
+    moods:["ok","meh","bad","meh"], flag:"décroche", jam:true, energy:2, low:true, screen:IDLE
+  },
+  ecran:{
+    note:"L'étape ne remplace pas le bureau : elle s'ouvre dans le moniteur, tout le reste continue d'exister autour. On peut aller consulter sa roadmap avant de répondre — c'est son propre backlog, pas une information cachée. On peut aussi ne pas répondre : ça se résout dans la pire branche, et ça se paie.",
+    alerts:[["bad","Inès décroche"]], moods:["ok","meh","bad","meh"], flag:"décroche",
+    jam:true, energy:2, low:true, screen:INBOX
+  }
+};
+
+function apply(name){
+  const v = VIEWS[name];
+  document.getElementById("note").textContent = v.note;
+  document.getElementById("alerts").innerHTML =
+    v.alerts.map(([c,t])=>`<span class="alert ${c==="warn"?"warn":""}"><i class="dot"></i>${t}</span>`).join("");
+  v.moods.forEach((m,i)=>{ document.getElementById("f"+i).innerHTML = face(m); });
+  document.getElementById("flag").textContent = v.flag;
+  document.querySelector("#binder .bnd").setAttribute("fill", v.jam ? "#8a5a3c" : "#4a6fbf");
+  document.querySelector("#binder .rows").setAttribute("fill", v.jam ? "rgba(255,255,255,.42)" : "rgba(255,255,255,.78)");
+  document.getElementById("energy").textContent = v.energy;
+  document.getElementById("cupbody").setAttribute("fill", v.low ? "#f2e2dd" : "#fff");
+  document.getElementById("screen").innerHTML = v.screen;
+  document.querySelectorAll(".tools button").forEach(b=>
+    b.setAttribute("aria-pressed", String(b.dataset.view===name)));
+}
+document.querySelectorAll(".tools button").forEach(b=>
+  b.addEventListener("click",()=>apply(b.dataset.view)));
+apply("calme");
+
+function fit(){
+  const s=document.getElementById("stage");
+  const k=Math.min(1,(window.innerWidth-44)/1600);
+  s.style.transform=`scale(${k})`;
+  s.style.height=`${900*k}px`;
+}
+window.addEventListener("resize",fit); fit();
+</script>
+</body>
+</html>
