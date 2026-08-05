@@ -4,6 +4,7 @@ extends Node
 ##   xvfb-run -a godot --path game --display-driver x11 res://tests/screenshot_screens.tscn
 
 const SCREENS := [
+	"res://scenes/screens/desk_screen.tscn",
 	"res://scenes/screens/start_screen.tscn",
 	"res://scenes/screens/career_select_screen.tscn",
 	"res://scenes/screens/scenario_screen.tscn",
