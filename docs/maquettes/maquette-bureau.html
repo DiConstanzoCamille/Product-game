@@ -63,21 +63,6 @@
   .ledger .p{color:var(--good);font-weight:700}
   .ledger .n{color:var(--bad);font-weight:700}
 
-  /* la boutique : une étagère, visible mais éteinte hors Comité */
-  .shelf{position:absolute;right:196px;top:26px;width:352px;height:116px;background:#e9e4da;
-         border:3px solid var(--wood-dark);display:flex;align-items:center;justify-content:center;gap:22px}
-  .shelf.locked{filter:grayscale(1);opacity:.45}
-  .prod{width:82px;height:78px;background:#fff;border:2px solid var(--ink);border-radius:5px;
-        display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;font-size:23px}
-  .prod span{font-size:8.5px;letter-spacing:.09em;color:var(--muted);font-weight:700}
-  .shelf-tag{position:absolute;right:196px;top:150px;width:352px;text-align:center;font-size:10px;
-             letter-spacing:.13em;color:var(--muted);text-transform:uppercase;font-weight:600}
-
-  .target{position:absolute;right:56px;top:32px;width:92px;height:92px;border-radius:50%;
-          background:repeating-radial-gradient(circle,#fff 0 11px,#d3543f 11px 22px);border:3px solid var(--ink)}
-  .target-tag{position:absolute;right:14px;top:132px;width:176px;text-align:center;font-size:9.5px;
-              letter-spacing:.12em;color:var(--muted);text-transform:uppercase;line-height:1.6;font-weight:600}
-
   /* ── SUR LE PLATEAU : seulement ce qui est vraiment un objet ─────── */
   .obj{position:absolute;cursor:pointer;transition:transform .16s ease;z-index:5}
   .obj:hover{transform:translateY(-8px)}
@@ -100,7 +85,23 @@
   .osbar{height:28px;background:rgba(255,255,255,.06);display:flex;align-items:center;
          padding:0 14px;gap:10px;font-size:10px;letter-spacing:.14em;color:var(--panel-muted);font-weight:700}
   .osbar .back{cursor:pointer;color:#8fb0ff}
-  .osbody{flex:1;padding:20px 22px;overflow:hidden}
+  .osmain{flex:1;display:flex;min-height:0}
+
+  /* Le rail : ce qu'on achète et ce qu'on vise. Volontairement en marge —
+     ce n'est pas le geste de tous les sprints. */
+  .rail{width:104px;flex:0 0 104px;border-right:1px solid rgba(255,255,255,.1);
+        padding:14px 8px;display:flex;flex-direction:column;gap:12px;align-items:center}
+  .tile{width:78px;padding:10px 4px 8px;border-radius:8px;border:1px solid rgba(255,255,255,.13);
+        background:rgba(255,255,255,.05);text-align:center;cursor:pointer}
+  .tile:hover{background:rgba(255,255,255,.1);border-color:#5a7ad0}
+  .tile .lb{font-size:8.5px;letter-spacing:.07em;color:var(--panel-muted);margin-top:6px;
+            font-weight:700;line-height:1.3}
+  .tile.off{opacity:.32;cursor:default}
+  .tile.off:hover{background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.13)}
+  .tile.live{border-color:#6ed49b;background:rgba(47,158,99,.16)}
+  .tile.live .lb{color:#6ed49b}
+
+  .osbody{flex:1;padding:20px 22px;overflow:hidden;min-width:0}
 
   /* le bureau du poste de travail : trois applications */
   .apps{display:flex;gap:18px;height:100%;align-items:center;justify-content:center}
@@ -137,6 +138,7 @@
   <button data-view="calme" aria-pressed="true">1 · Le bureau au calme</button>
   <button data-view="alerte" aria-pressed="false">2 · Ça remonte tout seul</button>
   <button data-view="app" aria-pressed="false">3 · Une application ouverte</button>
+  <button data-view="comite" aria-pressed="false">4 · La fin de trimestre</button>
 </div>
 <p class="note" id="note"></p>
 
@@ -170,16 +172,6 @@
       <div><span>Churn</span><span class="n">−210</span></div>
     </div>
 
-    <div class="shelf locked">
-      <div class="prod">🧰<span>OUTILS</span></div>
-      <div class="prod">🧭<span>STRATÉGIE</span></div>
-      <div class="prod">⚙️<span>STACK</span></div>
-    </div>
-    <div class="shelf-tag">Boutique — rouvre au Comité (T4)</div>
-
-    <div class="target"></div>
-    <div class="target-tag">Objectif du trimestre</div>
-
     <div class="desk"></div>
 
     <!-- SUR LE PLATEAU : la tasse et le tampon. Rien d'autre. -->
@@ -209,7 +201,10 @@
     <div class="monitor">
       <div class="screen">
         <div class="osbar" id="osbar"></div>
-        <div class="osbody" id="osbody"></div>
+        <div class="osmain">
+          <div class="rail" id="rail"></div>
+          <div class="osbody" id="osbody"></div>
+        </div>
       </div>
       <div class="stand"></div>
       <div class="foot"></div>
@@ -230,6 +225,18 @@ function face(mood){
     ${brow}<path d="${mouth}" stroke="#2a2f38" stroke-width="2" fill="none" stroke-linecap="round"/></svg>`;
 }
 
+const RAIL_ICON = {
+  shop:`<svg width="30" height="28" viewBox="0 0 30 28"><path d="M3 9 h24 l-2 17 h-20 z" fill="none"
+        stroke="currentColor" stroke-width="2.6"/><path d="M10 11 v-4 a5 5 0 0 1 10 0 v4" fill="none"
+        stroke="currentColor" stroke-width="2.6"/></svg>`,
+  comite:`<svg width="30" height="28" viewBox="0 0 30 28"><path d="M4 24 h22 M6 24 v-11 M12 24 v-11
+        M18 24 v-11 M24 24 v-11 M2 13 h26 L15 4 z" fill="none" stroke="currentColor" stroke-width="2.4"
+        stroke-linejoin="round"/></svg>`,
+  target:`<svg width="30" height="28" viewBox="0 0 30 28"><circle cx="15" cy="14" r="11" fill="none"
+        stroke="currentColor" stroke-width="2.4"/><circle cx="15" cy="14" r="5.5" fill="none"
+        stroke="currentColor" stroke-width="2.4"/><circle cx="15" cy="14" r="1.6" fill="currentColor"/></svg>`
+};
+
 const ICON = {
   mail:`<svg width="52" height="40" viewBox="0 0 52 40"><rect x="2" y="2" width="48" height="36" rx="4"
         fill="none" stroke="#c8d2e8" stroke-width="3"/><path d="M2 6 L26 24 L50 6" fill="none"
@@ -240,6 +247,15 @@ const ICON = {
   dash:`<svg width="50" height="40" viewBox="0 0 50 40"><polyline points="3,34 15,26 25,18 34,12 47,4"
         fill="none" stroke="#6ed49b" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg>`
 };
+
+function rail(v){
+  const t = (cls,ico,lb) => `<div class="tile ${cls}" style="color:${
+      cls==="live" ? "#6ed49b" : cls==="off" ? "#8b97b0" : "#c8d2e8"}">${RAIL_ICON[ico]}
+      <div class="lb">${lb}</div></div>`;
+  return t("", "shop", "ÉTAL DU<br>SPRINT")
+       + t(v.comite ? "live" : "off", "comite", v.comite ? "COMITÉ<br>OUVERT" : "COMITÉ<br>T4")
+       + t("", "target", "OBJECTIF<br>T3");
+}
 
 function apps(v){
   return `<div class="apps">
@@ -265,23 +281,40 @@ const MAILAPP = `
   </div>
   <div class="skip">Ne pas répondre → se résout au pire, à la clôture</div>`;
 
+const COMITE = `
+  <div style="font-size:11px;letter-spacing:.13em;color:#6ed49b;font-weight:700;margin-bottom:12px">
+    TRIMESTRE 3 FRANCHI · 💥 62 À ENGAGER</div>
+  <div class="replies">
+    <div class="reply"><b>Décision stratégique</b> &nbsp;·&nbsp; 1 par trimestre, irréversible &nbsp;·&nbsp; 💥 40</div>
+    <div class="reply"><b>Capacité d'outillage</b> &nbsp;·&nbsp; +1 slot &nbsp;·&nbsp; 💥 28</div>
+    <div class="reply"><b>Relever le cap d'effectif</b> &nbsp;·&nbsp; 5 → 6 &nbsp;·&nbsp; 💥 22</div>
+  </div>
+  <div class="skip" style="color:#8b97b0">Le prochain quota double. Ce que vous n'engagez pas reste au portefeuille.</div>`;
+
 const VIEWS = {
   calme:{
     note:"Trois chiffres sur une ligne, et rien d'autre. Le Moral, la Dette, le Capital politique, le Cynisme, le Levier, les charges : tout tourne, rien n'est écrit. Le poste de travail montre ses trois logiciels ; le papier reste au mur ; sur le plateau il ne reste que ce qui est vraiment un objet.",
     alerts:[], moods:["ok","ok","ok","ok"], flag:"", jam:false, energy:10, low:false,
-    mail:2, mailSt:"2 messages", roadSt:"6 tickets au backlog", dashSt:"12 400 utilisateurs", open:null
+    mail:2, mailSt:"2 messages", roadSt:"6 tickets au backlog", dashSt:"12 400 utilisateurs",
+    comite:false, open:null
   },
   alerte:{
     note:"Rien n'a été cliqué : c'est le jeu qui vient prévenir. Inès décroche — son visage change au mur avant qu'un seul chiffre soit affiché — et l'application Roadmap signale la congestion. Les seuils vivent dans balance.json, et le motif existe déjà dans le code de #43 (get_employee_alert, alertAt: 25).",
     alerts:[["bad","Inès décroche"],["warn","Dette · livraisons ralenties"]],
     moods:["ok","meh","bad","meh"], flag:"décroche", jam:true, energy:2, low:true,
     mail:2, mailSt:"2 messages · 1 urgent", roadSt:"Congestionnée · −2 pts de capacité",
-    dashSt:"12 400 · croissance qui fléchit", open:null
+    dashSt:"12 400 · croissance qui fléchit", comite:false, open:null
   },
   app:{
     note:"L'application s'ouvre dans l'écran, et le bureau continue d'exister autour : l'équipe au mur, la tasse, le tampon. On peut fermer, aller ouvrir la Roadmap pour vérifier son backlog, puis revenir répondre. On peut aussi ne pas répondre — ça se résout dans la pire branche, et ça se paie.",
     alerts:[["bad","Inès décroche"]], moods:["ok","meh","bad","meh"], flag:"décroche",
-    jam:true, energy:2, low:true, mail:2, mailSt:"", roadSt:"", dashSt:"", open:"Boîte mail"
+    jam:true, energy:2, low:true, mail:2, mailSt:"", roadSt:"", dashSt:"",
+    comite:false, open:"Boîte mail"
+  },
+  comite:{
+    note:"La fin de trimestre est un moment à part, et ça se voit : la tuile Comité s'allume, elle ne l'était à aucun autre sprint. L'étal du sprint, lui, est resté ouvert tout du long — deux boutiques, deux rythmes. Le rail est volontairement en marge : acheter n'est pas le geste de tous les sprints.",
+    alerts:[], moods:["ok","ok","meh","ok"], flag:"", jam:false, energy:6, low:false,
+    mail:0, mailSt:"", roadSt:"", dashSt:"", comite:true, open:"Comité d'investissement"
   }
 };
 
@@ -297,7 +330,9 @@ function apply(name){
   document.getElementById("osbar").innerHTML = v.open
     ? `<span class="back">◂ POSTE DE TRAVAIL</span><span>·</span><span>${v.open.toUpperCase()}</span>`
     : `<span>POSTE DE TRAVAIL</span>`;
-  document.getElementById("osbody").innerHTML = v.open ? MAILAPP : apps(v);
+  document.getElementById("rail").innerHTML = rail(v);
+  document.getElementById("osbody").innerHTML =
+    v.open === "Comité d'investissement" ? COMITE : v.open ? MAILAPP : apps(v);
   document.querySelectorAll(".tools button").forEach(b=>
     b.setAttribute("aria-pressed", String(b.dataset.view===name)));
 }
