@@ -35,11 +35,43 @@ extends Node
 ##                slots avant d'engager de nouveaux salaires.
 ##  - "generaliste": recrute d'abord les rôles manquants pour viser Équipe
 ##                complète, sans dépendre d'un outil précis du tirage.
+##  - "thesauriseur": le contre-exemple du lot B (#36) — il livre comme les
+##                autres et joue ses actions personnelles, mais **n'achète
+##                jamais rien** : ni carte, ni pratique, ni embauche. Il
+##                accumule. L'escalade des objectifs doit l'empêcher de
+##                franchir T3 : si thésauriser suffit, la seule décision du
+##                jeu (dépenser ou garder) n'en est plus une.
 ##  - "careful" : joueur immobile — choix Inbox le moins coûteux, aucune
 ##                feature livrée, aucune embauche, aucun achat, aucune
 ##                action personnelle. Depuis la Phase A ("la pression"),
 ##                ne rien faire DOIT perdre avant la fin du mandat.
 const GOOD_ENDINGS := ["ipo", "rachat"]
+
+## Combien des quatre mandats du thésauriseur (#36) ont le droit de franchir
+## T3. Un seul est toléré ; deux sont un échec.
+##
+## Ce seuil est un compromis mesuré, et il faut connaître sa portée exacte
+## avant de s'y fier — c'est un garde-fou grossier, pas une preuve :
+##
+##  · **il ne se déclenche jamais à tort.** 0/20 sur la table livrée comme sur
+##    l'ancienne, défectueuse ;
+##  · **il attrape une courbe franchement cassée.** 13/20 quand T3 est divisé
+##    par deux ;
+##  · **il est aveugle au défaut qui a motivé le lot.** À T3 = 2200, où le
+##    thésauriseur franchissait quand même une fois sur vingt-cinq, il ne se
+##    déclenche pas.
+##
+## Asserter « il n'a jamais franchi T3 » serait plus sensible mais friable :
+## l'événement arrive une fois sur 260 runs sur la courbe saine. Une marge
+## (portefeuille / objectif au verdict fatal) a été essayée puis abandonnée :
+## les deux courbes y sont indiscernables — médianes 91 % contre 87 % — parce
+## qu'une barre plus basse ne fait pas gagner le thésauriseur, elle le fait
+## mourir un trimestre plus loin, au même ratio.
+##
+## **Le vrai critère est donc une mesure, pas une assertion** : le taux de
+## franchissement sur 200 runs (carnet §35.2). À re-mesurer chaque fois qu'on
+## touche à l'escalade — ce test-là ne le dira pas.
+const HOARDER_MAX_MANDATES_PAST_T3 := 1
 
 var failures: int = 0
 
@@ -53,6 +85,8 @@ func _ready() -> void:
 	_test_investment_draw_rules()
 	_test_score_resolution_integration()
 	_test_tool_families_and_strategy_lot3()
+	_test_strategy_quota_activation()
+	_test_price_index_follows_quota()
 	_test_quarter_runtime()
 	_test_committee_lot4()
 	_test_support_teams_and_compendium_lot4()
@@ -63,18 +97,23 @@ func _ready() -> void:
 	_test_attention_and_autopilot_lot5()
 
 	var quarters_reached: Dictionary = {}
-	for strategy in ["stress", "greedy", "economie", "levier", "outillage", "generaliste", "careful"]:
+	var mandates_past_t3: Dictionary = {}  # portefeuille / quota au verdict qui a tué le mandat
+	for strategy in ["stress", "greedy", "economie", "levier", "outillage", "generaliste", "thesauriseur", "careful"]:
 		print("\n=== SMOKE TEST LOGIQUE — %s ===" % strategy.to_upper())
 		var endings: Array = []
 		var run_index := 0
 		var best_quarter := 0
+		var past_t3 := 0
 		for company_id in ["meridia-corp", "karavel-scaleup"]:
 			for repeat in range(2):
 				_play_one_mandate(run_index, strategy, company_id)
 				endings.append(SprintState.ending_id)
 				best_quarter = max(best_quarter, SprintState.quarter_index)
+				if SprintState.quarter_index >= 4:
+					past_t3 += 1
 				run_index += 1
 		quarters_reached[strategy] = best_quarter
+		mandates_past_t3[strategy] = past_t3
 
 		# Critère de recette Phase B : la spirale burn-out (Moral effondré →
 		# régén nulle → Taf soi-même répété → Énergie ≤ 0) doit rester
@@ -101,6 +140,26 @@ func _ready() -> void:
 		_fail("La trajectoire « économie » ne passe plus aucun verdict de board sur 4 mandats (T%d) — nourrir la boîte doit rester un chemin viable." % economy_quarter)
 	if lever_quarter < 2:
 		_fail("La trajectoire « Levier » ne passe plus aucun verdict de board sur 4 mandats (T%d) — jouer l'organisation doit rester un chemin viable." % lever_quarter)
+	# 💥 Critère de recette 3 du lot B (#36) : accumuler sans jamais acheter ne
+	# doit pas suffire. C'est l'escalade des objectifs qui produit la
+	# contrainte — pas une règle ajoutée : si un facteur 2 sépare deux paliers,
+	# le cliquet du portefeuille joue à la place du joueur, et « dépenser ou
+	# garder » cesse d'être une décision.
+	#
+	# L'assertion compte **combien des quatre mandats** franchissent T3, et pas
+	# si le meilleur y arrive. La première version asserait le meilleur : elle
+	# tombait une fois sur 260 runs, sur un moteur parfaitement calibré, parce
+	# qu'un tirage favorable sur quatre mandats suffisait à la faire mentir.
+	# C'est la leçon du carnet §29 encore une fois — « thésauriser ne marche
+	# pas » est une propriété de la courbe, « ce mandat-là est passé » est un
+	# tirage. Deux mandats sur quatre, en revanche, ne s'obtiennent pas par
+	# chance : ce serait une stratégie.
+	var hoarder_past_t3 := int(mandates_past_t3.get("thesauriseur", 0))
+	if hoarder_past_t3 > HOARDER_MAX_MANDATES_PAST_T3:
+		_fail("Le thésauriseur a franchi T3 sur %d de ses 4 mandats sans acheter quoi que ce soit — l'escalade de quotas.json est trop douce, accumuler est redevenu une stratégie." % hoarder_past_t3)
+	print("Thésauriseur (#36) — meilleur T%d, %d/4 mandats au-delà de T3, sans un seul achat (le vrai critère est le taux sur 200 runs, carnet §35.2)." % [
+		int(quarters_reached.get("thesauriseur", 0)), hoarder_past_t3
+	])
 	print("\nTrajectoires — économie : meilleur T%d · Levier : meilleur T%d (critère de recette 2 de #42 ; la comparaison des deux se lit sur 40 runs, pas ici)" % [economy_quarter, lever_quarter])
 	print("Archétypes #37 — outillage : meilleur T%d · généraliste : meilleur T%d (la domination se mesure sur 40 runs)" % [
 		int(quarters_reached.get("outillage", 0)), int(quarters_reached.get("generaliste", 0))
@@ -487,6 +546,83 @@ func _test_tool_families_and_strategy_lot3() -> void:
 	var expected_remaining: int = GameData.strategy.get("strategies", []).size() - SprintState.chosen_strategy_ids.size()
 	if SprintState.get_strategy_options(10).size() != expected_remaining:
 		_fail("Le trimestre suivant doit reproposer tout le catalogue sauf ce qui est déjà choisi.")
+
+
+## Une décision stratégique ne peut jamais modifier l'objectif d'un trimestre
+## déjà clos : le panneau du mandat doit continuer à décrire le verdict rendu.
+func _test_strategy_quota_activation() -> void:
+	print("=== SMOKE TEST LOGIQUE — ACTIVATION DES STRATÉGIES ===")
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+	# Neutralise une éventuelle injonction T1 pour isoler le choix volontaire T2.
+	SprintState.chosen_strategy_ids.clear()
+	SprintState.strategy_activation_quarters.clear()
+	SprintState.quarter_strategy_chosen = false
+	SprintState.quarter_forced_strategy_id = ""
+	var t1_quota := SprintState.get_quota_for_quarter(1)
+	var t2_quota := SprintState.get_quota_for_quarter(2)
+
+	SprintState.quarter_index = 2
+	if SprintState.choose_strategy("expansion-internationale") != "":
+		_fail("Expansion internationale doit pouvoir être adoptée au T2.")
+		return
+	var mandate_quotas := SprintState.get_mandate_quotas()
+	if int(mandate_quotas[0].get("quota", -1)) != t1_quota:
+		_fail("Une stratégie adoptée au T2 ne doit pas réécrire le quota T1 (%d → %d)." % [t1_quota, int(mandate_quotas[0].get("quota", -1))])
+	if SprintState.get_quota_for_quarter(2) != int(round(t2_quota * 1.2)):
+		_fail("Expansion internationale doit relever le quota à partir de son trimestre d'adoption.")
+	SprintState.quarter_index = 1
+
+
+## Lot B (#36) — les prix suivent l'escalade des objectifs, **mais moins vite
+## qu'elle**. Les deux moitiés se testent, et c'est le point : « le prix monte »
+## seul passe aussi bien avec une indexation correcte qu'avec de l'inflation
+## pure, qui est précisément le défaut à éviter. Un trimestre plus tard, un
+## item doit coûter plus cher en absolu **et** moins cher rapporté à la barre à
+## franchir — sinon le joueur n'a rien construit, il a juste changé d'échelle.
+func _test_price_index_follows_quota() -> void:
+	print("=== SMOKE TEST LOGIQUE — INDEXATION DES PRIX (#36) ===")
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+	var card_id: String = GameData.cards.get("cards", [])[0].get("id", "")
+	var samples: Array = []
+	for quarter in [1, 2, 3, 4]:
+		# On déplace le trimestre à la main : jouer trois sprints ferait
+		# dépendre le prix d'un tirage, et le test asserterait sur la chance.
+		SprintState.quarter_index = quarter
+		samples.append({
+			"quarter": quarter,
+			"quota": SprintState.get_quota_for_quarter(quarter),
+			"card": SprintState.resolved_price("decision", card_id),
+			"seat": SprintState.resolved_price("committee", "open-seat"),
+		})
+	SprintState.quarter_index = 1
+
+	for index in range(1, samples.size()):
+		var before: Dictionary = samples[index - 1]
+		var after: Dictionary = samples[index]
+		if int(after["quota"]) <= int(before["quota"]):
+			continue  # une table plate ne dit rien sur l'indexation
+		if int(after["card"]) <= int(before["card"]):
+			_fail("Le prix d'une carte ne monte pas de T%d à T%d (%d → %d) alors que l'objectif passe de %d à %d — le late game redevient gratuit." % [
+				int(before["quarter"]), int(after["quarter"]), int(before["card"]), int(after["card"]),
+				int(before["quota"]), int(after["quota"])
+			])
+		var before_share := float(before["card"]) / float(before["quota"])
+		var after_share := float(after["card"]) / float(after["quota"])
+		if after_share >= before_share:
+			_fail("Le coût d'une carte RAPPORTÉ à l'objectif ne baisse pas de T%d à T%d (%.4f → %.4f) — c'est de l'inflation pure, le joueur ne s'enrichit jamais." % [
+				int(before["quarter"]), int(after["quarter"]), before_share, after_share
+			])
+		# Le Comité porte les gros achats : l'y oublier le rendrait trivial en
+		# fin de mandat, ce que la spec §3.3 interdit explicitement.
+		if int(after["seat"]) > 0 and int(before["seat"]) > 0 and int(after["seat"]) <= int(before["seat"]):
+			_fail("Le prix d'un poste du Comité ne suit pas l'escalade de T%d à T%d (%d → %d)." % [
+				int(before["quarter"]), int(after["quarter"]), int(before["seat"]), int(after["seat"])
+			])
+
+	# Et le premier trimestre reste la référence : à T1 les prix sont ceux du
+	# JSON, sinon l'indexation aurait déplacé le point de départ du run.
+	if not is_equal_approx(SprintState.price_index(), 1.0):
+		_fail("L'indexation ne vaut pas 1,0 au T1 (%f) — les prix de départ ne sont plus ceux des données." % SprintState.price_index())
 
 
 func _test_quarter_runtime() -> void:
@@ -1668,7 +1804,7 @@ func _play_sprint(strategy: String) -> void:
 		while SprintState.personal_action_refusal() == "" and guard < 4:
 			SprintState.do_self_work()
 			guard += 1
-	elif strategy in ["greedy", "economie", "levier", "outillage", "generaliste"] and SprintState.energy >= 50 and SprintState.personal_action_refusal() == "":
+	elif strategy in ["greedy", "economie", "levier", "outillage", "generaliste", "thesauriseur"] and SprintState.energy >= 50 and SprintState.personal_action_refusal() == "":
 		SprintState.do_self_work()
 
 	# Phase 2 — Roadmap : le vrai tirage persistant du backlog remplace les
@@ -1691,7 +1827,7 @@ func _play_sprint(strategy: String) -> void:
 		# d'Impact, même pour qui joue la caisse.
 		if strategy == "economie" and int(item.get("clients", 0)) < 0 and used * 2 < capacity:
 			continue
-		if strategy == "stress" or (strategy in ["greedy", "economie", "levier", "outillage", "generaliste"] and used + points <= capacity):
+		if strategy == "stress" or (strategy in ["greedy", "economie", "levier", "outillage", "generaliste", "thesauriseur"] and used + points <= capacity):
 			plan.append({"id": item.get("id", ""), "points": points})
 			used += points
 	if strategy != "careful":
@@ -1753,7 +1889,10 @@ func _play_sprint(strategy: String) -> void:
 			# verdict qui arrive. Le banc conserve donc le quota courant avant de
 			# payer un outil ; sinon il confondrait « outillage risqué » et achat
 			# volontairement suicidaire la veille du board.
-			var card_cost := int(SprintState.find_card(card_id).get("costImpact", 0))
+			# Le prix résolu, jamais la valeur brute du JSON : depuis le lot B
+			# (#36) il est indexé sur l'escalade, et un banc qui lirait la
+			# colonne se croirait riche.
+			var card_cost := SprintState.resolved_price("decision", card_id)
 			if SprintState.impact_wallet - card_cost < SprintState.get_current_quota() * 0.5:
 				continue
 			if SprintState.activate_decision(card_id) == "":
@@ -1764,7 +1903,7 @@ func _play_sprint(strategy: String) -> void:
 	# suivant plutôt que de le perdre au tirage.
 	if strategy == "greedy" and SprintState.sprint_number == 5 and SprintState.impact_wallet >= SprintState.reserve_cost():
 		for candidate in offer.get("candidates", []):
-			if int(candidate.get("costPieces", 0)) > SprintState.impact_wallet:
+			if SprintState.resolved_price("candidate", candidate.get("id", ""), candidate) > SprintState.impact_wallet:
 				SprintState.toggle_reservation("candidate", candidate.get("id", ""), candidate)
 				break
 
@@ -1853,7 +1992,7 @@ func _play_sprint(strategy: String) -> void:
 		return
 	# 🧘 Souffler se décide à la Résolution : "greedy" lève le pied quand la
 	# jauge est basse (le prochain sprint se jouera sans action personnelle).
-	if strategy in ["greedy", "economie", "levier", "outillage", "generaliste"] and SprintState.energy < 30:
+	if strategy in ["greedy", "economie", "levier", "outillage", "generaliste", "thesauriseur"] and SprintState.energy < 30:
 		SprintState.plan_breather()
 	SprintState.sprint_number += 1
 

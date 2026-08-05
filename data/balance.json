@@ -162,6 +162,11 @@
     "defaultStrategyFlat": 0
   },
 
+  "prices": {
+    "_comment": "💥 Indexation des prix sur l'escalade des objectifs (spec-impact-monnaie.md §3.3). `prix = prix_base × (objectif_du_trimestre / objectif_T1) ^ quotaIndexExponent`. L'exposant est le seul réglage, et il est le cœur du lot : à 1 les prix suivent exactement l'escalade et chaque trimestre est identique au précédent avec plus de zéros — de l'inflation pure ; à 0 ils ne bougent pas et le late game devient gratuit. Entre les deux, le joueur s'enrichit RELATIVEMENT — il s'offre plus qu'au premier trimestre sans que ce soit donné. La source est la table des quotas elle-même (quotas.json) et jamais une seconde table de prix : changer l'escalade fait suivre les prix tout seul.",
+    "quotaIndexExponent": 0.7
+  },
+
   "shopDraw": {
     "slotsPerSprint": 6,
     "guaranteedPerSprint": {

@@ -1814,3 +1814,179 @@ Godot — il refuse un asset qui ne correspond plus à sa source.
 Un effet de bord vaut d'être noté : l'ancien asset dessinait `💥` (l'Impact) et
 `⚡` (l'Énergie) avec le même éclair. Deux grandeurs qui ne se comparent pas
 partageaient un signe. Le manifeste les sépare.
+
+---
+
+## 35. Les prix suivent l'escalade, moins vite qu'elle (issue #36)
+
+Le portefeuille se conserve d'un trimestre à l'autre et c'est son **solde** que
+le board juge (§31). Deux conséquences restaient à tirer, et ce lot les tire.
+
+### 35.1 Un prix ne se lit plus dans le JSON — il se dérive de l'objectif
+
+`prix = prix_base × (objectif_du_trimestre / objectif_T1) ^ k`, `k = 0,7` dans
+`balance.json → prices.quotaIndexExponent`.
+
+Sans indexation, un objectif à 4600 face à des outils à 25 rend tout le late
+game gratuit : le joueur achète le catalogue sans réfléchir au moment précis où
+la décision devrait être la plus tendue. Avec `k = 1`, le défaut exactement
+inverse : le pouvoir d'achat relatif ne bouge jamais, chaque trimestre est le
+précédent avec plus de zéros. De l'inflation pure, qui est le contraire du
+décollage recherché. Entre les deux, `k = 0,7` fait que le joueur s'offre
+**relativement** plus qu'au premier trimestre sans que ce soit donné.
+
+La table des quotas est la seule source : changer l'escalade fait suivre les
+prix tout seul. Il n'existe pas de seconde table de prix par trimestre — deux
+tables finiraient par diverger, et personne ne saurait laquelle fait foi.
+
+Trois choix de mise en œuvre méritent d'être écrits, parce qu'ils ne se
+devinent pas à la lecture de la formule :
+
+- **La référence est le barème structurel, pas le quota du moment.** Une
+  exigence tirée au sort qui relève la barre d'un trimestre ne fait pas bondir
+  l'étal avec elle : sinon le prix suivrait un tirage, et plus rien ne
+  s'anticipe. En revanche une **décision stratégique**, qui relève la barre
+  pour toujours, est bien dans la référence — sans quoi la stratégie qui
+  durcit le mandat rendrait mécaniquement le catalogue bon marché.
+- **Le Comité est indexé comme l'étal.** C'est là que sont les gros achats ;
+  l'y oublier l'aurait rendu trivial en fin de mandat. Rien n'a été à écrire
+  pour ça : tout passe déjà par `resolved_price()`, et c'est précisément ce que
+  cette fonction préparait (§31). Le lot aura coûté une fonction de six lignes
+  là où il aurait coûté la réouverture de tous les écrans.
+- **Au Comité, `quarter_index` pointe déjà le trimestre qui s'ouvre** — le
+  verdict appelle `_prepare_quarter()` avant. On y achète donc au prix du
+  trimestre dans lequel on entre, ce qui est la lecture voulue.
+
+### 35.2 Thésauriser ne devait pas être une stratégie — le banc le vérifie
+
+L'objection évidente au solde jugé est « alors il suffit d'accumuler ». Elle ne
+se réfute pas par une règle ajoutée : c'est **l'escalade** qui doit la rendre
+fausse. Encore faut-il le mesurer, sinon c'est une intention.
+
+Le banc a donc une septième trajectoire, `thesauriseur` : elle livre comme les
+autres, joue ses actions personnelles, et **n'achète jamais rien**. Elle
+franchit T1 et T2 sans effort et doit mourir à T3. Le banc échoue si elle passe.
+À titre de comparaison, la trajectoire `generaliste`, qui dépense, atteint
+3281 💥 et meurt à T4 : acheter paie, et c'est cet écart-là qui fait exister la
+décision.
+
+**Et le test a immédiatement trouvé un défaut.** Avec l'escalade
+`[150, 760, 2200, 4600]`, le thésauriseur franchissait T3 **16 fois sur 400
+runs** (11/200 puis 5/200, deux mesures indépendantes) — un run sur vingt-cinq
+où ne rien acheter suffisait pour trois trimestres. Ce n'est pas un test
+friable, c'est un déséquilibre : il n'apparaît qu'au bout de plusieurs dizaines
+de runs, exactement le genre de chose qu'une partie manuelle ne voit jamais et
+qu'une relecture ne peut pas attraper.
+
+Le chiffre s'est dérivé du banc, comme la spec le demandait — pas d'un choix à
+l'œil. Balayage à 30 runs par palier, en regardant les deux bords à la fois :
+
+| T3 / T4 (pm) | thésauriseur franchit T3 | `generaliste` (meilleur trimestre) |
+|---|---|---|
+| 2200 / 4600 | 1/30 | T4 presque toujours |
+| **2640 / 5520** | **0/30** | **T4 la plupart du temps** |
+| 3080 / 6440 | 0/30 | T3 le plus souvent |
+| 3520 / 7360 | 0/30 | T3, T4 rare |
+
+Le facteur ×1,2 est le seul qui ferme la porte au thésauriseur **sans** fermer
+celle du joueur qui achète : au-delà, c'est la trajectoire qui dépense qui
+cesse de passer, et on aurait corrigé le déséquilibre en cassant le chemin
+qu'on veut récompenser. Table finale : `[150, 760, 2640, 5520]`, soit ×5,1 puis
+×3,5 puis ×2,1, appliqué à tous les niveaux de carrière pour que la
+progression garde sa forme. Mesure de contrôle : **1 franchissement sur 260
+runs** (0/200 puis 1/60), contre 16/400 avant — un facteur 10.
+
+### 35.2 bis — La propriété ne s'asserte pas sur un run, elle se mesure
+
+La première version du garde-fou asserait « le thésauriseur n'a jamais franchi
+T3 sur ses quatre mandats ». C'est la bonne propriété, et c'est une assertion
+friable : elle tombe une fois sur 260 runs sur une courbe pourtant saine. La
+relecture l'a trouvée en rejouant 60 runs — la mesure de l'auteur, 0/200,
+n'était pas fausse, elle était simplement trop courte pour un événement à 0,4 %.
+
+Deux formes plus stables ont été essayées, et **il faut les connaître pour ne
+pas les re-tenter** :
+
+- **la marge** — portefeuille rapporté à l'objectif au verdict qui tue le
+  mandat. Elle ne discrimine rien : médiane 91 % sur la table livrée contre
+  87 % sur l'ancienne, défectueuse. La raison est structurelle : une barre plus
+  basse ne fait pas gagner le thésauriseur, elle le fait mourir **un trimestre
+  plus loin**, au même ratio ;
+- **le compte de mandats** — « pas plus d'un des quatre ». Stable (0/20 faux
+  positifs sur les deux tables) et capable d'attraper une courbe franchement
+  cassée (13/20 quand T3 est divisé par deux), mais **aveugle au défaut qui a
+  motivé le lot** : à T3 = 2200 il ne se déclenche jamais.
+
+C'est cette dernière qui est en place, avec sa portée écrite dans le code. Le
+**vrai** critère reste le taux de franchissement mesuré sur 200 runs, à
+re-mesurer chaque fois qu'on touche à l'escalade : le banc ne le dira pas. Même
+conclusion que pour « aucune trajectoire ne domine » (§32.5) — certaines
+propriétés d'un jeu aléatoire se mesurent et se documentent, elles ne
+s'assèrent pas.
+
+**Ce que ça coûte, et c'est assumé.** Le jeu est plus dur qu'avant : la part
+des runs de banc où une trajectoire atteint une fin positive passe de **175/200
+à 135/200**. Le chemin qui fait décoller une partie existe toujours et reste
+largement emprunté — mais deux tiers au lieu de neuf dixièmes. C'est cohérent
+avec l'exigence de fond (« il ne doit pas être simple de faire une entreprise
+qui fonctionne ») et c'est le prix à payer pour que thésauriser cesse d'être
+une option ; si la barre paraît trop haute à jouer, c'est ce chiffre-là qu'il
+faut regarder, pas le taux du thésauriseur.
+
+Le ×5 de la première marche est ce qui casse l'accumulation ; c'est la
+deuxième, longtemps restée à ×2,9, qui laissait passer. Ce sont ces deux
+marches-là qu'il faut regarder si le thésauriseur se remet un jour à passer.
+
+### 35.3 Ce que le joueur voit maintenant, et pourquoi ce n'est pas de l'aide
+
+Trois informations étaient calculées et non montrées. Aucune ne parle du
+hasard — elles disent toutes les trois **la règle** :
+
+- **les quatre objectifs du mandat, dès le sprint 1.** La donnée est dans
+  `quotas.json` depuis toujours ; la cacher n'ajoutait aucune tension, elle
+  empêchait seulement de voir que la marche suivante est cinq fois plus haute,
+  donc de décider s'il faut dépenser maintenant ou attendre ;
+- **le dépassement de l'objectif.** La jauge était bornée par
+  `clampi(impact, 0, target)` : au-dessus de la barre, l'information disparaissait
+  — alors que c'est elle qui dit s'il reste de quoi acheter au Comité ;
+- **l'objectif du trimestre qui s'ouvre, affiché au Comité pendant qu'on
+  dépense.** Le verdict avait déjà tiré l'exigence et le quota ; l'écran ne les
+  lisait pas. On engageait un portefeuille qui ne se reconstitue plus par un
+  cliquet, sans voir la barre à franchir.
+
+Une précision trouvée en relecture, et qui a failli passer : dans la liste du
+mandat, **le trimestre en cours affiche la barre réelle, les suivants leur
+barème**. L'exigence « Trimestre court » baisse le quota de 25 % ; annoncer
+`T1 150` dans la liste pendant que la ligne du dessus affiche `0 / 113` aurait
+donné deux nombres pour la même échéance, à trois lignes d'écart. Les
+trimestres à venir gardent le barème : leur exigence n'est pas encore tirée, et
+l'inventer serait promettre.
+
+Ces trois-là ne franchissent pas la ligne de la question 4 de la vision : le
+jeu montre ce qu'un achat **aurait** rapporté, jamais ce qu'il **va** rapporter.
+Un objectif écrit dans une table n'est pas une prédiction de gain — c'est
+l'énoncé du problème.
+
+### 35.4 Deux tests dont un seul sens ne prouvait rien
+
+« Le prix monte d'un trimestre au suivant » passe aussi bien avec une
+indexation correcte qu'avec de l'inflation pure — c'est-à-dire avec le défaut
+qu'on cherche à éviter. Le banc asserte donc les **deux** sens : le prix d'un
+item monte en absolu, **et** son coût rapporté à l'objectif baisse. Vérifié
+non vacuous en poussant `k` aux deux bornes : à `k = 1` c'est la seconde
+assertion qui tombe, à `k = 0` la première.
+
+Deux pièges rencontrés en écrivant ce lot, tous deux déjà dans ce carnet et
+retombés dessus quand même :
+
+- `GameData.cards` est un **dictionnaire**, pas un tableau. `GameData.cards[0]`
+  lève une erreur de script — que GDScript imprime sur stderr sans faire échouer
+  le test. La première version du test n'a donc jamais rien asserté, et les
+  deux sentinelles `k = 0` / `k = 1` sont passées au vert. **Un grep de recette
+  qui ne cherche que `ASSERTION` et `OK` rate ce cas** : il faut y ajouter
+  `SCRIPT ERROR`.
+- une variable inférée depuis un ternaire (`var x := a if cond else b`) ne
+  compile pas quand les deux branches n'ont pas le même type statique. L'erreur
+  fait échouer le chargement de l'autoload, et **tout** le jeu part en
+  `base 'Nil'` — ce qui ressemble à s'y méprendre au cache `.godot` périmé
+  décrit dans `CLAUDE.md`. Lire la première ligne du log avant de conclure.

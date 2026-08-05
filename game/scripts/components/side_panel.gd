@@ -690,20 +690,28 @@ func _build_quota(vbox: VBoxContainer) -> void:
 	section.add_theme_constant_override("separation", 5)
 	vbox.add_child(section)
 	section.add_child(_group_label("Quota trimestriel · T%d" % int(quota.get("quarter", SprintState.quarter_index))))
-	section.add_child(_label("Sprint %d/%d · portefeuille %d / %d 💥" % [
-		int(quota.get("sprint", 0)) + 1, int(quota.get("length", 3)), impact, target
+	var ahead := impact - target
+	section.add_child(_label("Sprint %d/%d · portefeuille %d / %d 💥%s" % [
+		int(quota.get("sprint", 0)) + 1, int(quota.get("length", 3)), impact, target,
+		" · +%d d'avance" % ahead if ahead > 0 else ""
 	], 11, UIHelpers.PANEL_FG, true))
 
+	# La jauge était bornée à l'objectif : dépasser ne se voyait nulle part,
+	# alors que c'est précisément l'information qui dit s'il reste de quoi
+	# acheter au Comité. Au-delà de la barre, l'échelle suit le portefeuille et
+	# le remplissage passe au vert — le dépassement n'est plus perdu.
 	var bar := ProgressBar.new()
 	bar.name = "QuotaProgress"
 	bar.custom_minimum_size = Vector2(0, BAR_HEIGHT)
-	bar.max_value = target
-	bar.value = clampi(impact, 0, target)
+	bar.max_value = maxi(target, impact)
+	bar.value = maxi(impact, 0)
 	bar.show_percentage = false
 	bar.tooltip_text = _quota_tooltip()
-	bar.add_theme_stylebox_override("fill", _flat(UIHelpers.PANEL_ACCENT, 3))
+	bar.add_theme_stylebox_override("fill", _flat(UIHelpers.PANEL_GOOD if ahead >= 0 else UIHelpers.PANEL_ACCENT, 3))
 	bar.add_theme_stylebox_override("background", _flat(Color(1, 1, 1, 0.10), 3))
 	section.add_child(bar)
+
+	_build_mandate_objectives(section)
 
 	for requirement in SprintState.get_active_quarter_requirements():
 		var requirement_label := _label("%s %s\n%s" % [
@@ -719,6 +727,38 @@ func _build_quota(vbox: VBoxContainer) -> void:
 			var ok: bool = bool(objective.get("ok", false))
 			section.add_child(_label("%s %s" % ["✓" if ok else "○", objective.get("label", "")], 10,
 				UIHelpers.PANEL_GOOD if ok else UIHelpers.PANEL_MUTED, true))
+
+
+## Les quatre objectifs du mandat, dès le premier sprint. Ne montrer que celui
+## du trimestre en cours ne cachait pas une information de hasard — la table
+## est écrite dans quotas.json depuis toujours — ça empêchait seulement de voir
+## que la marche suivante est cinq fois plus haute, donc de décider s'il faut
+## dépenser maintenant ou attendre. C'est de l'information sur la règle.
+func _build_mandate_objectives(section: VBoxContainer) -> void:
+	var quotas: Array = SprintState.get_mandate_quotas()
+	if quotas.size() < 2:
+		return
+	var parts: Array = []
+	for entry in quotas:
+		var quota := int(entry.get("quota", 0))
+		var text := ""
+		if bool(entry.get("current", false)):
+			# Le trimestre en cours affiche la barre RÉELLE, celle que le
+			# verdict appliquera : « Trimestre court » la baisse de 25 %, et
+			# annoncer le barème structurel donnerait deux nombres différents
+			# pour le même trimestre à trois lignes d'écart. Les trimestres à
+			# venir gardent le barème : leur exigence n'est pas encore tirée,
+			# et l'inventer serait promettre.
+			text = "▸ T%d %d" % [int(entry.get("quarter", 0)), SprintState.get_current_quota()]
+		elif bool(entry.get("reached", false)):
+			text = "✓ T%d %d" % [int(entry.get("quarter", 0)), quota]
+		else:
+			text = "T%d %d" % [int(entry.get("quarter", 0)), quota]
+		parts.append(text)
+	var label := _label("Mandat : %s" % " · ".join(parts), 10, UIHelpers.PANEL_MUTED, true)
+	label.mouse_filter = Control.MOUSE_FILTER_STOP
+	label.tooltip_text = "Les objectifs des quatre trimestres, connus dès le départ. Le portefeuille ne se remet jamais à zéro : ce qui reste après un verdict compte pour le suivant — et la marche d'après est bien plus haute que la précédente."
+	section.add_child(label)
 
 
 func _quota_tooltip() -> String:
