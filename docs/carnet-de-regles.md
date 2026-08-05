@@ -1814,3 +1814,35 @@ Godot — il refuse un asset qui ne correspond plus à sa source.
 Un effet de bord vaut d'être noté : l'ancien asset dessinait `💥` (l'Impact) et
 `⚡` (l'Énergie) avec le même éclair. Deux grandeurs qui ne se comparent pas
 partageaient un signe. Le manifeste les sépare.
+
+---
+
+## 35. L'équipe n'est pas une jauge, ce sont des gens (issue #43)
+
+Le Moral d'équipe n'est plus un compteur auquel les choix écrivent directement.
+Chaque personne du roster porte désormais quatre niveaux bornés : Moral,
+Confiance envers le CPO, Énergie et satisfaction de salaire. Le Moral affiché
+reste la moyenne pondérée de ces états individuels, ce qui conserve les règles
+existantes qui le lisent sans réintroduire une seconde source de vérité.
+
+Les archétypes de recrutement définissent les niveaux de départ et les
+sensibilités aux effets. Leur nom n'apparaît qu'après un 1:1 ; cette action reste
+disponible ensuite, répare la Confiance et ne rejoue pas les effets cachés. Le
+CPO porte les mêmes niveaux personnels pour les effets qui le ciblent, son
+Énergie restant raccordée à la jauge déjà jouée.
+
+Les choix Inbox qui affectent encore le Moral annoncent explicitement leur
+`peopleTarget` dans leur donnée : tous, un profil, une ancienneté, la personne
+la plus fragile ou le CPO. Les effets sont appliqués à la personne concernée
+puis modulés par son caractère. Dette, surcharge et besoins de recrutement
+agissent donc sur des gens, pas sur une valeur globale.
+
+Une personne qui atteint zéro sur un critère ouvre une scène Inbox prioritaire :
+réparer la situation ou accepter son départ. Zéro Confiance bloque immédiatement
+sa contribution, mais elle ne disparaît jamais sans ce choix. Le panneau latéral
+montre un point par personne au repos, une alerte nommée quand un seuil est bas,
+et les quatre niveaux seulement au survol ou après ouverture du détail.
+
+Le smoke logique couvre les quatre états, les cibles, le CPO, les 1:1 et les
+deux issues d'une crise. Le smoke UI conserve le contrôle des onze écrans et du
+panneau permanent.

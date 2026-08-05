@@ -24,9 +24,8 @@ La couche multiplicative du Levier de
 **implémentée** — issue #37, carnet §33 :
 `Levier final = (base + Σ additifs) × Π multiplicateurs`.
 [`spec-equipe-individuelle.md`](docs/spec-equipe-individuelle.md) (le Moral
-cache des personnes avec un caractère) est **validée et non implémentée** :
-c'est le lot suivant, et il ne se fait pas en même temps qu'un autre lot qui
-réécrit des effets de contenu.
+cache des personnes avec un caractère) est **implémentée** — issue #43,
+carnet §35.
 
 Un principe en sort, à ne jamais remélanger : **trois entités perçoivent
 quelque chose**, et chacune a sa grandeur. Les *utilisateurs* jugent le produit

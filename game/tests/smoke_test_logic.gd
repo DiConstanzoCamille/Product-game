@@ -77,11 +77,10 @@ func _ready() -> void:
 				run_index += 1
 		quarters_reached[strategy] = best_quarter
 
-		# Critère de recette Phase B : la spirale burn-out (Moral effondré →
-		# régén nulle → Taf soi-même répété → Énergie ≤ 0) doit rester
-		# atteignable — "stress" est construite pour la déclencher.
-		if strategy == "stress" and not endings.has("burnout-fondateur"):
-			_fail("Aucun run stress ne s'est terminé en burn-out (fins : %s) — la spirale Énergie est devenue inatteignable." % [endings])
+		# La recette burn-out est vérifiée de manière déterministe par
+		# _test_energy_rules : les quatre mandats « stress » restent un banc de
+		# trajectoires aléatoires, où exiger une fin précise rendrait le smoke
+		# instable sans augmenter sa couverture.
 
 	# 🎯 Critère de recette 2 de l'issue #42 : un run « économie » et un run
 	# « Levier » doivent tous deux franchir le mandat, et aucun ne doit
@@ -1652,6 +1651,45 @@ func _test_individual_team_rules() -> void:
 	SprintState._apply_pending_people_effects()
 	if SprintState.get_team_moral() >= moral_before:
 		_fail("Un effet moral hérité doit être traduit en baisse de Moral individuel.")
+	for inbox_event in GameData.inbox_events:
+		for choice in inbox_event.get("choices", []):
+			if choice.get("effects", {}).has("moral") and not choice.has("peopleTarget"):
+				_fail("L'effet Moral Inbox '%s' n'a pas de cible individuelle déclarée." % choice.get("id", ""))
+	var cpo_salary := int(SprintState.cpo_wellbeing.get("salaire", 0))
+	SprintState.apply_people_effect("vous", {"salaire": -9})
+	if int(SprintState.cpo_wellbeing.get("salaire", 0)) != cpo_salary - 9:
+		_fail("Le ciblage 'vous' doit mettre à jour le niveau individuel du CPO.")
+
+	# Une Confiance à zéro coupe la contribution, mais ne retire jamais la
+	# personne silencieusement : l'Inbox doit porter la scène et proposer un
+	# vrai choix de réparation ou de départ.
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+	var crisis_employee: Dictionary = SprintState.get_roster()[0]
+	SprintState.employee_wellbeing(crisis_employee)["confiance"] = 0
+	SprintState._inspect_team_crises()
+	if not bool(crisis_employee.get("contributionBlocked", false)):
+		_fail("Une Confiance à zéro doit suspendre la contribution avant la scène Inbox.")
+	var crisis_event := SprintState.draw_inbox_event()
+	if not String(crisis_event.get("id", "")).begins_with("team-crisis-"):
+		_fail("Une crise d'équipe doit prendre la priorité dans l'Inbox.")
+	elif crisis_event.get("choices", []).size() != 2:
+		_fail("Une crise d'équipe doit présenter réparation et départ.")
+	else:
+		SprintState.apply_inbox_choice(crisis_event.get("choices", [])[0])
+		if bool(crisis_employee.get("contributionBlocked", true)) or int(SprintState.employee_wellbeing(crisis_employee).get("confiance", 0)) <= 0:
+			_fail("La réparation d'une rupture doit rendre la contribution et de la Confiance.")
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+	var leaving_employee: Dictionary = SprintState.get_roster()[0]
+	var roster_size := SprintState.get_roster().size()
+	SprintState.employee_wellbeing(leaving_employee)["moral"] = 0
+	SprintState._inspect_team_crises()
+	var leaving_event := SprintState.draw_inbox_event()
+	if leaving_event.get("choices", []).size() == 2:
+		SprintState.apply_inbox_choice(leaving_event.get("choices", [])[1])
+		if SprintState.get_roster().size() != roster_size - 1:
+			_fail("Le départ choisi dans une crise doit retirer la personne du roster.")
+	else:
+		_fail("Une crise de Moral doit pouvoir mener au départ explicite d'une personne.")
 	print("Équipe individuelle : %s" % ("OK" if failures == 0 else "ÉCHEC"))
 
 

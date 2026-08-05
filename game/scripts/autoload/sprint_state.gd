@@ -124,6 +124,7 @@ var current_committee_offer: Dictionary = {}  # {quarter, strategy_cost} — le 
 
 # --- Phase B : l'économie du joueur (spec profondeur §7) ---
 var energy: int = 70                   # ⚡ jauge personnelle du CPO (0..energy.max), côté jeu uniquement
+var cpo_wellbeing: Dictionary = {}     # mêmes niveaux que le roster ; sa Confiance envers soi n'est pas jouée
 var energy_spent_this_sprint: int = 0  # ⚡ réellement dépensés en actions personnelles depuis la dernière Résolution
 var self_work_capacity: int = 0        # points de capacité ajoutés par "Faire le taf soi-même" ce sprint
 var breather_planned: bool = false     # Souffler pris à la dernière Résolution : actions bloquées ce sprint, bonus de régén à la prochaine
@@ -135,6 +136,7 @@ var _hired_candidate_ids: Array = []   # candidats déjà embauchés ce mandat (
 var _backlog_bag: Array = []           # sac des propositions de Roadmap, filtré par ère
 var _quarter_requirement_bag: Array = []
 var _last_quarter_requirement_id: String = ""
+var pending_team_crises: Array = []    # [{employee_id, criterion}] — priorité Inbox au sprint suivant
 
 
 ## À appeler au lancement d'un nouveau mandat, une fois le niveau de carrière,
@@ -202,8 +204,11 @@ func reset_run(chosen_era_id: String = "", chosen_company_id: String = "", chose
 	quarter_strategy_chosen = false
 	_quarter_requirement_bag.clear()
 	_last_quarter_requirement_id = ""
+	pending_team_crises.clear()
 	current_shop_offer.clear()
 	energy = int(get_energy_conf().get("start", 70))
+	cpo_wellbeing = get_individual_team_conf().get("cpoStart", {}).duplicate(true)
+	cpo_wellbeing["energie"] = energy
 	energy_spent_this_sprint = 0
 	self_work_capacity = 0
 	breather_planned = false
@@ -1361,6 +1366,7 @@ func _employee_from_source(source: Dictionary, hired_sprint: int, trait_revealed
 		"hiddenRevealed": source.get("hiddenRevealed", trait_revealed),
 		"hiredSprint": hired_sprint,
 		"personality": personality_id,
+		"personalityRevealed": bool(source.get("personalityRevealed", false)),
 		"wellbeing": wellbeing,
 		"contributionBlocked": false,
 	}
@@ -1427,6 +1433,8 @@ func get_employee_alert(employee: Dictionary) -> Dictionary:
 
 func _select_people(target: String) -> Array:
 	var roster := get_roster()
+	if target == "vous":
+		return []
 	if target == "un-au-hasard":
 		return [roster[randi() % roster.size()]] if not roster.is_empty() else []
 	if target.begins_with("role:"):
@@ -1470,6 +1478,15 @@ func queue_people_effect(target: String, deltas: Dictionary, note: String = "") 
 
 func apply_people_effect(target: String, deltas: Dictionary) -> void:
 	var criteria: Array = get_individual_team_conf().get("criteria", [])
+	if target == "vous":
+		for criterion in deltas:
+			var self_key := String(criterion)
+			if not criteria.has(self_key):
+				continue
+			cpo_wellbeing[self_key] = clampi(int(round(float(cpo_wellbeing.get(self_key, 0)) + float(deltas[criterion]))), 0, 100)
+		if deltas.has("energie"):
+			energy = int(cpo_wellbeing.get("energie", energy))
+		return
 	for employee in _select_people(target):
 		var wellbeing := employee_wellbeing(employee)
 		var personality := get_personality(String(employee.get("personality", "")))
@@ -1501,6 +1518,87 @@ func _apply_pending_people_effects() -> void:
 	for effect in pending_people_effects:
 		apply_people_effect(String(effect.get("target", "tous")), effect.get("deltas", {}))
 	pending_people_effects.clear()
+
+
+func _sync_cpo_energy() -> void:
+	cpo_wellbeing["energie"] = energy
+
+
+## Le seuil de départ ne retire jamais quelqu'un dans le dos du joueur. Il
+## prépare une scène Inbox prioritaire ; seule la Confiance à zéro coupe la
+## contribution tout de suite, parce que la rupture est déjà visible au travail.
+func _inspect_team_crises() -> void:
+	var leave_at := int(get_individual_team_conf().get("leaveAt", 0))
+	for employee in get_roster():
+		var wellbeing := employee_wellbeing(employee)
+		for criterion in get_individual_team_conf().get("criteria", []):
+			var key := String(criterion)
+			if key == "confiance" and int(wellbeing.get(key, 100)) <= leave_at:
+				employee["contributionBlocked"] = true
+			if int(wellbeing.get(key, 100)) > leave_at:
+				continue
+			if String(employee.get("pendingCrisis", "")) == key:
+				continue
+			employee["pendingCrisis"] = key
+			pending_team_crises.append({"employee_id": employee.get("id", ""), "criterion": key})
+			break
+
+
+func _team_crisis_event(crisis: Dictionary) -> Dictionary:
+	var employee := find_employee(String(crisis.get("employee_id", "")))
+	if employee.is_empty():
+		return {}
+	var criterion := String(crisis.get("criterion", "moral"))
+	var conf: Dictionary = get_individual_team_conf().get("crises", {}).get(criterion, {})
+	var name := String(employee.get("name", "Cette personne"))
+	return {
+		"id": "team-crisis-%s-%s" % [employee.get("id", ""), criterion],
+		"from": "Équipe produit",
+		"channel": "#equipe-produit",
+		"status": "urgent",
+		"subject": "%s %s" % [name, conf.get("subject", "a besoin de vous")],
+		"text": "%s est à zéro en %s. Ce n'est plus une alerte : vous devez choisir ce qui se passe maintenant." % [
+			name, {"moral": "Moral", "confiance": "Confiance", "energie": "Énergie", "salaire": "satisfaction salariale"}.get(criterion, criterion)
+		],
+		"choices": [
+			{
+				"id": "restaurer-%s" % criterion,
+				"label": conf.get("restoreLabel", "Réparer la situation"),
+				"reveal": "%s reste. Le sujet ne disparaît pas, mais vous lui rendez une marge de manœuvre." % name,
+				"personEffect": {"employee_id": employee.get("id", ""), "deltas": conf.get("restore", {})},
+				"teamCrisis": {"employee_id": employee.get("id", ""), "criterion": criterion, "action": "restore"},
+			},
+			{
+				"id": "laisser-partir-%s" % criterion,
+				"label": conf.get("leaveLabel", "Le laisser partir"),
+				"reveal": "%s quitte l'équipe. Les autres voient très bien pourquoi." % name,
+				"teamCrisis": {"employee_id": employee.get("id", ""), "criterion": criterion, "action": "leave", "teamAfterLeave": conf.get("teamAfterLeave", {})},
+			},
+		],
+	}
+
+
+func _resolve_team_crisis(choice: Dictionary) -> void:
+	var crisis: Dictionary = choice.get("teamCrisis", {})
+	if crisis.is_empty():
+		return
+	var employee := find_employee(String(crisis.get("employee_id", "")))
+	if employee.is_empty():
+		return
+	var action := String(crisis.get("action", ""))
+	if action == "restore":
+		employee["pendingCrisis"] = ""
+		if String(crisis.get("criterion", "")) == "confiance":
+			employee["contributionBlocked"] = false
+		return
+	if action != "leave":
+		return
+	var owner := _find_employee_owner(String(employee.get("id", "")))
+	var owner_roster: Array = owner.get("squad", {}).get("roster", [])
+	owner_roster.erase(employee)
+	queue_people_effect("tous", crisis.get("teamAfterLeave", {}))
+	pending_journal_lines.append("🚪 %s quitte l'équipe. Personne ne fait semblant de ne pas comprendre." % employee.get("name", "Une personne"))
+	_refresh_team_moral()
 
 
 ## Facteur de contribution d'un employé : 1.0 par défaut, réduit par un
@@ -1661,6 +1759,7 @@ func personal_action_refusal() -> String:
 func _spend_energy(cost: int) -> void:
 	var spent: int = min(cost, energy)
 	energy -= spent
+	_sync_cpo_energy()
 	energy_spent_this_sprint += spent
 
 
@@ -1680,6 +1779,7 @@ func do_one_on_one(person: Dictionary) -> String:
 	var cost := get_personal_action_cost("oneOnOne")
 	_spend_energy(cost)
 	person["hiddenRevealed"] = true
+	person["personalityRevealed"] = true
 
 	var hidden_trait := get_hidden_trait(person.get("hidden_trait", ""))
 	var verdict := ""
@@ -1689,6 +1789,9 @@ func do_one_on_one(person: Dictionary) -> String:
 		verdict = "%s %s — %s" % [
 			hidden_trait.get("icon", ""), hidden_trait.get("name", ""), hidden_trait.get("description", "")
 		]
+	var personality := get_personality(String(person.get("personality", get_individual_team_conf().get("defaultPersonalityBySeniority", {}).get(person.get("seniority", "junior"), ""))))
+	if not personality.is_empty():
+		verdict += " · %s" % personality.get("name", "")
 	var extra := ""
 	if is_employee:  # employé du roster (un candidat n'a pas encore de sprint d'embauche)
 		apply_people_effect_for_employee(person, {"confiance": float(get_individual_team_conf().get("oneOnOneConfiance", 0))})
@@ -2970,6 +3073,10 @@ func _role_label(role_id: String) -> String:
 ## immédiates d'un sac à l'autre. Consomme une pioche — à appeler une seule
 ## fois par sprint, depuis l'écran Inbox.
 func draw_inbox_event() -> Dictionary:
+	while not pending_team_crises.is_empty():
+		var crisis_event := _team_crisis_event(pending_team_crises.pop_front())
+		if not crisis_event.is_empty():
+			return crisis_event
 	var eligible: Array = _eligible_inbox_events()
 	if eligible.is_empty():
 		return {}
@@ -3031,10 +3138,21 @@ func _find_inbox_event(event_id: String) -> Dictionary:
 ## delta de jauge. La fraction est **tirée** dans la fourchette de la carte :
 ## le joueur choisit d'y consacrer le sprint, il ne sait pas combien suivront.
 func apply_inbox_choice(choice: Dictionary, note: String = "") -> void:
-	add_pending(choice.get("effects", {}), note)
+	var effects: Dictionary = choice.get("effects", {}).duplicate()
+	if effects.has("moral"):
+		var target := String(choice.get("peopleTarget", "tous"))
+		queue_people_effect(target, {"moral": float(effects.get("moral", 0))})
+		effects.erase("moral")
+	add_pending(effects, note)
+	var person_effect: Dictionary = choice.get("personEffect", {})
+	if not person_effect.is_empty():
+		var person := find_employee(String(person_effect.get("employee_id", "")))
+		if not person.is_empty():
+			apply_people_effect_for_employee(person, person_effect.get("deltas", {}))
 	var people_effect: Dictionary = choice.get("peopleEffects", {})
 	if not people_effect.is_empty():
 		queue_people_effect(String(people_effect.get("target", "tous")), people_effect.get("deltas", {}))
+	_resolve_team_crisis(choice)
 	var conversion: Dictionary = choice.get("clientConversion", {})
 	if conversion.is_empty():
 		return
@@ -3047,9 +3165,9 @@ func apply_inbox_choice(choice: Dictionary, note: String = "") -> void:
 func add_pending(deltas: Dictionary, note: String = "") -> void:
 	for resource_id in deltas.keys():
 		var value: float = float(deltas[resource_id])
-		# Compatibilité des contenus écrits avant le lot : un "moral": -4
-		# devient un effet sur chaque personne, modulé par son caractère. Les
-		# nouvelles cartes peuvent choisir une cible avec `peopleEffects`.
+		# Les effets structurels et les contenus qui n'ont pas de cible (une
+		# carte globale, une pratique, un epic) s'appliquent à tout le roster.
+		# L'Inbox, elle, résout son ciblage déclaratif dans apply_inbox_choice().
 		if resource_id == "moral":
 			queue_people_effect("tous", {"moral": value})
 			continue
@@ -3072,6 +3190,7 @@ func apply_pending_and_check() -> String:
 	_apply_per_sprint_effects()
 	_apply_pending_people_effects()
 	_apply_team_sprint_energy()
+	_inspect_team_crises()
 	var was_cleanup_sprint := cleanup_sprint_pending
 	last_score_report = ScoreResolver.resolve(_build_score_snapshot(), {
 		"scoring": GameData.scoring,
@@ -3151,6 +3270,10 @@ func apply_pending_and_check() -> String:
 ## absence), traits cachés révélés à effet continu, pratiques à effet
 ## par sprint, et décroissance naturelle de la Réputation produit (§8.1).
 func _apply_per_sprint_effects() -> void:
+	var people_systems: Dictionary = get_individual_team_conf().get("systemicEffects", {})
+	var projected_debt := float(resource_values.get("dette-organisationnelle", 0.0)) + float(pending_deltas.get("dette-organisationnelle", 0.0))
+	if projected_debt >= float(people_systems.get("debtMoralAt", 101)):
+		queue_people_effect("tous", {"moral": float(people_systems.get("debtMoralPerSprint", 0))})
 	var roles: Dictionary = GameData.balance.get("roles", {})
 	var ops_conf: Dictionary = roles.get("ops", {})
 	var ops_weight := get_role_weight("ops")
@@ -3164,14 +3287,13 @@ func _apply_per_sprint_effects() -> void:
 		if relief != 0.0:
 			add_pending({"dette-organisationnelle": relief})
 
-	var moral_from_traits := 0.0
 	for employee in get_roster():
 		if not employee.get("hiddenRevealed", false):
 			continue
 		var hidden_trait := get_hidden_trait(employee.get("hidden_trait", ""))
-		moral_from_traits += float(hidden_trait.get("effects", {}).get("moralPerSprint", 0))
-	if moral_from_traits != 0.0:
-		add_pending({"moral": moral_from_traits})
+		var trait_moral := float(hidden_trait.get("effects", {}).get("moralPerSprint", 0))
+		if trait_moral != 0.0:
+			apply_people_effect_for_employee(employee, {"moral": trait_moral})
 
 	for practice_id in owned_practices:
 		var practice := find_practice(practice_id)
@@ -3461,6 +3583,7 @@ func _apply_energy_flow() -> void:
 
 	var before := energy
 	energy = clampi(energy + regen + bonus + events, 0, get_energy_max())
+	_sync_cpo_energy()
 
 	last_energy_report = {
 		"spent": energy_spent_this_sprint,

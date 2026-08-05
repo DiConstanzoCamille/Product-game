@@ -84,7 +84,7 @@ Les cartes concrètes affichées dans le shop de démo sur la landing page, par 
 
 ## `candidates.json`
 
-Le pool de candidats du Marché (spec profondeur §5.1, carnet §17) : `candidates[]` — `id`, `name`, `role` (`dev`/`pm`/`designer`/`ops`), `seniority` (`junior`/`senior`), `costImpact` (prix d'embauche en 💥, lu par `SprintState.resolved_price()`), `salary` (charge de 💰 Revenue par sprint, cohérente avec `balance.json` → `salaries`), `trait` (texte affiché), `visible_trait_id` (règle de Levier dans `scoring.json`), `badges[]`, `eras[]` optionnel. Le trait caché n'est **pas** dans ce fichier : il est tiré dans `hidden-traits.json` au moment où le candidat apparaît au Marché.
+Le pool de candidats du Marché (spec profondeur §5.1, carnet §17) : `candidates[]` — `id`, `name`, `role` (`dev`/`pm`/`designer`/`ops`), `seniority` (`junior`/`senior`), `personality` (id de `recruitment-archetypes.json`, caché jusqu'au 🤝 1:1), `costImpact` (prix d'embauche en 💥, lu par `SprintState.resolved_price()`), `salary` (charge de 💰 Revenue par sprint, cohérente avec `balance.json` → `salaries`), `trait` (texte affiché), `visible_trait_id` (règle de Levier dans `scoring.json`), `badges[]`, `eras[]` optionnel. Le trait caché n'est **pas** dans ce fichier : il est tiré dans `hidden-traits.json` au moment où le candidat apparaît au Marché.
 
 ## `practices.json`
 
@@ -104,6 +104,8 @@ Le pool de traits cachés des candidats (spec profondeur §4.5, carnet §17) : `
 ## `recruitment-archetypes.json` — états individuels
 
 La table des caractères du recrutement est aussi la source des niveaux de départ du roster : chaque archétype porte `depart` (`moral`, `confiance`, `energie`, `salaire`, tous 0–100) et `influence` (multiplicateur de chaque effet reçu). À runtime, un employé conserve `personality` et `wellbeing` ; ces deux champs ne sont pas écrits dans les pools de démo. Le Moral d'équipe est une moyenne pondérée par contribution de `wellbeing.moral`, jamais une valeur de règle indépendante.
+
+Les effets de personnes suivent `peopleEffects: { target, deltas }`. `target` est fermé : `tous`, `un-au-hasard`, `role:dev`, `seniorite:junior`, `le-plus-ancien`, `le-mieux-paye`, `le-plus-fragile` ou `vous`. Les choix Inbox qui portent encore une clé `moral` déclarent leur `peopleTarget` au même endroit : cette valeur est retirée du panier de jauges et appliquée individuellement lors de la résolution.
 
 ## `hud-demo.json`
 

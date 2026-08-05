@@ -11,6 +11,7 @@
       "choices": [
         {
           "id": "negocier-augmentation",
+          "peopleTarget": "un-au-hasard",
           "label": "Négocier une augmentation",
           "reveal": "💰 Revenue −4 · 🫶 Moral +6 — il reste, et les autres l'apprennent vite.",
           "effects": {
@@ -20,6 +21,7 @@
         },
         {
           "id": "promettre-autonomie",
+          "peopleTarget": "un-au-hasard",
           "label": "Lui promettre plus d'autonomie, sans budget",
           "reveal": "🫶 Moral +2 · 🎭 Cynisme +5 — une promesse de plus à tenir un jour ou l'autre.",
           "effects": {
@@ -29,6 +31,7 @@
         },
         {
           "id": "temporiser",
+          "peopleTarget": "un-au-hasard",
           "label": "Ne rien changer, temporiser",
           "reveal": "🎯 Capital politique −3 · 🫶 Moral −8 — il part dans trois semaines.",
           "effects": {
@@ -49,6 +52,7 @@
       "choices": [
         {
           "id": "tout-arreter",
+          "peopleTarget": "tous",
           "label": "Tout arrêter pour corriger proprement",
           "reveal": "🧱 Dette −8 · 🫶 Moral −3 · 💰 Revenue −2 — corrigé à la racine, la démo est reportée.",
           "effects": {
@@ -99,6 +103,7 @@
         },
         {
           "id": "couper-budget",
+          "peopleTarget": "role:dev",
           "label": "Couper 20% du budget outillage",
           "reveal": "💰 Revenue +6 · 🧱 Dette +5 · 🫶 Moral −3 — l'équipe compense avec des raccourcis.",
           "effects": {
@@ -129,6 +134,7 @@
       "choices": [
         {
           "id": "jour-off",
+          "peopleTarget": "le-plus-fragile",
           "label": "Lui donner un jour off immédiat",
           "reveal": "🫶 Moral +6 · 💰 Revenue −1 — soulagement visible, la charge reste à répartir.",
           "effects": {
@@ -138,6 +144,7 @@
         },
         {
           "id": "recruter-renfort",
+          "peopleTarget": "le-plus-fragile",
           "label": "Recruter du renfort en urgence",
           "reveal": "💰 Revenue −8 · 🫶 Moral +3 · 🧱 Dette −2 — coûteux, mais l'astreinte est enfin répartie.",
           "effects": {
@@ -148,6 +155,7 @@
         },
         {
           "id": "tenir-encore",
+          "peopleTarget": "le-plus-fragile",
           "label": "Lui demander de tenir encore un sprint",
           "reveal": "🫶 Moral −7 · 🧱 Dette +3 · ⚡ Énergie −4 — il tient, mais le compteur tourne. Vous vérifiez les alertes à sa place, la nuit.",
           "effects": {
@@ -178,6 +186,7 @@
         },
         {
           "id": "accelerer-urgence",
+          "peopleTarget": "tous",
           "label": "Accélérer en urgence, quitte à bâcler",
           "reveal": "📈 Réputation produit +5 · 🧱 Dette +8 · 🫶 Moral −5 — livré à temps, personne ne sait comment. 👥 +1 en clients.",
           "effects": {
@@ -210,6 +219,7 @@
       "choices": [
         {
           "id": "mobiliser-urgence",
+          "peopleTarget": "role:dev",
           "label": "Mobiliser l'équipe en urgence",
           "reveal": "🧱 Dette −8 · 🫶 Moral −4 · 🎯 Capital politique +3 · ⚡ Énergie −6 — propre, mais ça a coûté un sprint de travail au chausse-pied, war room pilotée par vos soins.",
           "effects": {
@@ -250,6 +260,7 @@
       "choices": [
         {
           "id": "demo-soignee",
+          "peopleTarget": "tous",
           "label": "Improviser une démo soignée",
           "reveal": "🎯 Capital politique +4 · 🫶 Moral −3 · 💥 +16 — l'investisseur repart conquis et glisse un mot au board.",
           "effects": {
@@ -347,6 +358,7 @@
         },
         {
           "id": "laisser-partir",
+          "peopleTarget": "tous",
           "label": "Le laisser partir",
           "reveal": "📈 Réputation produit −4 · 🫶 Moral +2 — un client de moins à satisfaire, l'équipe respire un peu. 👥 −3 : il n'est pas parti seul.",
           "effects": {
@@ -368,6 +380,7 @@
       "choices": [
         {
           "id": "augmenter-offre",
+          "peopleTarget": "le-mieux-paye",
           "label": "Augmenter l'offre salariale",
           "reveal": "💰 Revenue −7 · 🫶 Moral +3 — les candidatures affluent enfin.",
           "effects": {
@@ -377,6 +390,7 @@
         },
         {
           "id": "elargir-criteres",
+          "peopleTarget": "seniorite:junior",
           "label": "Élargir les critères de recrutement",
           "reveal": "🧱 Dette +3 · 🫶 Moral +1 — un profil moins évident, à former.",
           "effects": {
@@ -386,6 +400,7 @@
         },
         {
           "id": "redistribuer-charge",
+          "peopleTarget": "tous",
           "label": "Redistribuer la charge en interne",
           "reveal": "🫶 Moral −6 — le poste reste vacant, l'équipe absorbe.",
           "effects": {
@@ -408,6 +423,7 @@
       "choices": [
         {
           "id": "recadrer-format",
+          "peopleTarget": "tous",
           "label": "Recadrer fermement le format",
           "reveal": "🫶 Moral −3 · 🎭 Cynisme −4 — grincheux sur le coup, soulagés le lendemain.",
           "effects": {
@@ -417,6 +433,7 @@
         },
         {
           "id": "laisser-filer",
+          "peopleTarget": "tous",
           "label": "Laisser filer, l'équipe a besoin de parler",
           "reveal": "🫶 Moral +3 · 🧱 Dette +2 — le rythme de livraison en prend un coup.",
           "effects": {
@@ -426,6 +443,7 @@
         },
         {
           "id": "supprimer-daily",
+          "peopleTarget": "tous",
           "label": "Supprimer le daily temporairement",
           "reveal": "🎭 Cynisme +5 · 🫶 Moral +2 — un rituel de moins, et une question sans réponse.",
           "effects": {
@@ -458,6 +476,7 @@
         },
         {
           "id": "internaliser-role",
+          "peopleTarget": "tous",
           "label": "Internaliser le rôle sur un lead existant",
           "reveal": "🧱 Dette −3 · 🫶 Moral −4 — moins cher, mais un lead de plus qui porte trop de casquettes.",
           "effects": {
@@ -467,6 +486,7 @@
         },
         {
           "id": "auto-organisation",
+          "peopleTarget": "tous",
           "label": "Ne pas remplacer, laisser l'équipe s'auto-organiser",
           "reveal": "🎭 Cynisme +7 · 🫶 Moral +4 — un vrai soulagement, et une transformation qui perd son cap.",
           "effects": {
@@ -492,6 +512,7 @@
       "choices": [
         {
           "id": "construire-en-urgence",
+          "peopleTarget": "role:dev",
           "label": "La construire en urgence, quoi qu'il en coûte",
           "reveal": "🧱 Dette +6 · 🫶 Moral −3 — la capacité du sprint part sur une promesse, pas sur le backlog. Traction médiocre garantie. 👥 +2 signés.",
           "effects": {
@@ -597,6 +618,7 @@
       "choices": [
         {
           "id": "prioriser-pour-campagne",
+          "peopleTarget": "role:dev",
           "label": "Prioriser la feature pour tenir la date",
           "reveal": "🧱 Dette +4 · 🫶 Moral −3 — l'équipe sprint pour une date qu'elle n'a pas choisie.",
           "effects": {
@@ -632,6 +654,7 @@
       "choices": [
         {
           "id": "stopper-pour-corriger",
+          "peopleTarget": "role:dev",
           "label": "Tout arrêter pour corriger",
           "reveal": "🧱 Dette −5 · 🫶 Moral −4 — le sprint saute, mais le Support cesse de porter seul le problème. 👥 +1 : ceux qui hésitaient restent.",
           "effects": {
@@ -698,6 +721,7 @@
       "choices": [
         {
           "id": "accompagner-bascule",
+          "peopleTarget": "role:dev",
           "label": "Mobiliser l'équipe pour les faire basculer",
           "reveal": "🫶 Moral −4 · 🧱 Dette +3 — une part des entrants passe payante, et l'équipe a passé le sprint au téléphone.",
           "effects": {

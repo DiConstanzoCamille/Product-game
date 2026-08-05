@@ -529,6 +529,11 @@ func _team_row(employee: Dictionary) -> Control:
 		], 9, UIHelpers.PANEL_WARN)
 		warning.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		row.add_child(warning)
+	else:
+		var stable := _label("●", 10, UIHelpers.PANEL_GOOD)
+		stable.tooltip_text = "Aucune alerte individuelle"
+		stable.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		row.add_child(stable)
 
 	var suffix := " 🔒" if not revealed else _hidden_trait_icon(employee)
 	var role_label := _label("%s %s%s" % [
@@ -556,6 +561,12 @@ func _employee_tooltip(employee: Dictionary, role_conf: Dictionary) -> String:
 	]]
 	if employee.get("trait", "") != "":
 		lines.append(employee.get("trait", ""))
+	if employee.get("personalityRevealed", false):
+		var personality: Dictionary = SprintState.get_personality(employee.get("personality", ""))
+		if not personality.is_empty():
+			lines.append("Caractère révélé : %s — %s" % [personality.get("name", ""), personality.get("trait", "")])
+	else:
+		lines.append("🤝 Un 1:1 peut révéler son caractère.")
 	var wellbeing: Dictionary = SprintState.employee_wellbeing(employee)
 	lines.append("🫶 Moral %d · 🤝 Confiance %d · ⚡ Énergie %d · 💸 Salaire %d" % [
 		int(wellbeing.get("moral", 0)), int(wellbeing.get("confiance", 0)),
