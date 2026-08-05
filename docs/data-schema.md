@@ -84,11 +84,11 @@ Les cartes concrètes affichées dans le shop de démo sur la landing page, par 
 
 ## `candidates.json`
 
-Le pool de candidats du Marché (spec profondeur §5.1, carnet §17) : `candidates[]` — `id`, `name`, `role` (`dev`/`pm`/`designer`/`ops`), `seniority` (`junior`/`senior`), `costImpact` (prix d'embauche en 💥, lu par `SprintState.resolved_price()`), `salary` (charge de 💰 Revenue par sprint, cohérente avec `balance.json` → `salaries`), `trait` (texte affiché), `visible_trait_id` (règle de Levier dans `scoring.json`), `badges[]`, `eras[]` optionnel. Le trait caché n'est **pas** dans ce fichier : il est tiré dans `hidden-traits.json` au moment où le candidat apparaît au Marché.
+Le pool de candidats du Marché (spec profondeur §5.1, carnet §17) : `candidates[]` — `id`, `name`, `role` (`dev`/`pm`/`designer`/`ops`), `seniority` (`junior`/`senior`), `personality` (id de `recruitment-archetypes.json`, caché jusqu'au 🤝 1:1), `costImpact` (prix d'embauche en 💥, lu par `SprintState.resolved_price()`), `salary` (charge de 💰 Revenue par sprint, cohérente avec `balance.json` → `salaries`), `trait` (texte affiché), `visible_trait_id` (règle de Levier dans `scoring.json`), `badges[]`, `eras[]` optionnel. Le trait caché n'est **pas** dans ce fichier : il est tiré dans `hidden-traits.json` au moment où le candidat apparaît au Marché.
 
 ## `practices.json`
 
-Le pool de pratiques du Marché (spec profondeur §5.2, carnet §17) : `practices[]` — `id`, `icon`, `name`, `costImpact` (prix d'adoption en 💥), `licensePerSeat` (charge de 💰 Revenue par sprint et par personne du roster), `description`, `unlocks` (flag consommé par le système concerné : `hiddenTraits` révèle les traits cachés au Marché ; `clients` révèle définitivement la colonne d'effet client du backlog et `clientSegments` en détaille la ventilation par segment ; `risk` révèle la colonne Dette ; `okrBonus` donne le bonus de Capital politique aux livraisons à fort effet client ; `burndown`/`accounts` déverrouillent leurs sections du Pilotage), `perSprint` optionnel (deltas de ressources appliqués à chaque Résolution tant que la pratique est possédée), `rarity` et `eraWeights` optionnels (voir *Rareté et tirage* ci-dessous), `eras[]` optionnel.
+Le pool de pratiques du Marché (spec profondeur §5.2, carnet §17) : `practices[]` — `id`, `icon`, `name`, `costImpact` (prix d'adoption en 💥), `licensePerSeat` (charge de 💰 Revenue par sprint et par personne du roster), `description`, `unlocks` (flag consommé par le système concerné : `hiddenTraits` révèle les traits cachés au Marché ; `clients` révèle définitivement la colonne d'effet client du backlog et `clientSegments` en détaille la ventilation par segment ; `risk` révèle la colonne Dette ; `okrBonus` donne le bonus de Capital politique aux livraisons à fort effet client ; `burndown`/`accounts` déverrouillent leurs sections du Pilotage), `perSprint` optionnel (deltas de ressources appliqués à chaque Résolution tant que la pratique est possédée), `onPurchasePeopleEffects` optionnel (effet individuel mis en attente à l'achat), `perSprintPeopleEffects` optionnel (effet individuel répété à chaque Résolution), `rarity` et `eraWeights` optionnels (voir *Rareté et tirage* ci-dessous), `eras[]` optionnel. Les deux effets de personnes reprennent la forme `{ target, deltas }` décrite plus bas.
 
 ### Rareté et tirage — commun à `cards.json`, `practices.json` et `candidates.json`
 
@@ -100,6 +100,14 @@ Depuis le carnet §21, les trois pools sont tirés **au poids**, sans mémoire d
 ## `hidden-traits.json`
 
 Le pool de traits cachés des candidats (spec profondeur §4.5, carnet §17) : `distribution` (poids relatifs `none`/`negative`/`positive` du tirage — ~50/30/20), `traits[]` — `id`, `icon`, `name`, `polarity`, `description`, `effects` (une clé par mécanique : `moralPerSprint`, `contributionFactor` — divise les contributions de rôle, `capacityBonus`, `salaryRaiseAtTrialEnd`, `quitsAtHiredPlus` — départ sans préavis au sprint d'embauche + N, `nextHireDiscountPieces`). Les effets ne s'appliquent qu'une fois le trait révélé (fin de période d'essai).
+
+## `recruitment-archetypes.json` — états individuels
+
+La table des caractères du recrutement est aussi la source des niveaux de départ du roster : chaque archétype porte `depart` (`moral`, `confiance`, `energie`, `salaire`, tous 0–100) et `influence` (multiplicateur de chaque effet reçu). À runtime, un employé conserve `personality` et `wellbeing` ; ces deux champs ne sont pas écrits dans les pools de démo. Le Moral d'équipe est une moyenne pondérée par contribution de `wellbeing.moral`, jamais une valeur de règle indépendante.
+
+Les effets de personnes suivent `peopleEffects: { target, deltas }`. `target` est fermé : `tous`, `un-au-hasard`, `role:dev`, `seniorite:junior`, `le-plus-ancien`, `le-mieux-paye`, `le-plus-fragile` ou `vous`. Les choix Inbox qui portent encore une clé `moral` déclarent leur `peopleTarget` au même endroit : cette valeur est retirée du panier de jauges et appliquée individuellement lors de la résolution.
+
+`balance.json → individualTeam` porte aussi les règles du cycle de management : `managementActions` (effets du repos, de l'augmentation et du périmètre confié), `sprintEnergy`, `systemicEffects` et `concerns`. Chaque entrée de `concerns` correspond à un critère et fournit `subject`, `body` et trois `choices[]`. Un choix peut déclarer `action` (`time-off`, `salary-raise`, `ownership`), `employeeDeltas` et `cpoDeltas`. Le moteur transforme dynamiquement ces gabarits en événements Inbox nommés pour la personne concernée ; aucun identifiant d'employé n'est codé dans le JSON.
 
 ## `hud-demo.json`
 

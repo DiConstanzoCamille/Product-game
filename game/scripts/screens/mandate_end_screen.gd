@@ -84,7 +84,7 @@ func _load_career_progress() -> void:
 
 func _build_summary_row(resource: Dictionary) -> Control:
 	var resource_id: String = resource.get("id", "")
-	var value: float = SprintState.resource_values.get(resource_id, 0.0)
+	var value: float = SprintState.get_resource_value(resource_id)
 	var state := EffectResolver.gauge_state(resource_id, value)
 
 	var row := HBoxContainer.new()

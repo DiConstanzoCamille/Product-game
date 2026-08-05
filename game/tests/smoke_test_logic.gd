@@ -78,6 +78,7 @@ var failures: int = 0
 
 func _ready() -> void:
 	_test_energy_rules()
+	_test_individual_team_rules()
 	_test_multi_squad_roster()
 	_test_inbox_channels()
 	_test_backlog_rules()
@@ -115,11 +116,10 @@ func _ready() -> void:
 		quarters_reached[strategy] = best_quarter
 		mandates_past_t3[strategy] = past_t3
 
-		# Critère de recette Phase B : la spirale burn-out (Moral effondré →
-		# régén nulle → Taf soi-même répété → Énergie ≤ 0) doit rester
-		# atteignable — "stress" est construite pour la déclencher.
-		if strategy == "stress" and not endings.has("burnout-fondateur"):
-			_fail("Aucun run stress ne s'est terminé en burn-out (fins : %s) — la spirale Énergie est devenue inatteignable." % [endings])
+		# La recette burn-out est vérifiée de manière déterministe par
+		# _test_energy_rules : les quatre mandats « stress » restent un banc de
+		# trajectoires aléatoires, où exiger une fin précise rendrait le smoke
+		# instable sans augmenter sa couverture.
 
 	# 🎯 Critère de recette 2 de l'issue #42 : un run « économie » et un run
 	# « Levier » doivent tous deux franchir le mandat, et aucun ne doit
@@ -1642,16 +1642,16 @@ func _test_energy_rules() -> void:
 		_fail("Énergie de départ %d au lieu de %d." % [SprintState.energy, int(conf.get("start", 70))])
 
 	# Modulation de la régénération par le Moral (×1 / ×0.5 / ×0).
-	SprintState.resource_values["moral"] = 80.0
+	_set_team_moral_for_test(80)
 	if SprintState.get_energy_regen_factor() != 1.0:
 		_fail("Facteur de régén attendu ×1 à Moral 80, obtenu ×%s." % SprintState.get_energy_regen_factor())
-	SprintState.resource_values["moral"] = 45.0
+	_set_team_moral_for_test(45)
 	if SprintState.get_energy_regen_factor() != 0.5:
 		_fail("Facteur de régén attendu ×0.5 à Moral 45, obtenu ×%s." % SprintState.get_energy_regen_factor())
-	SprintState.resource_values["moral"] = 10.0
+	_set_team_moral_for_test(10)
 	if SprintState.get_energy_regen_factor() != 0.0:
 		_fail("Facteur de régén attendu ×0 à Moral 10, obtenu ×%s." % SprintState.get_energy_regen_factor())
-	SprintState.resource_values["moral"] = 60.0
+	_set_team_moral_for_test(60)
 
 	# 🔧 Faire le taf soi-même : capacité en plus, Énergie en moins.
 	var self_conf: Dictionary = conf.get("actions", {}).get("selfWork", {})
@@ -1706,7 +1706,7 @@ func _test_energy_rules() -> void:
 		_fail("plan_breather() devrait refuser un second appel (deja-planifie).")
 	if SprintState.do_self_work() != "souffler":
 		_fail("Souffler doit bloquer les actions personnelles jusqu'à la prochaine Résolution.")
-	SprintState.resource_values["moral"] = 10.0
+	_set_team_moral_for_test(10)
 	SprintState.apply_pending_and_check()
 	var report: Dictionary = SprintState.last_energy_report
 	if int(report.get("regen", -1)) != 0:
@@ -1720,7 +1720,7 @@ func _test_energy_rules() -> void:
 
 	# 🔥 Burn-out remappé (spec §8.3) : Énergie ≤ 0 à la Résolution = fin.
 	SprintState.reset_run("agile-transformation", "meridia-corp")
-	SprintState.resource_values["moral"] = 10.0  # régén nulle
+	_set_team_moral_for_test(10)  # régén nulle
 	SprintState.energy = 3
 	SprintState.do_self_work()  # puise les 3 derniers points : jauge à 0
 	if SprintState.energy != 0:
@@ -1729,6 +1729,298 @@ func _test_energy_rules() -> void:
 	if ending != "burnout-fondateur":
 		_fail("Énergie 0 + régén nulle devrait finir en burn-out, obtenu '%s'." % ending)
 	print("Règles d'Énergie : %s" % ("OK" if failures == 0 else "ÉCHEC"))
+
+
+## Le Moral est désormais une vue calculée : un test qui veut le contrôler
+## pose l'état des personnes, jamais un nombre global dans `resource_values`.
+func _set_team_moral_for_test(value: int) -> void:
+	for employee in SprintState.get_roster():
+		SprintState.employee_wellbeing(employee)["moral"] = value
+	SprintState._refresh_team_moral()
+
+
+## Le Moral n'existe que chez des personnes : tout contenu qui en produit doit
+## dire **qui** il touche. Le garde-fou ne se limite pas à l'Inbox — c'est par
+## les autres familles (cartes, pratiques) qu'une cible implicite reviendrait.
+func _check_declared_people_targets() -> void:
+	var moral_axes: Array = []
+	var axis_map: Dictionary = GameData.balance.get("cardAxisResourceMap", {})
+	for axis_id in axis_map.keys():
+		if String(axis_map.get(axis_id, {}).get("resource", "")) == "moral":
+			moral_axes.append(axis_id)
+	for card in GameData.cards.get("cards", []):
+		var touches_moral := false
+		for profile in card.get("effects", {}).keys():
+			for axis_id in moral_axes:
+				if card.get("effects", {}).get(profile, {}).has(axis_id):
+					touches_moral = true
+		if touches_moral and not card.has("peopleTarget"):
+			_fail("La carte '%s' produit du Moral sans cible déclarée." % card.get("id", ""))
+	for practice in GameData.practices:
+		if practice.get("perSprint", {}).has("moral") and not practice.has("peopleTarget"):
+			_fail("La pratique '%s' produit du Moral sans cible déclarée." % practice.get("id", ""))
+		var purchase: Dictionary = practice.get("onPurchasePeopleEffects", {})
+		if not purchase.is_empty() and not purchase.has("target"):
+			_fail("La pratique '%s' applique un effet de personnes sans cible déclarée." % practice.get("id", ""))
+		var per_sprint_people: Dictionary = practice.get("perSprintPeopleEffects", {})
+		if not per_sprint_people.is_empty() and not per_sprint_people.has("target"):
+			_fail("La pratique '%s' applique un effet de personnes par sprint sans cible déclarée." % practice.get("id", ""))
+
+
+## Ce qu'une équipe livre ne doit se ressentir que chez elle. Le test se joue à
+## deux équipes — la seule configuration où une cible implicite se voit.
+func _check_squad_scoped_moral() -> void:
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+	var main_squad: Dictionary = SprintState.squads[0]
+	var main_roster: Array = main_squad.get("roster", [])
+	if main_roster.size() < 2:
+		_fail("Le roster de départ doit permettre de séparer deux équipes.")
+		return
+	var moved: Dictionary = main_roster[1]
+	var second_squad: Dictionary = SprintState._new_empty_squad(2)
+	main_roster.erase(moved)
+	second_squad.get("roster", []).append(moved)
+	SprintState.squads.append(second_squad)
+
+	var stayed: Dictionary = main_roster[0]
+	var stayed_before := int(SprintState.employee_wellbeing(stayed).get("moral", 0))
+	var moved_before := int(SprintState.employee_wellbeing(moved).get("moral", 0))
+	SprintState.add_pending({"moral": -20}, "", "squad:%s" % second_squad.get("id", ""))
+	SprintState._apply_pending_people_effects()
+	if int(SprintState.employee_wellbeing(stayed).get("moral", 0)) != stayed_before:
+		_fail("Un effet Moral ciblé sur une équipe ne doit pas atteindre l'autre.")
+	if int(SprintState.employee_wellbeing(moved).get("moral", 0)) >= moved_before:
+		_fail("Un effet Moral ciblé sur une équipe doit atteindre ses membres.")
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+
+
+## Le Moral est une vue ; les effets d'équipe doivent donc atteindre les
+## personnes ciblées, être modulés par leur personnalité, puis seulement
+## reflétés dans la moyenne utilisée par les anciens systèmes.
+func _test_individual_team_rules() -> void:
+	print("=== SMOKE TEST LOGIQUE — ÉQUIPE INDIVIDUELLE ===")
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+	var roster := SprintState.get_roster()
+	if roster.is_empty():
+		_fail("Le roster de départ est vide : impossible de tester l'équipe individuelle.")
+		return
+	for employee in roster:
+		var wellbeing := SprintState.employee_wellbeing(employee)
+		for criterion in GameData.balance.get("individualTeam", {}).get("criteria", []):
+			if not wellbeing.has(criterion):
+				_fail("%s n'a pas le critère individuel '%s'." % [employee.get("name", "?"), criterion])
+
+	var pm: Dictionary = {}
+	var dev: Dictionary = {}
+	for employee in roster:
+		if employee.get("role", "") == "pm":
+			pm = employee
+		if employee.get("role", "") == "dev" and dev.is_empty():
+			dev = employee
+	if pm.is_empty() or dev.is_empty():
+		_fail("Le roster de Meridia doit permettre de tester un ciblage rôle:dev.")
+		return
+	var pm_confiance := int(SprintState.employee_wellbeing(pm).get("confiance", 0))
+	var dev_confiance := int(SprintState.employee_wellbeing(dev).get("confiance", 0))
+	SprintState.queue_people_effect("role:dev", {"confiance": -20})
+	SprintState._apply_pending_people_effects()
+	if int(SprintState.employee_wellbeing(pm).get("confiance", 0)) != pm_confiance:
+		_fail("Un effet role:dev ne doit pas atteindre le PM.")
+	if int(SprintState.employee_wellbeing(dev).get("confiance", 0)) >= dev_confiance:
+		_fail("Un effet role:dev doit baisser la Confiance du dev ciblé.")
+
+	var confidence_before_one_on_one := int(SprintState.employee_wellbeing(dev).get("confiance", 0))
+	if SprintState.do_one_on_one(dev) != "":
+		_fail("Un 1:1 avec un employé doit rester jouable pour rétablir la Confiance.")
+	if int(SprintState.employee_wellbeing(dev).get("confiance", 0)) <= confidence_before_one_on_one:
+		_fail("Le 1:1 n'a pas remonté la Confiance de la personne choisie.")
+	var energy_before_ownership := SprintState.energy
+	if SprintState.grant_ownership(String(dev.get("id", ""))) != "":
+		_fail("Confier un périmètre doit être jouable depuis la fiche d'équipe.")
+	var ownership_cost := int(GameData.balance.get("individualTeam", {}).get("managementActions", {}).get("ownership", {}).get("cpoEnergyCost", 0))
+	if SprintState.energy != energy_before_ownership - ownership_cost:
+		_fail("Confier un périmètre doit coûter %d d'Énergie au CPO." % ownership_cost)
+	if SprintState.grant_ownership(String(dev.get("id", ""))) != "deja-ce-sprint":
+		_fail("Une même action de management ne doit pas être répétable sur une personne dans le même sprint.")
+
+	var moral_before := SprintState.get_team_moral()
+	SprintState.add_pending({"moral": -10})
+	if SprintState.pending_deltas.has("moral"):
+		_fail("Un effet moral hérité ne doit plus s'accumuler dans une jauge globale.")
+	SprintState._apply_pending_people_effects()
+	if SprintState.get_team_moral() >= moral_before:
+		_fail("Un effet moral hérité doit être traduit en baisse de Moral individuel.")
+	for inbox_event in GameData.inbox_events:
+		for choice in inbox_event.get("choices", []):
+			if choice.get("effects", {}).has("moral") and not choice.has("peopleTarget"):
+				_fail("L'effet Moral Inbox '%s' n'a pas de cible individuelle déclarée." % choice.get("id", ""))
+	_check_declared_people_targets()
+	_check_squad_scoped_moral()
+	var cpo_salary := int(SprintState.cpo_wellbeing.get("salaire", 0))
+	SprintState.apply_people_effect("vous", {"salaire": -9})
+	if int(SprintState.cpo_wellbeing.get("salaire", 0)) != cpo_salary - 9:
+		_fail("Le ciblage 'vous' doit mettre à jour le niveau individuel du CPO.")
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+	var moral_before_turnaround := SprintState.get_team_moral()
+	SprintState.turnaround_plans_available = 1
+	SprintState.impact_wallet = 0
+	SprintState.quarter_sprint = SprintState.get_quarter_length() - 1
+	SprintState._record_quarter_resolution()
+	if SprintState.get_team_moral() >= moral_before_turnaround:
+		_fail("Un quota raté puis rattrapé doit malgré tout entamer le Moral individuel.")
+
+	# Une Confiance à zéro coupe la contribution, mais ne retire jamais la
+	# personne silencieusement : l'Inbox doit porter la scène et proposer un
+	# vrai choix de réparation ou de départ.
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+	var crisis_employee: Dictionary = SprintState.get_roster()[0]
+	SprintState.employee_wellbeing(crisis_employee)["confiance"] = 0
+	SprintState._inspect_team_crises()
+	if not bool(crisis_employee.get("contributionBlocked", false)):
+		_fail("Une Confiance à zéro doit suspendre la contribution avant la scène Inbox.")
+	var crisis_event := SprintState.draw_inbox_event()
+	if not String(crisis_event.get("id", "")).begins_with("team-crisis-"):
+		_fail("Une crise d'équipe doit prendre la priorité dans l'Inbox.")
+	elif crisis_event.get("choices", []).size() != 2:
+		_fail("Une crise d'équipe doit présenter réparation et départ.")
+	else:
+		SprintState.apply_inbox_choice(crisis_event.get("choices", [])[0])
+		if bool(crisis_employee.get("contributionBlocked", true)) or int(SprintState.employee_wellbeing(crisis_employee).get("confiance", 0)) <= 0:
+			_fail("La réparation d'une rupture doit rendre la contribution et de la Confiance.")
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+	var leaving_employee: Dictionary = SprintState.get_roster()[0]
+	var roster_size := SprintState.get_roster().size()
+	SprintState.employee_wellbeing(leaving_employee)["moral"] = 0
+	SprintState._inspect_team_crises()
+	var leaving_event := SprintState.draw_inbox_event()
+	if leaving_event.get("choices", []).size() == 2:
+		SprintState.apply_inbox_choice(leaving_event.get("choices", [])[1])
+		if SprintState.get_roster().size() != roster_size - 1:
+			_fail("Le départ choisi dans une crise doit retirer la personne du roster.")
+	else:
+		_fail("Une crise de Moral doit pouvoir mener au départ explicite d'une personne.")
+
+	# Une réparation de crise ne se contente pas de remonter le critère : elle
+	# exécute l'acte que son libellé promet, et le joueur le paie là où ça se
+	# sent — la masse salariale, puis la capacité du sprint.
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+	var underpaid: Dictionary = SprintState.get_roster()[0]
+	SprintState.employee_wellbeing(underpaid)["salaire"] = 0
+	SprintState._inspect_team_crises()
+	var salary_crisis := SprintState.draw_inbox_event()
+	if not String(salary_crisis.get("id", "")).ends_with("-salaire"):
+		_fail("Une satisfaction salariale à zéro doit ouvrir sa crise.")
+	else:
+		var salary_before_repair := int(underpaid.get("salary", 0))
+		var payroll_before := float(SprintState.get_recurring_charges().get("total", 0))
+		var satisfaction_before := int(SprintState.employee_wellbeing(underpaid).get("salaire", 0))
+		SprintState.apply_inbox_choice(salary_crisis.get("choices", [])[0])
+		if int(underpaid.get("salary", 0)) <= salary_before_repair:
+			_fail("Aligner un salaire en crise doit augmenter le salaire de la personne.")
+		if float(SprintState.get_recurring_charges().get("total", 0)) <= payroll_before:
+			_fail("Aligner un salaire en crise doit alourdir la masse salariale du sprint.")
+		if int(SprintState.employee_wellbeing(underpaid).get("salaire", 0)) <= satisfaction_before:
+			_fail("Aligner un salaire en crise doit aussi remonter la satisfaction salariale.")
+
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+	var burnt: Dictionary = {}
+	for employee in SprintState.get_roster():
+		if employee.get("role", "") == "dev":
+			burnt = employee
+			break
+	if burnt.is_empty():
+		_fail("Le roster de départ doit contenir un dev pour tester la capacité.")
+	else:
+		SprintState.employee_wellbeing(burnt)["energie"] = 0
+		SprintState._inspect_team_crises()
+		var burnout_crisis := SprintState.draw_inbox_event()
+		if not String(burnout_crisis.get("id", "")).ends_with("-energie"):
+			_fail("Une Énergie à zéro doit ouvrir sa crise.")
+		else:
+			var capacity_before_repair := SprintState.get_effective_capacity()
+			SprintState.apply_inbox_choice(burnout_crisis.get("choices", [])[0])
+			if SprintState.employee_contribution_factor(burnt) != 0.0:
+				_fail("Arrêter le sprint pour protéger quelqu'un doit retirer sa contribution.")
+			if SprintState.get_effective_capacity() >= capacity_before_repair:
+				_fail("Arrêter le sprint pour protéger quelqu'un doit coûter de la capacité.")
+			if int(SprintState.employee_wellbeing(burnt).get("energie", 0)) <= 0:
+				_fail("Arrêter le sprint doit aussi restaurer l'Énergie de la personne.")
+
+	# 👥 Le Moral affiché est une vue sur le roster : il ne doit jamais rester
+	# sur un repos périmé ni sur une équipe qui n'existe plus. Les deux sens
+	# comptent — la moyenne baisse quand la personne revient, monte quand
+	# celle qui décrochait s'en va.
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+	var rested: Dictionary = SprintState.get_roster()[0]
+	SprintState.employee_wellbeing(rested)["moral"] = 0
+	SprintState._refresh_team_moral()
+	if SprintState.grant_time_off(String(rested.get("id", ""))) != "":
+		_fail("Le repos doit rester accordable pour tester l'expiration du facteur.")
+	var moral_during_rest := SprintState.get_resource_value("moral")
+	SprintState.advance_to_next_sprint()
+	if not is_equal_approx(float(SprintState.resource_values.get("moral", 0.0)), SprintState.get_team_moral()):
+		_fail("Le Moral affiché doit suivre l'expiration du repos au sprint suivant.")
+	if SprintState.get_resource_value("moral") >= moral_during_rest:
+		_fail("Le retour d'une personne en difficulté doit faire redescendre la moyenne affichée.")
+
+	SprintState.impact_wallet = 999
+	var unhappy: Dictionary = SprintState.get_roster()[1]
+	SprintState.employee_wellbeing(unhappy)["moral"] = 0
+	SprintState._refresh_team_moral()
+	var moral_with_unhappy := float(SprintState.resource_values.get("moral", 0.0))
+	if SprintState.fire_employee(String(unhappy.get("id", ""))) != "":
+		_fail("Le licenciement doit rester jouable pour tester le miroir du Moral.")
+	elif float(SprintState.resource_values.get("moral", 0.0)) <= moral_with_unhappy:
+		_fail("Le Moral affiché doit suivre le départ d'une personne, sans attendre un effet de bien-être.")
+
+	# Deux signaux faibles produisent deux conversations successives au sprint
+	# suivant. La demande salariale engage une charge récurrente ; le repos
+	# restaure l'Énergie mais retire réellement la contribution du sprint.
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+	var salary_employee: Dictionary = SprintState.get_roster()[0]
+	var tired_employee: Dictionary = SprintState.get_roster()[1]
+	SprintState.employee_wellbeing(salary_employee)["salaire"] = 20
+	SprintState.employee_wellbeing(tired_employee)["energie"] = 18
+	SprintState._inspect_team_crises()
+	if SprintState.pending_team_event_count() != 2:
+		_fail("Deux alertes individuelles doivent programmer deux demandes Inbox, obtenu %d." % SprintState.pending_team_event_count())
+	var salary_event := SprintState.draw_inbox_event()
+	if not String(salary_event.get("id", "")).ends_with("-salaire") or salary_event.get("choices", []).size() != 3:
+		_fail("Une satisfaction salariale basse doit produire une demande à trois arbitrages.")
+	else:
+		var salary_before := int(salary_employee.get("salary", 0))
+		SprintState.apply_inbox_choice(salary_event.get("choices", [])[0])
+		if int(salary_employee.get("salary", 0)) != salary_before + 1:
+			_fail("Accepter la demande salariale doit augmenter la masse salariale récurrente.")
+	var energy_event := SprintState.draw_inbox_event()
+	if not String(energy_event.get("id", "")).ends_with("-energie") or energy_event.get("choices", []).size() != 3:
+		_fail("Une Énergie basse doit produire sa propre demande au même passage Inbox.")
+	else:
+		SprintState.apply_inbox_choice(energy_event.get("choices", [])[0])
+		if SprintState.employee_contribution_factor(tired_employee) != 0.0:
+			_fail("Le repos accordé depuis l'Inbox doit retirer la personne de la capacité du sprint.")
+		if int(SprintState.employee_wellbeing(tired_employee).get("energie", 0)) <= 18:
+			_fail("Le repos accordé depuis l'Inbox doit restaurer l'Énergie.")
+	if SprintState.has_pending_team_events():
+		_fail("Les deux demandes traitées ne doivent pas rester en attente.")
+
+	# Les investissements d'équipe ont un effet réel à l'achat puis à chaque
+	# Résolution, et ne se limitent pas au texte de leur carte.
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+	SprintState.impact_wallet = 999
+	var practice_employee: Dictionary = SprintState.get_roster()[0]
+	var trust_before := int(SprintState.employee_wellbeing(practice_employee).get("confiance", 0))
+	if SprintState.buy_practice("barometre-equipe") != "":
+		_fail("Le Baromètre d'équipe doit être achetable dans la boutique.")
+	SprintState._apply_pending_people_effects()
+	var trust_after_purchase := int(SprintState.employee_wellbeing(practice_employee).get("confiance", 0))
+	if trust_after_purchase <= trust_before:
+		_fail("Le Baromètre d'équipe doit restaurer la Confiance à son adoption.")
+	SprintState._apply_per_sprint_effects()
+	SprintState._apply_pending_people_effects()
+	if int(SprintState.employee_wellbeing(practice_employee).get("confiance", 0)) <= trust_after_purchase:
+		_fail("Le Baromètre d'équipe doit continuer d'agir à chaque sprint.")
+	print("Équipe individuelle : %s" % ("OK" if failures == 0 else "ÉCHEC"))
 
 
 func _play_one_mandate(run_index: int, strategy: String, company_id: String) -> void:

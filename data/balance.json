@@ -30,6 +30,114 @@
 
   "stateThresholds": { "goodMin": 60, "dangerMax": 25 },
 
+  "individualTeam": {
+    "_comment": "L'équipe n'est plus une jauge : chaque personne porte ces quatre niveaux. `moral` reste dans resources.json uniquement comme vue calculée, pour les systèmes qui le lisent (score, fatigue, fins). Toutes les valeurs de ce bloc sont de l'équilibrage, jamais des constantes de script.",
+    "criteria": ["moral", "confiance", "energie", "salaire"],
+    "alertAt": 25,
+    "leaveAt": 0,
+    "cpoStart": { "moral": 70, "confiance": 0, "energie": 70, "salaire": 68 },
+    "oneOnOneConfiance": 14,
+    "promotionSalaire": 18,
+    "seminarMoral": 10,
+    "managementActions": {
+      "timeOff": { "moral": 10, "energie": 28, "confiance": 4 },
+      "salaryRaise": { "salaryStep": 1, "salaire": 30, "confiance": 8 },
+      "ownership": { "confiance": 22, "moral": 6, "cpoEnergyCost": 6 },
+      "oncePerSprint": true
+    },
+    "sprintEnergy": {
+      "underCapacity": 4,
+      "atCapacity": -4,
+      "overCapacity": -9,
+      "successfulDeliveryMoral": 3
+    },
+    "systemicEffects": {
+      "debtMoralAt": 55,
+      "debtMoralPerSprint": -3,
+      "missedQuarter": { "moral": -12, "confiance": -10 },
+      "salaryDriftAfterSprints": 3,
+      "salaryDriftPerSprint": -3,
+      "betterPaidNewcomer": -8
+    },
+    "concerns": {
+      "moral": {
+        "subject": "demande à souffler avant de décrocher",
+        "body": "Le travail avance, mais la personne ne voit plus pourquoi elle devrait continuer à ce rythme.",
+        "choices": [
+          { "id": "ecouter", "label": "Prendre le temps de l'écouter", "reveal": "Vous nommez enfin le problème. Ce n'est pas réglé, mais ce n'est plus invisible.", "employeeDeltas": { "moral": 16, "confiance": 6 }, "cpoDeltas": { "energie": -4 } },
+          { "id": "repos", "label": "Lui donner le sprint pour souffler", "reveal": "La personne récupère, mais ne contribuera pas à la capacité de ce sprint.", "action": "time-off" },
+          { "id": "ignorer", "label": "Maintenir le cap et ne rien changer", "reveal": "Le silence est entendu comme une réponse.", "employeeDeltas": { "moral": -12, "confiance": -6 } }
+        ]
+      },
+      "confiance": {
+        "subject": "vous demande ce qui peut encore être cru",
+        "body": "Les décisions ont changé plusieurs fois. La personne veut savoir ce que vous tiendrez vraiment.",
+        "choices": [
+          { "id": "ownership", "label": "Lui confier un vrai périmètre", "reveal": "Vous donnez une responsabilité vérifiable, pas une promesse de plus.", "action": "ownership" },
+          { "id": "ecouter", "label": "Faire un 1:1 sans éléments de langage", "reveal": "La conversation coûte de l'énergie, mais recrée un point d'appui.", "employeeDeltas": { "confiance": 18 }, "cpoDeltas": { "energie": -4 } },
+          { "id": "recadrer", "label": "Demander de suivre malgré les doutes", "reveal": "La livraison continue. La confiance, non.", "employeeDeltas": { "confiance": -14, "moral": -5 } }
+        ]
+      },
+      "energie": {
+        "subject": "ne peut pas repartir pour un sprint identique",
+        "body": "La fatigue est désormais visible. Continuer au même rythme transforme une alerte en burn-out.",
+        "choices": [
+          { "id": "repos", "label": "Lui donner le sprint pour récupérer", "reveal": "La capacité baisse ce sprint, l'épuisement recule.", "action": "time-off" },
+          { "id": "alleger", "label": "Alléger sa charge et reprendre une partie du travail", "reveal": "Vous absorbez la pression à sa place.", "employeeDeltas": { "energie": 18, "moral": 5 }, "cpoDeltas": { "energie": -8 } },
+          { "id": "tenir", "label": "Lui demander de tenir encore", "reveal": "La personne livre encore. Le compteur, lui, approche de zéro.", "employeeDeltas": { "energie": -14, "confiance": -6 } }
+        ]
+      },
+      "salaire": {
+        "subject": "demande une augmentation avant de regarder ailleurs",
+        "body": "La comparaison avec le marché est devenue explicite. La reconnaissance symbolique ne suffira plus.",
+        "choices": [
+          { "id": "augmentation", "label": "Augmenter son salaire de 1 💰/sprint", "reveal": "La hausse devient une charge récurrente, et la demande reçoit une réponse concrète.", "action": "salary-raise" },
+          { "id": "promotion", "label": "Lui donner un vrai périmètre en attendant", "reveal": "La confiance remonte, mais la question salariale reste ouverte.", "action": "ownership", "employeeDeltas": { "salaire": 8 } },
+          { "id": "refuser", "label": "Refuser sans contrepartie", "reveal": "La personne sait désormais que rien ne changera ici.", "employeeDeltas": { "salaire": -16, "confiance": -8 } }
+        ]
+      }
+    },
+    "crises": {
+      "moral": {
+        "subject": "n'arrive plus à se projeter ici",
+        "restoreLabel": "Lui rendre du temps et un vrai périmètre",
+        "restoreActions": ["time-off", "ownership"],
+        "restore": { "moral": 18 },
+        "leaveLabel": "Accepter son départ",
+        "teamAfterLeave": { "moral": -8 }
+      },
+      "confiance": {
+        "subject": "ne vous suit plus",
+        "restoreLabel": "Lui confier un vrai sujet et le tenir",
+        "restoreActions": ["ownership"],
+        "restore": { "confiance": 16 },
+        "leaveLabel": "Le laisser partir",
+        "teamAfterLeave": { "moral": -4 }
+      },
+      "energie": {
+        "subject": "est en burn-out",
+        "restoreLabel": "Arrêter le sprint pour le protéger",
+        "restoreActions": ["time-off"],
+        "restore": { "energie": 14 },
+        "leaveLabel": "Le laisser quitter l'équipe",
+        "teamAfterLeave": { "moral": -10 }
+      },
+      "salaire": {
+        "subject": "a une offre ailleurs",
+        "restoreLabel": "Aligner son salaire et sa reconnaissance",
+        "restoreActions": ["salary-raise"],
+        "restore": { "salaire": 6 },
+        "leaveLabel": "Ne pas s'aligner",
+        "teamAfterLeave": { "moral": -5 }
+      }
+    },
+    "defaultPeopleTarget": "tous",
+    "defaultPersonalityBySeniority": {
+      "junior": "junior-ambitieux",
+      "senior": "veteran-desabuse"
+    }
+  },
+
   "trimesterLengthSprints": 3,
 
   "endingThresholds": [
@@ -149,7 +257,7 @@
 
   "firing": {
     "severanceImpact": 18,
-    "moral": -4,
+    "confiance": -8,
     "cynismePerExtraFiring": 3
   },
 

@@ -1,6 +1,6 @@
 # Spec — L'équipe n'est pas une jauge, ce sont des gens
 
-**Statut : validé le 02/08/2026, non implémenté.** Écrit à partir de la
+**Statut : implémenté — issue #43, carnet §36.** Écrit à partir de la
 question de Camille sur la PR #40, puis tranché avec elle point par point (les
 décisions sont datées dans le texte). À séquencer **après**
 [`spec-clients-revenue.md`](spec-clients-revenue.md) — voir §9.

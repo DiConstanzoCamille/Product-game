@@ -1990,3 +1990,103 @@ retombés dessus quand même :
   fait échouer le chargement de l'autoload, et **tout** le jeu part en
   `base 'Nil'` — ce qui ressemble à s'y méprendre au cache `.godot` périmé
   décrit dans `CLAUDE.md`. Lire la première ligne du log avant de conclure.
+
+---
+
+## 36. L'équipe n'est pas une jauge, ce sont des gens (issue #43)
+
+Le Moral d'équipe n'est plus un compteur auquel les choix écrivent directement.
+Chaque personne du roster porte désormais quatre niveaux bornés : Moral,
+Confiance envers le CPO, Énergie et satisfaction de salaire. Le Moral affiché
+reste la moyenne pondérée de ces états individuels, ce qui conserve les règles
+existantes qui le lisent sans réintroduire une seconde source de vérité.
+
+Les archétypes de recrutement définissent les niveaux de départ et les
+sensibilités aux effets. Leur nom n'apparaît qu'après un 1:1 ; cette action reste
+disponible ensuite, répare la Confiance et ne rejoue pas les effets cachés. Le
+CPO porte les mêmes niveaux personnels pour les effets qui le ciblent, son
+Énergie restant raccordée à la jauge déjà jouée.
+
+Les choix Inbox qui affectent encore le Moral annoncent explicitement leur
+`peopleTarget` dans leur donnée : tous, un profil, une ancienneté, la personne
+la plus fragile ou le CPO. Les effets sont appliqués à la personne concernée
+puis modulés par son caractère. Dette, surcharge et besoins de recrutement
+agissent donc sur des gens, pas sur une valeur globale.
+
+Une personne qui atteint zéro sur un critère ouvre une scène Inbox prioritaire :
+réparer la situation ou accepter son départ. Zéro Confiance bloque immédiatement
+sa contribution, mais elle ne disparaît jamais sans ce choix. Le panneau latéral
+montre un point par personne au repos, une alerte nommée quand un seuil est bas,
+et les quatre niveaux seulement au survol ou après ouverture du détail.
+
+### 36.1 Surveiller, comprendre, agir
+
+Le bouton permanent **Gérer et faire grandir l'équipe** ouvre un hub sans
+quitter la phase courante. La liste garde une lecture compacte ; la fiche d'une
+personne explique séparément les quatre niveaux, leur cause et leur remède,
+montre le caractère révélé et annonce les demandes déjà prévues dans l'Inbox.
+Elle permet de faire un 1:1, confier un périmètre contre de l'Énergie du CPO, accorder un sprint de repos,
+augmenter, promouvoir ou licencier. Les actions de management ne sont jouables
+qu'une fois par personne et par sprint. Le repos rend réellement sa
+contribution indisponible ; l'augmentation accroît réellement la masse
+salariale récurrente.
+
+À la Résolution, chaque critère compris entre 1 et 25 programme sa propre
+conversation pour l'Inbox suivante. Plusieurs personnes ou plusieurs sujets
+peuvent donc produire plusieurs événements successifs : une demande salariale
+ne masque pas un épuisement. Chaque scène offre trois arbitrages — traiter la
+cause, transférer un coût vers le CPO ou laisser empirer — tandis que le zéro
+reste une crise à deux issues, réparation ou départ explicite.
+
+La boucle longue fait évoluer ces états : une livraison tenue restaure un peu
+le Moral, la pleine charge érode l'Énergie, la satisfaction salariale dérive
+après trois sprints et l'arrivée d'une personne mieux payée rend la comparaison
+visible. La boutique propose aussi trois investissements dédiés — Baromètre
+d'équipe, Budget formation et Garde-fou de charge — avec un effet à l'adoption,
+un effet par sprint et une licence récurrente. Gérer l'équipe est donc un
+arbitrage entre capacité immédiate, Énergie du CPO, Impact et Revenue, pas un
+bouton cosmétique.
+
+Le smoke logique couvre les quatre états, les cibles, le CPO, les 1:1, les
+alertes multiples, les demandes, la capacité perdue au repos, les pratiques
+persistantes et les deux issues d'une crise. Le smoke UI ouvre le hub depuis le
+vrai panneau permanent, vérifie ses quatre diagnostics et joue une augmentation
+qui modifie le salaire.
+
+### 36.2 Trois corrections de relecture
+
+**Une réparation de crise exécute ce que son libellé promet.** Les deux issues
+d'un zéro se jouaient jusqu'ici entièrement en deltas de bien-être : « Aligner
+son salaire » remontait la satisfaction sans toucher au salaire ni à la masse
+salariale, « Arrêter le sprint » restaurait l'Énergie sans retirer personne de
+la capacité. Chaque crise déclare désormais ses actes dans `balance.json`
+(`crises.<critère>.restoreActions`), et ils passent par les mêmes fonctions que
+le hub — un seul chemin d'exécution pour le repos, l'augmentation et le
+périmètre. Ce que le joueur lit est donc ce que le moteur facture : la capacité
+du sprint, la masse salariale récurrente ou l'Énergie du CPO. Les deltas de
+`restore` ont été réduits d'autant : la réparation vaut toujours la même
+remontée, elle se paie maintenant.
+
+**Le Moral affiché est une vue, jamais un miroir.** `resource_values.moral` se
+périmait dès qu'un facteur changeait sans effet de bien-être — un repos qui
+expire au sprint suivant, un licenciement, une démission silencieuse — et le
+panneau affichait alors une moyenne calculée sur l'ancien roster pendant tout
+le sprint. Les consommateurs passent maintenant par `get_resource_value()` et
+`get_resource_snapshot()`, qui resynchronisent la valeur dérivée avant de la
+rendre ; le passage au sprint suivant vit dans `advance_to_next_sprint()`
+plutôt que dans l'écran de Résolution, et les mutations de roster rafraîchissent
+le miroir. C'est la règle générale du dépôt appliquée à une grandeur de plus :
+aucune valeur dérivée ne se lit brute.
+
+**Le ciblage d'un effet Moral est déclaratif pour toutes les familles de
+contenu.** L'Inbox déclarait sa cible, mais `add_pending()` retombait
+silencieusement sur « tout le roster » pour les cartes, les pratiques et les
+livraisons — ce qui, à N>1, aurait fait remuer le Moral de toute l'entreprise
+au moindre sprint d'une seule équipe. `add_pending()` prend désormais la cible
+en paramètre, une livraison porte l'équipe qui l'a produite (`squad:<id>`, un
+ciblage interne qui n'apparaît jamais à l'écran), les cartes et les pratiques
+déclarent leur `peopleTarget` dans leur JSON, et le défaut vit dans les données
+(`individualTeam.defaultPeopleTarget`). Trois garde-fous mécaniques le
+vérifient : les cartes et pratiques qui produisent du Moral doivent déclarer
+leur cible, et un effet ciblé sur une équipe à deux équipes ne doit pas
+atteindre l'autre.

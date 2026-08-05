@@ -3,10 +3,10 @@
     {
       "id": "moral",
       "icon": "🫶",
-      "name": "Moral & confiance d'équipe",
-      "definition": "S'effondre en un sprint, se reconstruit en dix.",
-      "rises": ["Autonomie réelle", "Reconnaissance", "Décisions cohérentes avec le discours"],
-      "falls": ["Pivots non expliqués", "Reporting excessif", "Promesses non tenues"],
+      "name": "Moral d'équipe",
+      "definition": "La moyenne pondérée du Moral des personnes qui contribuent. Les alertes individuelles disent qui va mal et pourquoi.",
+      "rises": ["Séminaire", "Sprint soutenable", "Livraison tenue"],
+      "falls": ["Surchauffe", "Dette subie", "Départs autour de soi"],
       "extreme": { "condition": "Au plancher", "outcome": "Exode d'équipe" }
     },
     {

@@ -96,12 +96,49 @@
       "licensePerSeat": 0.1,
       "description": "Ce qui se dit en rétro reste en rétro — et pour une fois, quelqu'un écoute vraiment. +1 Moral par sprint.",
       "unlocks": "moralPerSprint",
+      "peopleTarget": "tous",
       "perSprint": {
         "moral": 1
       },
       "eras": [
         "agile-transformation"
       ]
+    },
+    {
+      "id": "barometre-equipe",
+      "icon": "🫶",
+      "name": "Baromètre d'équipe",
+      "costImpact": 28,
+      "licensePerSeat": 0.15,
+      "description": "Poser les questions avant la démission surprise. +8 Confiance à l'adoption et +2 Confiance par sprint pour toute l'équipe.",
+      "unlocks": "teamForecast",
+      "onPurchasePeopleEffects": { "target": "tous", "deltas": { "confiance": 8 } },
+      "perSprintPeopleEffects": { "target": "tous", "deltas": { "confiance": 2 } },
+      "eras": ["agile-transformation"]
+    },
+    {
+      "id": "budget-formation",
+      "icon": "🎓",
+      "name": "Budget formation",
+      "costImpact": 38,
+      "licensePerSeat": 0.25,
+      "description": "Donner une trajectoire aux personnes qui grandissent plus vite que leur fiche de poste. +6 Moral et +8 satisfaction salariale aux juniors, puis +2 Moral par sprint.",
+      "unlocks": "juniorGrowth",
+      "onPurchasePeopleEffects": { "target": "seniorite:junior", "deltas": { "moral": 6, "salaire": 8 } },
+      "perSprintPeopleEffects": { "target": "seniorite:junior", "deltas": { "moral": 2 } },
+      "eras": ["agile-transformation"]
+    },
+    {
+      "id": "garde-fou-charge",
+      "icon": "🤝",
+      "name": "Garde-fou de charge",
+      "costImpact": 44,
+      "licensePerSeat": 0.2,
+      "description": "Faire de la capacité une limite et pas une suggestion. +10 Énergie à l'adoption et +3 Énergie par sprint pour toute l'équipe.",
+      "unlocks": "teamEnergy",
+      "onPurchasePeopleEffects": { "target": "tous", "deltas": { "energie": 10 } },
+      "perSprintPeopleEffects": { "target": "tous", "deltas": { "energie": 3 } },
+      "eras": ["agile-transformation"]
     }
   ]
 }
