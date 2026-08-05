@@ -51,6 +51,11 @@ var _open_id := ""
 var _hosted: Control = null
 var _body: Control = null
 var _frame: TextureRect = null
+var _glow: ColorRect = null
+
+## Piste 3 : combien la dalle brille. 0 = la pièce et l'écran ont la même
+## matière ; 1 = contraste franc. Réglage, donc destiné à balance.json.
+static var screen_intensity := 0.55
 var _rect := Rect2()
 
 
@@ -74,6 +79,17 @@ func _ready() -> void:
 	_body.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_body)
 
+	# La couche de dalle se pose APRÈS le contenu : elle relit ce qui a été
+	# peint dessous (hint_screen_texture), donc son ordre dans l'arbre compte.
+	_glow = ColorRect.new()
+	_glow.name = "ScreenGlow"
+	_glow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var glow_material := ShaderMaterial.new()
+	glow_material.shader = preload("res://resources/shaders/screen_glow.gdshader")
+	glow_material.set_shader_parameter("intensity", screen_intensity)
+	_glow.material = glow_material
+	add_child(_glow)
+
 	_apply_frame(CLOSED_WIDTH, Vector2(800, 620))
 	_show_apps()
 
@@ -96,6 +112,10 @@ func _apply_frame(frame_width: float, anchor: Vector2) -> void:
 	_rect = Rect2(screen_position, screen_size)
 	_body.position = screen_position
 	_body.size = screen_size
+	if _glow != null:
+		_glow.position = screen_position
+		_glow.size = screen_size
+		_glow.material.set_shader_parameter("intensity", screen_intensity)
 	queue_redraw()
 
 
@@ -110,6 +130,7 @@ func _show_apps() -> void:
 	UIHelpers.clear_children(_body)
 	_apply_frame(CLOSED_WIDTH, Vector2(800, 620))
 
+	move_child(_glow, get_child_count() - 1)
 	_body.add_child(_os_bar("POSTE DE TRAVAIL", false))
 
 	var row := HBoxContainer.new()

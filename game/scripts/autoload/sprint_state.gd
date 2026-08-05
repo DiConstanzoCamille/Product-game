@@ -171,6 +171,14 @@ func reset_run(chosen_era_id: String = "", chosen_company_id: String = "", chose
 	activated_cards.clear()
 	activated_card_sprints.clear()
 	journal.clear()
+	# 🖥️ L'état du bureau appartient au run : sans ce nettoyage, un nouveau
+	# mandat commençait avec le parapheur du Comité déjà posé sur la table et
+	# le courrier du run précédent. Vu sur une capture, invisible autrement.
+	last_journal.clear()
+	committee_pending = false
+	_sprint_event = {}
+	_sprint_event_sprint = -1
+	_sprint_event_answered = false
 	pending_deltas.clear()
 	pending_people_effects.clear()
 	pending_journal_lines.clear()
