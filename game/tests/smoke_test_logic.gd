@@ -1603,6 +1603,61 @@ func _set_team_moral_for_test(value: int) -> void:
 	SprintState._refresh_team_moral()
 
 
+## Le Moral n'existe que chez des personnes : tout contenu qui en produit doit
+## dire **qui** il touche. Le garde-fou ne se limite pas à l'Inbox — c'est par
+## les autres familles (cartes, pratiques) qu'une cible implicite reviendrait.
+func _check_declared_people_targets() -> void:
+	var moral_axes: Array = []
+	var axis_map: Dictionary = GameData.balance.get("cardAxisResourceMap", {})
+	for axis_id in axis_map.keys():
+		if String(axis_map.get(axis_id, {}).get("resource", "")) == "moral":
+			moral_axes.append(axis_id)
+	for card in GameData.cards.get("cards", []):
+		var touches_moral := false
+		for profile in card.get("effects", {}).keys():
+			for axis_id in moral_axes:
+				if card.get("effects", {}).get(profile, {}).has(axis_id):
+					touches_moral = true
+		if touches_moral and not card.has("peopleTarget"):
+			_fail("La carte '%s' produit du Moral sans cible déclarée." % card.get("id", ""))
+	for practice in GameData.practices:
+		if practice.get("perSprint", {}).has("moral") and not practice.has("peopleTarget"):
+			_fail("La pratique '%s' produit du Moral sans cible déclarée." % practice.get("id", ""))
+		var purchase: Dictionary = practice.get("onPurchasePeopleEffects", {})
+		if not purchase.is_empty() and not purchase.has("target"):
+			_fail("La pratique '%s' applique un effet de personnes sans cible déclarée." % practice.get("id", ""))
+		var per_sprint_people: Dictionary = practice.get("perSprintPeopleEffects", {})
+		if not per_sprint_people.is_empty() and not per_sprint_people.has("target"):
+			_fail("La pratique '%s' applique un effet de personnes par sprint sans cible déclarée." % practice.get("id", ""))
+
+
+## Ce qu'une équipe livre ne doit se ressentir que chez elle. Le test se joue à
+## deux équipes — la seule configuration où une cible implicite se voit.
+func _check_squad_scoped_moral() -> void:
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+	var main_squad: Dictionary = SprintState.squads[0]
+	var main_roster: Array = main_squad.get("roster", [])
+	if main_roster.size() < 2:
+		_fail("Le roster de départ doit permettre de séparer deux équipes.")
+		return
+	var moved: Dictionary = main_roster[1]
+	var second_squad: Dictionary = SprintState._new_empty_squad(2)
+	main_roster.erase(moved)
+	second_squad.get("roster", []).append(moved)
+	SprintState.squads.append(second_squad)
+
+	var stayed: Dictionary = main_roster[0]
+	var stayed_before := int(SprintState.employee_wellbeing(stayed).get("moral", 0))
+	var moved_before := int(SprintState.employee_wellbeing(moved).get("moral", 0))
+	SprintState.add_pending({"moral": -20}, "", "squad:%s" % second_squad.get("id", ""))
+	SprintState._apply_pending_people_effects()
+	if int(SprintState.employee_wellbeing(stayed).get("moral", 0)) != stayed_before:
+		_fail("Un effet Moral ciblé sur une équipe ne doit pas atteindre l'autre.")
+	if int(SprintState.employee_wellbeing(moved).get("moral", 0)) >= moved_before:
+		_fail("Un effet Moral ciblé sur une équipe doit atteindre ses membres.")
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+
+
 ## Le Moral est une vue ; les effets d'équipe doivent donc atteindre les
 ## personnes ciblées, être modulés par leur personnalité, puis seulement
 ## reflétés dans la moyenne utilisée par les anciens systèmes.
@@ -1663,6 +1718,8 @@ func _test_individual_team_rules() -> void:
 		for choice in inbox_event.get("choices", []):
 			if choice.get("effects", {}).has("moral") and not choice.has("peopleTarget"):
 				_fail("L'effet Moral Inbox '%s' n'a pas de cible individuelle déclarée." % choice.get("id", ""))
+	_check_declared_people_targets()
+	_check_squad_scoped_moral()
 	var cpo_salary := int(SprintState.cpo_wellbeing.get("salaire", 0))
 	SprintState.apply_people_effect("vous", {"salaire": -9})
 	if int(SprintState.cpo_wellbeing.get("salaire", 0)) != cpo_salary - 9:
@@ -1706,6 +1763,79 @@ func _test_individual_team_rules() -> void:
 			_fail("Le départ choisi dans une crise doit retirer la personne du roster.")
 	else:
 		_fail("Une crise de Moral doit pouvoir mener au départ explicite d'une personne.")
+
+	# Une réparation de crise ne se contente pas de remonter le critère : elle
+	# exécute l'acte que son libellé promet, et le joueur le paie là où ça se
+	# sent — la masse salariale, puis la capacité du sprint.
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+	var underpaid: Dictionary = SprintState.get_roster()[0]
+	SprintState.employee_wellbeing(underpaid)["salaire"] = 0
+	SprintState._inspect_team_crises()
+	var salary_crisis := SprintState.draw_inbox_event()
+	if not String(salary_crisis.get("id", "")).ends_with("-salaire"):
+		_fail("Une satisfaction salariale à zéro doit ouvrir sa crise.")
+	else:
+		var salary_before_repair := int(underpaid.get("salary", 0))
+		var payroll_before := float(SprintState.get_recurring_charges().get("total", 0))
+		var satisfaction_before := int(SprintState.employee_wellbeing(underpaid).get("salaire", 0))
+		SprintState.apply_inbox_choice(salary_crisis.get("choices", [])[0])
+		if int(underpaid.get("salary", 0)) <= salary_before_repair:
+			_fail("Aligner un salaire en crise doit augmenter le salaire de la personne.")
+		if float(SprintState.get_recurring_charges().get("total", 0)) <= payroll_before:
+			_fail("Aligner un salaire en crise doit alourdir la masse salariale du sprint.")
+		if int(SprintState.employee_wellbeing(underpaid).get("salaire", 0)) <= satisfaction_before:
+			_fail("Aligner un salaire en crise doit aussi remonter la satisfaction salariale.")
+
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+	var burnt: Dictionary = {}
+	for employee in SprintState.get_roster():
+		if employee.get("role", "") == "dev":
+			burnt = employee
+			break
+	if burnt.is_empty():
+		_fail("Le roster de départ doit contenir un dev pour tester la capacité.")
+	else:
+		SprintState.employee_wellbeing(burnt)["energie"] = 0
+		SprintState._inspect_team_crises()
+		var burnout_crisis := SprintState.draw_inbox_event()
+		if not String(burnout_crisis.get("id", "")).ends_with("-energie"):
+			_fail("Une Énergie à zéro doit ouvrir sa crise.")
+		else:
+			var capacity_before_repair := SprintState.get_effective_capacity()
+			SprintState.apply_inbox_choice(burnout_crisis.get("choices", [])[0])
+			if SprintState.employee_contribution_factor(burnt) != 0.0:
+				_fail("Arrêter le sprint pour protéger quelqu'un doit retirer sa contribution.")
+			if SprintState.get_effective_capacity() >= capacity_before_repair:
+				_fail("Arrêter le sprint pour protéger quelqu'un doit coûter de la capacité.")
+			if int(SprintState.employee_wellbeing(burnt).get("energie", 0)) <= 0:
+				_fail("Arrêter le sprint doit aussi restaurer l'Énergie de la personne.")
+
+	# 👥 Le Moral affiché est une vue sur le roster : il ne doit jamais rester
+	# sur un repos périmé ni sur une équipe qui n'existe plus. Les deux sens
+	# comptent — la moyenne baisse quand la personne revient, monte quand
+	# celle qui décrochait s'en va.
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+	var rested: Dictionary = SprintState.get_roster()[0]
+	SprintState.employee_wellbeing(rested)["moral"] = 0
+	SprintState._refresh_team_moral()
+	if SprintState.grant_time_off(String(rested.get("id", ""))) != "":
+		_fail("Le repos doit rester accordable pour tester l'expiration du facteur.")
+	var moral_during_rest := SprintState.get_resource_value("moral")
+	SprintState.advance_to_next_sprint()
+	if not is_equal_approx(float(SprintState.resource_values.get("moral", 0.0)), SprintState.get_team_moral()):
+		_fail("Le Moral affiché doit suivre l'expiration du repos au sprint suivant.")
+	if SprintState.get_resource_value("moral") >= moral_during_rest:
+		_fail("Le retour d'une personne en difficulté doit faire redescendre la moyenne affichée.")
+
+	SprintState.impact_wallet = 999
+	var unhappy: Dictionary = SprintState.get_roster()[1]
+	SprintState.employee_wellbeing(unhappy)["moral"] = 0
+	SprintState._refresh_team_moral()
+	var moral_with_unhappy := float(SprintState.resource_values.get("moral", 0.0))
+	if SprintState.fire_employee(String(unhappy.get("id", ""))) != "":
+		_fail("Le licenciement doit rester jouable pour tester le miroir du Moral.")
+	elif float(SprintState.resource_values.get("moral", 0.0)) <= moral_with_unhappy:
+		_fail("Le Moral affiché doit suivre le départ d'une personne, sans attendre un effet de bien-être.")
 
 	# Deux signaux faibles produisent deux conversations successives au sprint
 	# suivant. La demande salariale engage une charge récurrente ; le repos

@@ -1876,3 +1876,41 @@ alertes multiples, les demandes, la capacité perdue au repos, les pratiques
 persistantes et les deux issues d'une crise. Le smoke UI ouvre le hub depuis le
 vrai panneau permanent, vérifie ses quatre diagnostics et joue une augmentation
 qui modifie le salaire.
+
+### 35.1 Trois corrections de relecture
+
+**Une réparation de crise exécute ce que son libellé promet.** Les deux issues
+d'un zéro se jouaient jusqu'ici entièrement en deltas de bien-être : « Aligner
+son salaire » remontait la satisfaction sans toucher au salaire ni à la masse
+salariale, « Arrêter le sprint » restaurait l'Énergie sans retirer personne de
+la capacité. Chaque crise déclare désormais ses actes dans `balance.json`
+(`crises.<critère>.restoreActions`), et ils passent par les mêmes fonctions que
+le hub — un seul chemin d'exécution pour le repos, l'augmentation et le
+périmètre. Ce que le joueur lit est donc ce que le moteur facture : la capacité
+du sprint, la masse salariale récurrente ou l'Énergie du CPO. Les deltas de
+`restore` ont été réduits d'autant : la réparation vaut toujours la même
+remontée, elle se paie maintenant.
+
+**Le Moral affiché est une vue, jamais un miroir.** `resource_values.moral` se
+périmait dès qu'un facteur changeait sans effet de bien-être — un repos qui
+expire au sprint suivant, un licenciement, une démission silencieuse — et le
+panneau affichait alors une moyenne calculée sur l'ancien roster pendant tout
+le sprint. Les consommateurs passent maintenant par `get_resource_value()` et
+`get_resource_snapshot()`, qui resynchronisent la valeur dérivée avant de la
+rendre ; le passage au sprint suivant vit dans `advance_to_next_sprint()`
+plutôt que dans l'écran de Résolution, et les mutations de roster rafraîchissent
+le miroir. C'est la règle générale du dépôt appliquée à une grandeur de plus :
+aucune valeur dérivée ne se lit brute.
+
+**Le ciblage d'un effet Moral est déclaratif pour toutes les familles de
+contenu.** L'Inbox déclarait sa cible, mais `add_pending()` retombait
+silencieusement sur « tout le roster » pour les cartes, les pratiques et les
+livraisons — ce qui, à N>1, aurait fait remuer le Moral de toute l'entreprise
+au moindre sprint d'une seule équipe. `add_pending()` prend désormais la cible
+en paramètre, une livraison porte l'équipe qui l'a produite (`squad:<id>`, un
+ciblage interne qui n'apparaît jamais à l'écran), les cartes et les pratiques
+déclarent leur `peopleTarget` dans leur JSON, et le défaut vit dans les données
+(`individualTeam.defaultPeopleTarget`). Trois garde-fous mécaniques le
+vérifient : les cartes et pratiques qui produisent du Moral doivent déclarer
+leur cible, et un effet ciblé sur une équipe à deux équipes ne doit pas
+atteindre l'autre.

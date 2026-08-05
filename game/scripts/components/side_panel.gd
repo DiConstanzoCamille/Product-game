@@ -162,7 +162,7 @@ func _build_rail(vbox: VBoxContainer) -> void:
 
 	for resource in GameData.resources:
 		var resource_id: String = resource.get("id", "")
-		var value: float = SprintState.resource_values.get(resource_id, 0.0)
+		var value: float = SprintState.get_resource_value(resource_id)
 		var state := EffectResolver.gauge_state(resource_id, value)
 		vbox.add_child(_rail_gauge(
 			resource.get("icon", "•"), value, 100.0,
@@ -274,7 +274,7 @@ func _build_header(vbox: VBoxContainer) -> void:
 # ── Jauges en barres ─────────────────────────────────────────────────────
 func _resource_gauge(resource: Dictionary) -> Control:
 	var resource_id: String = resource.get("id", "")
-	var value: float = SprintState.resource_values.get(resource_id, 0.0)
+	var value: float = SprintState.get_resource_value(resource_id)
 	var state := EffectResolver.gauge_state(resource_id, value)
 	return _gauge(
 		"%s %s" % [resource.get("icon", ""), resource.get("name", "")],

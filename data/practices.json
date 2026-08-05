@@ -96,6 +96,7 @@
       "licensePerSeat": 0.1,
       "description": "Ce qui se dit en rétro reste en rétro — et pour une fois, quelqu'un écoute vraiment. +1 Moral par sprint.",
       "unlocks": "moralPerSprint",
+      "peopleTarget": "tous",
       "perSprint": {
         "moral": 1
       },

@@ -101,32 +101,37 @@
       "moral": {
         "subject": "n'arrive plus à se projeter ici",
         "restoreLabel": "Lui rendre du temps et un vrai périmètre",
-        "restore": { "moral": 34, "energie": 10 },
+        "restoreActions": ["time-off", "ownership"],
+        "restore": { "moral": 18 },
         "leaveLabel": "Accepter son départ",
         "teamAfterLeave": { "moral": -8 }
       },
       "confiance": {
         "subject": "ne vous suit plus",
         "restoreLabel": "Lui confier un vrai sujet et le tenir",
-        "restore": { "confiance": 38 },
+        "restoreActions": ["ownership"],
+        "restore": { "confiance": 16 },
         "leaveLabel": "Le laisser partir",
         "teamAfterLeave": { "moral": -4 }
       },
       "energie": {
         "subject": "est en burn-out",
         "restoreLabel": "Arrêter le sprint pour le protéger",
-        "restore": { "energie": 42, "moral": 8 },
+        "restoreActions": ["time-off"],
+        "restore": { "energie": 14 },
         "leaveLabel": "Le laisser quitter l'équipe",
         "teamAfterLeave": { "moral": -10 }
       },
       "salaire": {
         "subject": "a une offre ailleurs",
         "restoreLabel": "Aligner son salaire et sa reconnaissance",
-        "restore": { "salaire": 36, "confiance": 8 },
+        "restoreActions": ["salary-raise"],
+        "restore": { "salaire": 6 },
         "leaveLabel": "Ne pas s'aligner",
         "teamAfterLeave": { "moral": -5 }
       }
     },
+    "defaultPeopleTarget": "tous",
     "defaultPersonalityBySeniority": {
       "junior": "junior-ambitieux",
       "senior": "veteran-desabuse"

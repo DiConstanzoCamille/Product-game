@@ -80,7 +80,7 @@ func _ready() -> void:
 
 	sprint_label.text = "Sprint %d — Phase 4 : Résolution" % SprintState.sprint_number
 
-	var old_values: Dictionary = SprintState.resource_values.duplicate()
+	var old_values: Dictionary = SprintState.get_resource_snapshot()
 	mandate_ending = SprintState.apply_pending_and_check()
 	UIHelpers.attach_company_menu(self)
 	_style_resolution_sections()
@@ -1121,7 +1121,7 @@ func _on_stay_long_mandate_pressed(dim: Control) -> void:
 func _build_strip_stat(resource: Dictionary, old_values: Dictionary, index: int) -> Control:
 	var resource_id: String = resource.get("id", "")
 	var old_value: float = old_values.get(resource_id, 0.0)
-	var new_value: float = SprintState.resource_values.get(resource_id, 0.0)
+	var new_value: float = SprintState.get_resource_value(resource_id)
 	var delta: int = int(round(new_value - old_value))
 	var state: String = EffectResolver.gauge_state(resource_id, new_value)
 	var box := VBoxContainer.new()
@@ -1162,7 +1162,7 @@ func _build_strip_stat(resource: Dictionary, old_values: Dictionary, index: int)
 func _build_gauge(resource: Dictionary, old_values: Dictionary, index: int) -> Control:
 	var resource_id: String = resource.get("id", "")
 	var old_value: float = old_values.get(resource_id, 0.0)
-	var new_value: float = SprintState.resource_values.get(resource_id, 0.0)
+	var new_value: float = SprintState.get_resource_value(resource_id)
 	var delta := int(round(new_value - old_value))
 	var state := EffectResolver.gauge_state(resource_id, new_value)
 
@@ -1218,7 +1218,7 @@ func _build_alert_text() -> String:
 
 	for resource in GameData.resources:
 		var resource_id: String = resource.get("id", "")
-		var value: float = SprintState.resource_values.get(resource_id, 50.0)
+		var value: float = SprintState.get_resource_value(resource_id)
 		var direction: String = GameData.balance.get("resourceDirection", {}).get(resource_id, "high-good")
 		var normalized := value if direction == "high-good" else (100.0 - value)
 		if normalized < worst_normalized:
@@ -1274,5 +1274,5 @@ func _quarter_just_closed() -> bool:
 ## mandat s'arrête (mandate_ending le court-circuite plus haut).
 func _on_next_sprint_pressed() -> void:
 	var go_to_committee := _quarter_just_closed()
-	SprintState.sprint_number += 1
+	SprintState.advance_to_next_sprint()
 	get_tree().change_scene_to_file(COMMITTEE_SCENE if go_to_committee else INBOX_SCENE)

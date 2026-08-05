@@ -1413,6 +1413,36 @@ func _refresh_team_moral() -> void:
 		resource_values["moral"] = get_team_moral()
 
 
+## 👥 Le Moral n'est pas une jauge stockée : c'est une vue sur le roster, et
+## `resource_values.moral` n'en est que le miroir. Des facteurs le déplacent
+## sans le moindre effet de bien-être — un repos qui expire au sprint suivant,
+## un licenciement, une démission silencieuse — et le miroir mentirait alors
+## pendant tout le sprint. Les consommateurs passent donc par cette fonction
+## de résolution, jamais par la valeur brute (CLAUDE.md : aucune valeur
+## dérivée ne se lit brute).
+func get_resource_value(resource_id: String) -> float:
+	if resource_id == "moral":
+		_refresh_team_moral()
+		return get_team_moral()
+	return float(resource_values.get(resource_id, 0.0))
+
+
+## Copie des jauges pour un affichage, une comparaison avant/après ou un
+## snapshot : les valeurs dérivées y sont resynchronisées d'abord.
+func get_resource_snapshot() -> Dictionary:
+	_refresh_team_moral()
+	return resource_values.duplicate()
+
+
+## Passage au sprint suivant. La règle vit ici et pas dans l'écran de
+## Résolution : changer de sprint périme des facteurs individuels (un repos ne
+## vaut que pour le sprint où il est accordé), et le miroir du Moral doit
+## suivre dans la foulée.
+func advance_to_next_sprint() -> void:
+	sprint_number += 1
+	_refresh_team_moral()
+
+
 ## L'état synthétique est la seule chose visible par défaut dans le roster.
 ## Les quatre chiffres restent dans le tooltip/détail au clic, jamais en grille.
 func get_employee_alert(employee: Dictionary) -> Dictionary:
@@ -1465,6 +1495,15 @@ func _select_people(target: String) -> Array:
 			if int(employee.get("salary", 0)) > int(highest_paid.get("salary", 0)):
 				highest_paid = employee
 		return [highest_paid]
+	if target.begins_with("squad:"):
+		# Ciblage interne, jamais affiché : ce qu'une équipe produit ne se
+		# ressent que chez elle (contrat d'architecture §2). À N=1 il désigne
+		# exactement le roster complet, donc rien ne change à l'écran.
+		var squad_id := target.trim_prefix("squad:")
+		for squad in squads:
+			if String(squad.get("id", "")) == squad_id:
+				return squad.get("roster", []).duplicate()
+		return []
 	if target == "le-plus-fragile":
 		if roster.is_empty():
 			return []
@@ -1474,6 +1513,12 @@ func _select_people(target: String) -> Array:
 				most_fragile = employee
 		return [most_fragile]
 	return roster
+
+
+func _people_target_or_default(target: String) -> String:
+	if target != "":
+		return target
+	return String(get_individual_team_conf().get("defaultPeopleTarget", "tous"))
 
 
 func queue_people_effect(target: String, deltas: Dictionary, note: String = "") -> void:
@@ -1654,7 +1699,12 @@ func _team_crisis_event(crisis: Dictionary) -> Dictionary:
 				"label": conf.get("restoreLabel", "Réparer la situation"),
 				"reveal": "%s reste. Le sujet ne disparaît pas, mais vous lui rendez une marge de manœuvre." % name,
 				"personEffect": {"employee_id": employee.get("id", ""), "deltas": conf.get("restore", {})},
-				"teamCrisis": {"employee_id": employee.get("id", ""), "criterion": criterion, "action": "restore"},
+				"teamCrisis": {
+					"employee_id": employee.get("id", ""),
+					"criterion": criterion,
+					"action": "restore",
+					"restoreActions": conf.get("restoreActions", []),
+				},
 			},
 			{
 				"id": "laisser-partir-%s" % criterion,
@@ -1675,6 +1725,10 @@ func _resolve_team_crisis(choice: Dictionary) -> void:
 		return
 	var action := String(crisis.get("action", ""))
 	if action == "restore":
+		# Le libellé d'une réparation promet un acte de management, pas
+		# seulement une remontée de jauge : il se paie donc là où le joueur
+		# le sent (capacité du sprint, masse salariale, Énergie du CPO).
+		_apply_management_actions(employee, crisis.get("restoreActions", []))
 		_remove_employee_pending(employee, "pendingCrises", String(crisis.get("criterion", "")))
 		if String(crisis.get("criterion", "")) == "confiance":
 			employee["contributionBlocked"] = false
@@ -1687,6 +1741,25 @@ func _resolve_team_crisis(choice: Dictionary) -> void:
 	queue_people_effect("tous", crisis.get("teamAfterLeave", {}))
 	pending_journal_lines.append("🚪 %s quitte l'équipe. Personne ne fait semblant de ne pas comprendre." % employee.get("name", "Une personne"))
 	_refresh_team_moral()
+
+
+## Exécute les actes de management déclarés par un contenu (une demande, une
+## réparation de crise). Un seul chemin d'exécution pour les trois actions :
+## l'Inbox ne peut pas promettre un repos ou une augmentation que le hub
+## facturerait autrement.
+func _apply_management_actions(employee: Dictionary, actions: Array) -> void:
+	for raw_action in actions:
+		var action := String(raw_action)
+		match action:
+			"time-off":
+				_apply_time_off(employee)
+			"salary-raise":
+				_apply_salary_raise(employee)
+			"ownership":
+				_apply_ownership(employee)
+			_:
+				continue
+		_record_management_action(employee, action)
 
 
 func _remove_employee_pending(employee: Dictionary, field: String, criterion: String) -> void:
@@ -1742,16 +1815,7 @@ func _resolve_team_concern(choice: Dictionary) -> void:
 	var employee := find_employee(String(concern.get("employee_id", "")))
 	if employee.is_empty():
 		return
-	match String(concern.get("action", "")):
-		"time-off":
-			_apply_time_off(employee)
-			_record_management_action(employee, "time-off")
-		"salary-raise":
-			_apply_salary_raise(employee)
-			_record_management_action(employee, "salary-raise")
-		"ownership":
-			_apply_ownership(employee)
-			_record_management_action(employee, "ownership")
+	_apply_management_actions(employee, [concern.get("action", "")])
 	apply_people_effect_for_employee(employee, concern.get("employeeDeltas", {}))
 	apply_people_effect("vous", concern.get("cpoDeltas", {}))
 	_remove_employee_pending(employee, "pendingConcerns", String(concern.get("criterion", "")))
@@ -2168,7 +2232,9 @@ func commit_backlog_plan(plan: Array) -> Dictionary:
 		client_points += int(item.get("clients", 0))
 
 	if not deltas.is_empty():
-		add_pending(deltas)
+		# Ce qu'une équipe livre se ressent d'abord chez elle : la livraison
+		# porte donc l'équipe qui l'a produite, pas le roster entier.
+		add_pending(deltas, "", "squad:%s" % squads[0].get("id", ""))
 	last_roadmap_report = {
 		"sprint": sprint_number,
 		"plannedPoints": spent,
@@ -2415,7 +2481,7 @@ func commit_backlog_plan_for_squad(squad_id: String, plan: Array) -> Dictionary:
 	for item in delivered:
 		client_points += int(item.get("clients", 0))
 	if not deltas.is_empty():
-		add_pending(deltas)
+		add_pending(deltas, "", "squad:%s" % squad_id)
 
 	var report := {
 		"sprint": sprint_number,
@@ -2930,7 +2996,7 @@ func activate_decision(card_id: String) -> String:
 	add_pending(deltas, "Grande décision : %s activée (%d 💥%s, %s)" % [
 		card.get("name", card_id), cost,
 		" · %d 💰/sprint de licence" % charge if charge > 0 else "", team_profile
-	])
+	], String(card.get("peopleTarget", "")))
 	activated_cards.append(card_id)
 	activated_card_sprints[card_id] = sprint_number
 	release_reservation("decision", card_id)
@@ -3208,6 +3274,7 @@ func fire_employee(employee_id: String) -> String:
 	var owner_squad: Dictionary = owner.get("squad", {})
 	var owner_roster: Array = owner_squad.get("roster", [])
 	owner_roster.erase(employee)
+	_refresh_team_moral()
 	return ""
 
 
@@ -3350,14 +3417,19 @@ func apply_inbox_choice(choice: Dictionary, note: String = "") -> void:
 		pending_journal_lines.append("👥 %d clients basculent vers l'offre payante." % int(round(moved)))
 
 
-func add_pending(deltas: Dictionary, note: String = "") -> void:
+## `people_target` est la cible du seul delta qui n'est pas une jauge : le
+## Moral, qui n'existe que chez des personnes. Chaque famille de contenu la
+## déclare — l'Inbox par `peopleTarget`, une livraison par l'équipe qui l'a
+## produite (`squad:<id>`), une carte ou une pratique par son propre
+## `peopleTarget`. Sans cible déclarée, la valeur par défaut vient des données
+## (`individualTeam.defaultPeopleTarget`) et jamais d'un littéral de script :
+## c'est ce qui empêche qu'à N>1 une livraison d'une seule équipe se mette à
+## remuer le Moral de tout le monde sans que rien ne casse.
+func add_pending(deltas: Dictionary, note: String = "", people_target: String = "") -> void:
 	for resource_id in deltas.keys():
 		var value: float = float(deltas[resource_id])
-		# Les effets structurels et les contenus qui n'ont pas de cible (une
-		# carte globale, une pratique, un epic) s'appliquent à tout le roster.
-		# L'Inbox, elle, résout son ciblage déclaratif dans apply_inbox_choice().
 		if resource_id == "moral":
-			queue_people_effect("tous", {"moral": value})
+			queue_people_effect(_people_target_or_default(people_target), {"moral": value})
 			continue
 		pending_deltas[resource_id] = pending_deltas.get(resource_id, 0.0) + value
 	if note != "":
@@ -3489,7 +3561,7 @@ func _apply_per_sprint_effects() -> void:
 		var practice := find_practice(practice_id)
 		var per_sprint: Dictionary = practice.get("perSprint", {})
 		if not per_sprint.is_empty():
-			add_pending(per_sprint)
+			add_pending(per_sprint, "", String(practice.get("peopleTarget", "")))
 		var people_per_sprint: Dictionary = practice.get("perSprintPeopleEffects", {})
 		if not people_per_sprint.is_empty():
 			queue_people_effect(String(people_per_sprint.get("target", "tous")), people_per_sprint.get("deltas", {}))
@@ -3609,7 +3681,7 @@ func _projected_score_resources() -> Dictionary:
 	var bounds: Dictionary = GameData.balance.get("resourceBounds", {"min": 0, "max": 100})
 	var minimum: float = bounds.get("min", 0)
 	var maximum: float = bounds.get("max", 100)
-	var projected := resource_values.duplicate()
+	var projected := get_resource_snapshot()
 	for resource_id in pending_deltas.keys():
 		if not projected.has(resource_id):
 			continue
@@ -3890,6 +3962,8 @@ func _resolve_silent_quits() -> void:
 			"text": "🧨 %s a démissionné sans prévenir. Le badge est resté sur le bureau, le Slack est déjà désactivé." % employee.get("name", ""),
 			"deltas": "",
 		})
+	if not leavers.is_empty():
+		_refresh_team_moral()
 
 
 ## Confronte les objectifs qualitatifs de l'entreprise à l'état courant, sans
@@ -3958,7 +4032,7 @@ func _condition_value(resource_id: String) -> float:
 			return float(impact_wallet)
 		"energie":
 			return float(energy)
-	return float(resource_values.get(resource_id, 0.0))
+	return get_resource_value(resource_id)
 
 
 ## Fins négatives par seuil (balance.json → endingThresholds). Les
