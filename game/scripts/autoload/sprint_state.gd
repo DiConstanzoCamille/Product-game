@@ -3508,6 +3508,9 @@ func _record_quarter_resolution() -> String:
 		turnaround_plans_available -= 1
 		passed = true
 		turnaround_used = true
+		var missed_quarter: Dictionary = get_individual_team_conf().get("systemicEffects", {}).get("missedQuarter", {})
+		apply_people_effect("tous", missed_quarter)
+		pending_journal_lines.append("🏛️ Le plan sauve le quota, pas la fatigue de l'équipe.")
 	var qualitative_bonus := 0
 	if passed and qualitative_ok:
 		qualitative_bonus = int(GameData.quotas.get("qualitativeBonusImpact", 0))

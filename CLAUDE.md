@@ -293,6 +293,17 @@ la capture d'écran. **Préférer toujours un garde-fou qu'une machine peut vér
    §14-19 documentent l'historique des arbitrages — continuer la série).
 4. La PR répond à **« qu'est-ce qui est meilleur à jouer maintenant ? »** en une
    phrase qui ne soit pas la reformulation de la tâche.
+5. La PR contient un commentaire **« Revue de lot »**, publié avant de la
+   déclarer prête : mandat de relecture lié à l'issue, verdict explicite
+   (bloqueur ou non), propriétés vérifiées et résultats exacts des commandes.
+   Une simple liste de tests sans ce qui a été relu ne vaut pas preuve.
+6. Ce commentaire joint les **captures réellement relues** qui concernent le
+   changement (au minimum un état nominal et un état d'alerte, si la règle a
+   une UI), avec une légende qui dit ce que chaque image vérifie. Il inclut
+   aussi le compte du banc aléatoire (`40/40`, ou le nombre d'échecs et leur
+   cause). Les chemins temporaires et la formule « captures faites » ne sont
+   pas des preuves : les images doivent être visibles dans la conversation de
+   la PR.
 
 ### Voir le jeu sans écran
 

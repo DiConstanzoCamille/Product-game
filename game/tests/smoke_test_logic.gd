@@ -1659,6 +1659,14 @@ func _test_individual_team_rules() -> void:
 	SprintState.apply_people_effect("vous", {"salaire": -9})
 	if int(SprintState.cpo_wellbeing.get("salaire", 0)) != cpo_salary - 9:
 		_fail("Le ciblage 'vous' doit mettre à jour le niveau individuel du CPO.")
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+	var moral_before_turnaround := SprintState.get_team_moral()
+	SprintState.turnaround_plans_available = 1
+	SprintState.impact_wallet = 0
+	SprintState.quarter_sprint = SprintState.get_quarter_length() - 1
+	SprintState._record_quarter_resolution()
+	if SprintState.get_team_moral() >= moral_before_turnaround:
+		_fail("Un quota raté puis rattrapé doit malgré tout entamer le Moral individuel.")
 
 	# Une Confiance à zéro coupe la contribution, mais ne retire jamais la
 	# personne silencieusement : l'Inbox doit porter la scène et proposer un
