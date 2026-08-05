@@ -2,7 +2,7 @@ extends Control
 ## Vue de la Roadmap profonde (§6). Les règles vivent dans SprintState : cet
 ## écran affiche le tirage persistant et lui remet seulement un plan de points.
 
-const NEXT_SCENE := "res://scenes/screens/investments_screen.tscn"
+const NEXT_SCENE := "res://scenes/screens/desk_screen.tscn"
 const START_SCREEN_SCENE := "res://scenes/screens/start_screen.tscn"
 
 @onready var sprint_label: Label = $Margin/VBox/TopBar/SprintLabel

@@ -384,6 +384,11 @@ static func make_stamp(kind: String, width: int = 110) -> TextureRect:
 ## au premier cadre SVG, la dalle est opaque : le papier réglé appartient à
 ## l'ordinateur et aucun élément de mobilier ne passe devant les contrôles.
 static func attach_decision_workspace(screen: Control, decision_path: NodePath) -> void:
+	# Le poste de travail décoratif dessine un ordinateur portable. Hébergé dans
+	# le moniteur du bureau, ça donnait un ordinateur DANS un ordinateur — vu
+	# sur la capture, invisible autrement.
+	if hosted_in_desk:
+		return
 	var target := screen.get_node_or_null(decision_path)
 	var margin := screen.get_node_or_null("Margin")
 	var background := screen.get_node_or_null("Background")

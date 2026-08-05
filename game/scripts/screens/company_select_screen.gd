@@ -5,7 +5,9 @@ extends Control
 ## (junior/senior) — ce n'est plus un bouton à bascule sur l'écran des
 ## Grandes décisions, mais un trait du contexte de la run, choisi ici.
 
-const INBOX_SCENE := "res://scenes/screens/inbox_screen.tscn"
+## Fin de la mise en place : on n'entre plus dans un tunnel de phases, on
+## s'assoit au bureau (issue #54). Tout le sprint se joue depuis là.
+const DESK_SCENE := "res://scenes/screens/desk_screen.tscn"
 const SCENARIO_SCENE := "res://scenes/screens/scenario_screen.tscn"
 
 @onready var back_button: Button = $Margin/VBox/TopBar/BackButton
@@ -139,4 +141,4 @@ func _build_company_card(company: Dictionary) -> Control:
 
 func _on_company_selected(company_id: String) -> void:
 	SprintState.reset_run(SprintState.pending_era_id, company_id, SprintState.pending_career_level)
-	get_tree().change_scene_to_file(INBOX_SCENE)
+	get_tree().change_scene_to_file(DESK_SCENE)

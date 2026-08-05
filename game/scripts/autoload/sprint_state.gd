@@ -134,6 +134,10 @@ var _sprint_event: Dictionary = {}
 var _sprint_event_sprint: int = -1
 var _sprint_event_answered: bool = false
 var last_journal: Array = []           # les lignes du dernier sprint clos, punaisées au mur
+# 🏛 Le Comité n'est plus un écran qu'on traverse : c'est un parapheur déposé
+# sur la table. Il ne se déduit donc pas d'un numéro de sprint — le trimestre
+# vient d'être clos, le dossier attend, et il attend jusqu'à ce qu'on l'ouvre.
+var committee_pending: bool = false
 
 var breather_planned: bool = false     # Souffler pris à la dernière Résolution : actions bloquées ce sprint, bonus de régén à la prochaine
 var last_energy_report: Dictionary = {}  # détail du delta Énergie de la dernière Résolution (pour l'affichage)

@@ -260,17 +260,23 @@ func _instantiate_app(id: String, host: Control) -> Control:
 	host.add_child(screen)
 	UIHelpers.hosted_in_desk = false
 
-	_rewire(screen, "Margin/VBox/TopBar/BackButton")
-	_rewire(screen, "Margin/VBox/BottomBar/NextButton")
+	# Les libellés du tunnel mentent une fois hébergés : « ← Accueil » ne ramène
+	# plus à l'accueil, et « Suivant : Roadmap » n'est plus la suite de rien
+	# puisqu'on choisit son ordre. Le lot B refera ces écrans ; en attendant, on
+	# ne laisse pas une promesse fausse à l'écran.
+	_rewire(screen, "Margin/VBox/TopBar/BackButton", "← Bureau")
+	_rewire(screen, "Margin/VBox/BottomBar/NextButton", "Terminé")
 	return screen
 
 
 ## Un bouton hébergé garde son libellé et sa place — c'est le lot B qui refera
 ## la forme des écrans. Seule sa destination change.
-func _rewire(screen: Control, path: String) -> void:
+func _rewire(screen: Control, path: String, label: String = "") -> void:
 	var button: Node = screen.get_node_or_null(NodePath(path))
 	if button == null or not (button is BaseButton):
 		return
 	for connection in button.pressed.get_connections():
 		button.pressed.disconnect(connection.get("callable"))
 	button.pressed.connect(close_app)
+	if label != "":
+		button.text = label

@@ -104,8 +104,7 @@ func refresh() -> void:
 
 
 func _committee_open() -> bool:
-	var progress := SprintState.get_quarter_progress()
-	return int(progress.get("sprint", 0)) >= int(progress.get("length", 3)) - 1
+	return SprintState.committee_pending
 
 
 func _on_body_input(event: InputEvent) -> void:
@@ -126,6 +125,10 @@ func expand() -> void:
 func collapse() -> void:
 	if not _open:
 		return
+	# Le dossier a été ouvert : il quitte la table. C'est ce qui fait qu'un
+	# sprint sur trois ne ressemble pas aux deux autres — pas un compteur.
+	if kind == "committee":
+		SprintState.committee_pending = false
 	_open = false
 	_slide_to(_shape().get("rest", Rect2()), _fill_rest)
 	state_changed.emit()

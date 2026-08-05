@@ -28,6 +28,7 @@ func _ready() -> void:
 	await _shoot_all()
 	_prepare_team_state()
 	await _shoot_team_management()
+	await _shoot_desk_states()
 	print("=== CAPTURES : TERMINÉ ===")
 	get_tree().quit()
 
@@ -86,3 +87,37 @@ func _shoot_team_management() -> void:
 		print("  %s team_management_screen (%dx%d)" % ["✓" if err == OK else "✗", image.get_width(), image.get_height()])
 	screen.queue_free()
 	await get_tree().process_frame
+
+
+## Le bureau ne se juge pas au repos : ce qui pouvait casser, c'est une phase
+## existante hébergée dans le moniteur et un accessoire ouvert. Les deux se
+## capturent ici, sinon le lot serait déclaré fini sans que personne ne les ait
+## vus (CLAUDE.md : quatre lots livrés sans un pixel regardé).
+func _shoot_desk_states() -> void:
+	for state in ["app", "shop", "committee"]:
+		_prepare_team_state()
+		if state == "committee":
+			SprintState.committee_pending = true
+		var desk: Node = load("res://scenes/screens/desk_screen.tscn").instantiate()
+		get_tree().root.add_child(desk)
+		await get_tree().process_frame
+		await get_tree().process_frame
+
+		match state:
+			"app":
+				desk.get_node("Workstation").open_app("inbox")
+			"shop":
+				desk.get_node("shop").expand()
+			"committee":
+				desk.get_node("committee").expand()
+		# Les accessoires glissent en 0,34 s : capturer avant la fin du Tween
+		# montrerait un objet à mi-course, ce qui ne prouve rien.
+		for _i in range(40):
+			await get_tree().process_frame
+		await RenderingServer.frame_post_draw
+
+		var image := get_tree().root.get_texture().get_image()
+		image.save_png("%s/desk_%s.png" % [out_dir, state])
+		print("  ✓ desk_%s (%dx%d)" % [state, image.get_width(), image.get_height()])
+		desk.queue_free()
+		await get_tree().process_frame

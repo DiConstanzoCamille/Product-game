@@ -8,11 +8,10 @@ extends Control
 ## Depuis la Phase B : ligne de delta d'Énergie ⚡ (régénération modulée par
 ## le Moral, dépenses d'actions personnelles) et option 🧘 Souffler.
 
-const INBOX_SCENE := "res://scenes/screens/inbox_screen.tscn"
+const DESK_SCENE := "res://scenes/screens/desk_screen.tscn"
 const FOUNDATIONS_SCENE := "res://scenes/screens/foundations_screen.tscn"
 const START_SCREEN_SCENE := "res://scenes/screens/start_screen.tscn"
 const MANDATE_END_SCENE := "res://scenes/screens/mandate_end_screen.tscn"
-const COMMITTEE_SCENE := "res://scenes/screens/committee_screen.tscn"
 
 @onready var sprint_label: Label = $Margin/VBox/TopBar/SprintLabel
 @onready var back_button: Button = $Margin/VBox/TopBar/BackButton
@@ -1268,11 +1267,16 @@ func _quarter_just_closed() -> bool:
 	return int(result.get("sprint", -1)) == SprintState.sprint_number and bool(result.get("passed", false))
 
 
-## Le Comité d'investissement (spec §12, Lot 4) s'insère ici, entre la
-## Résolution qui clôture un trimestre et l'Inbox du trimestre suivant —
-## jamais quand le trimestre continue au fil de l'eau, jamais quand le
-## mandat s'arrête (mandate_ending le court-circuite plus haut).
+## Le Comité d'investissement (spec §12, Lot 4) ne s'intercale plus entre deux
+## écrans : la Résolution qui clôture un trimestre **dépose le parapheur** sur
+## le bureau, et il y reste jusqu'à ce que le joueur l'ouvre. Jamais quand le
+## trimestre continue au fil de l'eau, jamais quand le mandat s'arrête
+## (mandate_ending le court-circuite plus haut).
 func _on_next_sprint_pressed() -> void:
-	var go_to_committee := _quarter_just_closed()
+	if _quarter_just_closed():
+		SprintState.committee_pending = true
 	SprintState.advance_to_next_sprint()
-	get_tree().change_scene_to_file(COMMITTEE_SCENE if go_to_committee else INBOX_SCENE)
+	# Le Comité n'est plus un écran qu'on traverse : c'est le parapheur
+	# déposé sur la table, et le bureau décide seul de le faire apparaître
+	# (desk_prop.gd → _committee_open). On revient donc toujours au bureau.
+	get_tree().change_scene_to_file(DESK_SCENE)
