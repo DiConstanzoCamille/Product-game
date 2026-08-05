@@ -57,6 +57,7 @@ func _ready() -> void:
 	_build_plateau()
 	_build_workstation()
 	_build_props()
+	_build_grain()
 	refresh()
 
 
@@ -445,9 +446,12 @@ func _paper(at: Vector2, width: float, color: Color, tilt_degrees: float) -> Pan
 	style.border_color = UIHelpers.COLOR_INK
 	style.set_border_width_all(2)
 	style.set_corner_radius_all(3)
-	style.shadow_color = Color(0, 0, 0, 0.12)
-	style.shadow_size = 4
-	style.shadow_offset = Vector2(3, 4)
+	# Ombre dure et décalée plutôt que floue : le papier se décolle du mur, et
+	# c'est la signature graphique d'un jeu plutôt que d'une interface.
+	style.shadow_color = Color(0, 0, 0, 0.22)
+	style.shadow_size = 3
+	style.shadow_offset = Vector2(6, 7)
+	style.set_border_width_all(3)
 	style.content_margin_left = 15
 	style.content_margin_right = 15
 	style.content_margin_top = 13
@@ -523,6 +527,22 @@ func _refresh_props() -> void:
 		var prop: Control = _props[id]
 		if prop.has_method("refresh"):
 			prop.refresh()
+
+
+## La matière de la pièce : grain animé et vignette, en shader. C'est ce qui
+## sépare « une maquette de site » d'« une scène de jeu », et ça ne coûte ni
+## asset ni octet. La direction artistique claire du Lot 1 n'est pas touchée —
+## on ajoute une texture, on ne repeint pas (issue #54, piste 1).
+func _build_grain() -> void:
+	var grain := ColorRect.new()
+	grain.name = "Grain"
+	grain.position = Vector2.ZERO
+	grain.size = DESIGN
+	grain.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var material := ShaderMaterial.new()
+	material.shader = preload("res://resources/shaders/paper_grain.gdshader")
+	grain.material = material
+	add_child(grain)
 
 
 # ── Petits utilitaires ───────────────────────────────────────────────────

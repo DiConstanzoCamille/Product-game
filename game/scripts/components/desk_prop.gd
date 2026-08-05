@@ -20,7 +20,7 @@ extends Control
 
 signal state_changed
 
-const SLIDE_SECONDS := 0.34
+const SLIDE_SECONDS := 0.42
 
 ## Géométrie par nature : repos (affleurant), ouvert (grande dalle), matière.
 const SHAPES := {
@@ -139,7 +139,9 @@ func _slide_to(target: Rect2, then: Callable) -> void:
 	if _tween != null and _tween.is_valid():
 		_tween.kill()
 	_tween = create_tween()
-	_tween.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	# L'accessoire dépasse sa position puis se cale : un objet qu'on pousse a
+	# de l'inertie, un panneau qui s'affiche n'en a pas. C'est tout l'écart.
+	_tween.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	_tween.tween_method(_apply_interpolated.bind(_rect, target), 0.0, 1.0, SLIDE_SECONDS)
 	_tween.finished.connect(func():
 		_rect = target

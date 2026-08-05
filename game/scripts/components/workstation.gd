@@ -121,6 +121,12 @@ func _show_apps() -> void:
 
 	for app in apps:
 		row.add_child(_app_tile(app))
+	# Un HBoxContainer positionne ses enfants au tri suivant : mémoriser la
+	# position de repos avant serait mémoriser zéro (piège conteneur connu).
+	row.sort_children.connect(func():
+		for tile in row.get_children():
+			if not tile.has_meta("rest_y"):
+				tile.set_meta("rest_y", tile.position.y), CONNECT_ONE_SHOT)
 
 
 ## Chaque tuile porte son état **avant** qu'on l'ouvre : c'est là que la Dette
@@ -173,10 +179,25 @@ func _app_tile(app: Dictionary) -> Control:
 	box.add_child(status_label)
 
 	tile.add_child(box)
+	# Le survol soulève la tuile et l'éclaire. C'est la différence de sensation
+	# entre « un bouton » et « un objet qu'on prend » — et ça ne se voit sur
+	# aucune capture, seulement en jouant.
+	tile.pivot_offset = Vector2(78, 70)
+	tile.mouse_entered.connect(func(): _lift(tile, -6.0, 1.035))
+	tile.mouse_exited.connect(func(): _lift(tile, 0.0, 1.0))
 	tile.gui_input.connect(func(event: InputEvent):
 		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 			open_app(id))
 	return tile
+
+
+## Un ressort court, jamais un fondu : `TRANS_BACK` dépasse légèrement la cible
+## puis revient, et c'est ce dépassement qu'on lit comme de la matière.
+func _lift(node: Control, offset: float, scale_to: float) -> void:
+	var tween := node.create_tween().set_parallel(true)
+	tween.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tween.tween_property(node, "position:y", node.get_meta("rest_y", node.position.y) + offset, 0.18)
+	tween.tween_property(node, "scale", Vector2.ONE * scale_to, 0.18)
 
 
 func _app_status(id: String) -> Dictionary:
