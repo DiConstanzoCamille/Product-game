@@ -39,8 +39,15 @@
   .alert.warn{background:rgba(217,154,43,.16);border-color:rgba(217,154,43,.55);color:#ffd792}
   .dot{width:6px;height:6px;border-radius:50%;background:currentColor;flex:0 0 6px}
 
+  /* ── LE RAIL — au bord de la FENÊTRE DE JEU, pas dans l'ordinateur ─
+     Même matière que le bandeau : c'est le châssis du jeu, pas le décor.
+     Volontairement en marge — acheter n'est pas le geste de tous les
+     sprints, et le centre appartient à ce qu'on fait à chaque tour. */
+  .rail{position:absolute;left:0;top:52px;bottom:0;width:92px;background:var(--panel);
+        border-right:1px solid rgba(255,255,255,.07);padding:16px 7px;
+        display:flex;flex-direction:column;gap:14px;align-items:center;z-index:20}
   /* ── LA PIÈCE ────────────────────────────────────────────────────── */
-  .room{position:absolute;top:52px;left:0;right:0;bottom:0;background:var(--wall)}
+  .room{position:absolute;top:52px;left:92px;right:0;bottom:0;background:var(--wall)}
   .desk{position:absolute;left:0;right:0;bottom:0;height:54%;
         background:linear-gradient(var(--wood),var(--wood-dark));border-top:3px solid #8d7358}
 
@@ -86,12 +93,7 @@
          padding:0 14px;gap:10px;font-size:10px;letter-spacing:.14em;color:var(--panel-muted);font-weight:700}
   .osbar .back{cursor:pointer;color:#8fb0ff}
   .osmain{flex:1;display:flex;min-height:0}
-
-  /* Le rail : ce qu'on achète et ce qu'on vise. Volontairement en marge —
-     ce n'est pas le geste de tous les sprints. */
-  .rail{width:104px;flex:0 0 104px;border-right:1px solid rgba(255,255,255,.1);
-        padding:14px 8px;display:flex;flex-direction:column;gap:12px;align-items:center}
-  .tile{width:78px;padding:10px 4px 8px;border-radius:8px;border:1px solid rgba(255,255,255,.13);
+  .tile{width:78px;padding:11px 4px 9px;border-radius:8px;border:1px solid rgba(255,255,255,.13);
         background:rgba(255,255,255,.05);text-align:center;cursor:pointer}
   .tile:hover{background:rgba(255,255,255,.1);border-color:#5a7ad0}
   .tile .lb{font-size:8.5px;letter-spacing:.07em;color:var(--panel-muted);margin-top:6px;
@@ -153,6 +155,8 @@
     <span class="sprint">SPRINT 7 · T3</span>
   </div>
 
+  <div class="rail" id="rail"></div>
+
   <div class="room">
 
     <!-- AU MUR -->
@@ -202,7 +206,6 @@
       <div class="screen">
         <div class="osbar" id="osbar"></div>
         <div class="osmain">
-          <div class="rail" id="rail"></div>
           <div class="osbody" id="osbody"></div>
         </div>
       </div>
