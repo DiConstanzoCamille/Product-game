@@ -35,6 +35,11 @@ qui avait laissé s'installer la fuite `Impact → Valeur perçue → Revenue` ;
 grandeur produit s'appelle désormais `reputation-produit` dans les données, et
 plus aucune règle ne l'alimente depuis l'Impact.
 
+[`spec-bureau-3d.md`](docs/spec-bureau-3d.md) tranche la **forme** du bureau —
+le partage 3D pour le monde / 2D pour ce qu'on lit, les papiers du mur qu'on
+lève comme un paperboard, et trois pièges Godot silencieux. Elle ne touche à
+aucune règle : sa mise en œuvre est l'issue #59.
+
 `docs/data-schema.md` décrit le schéma de chaque JSON de `data/`.
 
 ---
