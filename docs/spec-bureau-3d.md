@@ -116,11 +116,16 @@ n'oblige à changer**.
 | Ambiance, profondeur de champ, SSAO | Non | Oui |
 | Cibles d'export | Les plus larges, web compris | Plus étroites |
 
-**Recommandation : rester en `gl_compatibility` pour l'issue #59.** Le lot doit
+**Décision (05/08/2026, Camille) : on reste en `gl_compatibility` pour l'issue #59.** Le lot doit
 prouver que la profondeur sert le jeu ; changer de renderer en même temps
 mélangerait deux variables et rendrait un éventuel échec illisible. Le passage à
 `forward_plus` mérite sa propre décision, une fois qu'on saura ce qu'on veut de
 l'ambiance.
+
+Conséquence à accepter : pas de SSAO, pas de profondeur de champ, des ombres
+correctes mais sans finesse. Si le rendu paraît pauvre à l'arrivée, **c'est le
+premier levier à essayer avant de conclure que la 3D ne sert à rien** — et pas
+l'inverse.
 
 ---
 
