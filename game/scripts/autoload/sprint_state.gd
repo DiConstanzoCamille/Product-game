@@ -128,6 +128,17 @@ var energy: int = 70                   # ⚡ jauge personnelle du CPO (0..energy
 var cpo_wellbeing: Dictionary = {}     # mêmes niveaux que le roster ; sa Confiance envers soi n'est pas jouée
 var energy_spent_this_sprint: int = 0  # ⚡ réellement dépensés en actions personnelles depuis la dernière Résolution
 var self_work_capacity: int = 0        # points de capacité ajoutés par "Faire le taf soi-même" ce sprint
+# 🖥️ Le bureau (#54) : l'événement du sprint est tiré une fois et reste
+# consultable jusqu'à la clôture ; s'il n'a pas été traité, il se paie.
+var _sprint_event: Dictionary = {}
+var _sprint_event_sprint: int = -1
+var _sprint_event_answered: bool = false
+var last_journal: Array = []           # les lignes du dernier sprint clos, punaisées au mur
+# 🏛 Le Comité n'est plus un écran qu'on traverse : c'est un parapheur déposé
+# sur la table. Il ne se déduit donc pas d'un numéro de sprint — le trimestre
+# vient d'être clos, le dossier attend, et il attend jusqu'à ce qu'on l'ouvre.
+var committee_pending: bool = false
+
 var breather_planned: bool = false     # Souffler pris à la dernière Résolution : actions bloquées ce sprint, bonus de régén à la prochaine
 var last_energy_report: Dictionary = {}  # détail du delta Énergie de la dernière Résolution (pour l'affichage)
 
@@ -160,6 +171,14 @@ func reset_run(chosen_era_id: String = "", chosen_company_id: String = "", chose
 	activated_cards.clear()
 	activated_card_sprints.clear()
 	journal.clear()
+	# 🖥️ L'état du bureau appartient au run : sans ce nettoyage, un nouveau
+	# mandat commençait avec le parapheur du Comité déjà posé sur la table et
+	# le courrier du run précédent. Vu sur une capture, invisible autrement.
+	last_journal.clear()
+	committee_pending = false
+	_sprint_event = {}
+	_sprint_event_sprint = -1
+	_sprint_event_answered = false
 	pending_deltas.clear()
 	pending_people_effects.clear()
 	pending_journal_lines.clear()
@@ -1503,6 +1522,9 @@ func get_resource_snapshot() -> Dictionary:
 ## suivre dans la foulée.
 func advance_to_next_sprint() -> void:
 	sprint_number += 1
+	_sprint_event = {}
+	_sprint_event_sprint = -1
+	_sprint_event_answered = false
 	_refresh_team_moral()
 
 
@@ -4138,3 +4160,163 @@ func _resolve_good_ending() -> String:
 	if charges > 0.0 and get_client_revenue() < charges * ratio:
 		return config.get("lowEnding", "rachat")
 	return config.get("highEnding", "ipo")
+
+
+# --- Le bureau : la remontée par exception (issue #54) ---
+
+## Le HUD n'affiche que trois chiffres. Tout le reste — les jauges, l'Énergie,
+## la caisse, l'écart au quota — **vient chercher le joueur quand ça va mal**,
+## et se tait le reste du temps. C'est le même motif que
+## `get_employee_alert()` livré par #43, généralisé à l'entreprise.
+##
+## Deux règles portées ici et pas dans l'écran :
+##  1. les seuils vivent dans `balance.json → desk.alerts`, jamais en dur ;
+##  2. une alerte doit prévenir **avec de la marge**. Arrivée au moment où
+##     c'est perdu, elle punit au lieu d'informer — `alerts.marginPerSprint`
+##     est le contrat, et le banc le vérifie jauge par jauge.
+func get_desk_conf() -> Dictionary:
+	return GameData.balance.get("desk", {})
+
+
+func get_alerts_conf() -> Dictionary:
+	return get_desk_conf().get("alerts", {})
+
+
+## Les alertes actives, dans l'ordre où elles doivent s'afficher : la plus
+## grave d'abord. Chaque entrée porte `id`, `label` et `severity`
+## (`danger`/`warn`), jamais de mise en forme — l'écran décide de la couleur.
+func get_active_alerts() -> Array:
+	var conf := get_alerts_conf()
+	var alerts: Array = []
+
+	for gauge in conf.get("gauges", []):
+		var gauge_id := String(gauge.get("id", ""))
+		if gauge_id == "":
+			continue
+		var value := get_resource_value(gauge_id)
+		var at := float(gauge.get("at", 0))
+		var below := String(gauge.get("direction", "below")) == "below"
+		if (below and value <= at) or (not below and value >= at):
+			# La sévérité se déduit de la distance restante au mur : à
+			# mi-chemin de la marge, ce n'est plus un avertissement.
+			var margin := float(conf.get("marginPerSprint", 12))
+			var remaining: float = absf(float(gauge.get("bound", 0)) - value)
+			alerts.append({
+				"id": gauge_id,
+				"label": String(gauge.get("label", gauge_id)),
+				"severity": "danger" if remaining <= margin else "warn",
+			})
+
+	var energy_at := float(conf.get("energyBelow", 0))
+	if energy_at > 0.0 and float(energy) <= energy_at:
+		alerts.append({"id": "energie", "label": String(conf.get("energyLabel", "Énergie basse")),
+			"severity": "danger" if float(energy) <= energy_at * 0.5 else "warn"})
+
+	# 💰 La caisse ne se juge pas dans l'absolu : elle se juge en sprints de
+	# survie. Vingt mille en banque ne veulent rien dire sans les charges.
+	var charges := float(get_recurring_charges().get("total", 0))
+	var sprints_covered := float(conf.get("cashBelowSprintsOfCharges", 0.0))
+	if charges > 0.0 and sprints_covered > 0.0 and revenue <= charges * sprints_covered:
+		alerts.append({"id": "revenue", "label": String(conf.get("cashLabel", "Caisse basse")),
+			"severity": "danger"})
+
+	# 🎯 L'écart au quota ne devient une alerte qu'au **dernier sprint** du
+	# trimestre : avant, il reste du temps, et prévenir trop tôt transforme
+	# un pari en calcul (question de vision n°4).
+	var progress := get_quarter_progress()
+	var length := int(progress.get("length", 1))
+	var quota := float(progress.get("quota", 0))
+	var ratio := float(conf.get("quotaShortfallRatio", 0.0))
+	if quota > 0.0 and ratio > 0.0 and int(progress.get("sprint", 0)) >= length - 1 \
+			and float(progress.get("impact", 0)) < quota * ratio:
+		alerts.append({"id": "quota", "label": String(conf.get("quotaLabel", "Quota menacé")),
+			"severity": "danger"})
+
+	alerts.sort_custom(func(a, b): return a.get("severity", "") == "danger" and b.get("severity", "") != "danger")
+	return alerts
+
+
+## Les trois valeurs permanentes du bureau, et elles seules. L'Impact sort
+## avec sa progression vers le quota : l'objectif est présent **par la forme**,
+## pas par un deuxième chiffre à surveiller (issue #54 §4).
+func get_desk_vitals() -> Dictionary:
+	var progress := get_quarter_progress()
+	var quota := float(progress.get("quota", 0))
+	return {
+		"impact": impact_wallet,
+		"quota": int(quota),
+		"quotaRatio": clampf(float(impact_wallet) / maxf(quota, 1.0), 0.0, 1.0),
+		"revenue": int(round(revenue)),
+		"users": int(round(get_client_total())),
+	}
+
+
+## 📬 Le courrier **du bureau** est collant sur le sprint. Dans le tunnel
+## d'écrans, l'Inbox n'était traversée qu'une fois : tirer à l'ouverture
+## suffisait. Dans un hub libre on ouvre et ferme le courrier autant qu'on
+## veut — retirer à chaque ouverture offrirait un re-roll gratuit et infini,
+## ce qui supprime le pari (issue #54 §1).
+##
+## `draw_inbox_event()` garde sa sémantique de file (crises, inquiétudes, pool)
+## pour tout le reste du jeu : c'est ici, et seulement ici, qu'on retient le
+## tirage.
+func get_sprint_event() -> Dictionary:
+	if _sprint_event_sprint == sprint_number:
+		return _sprint_event
+	_sprint_event = draw_inbox_event()
+	_sprint_event_sprint = sprint_number
+	_sprint_event_answered = false
+	return _sprint_event
+
+
+## Combien de courrier attend encore une réponse. La tuile de l'application
+## le porte **avant** qu'on l'ouvre : dans un hub libre, ce qui ne se rappelle
+## pas au joueur ne sera jamais ouvert.
+func pending_inbox_count() -> int:
+	if _sprint_event_answered:
+		return 0
+	return 1 if not get_sprint_event().is_empty() else 0
+
+
+func mark_sprint_event_answered() -> void:
+	_sprint_event_answered = true
+
+
+## 🏁 Ce qu'on emporte en signant. La feuille dit ce qui a été fait **et ce qui
+## a été ignoré** : découvrir à la Résolution qu'un événement non traité s'est
+## résolu au pire serait un piège, pas un pari (question de vision n°4).
+func get_closing_summary() -> Array:
+	var pending := pending_inbox_count()
+	var capacity := get_effective_capacity()
+	return [
+		{"label": "Capacité du sprint", "value": "%d points" % capacity, "warn": false},
+		{"label": "Courrier non traité", "value": str(pending), "warn": pending > 0},
+		{"label": "Énergie restante", "value": "⚡ %d" % energy, "warn": energy <= int(get_alerts_conf().get("energyBelow", 0))},
+		{"label": "Portefeuille", "value": "💥 %d" % impact_wallet, "warn": false},
+	]
+
+
+## Skipper coûte, toujours. Sans ça, ignorer le jeu devient la stratégie
+## dominante — et le banc l'asserte au même titre que « ne rien faire perd ».
+## La valeur du malus vit dans `balance.json → desk.skip`, jamais ici.
+func resolve_unanswered_events() -> int:
+	if _sprint_event_answered or _sprint_event.is_empty():
+		return 0
+	var skip: Dictionary = get_desk_conf().get("skip", {})
+	var penalty := int(skip.get("unansweredEventCapitalPolitique", 0))
+	if penalty != 0:
+		add_pending({"capital-politique": penalty},
+			"Un message est resté sans réponse : le board l'a remarqué.")
+	_sprint_event_answered = true
+	return penalty
+
+
+## Le journal du dernier sprint clos, punaisé au mur. C'est le germe du Lot D
+## (#55) : la Résolution deviendra ce flux de lignes, ici on ne fait que garder
+## les dernières pour qu'elles restent lisibles pendant le sprint suivant.
+func get_last_journal() -> Array:
+	return last_journal.duplicate(true)
+
+
+func record_journal(lines: Array) -> void:
+	last_journal = lines.duplicate(true)

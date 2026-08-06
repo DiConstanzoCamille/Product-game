@@ -3,7 +3,7 @@ extends Control
 ## Le choix et ses effets restent portés par SprintState ; cet écran les raconte
 ## comme le fil interne qui vient de tomber dans l'openspace.
 
-const NEXT_SCENE := "res://scenes/screens/roadmap_screen.tscn"
+const NEXT_SCENE := "res://scenes/screens/desk_screen.tscn"
 const START_SCREEN_SCENE := "res://scenes/screens/start_screen.tscn"
 const DEFAULT_CHANNEL := "#direction-produit"
 

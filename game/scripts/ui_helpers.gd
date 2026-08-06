@@ -384,6 +384,11 @@ static func make_stamp(kind: String, width: int = 110) -> TextureRect:
 ## au premier cadre SVG, la dalle est opaque : le papier réglé appartient à
 ## l'ordinateur et aucun élément de mobilier ne passe devant les contrôles.
 static func attach_decision_workspace(screen: Control, decision_path: NodePath) -> void:
+	# Le poste de travail décoratif dessine un ordinateur portable. Hébergé dans
+	# le moniteur du bureau, ça donnait un ordinateur DANS un ordinateur — vu
+	# sur la capture, invisible autrement.
+	if hosted_in_desk:
+		return
 	var target := screen.get_node_or_null(decision_path)
 	var margin := screen.get_node_or_null("Margin")
 	var background := screen.get_node_or_null("Background")
@@ -545,7 +550,21 @@ static func resource_tooltip(resource: Dictionary) -> String:
 ## ressources horizontale. Instancié par chaque écran — il n'a aucun état à
 ## préserver, tout vit dans SprintState. `screen` doit avoir un nœud "Margin"
 ## (MarginContainer) : sa marge droite est repoussée pour laisser la place.
+## Vrai pendant qu'un écran de phase est instancié **dans le bureau** (#54).
+## Le Panneau de bord n'existe plus dans ce monde-là : ses quinze valeurs sont
+## devenues trois zones et une remontée par exception. Le drapeau évite de
+## rouvrir les neuf écrans pour retirer un appel qu'ils font tous.
+static var hosted_in_desk := false
+
+
 static func attach_side_panel(screen: Control) -> Control:
+	if hosted_in_desk:
+		# Un Control nu, jamais `null` : les écrans gardent `side_panel.refresh()`
+		# et `side_panel.state_changed` — un null les ferait planter au premier
+		# achat, et ce lot ne doit pas les réécrire.
+		var stub: Control = load("res://scenes/components/side_panel_stub.tscn").instantiate()
+		screen.add_child(stub)
+		return stub
 	var panel_scene: PackedScene = load("res://scenes/components/side_panel.tscn")
 	var panel: Control = panel_scene.instantiate()
 	screen.add_child(panel)

@@ -12,7 +12,7 @@ extends Control
 ## Inséré par resolution_screen.gd quand un trimestre vient de se clôturer et
 ## que le mandat continue (voir _quarter_just_closed()).
 
-const NEXT_SCENE := "res://scenes/screens/inbox_screen.tscn"
+const NEXT_SCENE := "res://scenes/screens/desk_screen.tscn"
 const START_SCREEN_SCENE := "res://scenes/screens/start_screen.tscn"
 
 @onready var sprint_label: Label = $Margin/VBox/TopBar/SprintLabel

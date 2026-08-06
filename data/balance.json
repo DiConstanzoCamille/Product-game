@@ -1,6 +1,5 @@
 {
   "_comment": "Données de simulation — consommées uniquement par game/ (pas par landing/). Toutes les valeurs sont indicatives, à ajuster en playtest. Décisions documentées dans docs/carnet-de-regles.md §14-19. Phase C ajoute le backlog profond ; le contenu de ses features et epics vit dans backlog.json.",
-
   "startingResources": {
     "moral": 60,
     "dette-organisationnelle": 15,
@@ -8,17 +7,18 @@
     "reputation-produit": 50,
     "cynisme": 10
   },
-
   "startingResourceOverrides": {},
-
-  "resourceBounds": { "min": 0, "max": 100 },
-
+  "resourceBounds": {
+    "min": 0,
+    "max": 100
+  },
   "revenue": {
     "_comment": "💰 Le Revenue (spec-impact-monnaie.md §3) — la caisse de l'entreprise. Valeur SANS plafond : elle ne vit donc pas dans resources.json et n'a pas de jauge. Elle encaisse ce que les clients paient (spec-clients-revenue.md §2) et paie chaque sprint les salaires, les licences et le support des clients. À zéro, c'est la faillite (endingThresholds). Ce n'est PAS un stock d'abonnements : le stock, ce sont les clients eux-mêmes (businessModels → segments).",
     "start": 46,
-    "startOverrides": { "karavel-scaleup": 30 }
+    "startOverrides": {
+      "karavel-scaleup": 30
+    }
   },
-
   "resourceDirection": {
     "revenue": "high-good",
     "moral": "high-good",
@@ -27,22 +27,45 @@
     "dette-organisationnelle": "low-good",
     "cynisme": "low-good"
   },
-
-  "stateThresholds": { "goodMin": 60, "dangerMax": 25 },
-
+  "stateThresholds": {
+    "goodMin": 60,
+    "dangerMax": 25
+  },
   "individualTeam": {
     "_comment": "L'équipe n'est plus une jauge : chaque personne porte ces quatre niveaux. `moral` reste dans resources.json uniquement comme vue calculée, pour les systèmes qui le lisent (score, fatigue, fins). Toutes les valeurs de ce bloc sont de l'équilibrage, jamais des constantes de script.",
-    "criteria": ["moral", "confiance", "energie", "salaire"],
+    "criteria": [
+      "moral",
+      "confiance",
+      "energie",
+      "salaire"
+    ],
     "alertAt": 25,
     "leaveAt": 0,
-    "cpoStart": { "moral": 70, "confiance": 0, "energie": 70, "salaire": 68 },
+    "cpoStart": {
+      "moral": 70,
+      "confiance": 0,
+      "energie": 70,
+      "salaire": 68
+    },
     "oneOnOneConfiance": 14,
     "promotionSalaire": 18,
     "seminarMoral": 10,
     "managementActions": {
-      "timeOff": { "moral": 10, "energie": 28, "confiance": 4 },
-      "salaryRaise": { "salaryStep": 1, "salaire": 30, "confiance": 8 },
-      "ownership": { "confiance": 22, "moral": 6, "cpoEnergyCost": 6 },
+      "timeOff": {
+        "moral": 10,
+        "energie": 28,
+        "confiance": 4
+      },
+      "salaryRaise": {
+        "salaryStep": 1,
+        "salaire": 30,
+        "confiance": 8
+      },
+      "ownership": {
+        "confiance": 22,
+        "moral": 6,
+        "cpoEnergyCost": 6
+      },
       "oncePerSprint": true
     },
     "sprintEnergy": {
@@ -54,7 +77,10 @@
     "systemicEffects": {
       "debtMoralAt": 55,
       "debtMoralPerSprint": -3,
-      "missedQuarter": { "moral": -12, "confiance": -10 },
+      "missedQuarter": {
+        "moral": -12,
+        "confiance": -10
+      },
       "salaryDriftAfterSprints": 3,
       "salaryDriftPerSprint": -3,
       "betterPaidNewcomer": -8
@@ -64,36 +90,128 @@
         "subject": "demande à souffler avant de décrocher",
         "body": "Le travail avance, mais la personne ne voit plus pourquoi elle devrait continuer à ce rythme.",
         "choices": [
-          { "id": "ecouter", "label": "Prendre le temps de l'écouter", "reveal": "Vous nommez enfin le problème. Ce n'est pas réglé, mais ce n'est plus invisible.", "employeeDeltas": { "moral": 16, "confiance": 6 }, "cpoDeltas": { "energie": -4 } },
-          { "id": "repos", "label": "Lui donner le sprint pour souffler", "reveal": "La personne récupère, mais ne contribuera pas à la capacité de ce sprint.", "action": "time-off" },
-          { "id": "ignorer", "label": "Maintenir le cap et ne rien changer", "reveal": "Le silence est entendu comme une réponse.", "employeeDeltas": { "moral": -12, "confiance": -6 } }
+          {
+            "id": "ecouter",
+            "label": "Prendre le temps de l'écouter",
+            "reveal": "Vous nommez enfin le problème. Ce n'est pas réglé, mais ce n'est plus invisible.",
+            "employeeDeltas": {
+              "moral": 16,
+              "confiance": 6
+            },
+            "cpoDeltas": {
+              "energie": -4
+            }
+          },
+          {
+            "id": "repos",
+            "label": "Lui donner le sprint pour souffler",
+            "reveal": "La personne récupère, mais ne contribuera pas à la capacité de ce sprint.",
+            "action": "time-off"
+          },
+          {
+            "id": "ignorer",
+            "label": "Maintenir le cap et ne rien changer",
+            "reveal": "Le silence est entendu comme une réponse.",
+            "employeeDeltas": {
+              "moral": -12,
+              "confiance": -6
+            }
+          }
         ]
       },
       "confiance": {
         "subject": "vous demande ce qui peut encore être cru",
         "body": "Les décisions ont changé plusieurs fois. La personne veut savoir ce que vous tiendrez vraiment.",
         "choices": [
-          { "id": "ownership", "label": "Lui confier un vrai périmètre", "reveal": "Vous donnez une responsabilité vérifiable, pas une promesse de plus.", "action": "ownership" },
-          { "id": "ecouter", "label": "Faire un 1:1 sans éléments de langage", "reveal": "La conversation coûte de l'énergie, mais recrée un point d'appui.", "employeeDeltas": { "confiance": 18 }, "cpoDeltas": { "energie": -4 } },
-          { "id": "recadrer", "label": "Demander de suivre malgré les doutes", "reveal": "La livraison continue. La confiance, non.", "employeeDeltas": { "confiance": -14, "moral": -5 } }
+          {
+            "id": "ownership",
+            "label": "Lui confier un vrai périmètre",
+            "reveal": "Vous donnez une responsabilité vérifiable, pas une promesse de plus.",
+            "action": "ownership"
+          },
+          {
+            "id": "ecouter",
+            "label": "Faire un 1:1 sans éléments de langage",
+            "reveal": "La conversation coûte de l'énergie, mais recrée un point d'appui.",
+            "employeeDeltas": {
+              "confiance": 18
+            },
+            "cpoDeltas": {
+              "energie": -4
+            }
+          },
+          {
+            "id": "recadrer",
+            "label": "Demander de suivre malgré les doutes",
+            "reveal": "La livraison continue. La confiance, non.",
+            "employeeDeltas": {
+              "confiance": -14,
+              "moral": -5
+            }
+          }
         ]
       },
       "energie": {
         "subject": "ne peut pas repartir pour un sprint identique",
         "body": "La fatigue est désormais visible. Continuer au même rythme transforme une alerte en burn-out.",
         "choices": [
-          { "id": "repos", "label": "Lui donner le sprint pour récupérer", "reveal": "La capacité baisse ce sprint, l'épuisement recule.", "action": "time-off" },
-          { "id": "alleger", "label": "Alléger sa charge et reprendre une partie du travail", "reveal": "Vous absorbez la pression à sa place.", "employeeDeltas": { "energie": 18, "moral": 5 }, "cpoDeltas": { "energie": -8 } },
-          { "id": "tenir", "label": "Lui demander de tenir encore", "reveal": "La personne livre encore. Le compteur, lui, approche de zéro.", "employeeDeltas": { "energie": -14, "confiance": -6 } }
+          {
+            "id": "repos",
+            "label": "Lui donner le sprint pour récupérer",
+            "reveal": "La capacité baisse ce sprint, l'épuisement recule.",
+            "action": "time-off"
+          },
+          {
+            "id": "alleger",
+            "label": "Alléger sa charge et reprendre une partie du travail",
+            "reveal": "Vous absorbez la pression à sa place.",
+            "employeeDeltas": {
+              "energie": 18,
+              "moral": 5
+            },
+            "cpoDeltas": {
+              "energie": -8
+            }
+          },
+          {
+            "id": "tenir",
+            "label": "Lui demander de tenir encore",
+            "reveal": "La personne livre encore. Le compteur, lui, approche de zéro.",
+            "employeeDeltas": {
+              "energie": -14,
+              "confiance": -6
+            }
+          }
         ]
       },
       "salaire": {
         "subject": "demande une augmentation avant de regarder ailleurs",
         "body": "La comparaison avec le marché est devenue explicite. La reconnaissance symbolique ne suffira plus.",
         "choices": [
-          { "id": "augmentation", "label": "Augmenter son salaire de 1 💰/sprint", "reveal": "La hausse devient une charge récurrente, et la demande reçoit une réponse concrète.", "action": "salary-raise" },
-          { "id": "promotion", "label": "Lui donner un vrai périmètre en attendant", "reveal": "La confiance remonte, mais la question salariale reste ouverte.", "action": "ownership", "employeeDeltas": { "salaire": 8 } },
-          { "id": "refuser", "label": "Refuser sans contrepartie", "reveal": "La personne sait désormais que rien ne changera ici.", "employeeDeltas": { "salaire": -16, "confiance": -8 } }
+          {
+            "id": "augmentation",
+            "label": "Augmenter son salaire de 1 💰/sprint",
+            "reveal": "La hausse devient une charge récurrente, et la demande reçoit une réponse concrète.",
+            "action": "salary-raise"
+          },
+          {
+            "id": "promotion",
+            "label": "Lui donner un vrai périmètre en attendant",
+            "reveal": "La confiance remonte, mais la question salariale reste ouverte.",
+            "action": "ownership",
+            "employeeDeltas": {
+              "salaire": 8
+            }
+          },
+          {
+            "id": "refuser",
+            "label": "Refuser sans contrepartie",
+            "reveal": "La personne sait désormais que rien ne changera ici.",
+            "employeeDeltas": {
+              "salaire": -16,
+              "confiance": -8
+            }
+          }
         ]
       }
     },
@@ -101,34 +219,59 @@
       "moral": {
         "subject": "n'arrive plus à se projeter ici",
         "restoreLabel": "Lui rendre du temps et un vrai périmètre",
-        "restoreActions": ["time-off", "ownership"],
-        "restore": { "moral": 18 },
+        "restoreActions": [
+          "time-off",
+          "ownership"
+        ],
+        "restore": {
+          "moral": 18
+        },
         "leaveLabel": "Accepter son départ",
-        "teamAfterLeave": { "moral": -8 }
+        "teamAfterLeave": {
+          "moral": -8
+        }
       },
       "confiance": {
         "subject": "ne vous suit plus",
         "restoreLabel": "Lui confier un vrai sujet et le tenir",
-        "restoreActions": ["ownership"],
-        "restore": { "confiance": 16 },
+        "restoreActions": [
+          "ownership"
+        ],
+        "restore": {
+          "confiance": 16
+        },
         "leaveLabel": "Le laisser partir",
-        "teamAfterLeave": { "moral": -4 }
+        "teamAfterLeave": {
+          "moral": -4
+        }
       },
       "energie": {
         "subject": "est en burn-out",
         "restoreLabel": "Arrêter le sprint pour le protéger",
-        "restoreActions": ["time-off"],
-        "restore": { "energie": 14 },
+        "restoreActions": [
+          "time-off"
+        ],
+        "restore": {
+          "energie": 14
+        },
         "leaveLabel": "Le laisser quitter l'équipe",
-        "teamAfterLeave": { "moral": -10 }
+        "teamAfterLeave": {
+          "moral": -10
+        }
       },
       "salaire": {
         "subject": "a une offre ailleurs",
         "restoreLabel": "Aligner son salaire et sa reconnaissance",
-        "restoreActions": ["salary-raise"],
-        "restore": { "salaire": 6 },
+        "restoreActions": [
+          "salary-raise"
+        ],
+        "restore": {
+          "salaire": 6
+        },
         "leaveLabel": "Ne pas s'aligner",
-        "teamAfterLeave": { "moral": -5 }
+        "teamAfterLeave": {
+          "moral": -5
+        }
       }
     },
     "defaultPeopleTarget": "tous",
@@ -137,23 +280,53 @@
       "senior": "veteran-desabuse"
     }
   },
-
   "trimesterLengthSprints": 3,
-
   "endingThresholds": [
-    { "resource": "revenue", "comparison": "lte", "value": 0, "ending": "faillite" },
-    { "resource": "moral", "comparison": "lte", "value": 0, "ending": "exode-equipe" },
-    { "resource": "dette-organisationnelle", "comparison": "gte", "value": 100, "ending": "entreprise-zombie" },
-    { "resource": "capital-politique", "comparison": "lte", "value": 0, "ending": "rachat-hostile" },
-    { "resource": "cynisme", "comparison": "gte", "value": 100, "ending": "remplace-par-ia" },
-    { "resource": "energie", "comparison": "lte", "value": 0, "ending": "burnout-fondateur" }
+    {
+      "resource": "revenue",
+      "comparison": "lte",
+      "value": 0,
+      "ending": "faillite"
+    },
+    {
+      "resource": "moral",
+      "comparison": "lte",
+      "value": 0,
+      "ending": "exode-equipe"
+    },
+    {
+      "resource": "dette-organisationnelle",
+      "comparison": "gte",
+      "value": 100,
+      "ending": "entreprise-zombie"
+    },
+    {
+      "resource": "capital-politique",
+      "comparison": "lte",
+      "value": 0,
+      "ending": "rachat-hostile"
+    },
+    {
+      "resource": "cynisme",
+      "comparison": "gte",
+      "value": 100,
+      "ending": "remplace-par-ia"
+    },
+    {
+      "resource": "energie",
+      "comparison": "lte",
+      "value": 0,
+      "ending": "burnout-fondateur"
+    }
   ],
-
   "endingThresholdOverrides": {
-    "garage": { "cynisme": 130 },
-    "ai-era": { "capital-politique": 12 }
+    "garage": {
+      "cynisme": 130
+    },
+    "ai-era": {
+      "capital-politique": 12
+    }
   },
-
   "goodEnding": {
     "_comment": "Deux fins positives, deux juges différents (spec-clients-revenue.md §5.1.1) — on ne moyenne plus une perception produit et une perception joueur. 🚀 L'IPO se gagne sur ce que vaut le PRODUIT : 📈 Réputation produit au-dessus du seuil, et une base de clients réellement là. 🤝 Le rachat est le reste : quelqu'un achète l'entreprise (et vous avec), ce qui n'exige rien du produit.",
     "ipo": {
@@ -164,45 +337,119 @@
     "highEnding": "ipo",
     "lowEnding": "rachat"
   },
-
   "cardAxisResourceMap": {
-    "humain": { "resource": "moral", "invert": false },
-    "financier": { "resource": "revenue", "invert": false },
-    "ttm": { "resource": "reputation-produit", "invert": false },
-    "productivite": { "resource": "dette-organisationnelle", "invert": true }
+    "humain": {
+      "resource": "moral",
+      "invert": false
+    },
+    "financier": {
+      "resource": "revenue",
+      "invert": false
+    },
+    "ttm": {
+      "resource": "reputation-produit",
+      "invert": false
+    },
+    "productivite": {
+      "resource": "dette-organisationnelle",
+      "invert": true
+    }
   },
-
   "toolSlots": {
     "_comment": "Spec §7.1.1 et §13.4 (Lot 5). Base indexee par niveau de carriere - les 4 lignes ajoutees par le Lot 5 suivent la table de careers.json (3 -> 4 -> 5 -> 6 -> 7). Le plafond arbitraire structuralDecisionMaxActivations:4 disparait : la capacite se gagne (carriere) ou s'achete (extraSlotCosts), elle n'est plus une constante unique.",
     "careerLevels": {
-      "pm": { "base": 3 },
-      "lead-pm": { "base": 4 },
-      "director": { "base": 5 },
-      "cpo": { "base": 6 },
-      "ceo": { "base": 7 }
+      "pm": {
+        "base": 3
+      },
+      "lead-pm": {
+        "base": 4
+      },
+      "director": {
+        "base": 5
+      },
+      "cpo": {
+        "base": 6
+      },
+      "ceo": {
+        "base": 7
+      }
     },
-    "extraSlotCosts": [110, 190],
-    "swap": { "cynisme": 4, "cynismePerPreviousSwap": 3 }
+    "extraSlotCosts": [
+      110,
+      190
+    ],
+    "swap": {
+      "cynisme": 4,
+      "cynismePerPreviousSwap": 3
+    }
   },
-
-  "playableEras": ["agile-transformation"],
-
+  "playableEras": [
+    "agile-transformation"
+  ],
   "businessModels": {
     "_comment": "💰 Le Revenue n'est pas un stock, c'est une population qui paie (docs/spec-clients-revenue.md §2). Un modèle déclare 2 à 3 `segments`, jamais plus (§4.0) : c'est le minimum pour que « passer en payant » s'écrive sans règle spéciale, et le maximum lisible sur une ligne de panneau. Chaque sprint : `clients ← clients − churn + arrivées ± conversions`, puis `Revenue ← Revenue + Σ(clients × prix) − charges`. `clientsPerPoint` convertit l'effet client d'une feature (backlog.json → `clients`, une échelle de −6 à +6 partagée par tous les modèles) en clients réels de CE segment : la même feature amène 72 inscrits en freemium et 0,8 compte en B2B, sans qu'on écrive deux backlogs. `unitCost` est ce qu'un client coûte en support et en infra à chaque sprint — c'est lui qui rend une base gratuite dangereuse (§5.3). `price` est une CONSTANTE DU RUN (§5.2) : seule une décision stratégique explicite la change, jamais un événement. L'échelle de prix, elle, vient du scénario (eras.json → priceScale, §4.0.1). `role` (`entry`/`paying`) est ce qui rend les conversions écrivables sans connaître les ids : « faire passer des entrants en payants » est la même règle dans les deux modèles.",
     "freemium-volume": {
       "label": "Freemium — beaucoup de monde, peu d'argent",
       "description": "Des milliers d'inscrits, une poignée qui paie. Chaque utilisateur coûte du support même quand il ne rapporte rien : la base grandit plus vite que la caisse, et c'est exactement le piège.",
       "segments": [
-        { "id": "gratuits", "role": "entry", "label": "utilisateurs gratuits", "singular": "utilisateur gratuit", "shortLabel": "gratuits", "icon": "👥", "start": 760, "price": 0, "unitCost": 0.014, "churn": 0.07, "clientsPerPoint": 24 },
-        { "id": "payants", "role": "paying", "label": "abonnés", "singular": "abonné", "shortLabel": "abonnés", "icon": "💳", "start": 58, "price": 0.5, "unitCost": 0.04, "churn": 0.045, "clientsPerPoint": 1.5 }
+        {
+          "id": "gratuits",
+          "role": "entry",
+          "label": "utilisateurs gratuits",
+          "singular": "utilisateur gratuit",
+          "shortLabel": "gratuits",
+          "icon": "👥",
+          "start": 760,
+          "price": 0,
+          "unitCost": 0.014,
+          "churn": 0.07,
+          "clientsPerPoint": 24
+        },
+        {
+          "id": "payants",
+          "role": "paying",
+          "label": "abonnés",
+          "singular": "abonné",
+          "shortLabel": "abonnés",
+          "icon": "💳",
+          "start": 58,
+          "price": 0.5,
+          "unitCost": 0.04,
+          "churn": 0.045,
+          "clientsPerPoint": 1.5
+        }
       ]
     },
     "grands-comptes": {
       "label": "Grands comptes — peu de clients, chacun énorme",
       "description": "Quelques dizaines de comptes qui signent à l'année. En perdre un se voit sur la ligne du sprint ; en signer un change le trimestre. Le pilote qui traîne coûte cher et ne paie presque rien.",
       "segments": [
-        { "id": "pilotes", "role": "entry", "label": "comptes en pilote", "singular": "compte en pilote", "shortLabel": "pilotes", "icon": "🧪", "start": 15, "price": 0.28, "unitCost": 0.13, "churn": 0.13, "clientsPerPoint": 1.1 },
-        { "id": "comptes", "role": "paying", "label": "comptes signés", "singular": "compte signé", "shortLabel": "signés", "icon": "🏛️", "start": 25, "price": 1.2, "unitCost": 0.26, "churn": 0.03, "clientsPerPoint": 0.3 }
+        {
+          "id": "pilotes",
+          "role": "entry",
+          "label": "comptes en pilote",
+          "singular": "compte en pilote",
+          "shortLabel": "pilotes",
+          "icon": "🧪",
+          "start": 15,
+          "price": 0.28,
+          "unitCost": 0.13,
+          "churn": 0.13,
+          "clientsPerPoint": 1.1
+        },
+        {
+          "id": "comptes",
+          "role": "paying",
+          "label": "comptes signés",
+          "singular": "compte signé",
+          "shortLabel": "signés",
+          "icon": "🏛️",
+          "start": 25,
+          "price": 1.2,
+          "unitCost": 0.26,
+          "churn": 0.03,
+          "clientsPerPoint": 0.3
+        }
       ]
     },
     "waterfall-release": {
@@ -211,27 +458,39 @@
       "segments": []
     }
   },
-
   "eraCardEffectMultipliers": {
     "garage": {},
-    "agile-transformation": { "cynisme": 1.5 },
-    "ai-era": { "dette-organisationnelle": 1.15, "moral": 1.2, "revenue": 0.85 }
+    "agile-transformation": {
+      "cynisme": 1.5
+    },
+    "ai-era": {
+      "dette-organisationnelle": 1.15,
+      "moral": 1.2,
+      "revenue": 0.85
+    }
   },
-
-  "salaries": { "junior": 1, "senior": 2 },
-
+  "salaries": {
+    "junior": 1,
+    "senior": 2
+  },
   "roles": {
     "dev": {
       "label": "Dev",
       "icon": "💻",
-      "capacityPerEmployee": { "junior": 2, "senior": 3 },
+      "capacityPerEmployee": {
+        "junior": 2,
+        "senior": 3
+      },
       "fullYieldCount": 4,
       "extraYieldFactor": 0.5
     },
     "pm": {
       "label": "PM",
       "icon": "📋",
-      "capacityPerEmployee": { "junior": 1, "senior": 1 },
+      "capacityPerEmployee": {
+        "junior": 1,
+        "senior": 1
+      },
       "fullYieldCount": 3,
       "extraYieldFactor": 0.5,
       "overloadReductionPerPm": 0.25,
@@ -240,7 +499,10 @@
     "designer": {
       "label": "Designer",
       "icon": "🎨",
-      "capacityPerEmployee": { "junior": 0, "senior": 0 },
+      "capacityPerEmployee": {
+        "junior": 0,
+        "senior": 0
+      },
       "reputationPerFeatureDelivered": 1,
       "reputationPerFeatureDeliveredMax": 2,
       "reputationEffectsDivisorIfAbsent": 2
@@ -248,33 +510,31 @@
     "ops": {
       "label": "Ops",
       "icon": "🛠️",
-      "capacityPerEmployee": { "junior": 0, "senior": 0 },
+      "capacityPerEmployee": {
+        "junior": 0,
+        "senior": 0
+      },
       "dettePerOps": -1,
       "detteReliefMax": -2,
       "dettePerSprintIfAbsent": 2
     }
   },
-
   "firing": {
     "severanceImpact": 18,
     "confiance": -8,
     "cynismePerExtraFiring": 3
   },
-
   "trialPeriodSprints": 2,
-
   "licenses": {
     "_comment": "💰 Charges récurrentes (spec-impact-monnaie.md §3.6) — comptées PAR SIÈGE, jamais au forfait : grandir augmente mécaniquement la facture, et une organisation qui grossit sans produire se met en danger toute seule. `perSeat` est un coût de Revenue par sprint et par personne du roster ; `flat` un abonnement fixe. Chaque poste porte sa propre valeur (cards.json, practices.json, strategy.json, investments.json) ; ce bloc n'en donne que le défaut quand le poste n'en déclare pas.",
     "defaultToolPerSeat": 0.4,
     "defaultPracticePerSeat": 0.2,
     "defaultStrategyFlat": 0
   },
-
   "prices": {
     "_comment": "💥 Indexation des prix sur l'escalade des objectifs (spec-impact-monnaie.md §3.3). `prix = prix_base × (objectif_du_trimestre / objectif_T1) ^ quotaIndexExponent`. L'exposant est le seul réglage, et il est le cœur du lot : à 1 les prix suivent exactement l'escalade et chaque trimestre est identique au précédent avec plus de zéros — de l'inflation pure ; à 0 ils ne bougent pas et le late game devient gratuit. Entre les deux, le joueur s'enrichit RELATIVEMENT — il s'offre plus qu'au premier trimestre sans que ce soit donné. La source est la table des quotas elle-même (quotas.json) et jamais une seconde table de prix : changer l'escalade fait suivre les prix tout seul.",
     "quotaIndexExponent": 0.7
   },
-
   "shopDraw": {
     "slotsPerSprint": 6,
     "guaranteedPerSprint": {
@@ -300,26 +560,46 @@
     },
     "lockedLeaseSprints": 6
   },
-
   "energy": {
     "start": 70,
     "max": 100,
     "regenPerSprint": 12,
     "moralRegenTiers": [
-      { "moralMin": 60, "factor": 1.0 },
-      { "moralMin": 30, "factor": 0.5 },
-      { "moralMin": 0, "factor": 0.0 }
+      {
+        "moralMin": 60,
+        "factor": 1.0
+      },
+      {
+        "moralMin": 30,
+        "factor": 0.5
+      },
+      {
+        "moralMin": 0,
+        "factor": 0.0
+      }
     ],
     "breatherRegenBonus": 10,
     "actions": {
-      "oneOnOne": { "cost": 10 },
-      "selfWork": { "cost": 25, "capacityBonus": 2 },
-      "extension": { "cost": 10, "capitalPolitique": -8, "revenue": 14 },
-      "featureDive": { "cost": 15 },
-      "breather": { "cost": 0 }
+      "oneOnOne": {
+        "cost": 10
+      },
+      "selfWork": {
+        "cost": 25,
+        "capacityBonus": 2
+      },
+      "extension": {
+        "cost": 10,
+        "capitalPolitique": -8,
+        "revenue": 14
+      },
+      "featureDive": {
+        "cost": 15
+      },
+      "breather": {
+        "cost": 0
+      }
     }
   },
-
   "pressure": {
     "reputationDecayPerSprint": 2,
     "boardReview": {
@@ -327,15 +607,69 @@
       "failCapitalPolitique": -12
     }
   },
-
   "roadmap": {
-    "overCapacityPenalty": { "dette-organisationnelle": 10, "cynisme": 6, "moral": -4 }
+    "overCapacityPenalty": {
+      "dette-organisationnelle": 10,
+      "cynisme": 6,
+      "moral": -4
+    }
   },
-
   "backlogDraw": {
     "itemsPerSprintMin": 4,
     "itemsPerSprintMax": 5,
     "strongClientsThreshold": 2,
     "okrCapitalPolitiqueBonus": 2
+  },
+  "desk": {
+    "_comment": "Le bureau (issue #54). Aucune de ces valeurs n'est une constante de script : elles pilotent la remontée par exception du HUD et le coût du skip. Le Cynisme est volontairement absent de `alerts.gauges` — resources.json le définit comme « la jauge invisible », et l'afficher était un défaut.",
+    "alerts": {
+      "_comment": "Une alerte doit prévenir avec au moins `marginPerSprint` points d'avance sur l'échec : arrivée plus tard, elle punit au lieu d'informer. score_resolver_cases le vérifie pour chaque jauge.",
+      "marginPerSprint": 12,
+      "gauges": [
+        {
+          "id": "moral",
+          "direction": "below",
+          "at": 40,
+          "bound": 0,
+          "label": "L'équipe décroche"
+        },
+        {
+          "id": "dette-organisationnelle",
+          "direction": "above",
+          "at": 64,
+          "bound": 100,
+          "label": "Dette · livraisons ralenties"
+        },
+        {
+          "id": "capital-politique",
+          "direction": "below",
+          "at": 34,
+          "bound": 0,
+          "label": "Le board doute de vous"
+        },
+        {
+          "id": "reputation-produit",
+          "direction": "below",
+          "at": 34,
+          "bound": 0,
+          "label": "Les utilisateurs décrochent"
+        }
+      ],
+      "energyBelow": 14,
+      "energyLabel": "Vous êtes à bout",
+      "cashBelowSprintsOfCharges": 1.0,
+      "cashLabel": "La caisse ne tient pas le sprint",
+      "quotaShortfallRatio": 0.5,
+      "quotaLabel": "Quota hors d'atteinte au rythme actuel"
+    },
+    "skip": {
+      "_comment": "Skipper doit toujours coûter, sinon ignorer le jeu devient la stratégie dominante : un événement non traité se résout dans sa pire branche à la clôture.",
+      "unansweredEventResolvesWorst": true,
+      "unansweredEventCapitalPolitique": -4
+    },
+    "screen": {
+      "_comment": "Piste 3 : le monde reste clair et papier, la dalle du poste de travail est le seul endroit saturé et animé. Un seul curseur pilote scanlines, bombé, halo et saturation.",
+      "glowIntensity": 0.95
+    }
   }
 }

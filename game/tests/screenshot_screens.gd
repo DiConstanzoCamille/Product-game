@@ -4,6 +4,7 @@ extends Node
 ##   xvfb-run -a godot --path game --display-driver x11 res://tests/screenshot_screens.tscn
 
 const SCREENS := [
+	"res://scenes/screens/desk_screen.tscn",
 	"res://scenes/screens/start_screen.tscn",
 	"res://scenes/screens/career_select_screen.tscn",
 	"res://scenes/screens/scenario_screen.tscn",
@@ -27,6 +28,8 @@ func _ready() -> void:
 	await _shoot_all()
 	_prepare_team_state()
 	await _shoot_team_management()
+	await _shoot_desk_states()
+	await _shoot_screen_styles()
 	print("=== CAPTURES : TERMINÉ ===")
 	get_tree().quit()
 
@@ -85,3 +88,62 @@ func _shoot_team_management() -> void:
 		print("  %s team_management_screen (%dx%d)" % ["✓" if err == OK else "✗", image.get_width(), image.get_height()])
 	screen.queue_free()
 	await get_tree().process_frame
+
+
+## Le bureau ne se juge pas au repos : ce qui pouvait casser, c'est une phase
+## existante hébergée dans le moniteur et un accessoire ouvert. Les deux se
+## capturent ici, sinon le lot serait déclaré fini sans que personne ne les ait
+## vus (CLAUDE.md : quatre lots livrés sans un pixel regardé).
+func _shoot_desk_states() -> void:
+	for state in ["app", "shop", "committee"]:
+		_prepare_team_state()
+		if state == "committee":
+			SprintState.committee_pending = true
+		var desk: Node = load("res://scenes/screens/desk_screen.tscn").instantiate()
+		get_tree().root.add_child(desk)
+		await get_tree().process_frame
+		await get_tree().process_frame
+
+		match state:
+			"app":
+				desk.get_node("Workstation").open_app("inbox")
+			"shop":
+				desk.get_node("shop").expand()
+			"committee":
+				desk.get_node("committee").expand()
+		# Les accessoires glissent en 0,34 s : capturer avant la fin du Tween
+		# montrerait un objet à mi-course, ce qui ne prouve rien.
+		for _i in range(40):
+			await get_tree().process_frame
+		await RenderingServer.frame_post_draw
+
+		var image := get_tree().root.get_texture().get_image()
+		image.save_png("%s/desk_%s.png" % [out_dir, state])
+		print("  ✓ desk_%s (%dx%d)" % [state, image.get_width(), image.get_height()])
+		desk.queue_free()
+		await get_tree().process_frame
+
+
+## Piste 3 (#54) : jusqu'où la dalle brille. Trois intensités du même shader
+## sur la même scène — c'est la maquette, et elle est faite dans le moteur
+## plutôt qu'en HTML : un look piloté par shader ne se valide pas avec des
+## filtres CSS qu'on ne saurait pas reproduire. La piste retenue est déjà du
+## code, il n'y aura rien à porter.
+func _shoot_screen_styles() -> void:
+	var Workstation := load("res://scripts/components/workstation.gd")
+	for step in [{"name": "0-sobre", "value": 0.0},
+			{"name": "1-mesure", "value": 0.45},
+			{"name": "2-franc", "value": 0.95}]:
+		_prepare_team_state()
+		Workstation.screen_intensity = float(step["value"])
+		var desk: Node = load("res://scenes/screens/desk_screen.tscn").instantiate()
+		get_tree().root.add_child(desk)
+		for _i in range(6):
+			await get_tree().process_frame
+		await RenderingServer.frame_post_draw
+		var image := get_tree().root.get_texture().get_image()
+		image.save_png("%s/ecran_%s.png" % [out_dir, step["name"]])
+		print("  ✓ ecran_%s (intensité %.2f)" % [step["name"], step["value"]])
+		desk.queue_free()
+		await get_tree().process_frame
+	Workstation.screen_intensity = -1.0

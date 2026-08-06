@@ -19,7 +19,7 @@ extends Control
 ## et le contenu des zones changent. Le coût, l'effectif, l'Énergie et le profil
 ## d'équipe ne sont pas affichés ici mais en continu dans le Panneau de bord.
 
-const NEXT_SCENE := "res://scenes/screens/resolution_screen.tscn"
+const NEXT_SCENE := "res://scenes/screens/desk_screen.tscn"
 const START_SCREEN_SCENE := "res://scenes/screens/start_screen.tscn"
 
 ## Largeur de gouttière de la grille (doit suivre le `h_separation` de la
