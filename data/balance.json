@@ -666,6 +666,10 @@
       "_comment": "Skipper doit toujours coûter, sinon ignorer le jeu devient la stratégie dominante : un événement non traité se résout dans sa pire branche à la clôture.",
       "unansweredEventResolvesWorst": true,
       "unansweredEventCapitalPolitique": -4
+    },
+    "screen": {
+      "_comment": "Piste 3 : le monde reste clair et papier, la dalle du poste de travail est le seul endroit saturé et animé. Un seul curseur pilote scanlines, bombé, halo et saturation.",
+      "glowIntensity": 0.95
     }
   }
 }

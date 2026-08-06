@@ -146,4 +146,4 @@ func _shoot_screen_styles() -> void:
 		print("  ✓ ecran_%s (intensité %.2f)" % [step["name"], step["value"]])
 		desk.queue_free()
 		await get_tree().process_frame
-	Workstation.screen_intensity = 0.55
+	Workstation.screen_intensity = -1.0

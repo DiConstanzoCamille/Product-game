@@ -54,8 +54,17 @@ var _frame: TextureRect = null
 var _glow: ColorRect = null
 
 ## Piste 3 : combien la dalle brille. 0 = la pièce et l'écran ont la même
-## matière ; 1 = contraste franc. Réglage, donc destiné à balance.json.
-static var screen_intensity := 0.55
+## matière ; 1 = contraste franc. C'est un réglage, donc il vit dans
+## `balance.json → desk.screen.glowIntensity` et se lit par une fonction de
+## résolution — la variable statique n'existe que pour que le harnais de
+## captures puisse comparer plusieurs intensités sur la même scène.
+static var screen_intensity := -1.0
+
+
+static func resolved_screen_intensity() -> float:
+	if screen_intensity >= 0.0:
+		return screen_intensity
+	return float(SprintState.get_desk_conf().get("screen", {}).get("glowIntensity", 0.95))
 var _rect := Rect2()
 
 
@@ -86,7 +95,7 @@ func _ready() -> void:
 	_glow.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var glow_material := ShaderMaterial.new()
 	glow_material.shader = preload("res://resources/shaders/screen_glow.gdshader")
-	glow_material.set_shader_parameter("intensity", screen_intensity)
+	glow_material.set_shader_parameter("intensity", resolved_screen_intensity())
 	_glow.material = glow_material
 	add_child(_glow)
 
@@ -115,7 +124,7 @@ func _apply_frame(frame_width: float, anchor: Vector2) -> void:
 	if _glow != null:
 		_glow.position = screen_position
 		_glow.size = screen_size
-		_glow.material.set_shader_parameter("intensity", screen_intensity)
+		_glow.material.set_shader_parameter("intensity", resolved_screen_intensity())
 	queue_redraw()
 
 
