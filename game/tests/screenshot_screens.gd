@@ -70,13 +70,16 @@ func _shoot_all() -> void:
 
 
 func _shoot_team_management() -> void:
-	var screen: Control = load("res://scenes/screens/roadmap_screen.tscn").instantiate()
+	var screen: DeskScreen = load("res://scenes/screens/desk_screen.tscn").instantiate()
 	add_child(screen)
 	for i in range(12):
 		await get_tree().process_frame
-	var open_button: Button = screen.find_child("OpenTeamManagement", true, false)
+	screen.lift_paper("team")
+	for i in range(12):
+		await get_tree().process_frame
+	var open_button: Button = screen.readable_layer().find_child("OpenTeamManagement", true, false)
 	if open_button == null:
-		print("  ✗ bouton Gérer l'équipe introuvable")
+		print("  ✗ entrée de la fiche complète introuvable")
 	else:
 		open_button.pressed.emit()
 		for i in range(12):
@@ -91,29 +94,40 @@ func _shoot_team_management() -> void:
 
 
 ## Le bureau ne se juge pas au repos : ce qui pouvait casser, c'est une phase
-## existante hébergée dans le moniteur et un accessoire ouvert. Les deux se
-## capturent ici, sinon le lot serait déclaré fini sans que personne ne les ait
-## vus (CLAUDE.md : quatre lots livrés sans un pixel regardé).
+## existante hébergée dans la dalle, un accessoire ouvert et un poster levé.
+## Tous se capturent ici, sinon le lot serait déclaré fini sans que personne ne
+## les ait vus (CLAUDE.md : quatre lots livrés sans un pixel regardé).
+##
+## Le bureau est en volume depuis #59 : il se construit en `call_deferred` (un
+## `add_child()` pendant `_ready()` est **rejeté sans erreur GDScript**), donc
+## la première trame ne montre rien. D'où l'attente avant chaque geste.
 func _shoot_desk_states() -> void:
-	for state in ["app", "shop", "committee"]:
+	for state in ["calme", "app", "shop", "committee", "poster"]:
 		_prepare_team_state()
 		if state == "committee":
 			SprintState.committee_pending = true
-		var desk: Node = load("res://scenes/screens/desk_screen.tscn").instantiate()
+		if state == "poster":
+			# Un journal vide ne prouverait rien : on lève le poster « Équipe »,
+			# celui qui porte le détail par personne et ses actions.
+			SprintState.employee_wellbeing(SprintState.get_roster()[0])["salaire"] = 20
+			SprintState._inspect_team_crises()
+		var desk: DeskScreen = load("res://scenes/screens/desk_screen.tscn").instantiate()
 		get_tree().root.add_child(desk)
-		await get_tree().process_frame
-		await get_tree().process_frame
+		for _i in range(8):
+			await get_tree().process_frame
 
 		match state:
 			"app":
-				desk.get_node("Workstation").open_app("inbox")
+				desk.open_app("inbox")
 			"shop":
-				desk.get_node("shop").expand()
+				desk.open_prop("shop")
 			"committee":
-				desk.get_node("committee").expand()
-		# Les accessoires glissent en 0,34 s : capturer avant la fin du Tween
+				desk.open_prop("committee")
+			"poster":
+				desk.lift_paper("team")
+		# Les accessoires glissent en 0,42 s : capturer avant la fin du Tween
 		# montrerait un objet à mi-course, ce qui ne prouve rien.
-		for _i in range(40):
+		for _i in range(48):
 			await get_tree().process_frame
 		await RenderingServer.frame_post_draw
 

@@ -662,6 +662,10 @@
       "quotaShortfallRatio": 0.5,
       "quotaLabel": "Quota hors d'atteinte au rythme actuel"
     },
+    "journal": {
+      "_comment": "Le papier du mur ne se lit pas, il se survole : au-delà de quelques lignes il redevient un tableau de bord. On garde les mouvements les plus gros du sprint clos.",
+      "maxLines": 4
+    },
     "skip": {
       "_comment": "Skipper doit toujours coûter, sinon ignorer le jeu devient la stratégie dominante : un événement non traité se résout dans sa pire branche à la clôture.",
       "unansweredEventResolvesWorst": true,

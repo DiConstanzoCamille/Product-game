@@ -5,10 +5,10 @@ extends RefCounted
 ##
 ## Palette CLAIRE depuis la refonte UI (docs/proposition-ui-interface.md §6,
 ## piste « Post-it & Feutre ») : le monde de jeu est du papier — blanc cassé,
-## encre foncée, fiches et post-it. Le seul îlot sombre est le panneau de bord
-## (scenes/components/side_panel.tscn), l'écran TV du standup : ses couleurs
-## sont préfixées PANEL_ ci-dessous. Les hex de référence viennent du spike
-## validé scenes/prototype_2d/market_screen_proto.tscn.
+## encre foncée, fiches et post-it. Le seul îlot sombre est la dalle du poste
+## de travail, l'écran allumé posé dans une pièce claire : ses couleurs sont
+## préfixées PANEL_ ci-dessous. Les hex de référence viennent du spike validé
+## scenes/prototype_2d/market_screen_proto.tscn.
 
 # ── Le monde clair ────────────────────────────────────────────────────────
 const COLOR_SCREEN_BG := Color("#f4f6f3")
@@ -47,8 +47,6 @@ const PANEL_ACCENT := Color("#7fd3ff")
 const PANEL_GOOD := Color("#7fe3a5")
 const PANEL_WARN := Color("#f0b44a")
 const PANEL_DANGER := Color("#f3897f")
-
-const SIDE_PANEL_WIDTH := 320
 
 ## Ombre portée des objets de papier, au repos et au survol. Le survol d'un
 ## **bouton** ne touche pas à sa géométrie : il grossit son ombre, et le bouton
@@ -545,42 +543,28 @@ static func resource_tooltip(resource: Dictionary) -> String:
 	return "\n".join(lines)
 
 
-## Branche le Panneau de bord (§4 de la proposition UI) sur un écran de phase :
-## une colonne fixe à droite, présente en continu, qui remplace la barre de
-## ressources horizontale. Instancié par chaque écran — il n'a aucun état à
-## préserver, tout vit dans SprintState. `screen` doit avoir un nœud "Margin"
-## (MarginContainer) : sa marge droite est repoussée pour laisser la place.
 ## Vrai pendant qu'un écran de phase est instancié **dans le bureau** (#54).
-## Le Panneau de bord n'existe plus dans ce monde-là : ses quinze valeurs sont
-## devenues trois zones et une remontée par exception. Le drapeau évite de
-## rouvrir les neuf écrans pour retirer un appel qu'ils font tous.
+## Le drapeau reste utile après la suppression du Panneau de bord : c'est lui
+## qui empêche aussi `attach_decision_workspace()` de dessiner un ordinateur
+## dans un ordinateur.
 static var hosted_in_desk := false
 
 
+## Le Panneau de bord permanent est mort avec #59 : ses quinze valeurs sont
+## devenues trois zones et une remontée par exception, et les 830 lignes qui le
+## dessinaient ne servaient plus que sur un chemin que le jeu n'emprunte plus.
+## Ce qu'il portait d'irremplaçable — le mandat des quatre trimestres, la
+## chaîne de Levier — a été rangé sous le poster « Objectif » du bureau, qu'on
+## lève quand on veut le lire.
+##
+## L'appel survit parce que quatre écrans de phase le font encore et gardent
+## `side_panel.refresh()` / `side_panel.state_changed` : un `null` les ferait
+## planter au premier achat. Le talon honore ce contrat sans rien afficher.
+## C'est le Lot B (#10) qui refera ces écrans et supprimera l'appel.
 static func attach_side_panel(screen: Control) -> Control:
-	if hosted_in_desk:
-		# Un Control nu, jamais `null` : les écrans gardent `side_panel.refresh()`
-		# et `side_panel.state_changed` — un null les ferait planter au premier
-		# achat, et ce lot ne doit pas les réécrire.
-		var stub: Control = load("res://scenes/components/side_panel_stub.tscn").instantiate()
-		screen.add_child(stub)
-		return stub
-	var panel_scene: PackedScene = load("res://scenes/components/side_panel.tscn")
-	var panel: Control = panel_scene.instantiate()
-	screen.add_child(panel)
-
-	var margin: Node = screen.get_node_or_null("Margin")
-	if margin is MarginContainer:
-		# La marge suit la largeur *réelle* du panneau : un contenu qui impose sa
-		# taille minimale (nom d'entreprise long, roster large) ne doit jamais
-		# finir par recouvrir le contenu de la phase — et le rail replié doit
-		# rendre sa place aux cartes, pas la garder pour rien.
-		var keep_clear := func():
-			margin.add_theme_constant_override("margin_right",
-				int(max(panel.size.x, panel.get_combined_minimum_size().x)) + 28)
-		keep_clear.call()
-		panel.resized.connect(keep_clear)
-	return panel
+	var stub: Control = load("res://scenes/components/side_panel_stub.tscn").instantiate()
+	screen.add_child(stub)
+	return stub
 
 
 ## Branche le bouton + overlay "Dossier entreprise" (§16) sur un écran qui n'a

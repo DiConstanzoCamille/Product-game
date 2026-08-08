@@ -38,7 +38,7 @@ plus aucune règle ne l'alimente depuis l'Impact.
 [`spec-bureau-3d.md`](docs/spec-bureau-3d.md) tranche la **forme** du bureau —
 le partage 3D pour le monde / 2D pour ce qu'on lit, les papiers du mur qu'on
 lève comme un paperboard, et trois pièges Godot silencieux. Elle ne touche à
-aucune règle : sa mise en œuvre est l'issue #59.
+aucune règle : sa mise en œuvre est l'issue #59, **implémentée** — carnet §37.
 
 `docs/data-schema.md` décrit le schéma de chaque JSON de `data/`.
 
@@ -191,6 +191,32 @@ score et de tous les écrans de phase.
   pas : il faut un `godot --headless --path game --import` explicite, puis
   vérifier que `git status` ne laisse rien en `??`. Oublié quatre fois sur ce
   dépôt — c'est le piège le plus répétitif de la liste.
+- **`add_child()` sur un nœud « busy setting up children » est REJETÉ**, pas
+  différé. Godot le signale sur **stderr** ; le script continue comme si de
+  rien n'était et la scène reste vide. Trois écrans unis d'affilée sur le spike
+  3D avant de le comprendre. → Construire une scène **une fois entrée dans
+  l'arbre** (`call_deferred`), jamais pendant `_ready()`.
+- **`Camera3D.current` et `look_at()` n'ont d'effet qu'une fois le nœud dans
+  l'arbre.** Les poser avant `add_child()` donne un écran uni, sans erreur.
+- **Une scène claire a besoin de MOINS de lumière qu'une scène sombre.**
+  Première passe du spike à `light_energy = 1.15` : intégralement brûlée. 0,62
+  avec un ambiant à 0,32 donne la lecture voulue. Corollaire de cadrage : un
+  papier blanc sur un mur blanc n'est plus un papier, c'est une tache — le mur
+  doit être plus sombre que ce qu'on y punaise.
+- **Un quad texturé par un `SubViewport` ne reçoit aucun clic.** L'événement
+  s'arrête sur l'`Area3D` et n'entre jamais dans l'UI qui vit dedans : il faut
+  le convertir en UV puis le repousser par `push_input()`
+  (`DeskRoom.route_to_viewport()`). Et rien ne marche du tout tant que
+  `get_viewport().physics_object_picking` n'est pas à `true` — un objet 3D n'a
+  ni survol ni clic gratuits.
+- **Un `PanelContainer` n'accepte qu'UN enfant.** Lui en donner deux les empile
+  l'un sur l'autre, sans le moindre avertissement : un bouton de fermeture
+  écrit par-dessus le contenu qu'il devait fermer.
+- **Un `SubViewport` affiché plus petit qu'il n'est rendu produit du texte
+  flou** — et rien ne le signale. Déclarer la taille en pixels et en **déduire**
+  la taille du quad (jamais l'inverse) est la seule façon de ne pas rater ce
+  défaut ; un test qui compare la taille projetée à la taille déclarée l'attrape
+  mécaniquement (carnet §37.2).
 - **Un cache `game/.godot` périmé ment.** Après l'ajout d'un script avec un
   `class_name` global, des erreurs du type `Nonexistent function … in base
   'Nil'` ou un autoload qui échoue au chargement **ressemblent** à une

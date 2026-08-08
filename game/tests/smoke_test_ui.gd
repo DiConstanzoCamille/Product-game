@@ -58,6 +58,8 @@ func _ready() -> void:
 	await _test_t4_mandate_choice()
 	await _test_committee_screen_interactions()
 	await _test_compendium_tab()
+	await _test_desk_reads_as_a_room()
+	await _test_desk_paper_lift()
 
 	if failures > 0:
 		print("=== SMOKE TEST UI : ÉCHEC — %d assertion(s) en erreur ===" % failures)
@@ -307,23 +309,14 @@ func _test_investments_interactions() -> void:
 			_fail("La punaise de %s:%s n'a pas posé de réservation." % [entry["kind"], entry["id"]])
 		break
 
-	# Le repli du panneau : même schéma, le bouton vit dans ce qu'il reconstruit.
-	var panel: Control = screen.side_panel
-	panel.get_node("Margin/Scroll/VBox").get_child(0).pressed.emit()
-	for i in 3:
-		await get_tree().process_frame
-	if not panel.collapsed:
-		_fail("Le bouton de repli n'a pas replié le Panneau de bord.")
-	if panel.size.x > UIHelpers.SIDE_PANEL_WIDTH / 2:
-		_fail("Le panneau replié fait encore %d px de large." % int(panel.size.x))
-
 	screen.queue_free()
 	viewport.queue_free()
 	await get_tree().process_frame
 
 
-## Ouvre le vrai hub depuis le bouton permanent, vérifie les quatre diagnostics
-## puis joue une augmentation depuis la fiche d'une personne.
+## Ouvre le vrai hub d'équipe depuis le trombinoscope levé — son entrée vivait
+## dans le Panneau de bord permanent jusqu'à #59 — puis vérifie les quatre
+## diagnostics et joue une augmentation depuis la fiche d'une personne.
 func _test_team_management_interactions() -> void:
 	print("  → gestion d'équipe de bout en bout")
 	SprintState.reset_run("agile-transformation", "meridia-corp")
@@ -331,24 +324,21 @@ func _test_team_management_interactions() -> void:
 	SprintState.employee_wellbeing(employee)["salaire"] = 20
 	SprintState._refresh_team_moral()
 
-	var viewport := SubViewport.new()
-	viewport.size = Vector2i(1600, 900)
-	add_child(viewport)
-	var screen: Control = load("res://scenes/screens/roadmap_screen.tscn").instantiate()
-	viewport.add_child(screen)
-	for i in 8:
+	var desk := await _open_desk()
+	desk.lift_paper("team")
+	for i in 3:
 		await get_tree().process_frame
 
-	var open_button: Button = screen.find_child("OpenTeamManagement", true, false)
+	var open_button: Button = desk.readable_layer().find_child("OpenTeamManagement", true, false)
 	if open_button == null:
-		_fail("Le panneau permanent n'expose pas le bouton Gérer l'équipe.")
+		_fail("Le trombinoscope levé n'expose pas l'entrée de la fiche complète.")
 	else:
 		open_button.pressed.emit()
 		for i in 4:
 			await get_tree().process_frame
-		var dialog: Control = screen.find_child("TeamManagementDialog", true, false)
+		var dialog: Control = desk.readable_layer().find_child("TeamManagementDialog", true, false)
 		if dialog == null:
-			_fail("Le bouton Gérer l'équipe n'ouvre pas le hub dédié.")
+			_fail("Le bouton de fiche complète n'ouvre pas le hub dédié.")
 		else:
 			for criterion in ["moral", "confiance", "energie", "salaire"]:
 				if dialog.find_child("Wellbeing_%s" % criterion, true, false) == null:
@@ -366,8 +356,7 @@ func _test_team_management_interactions() -> void:
 				if int(SprintState.employee_wellbeing(employee).get("salaire", 0)) <= 20:
 					_fail("L'augmentation n'a pas restauré la satisfaction salariale.")
 
-	screen.queue_free()
-	viewport.queue_free()
+	desk.queue_free()
 	await get_tree().process_frame
 
 
@@ -440,12 +429,9 @@ func _test_resolution_replay() -> void:
 			_fail("La Resolution doit rejouer les multiplicateurs comme une etape visible.")
 		if not multiplier_is_visible:
 			_fail("Le multiplicateur principal ne doit pas etre masque derriere « +N autres ».")
-		var panel: Control = load("res://scenes/components/side_panel.tscn").instantiate()
-		viewport.add_child(panel)
-		await get_tree().process_frame
-		if panel.find_child("LeverChain", true, false) == null:
-			_fail("Le panneau lateral doit afficher en permanence la chaine de Levier.")
-		panel.queue_free()
+		# La chaîne de Levier a quitté le Panneau de bord avec #59 : elle vit
+		# désormais sous le poster « Objectif » du bureau, et c'est
+		# `_test_desk_paper_lift()` qui la vérifie.
 		screen._accelerate_score_replay()
 		if screen._score_replay_speed != 4.0:
 			_fail("Le premier geste de Resolution n'accelere pas l'animation.")
@@ -566,7 +552,7 @@ func _test_quarter_result_uses_global_sprint() -> void:
 
 
 func _test_quota_sidebar_and_freezes() -> void:
-	print("  → panneau quota et gels d'investissement")
+	print("  → gels d'investissement")
 	SprintState.reset_run("agile-transformation", "meridia-corp")
 	SprintState.quarter_requirement_ids = ["hiring-freeze", "tool-freeze"]
 	SprintState.quarter_requirement_id = "tool-freeze"
@@ -578,10 +564,6 @@ func _test_quota_sidebar_and_freezes() -> void:
 	viewport.add_child(screen)
 	for i in 4:
 		await get_tree().process_frame
-	if screen.side_panel.find_child("QuotaSection", true, false) == null:
-		_fail("Le panneau latéral doit afficher en permanence la section de quota.")
-	else:
-		_check_quota_section_shows_the_mandate(screen.side_panel)
 
 	var candidate: Dictionary = GameData.candidates[0]
 	var candidate_view: Dictionary = AssetView.for_candidate(candidate)
@@ -608,51 +590,6 @@ func _test_quota_sidebar_and_freezes() -> void:
 	screen.queue_free()
 	viewport.queue_free()
 	await get_tree().process_frame
-
-
-## Lot B (#36) — deux informations que le panneau doit porter, et qu'une
-## capture ne montre pas : elles vivent en bas d'une colonne qui défile.
-##
-##  · les quatre objectifs du mandat, dès le premier sprint. La donnée est dans
-##    quotas.json depuis toujours ; ne montrer que le trimestre courant ne
-##    cachait rien d'aléatoire, ça empêchait seulement de voir que la marche
-##    suivante est cinq fois plus haute ;
-##  · la jauge n'est plus bornée à l'objectif. Le `clampi` d'avant rendait le
-##    dépassement invisible — or c'est lui qui dit s'il reste de quoi acheter.
-func _check_quota_section_shows_the_mandate(panel: Node) -> void:
-	var mandate: Node = null
-	for label in _labels_of(panel):
-		if String(label.text).begins_with("Mandat :"):
-			mandate = label
-			break
-	if mandate == null:
-		_fail("Le panneau doit annoncer les objectifs des quatre trimestres dès le premier sprint.")
-	else:
-		for entry in SprintState.get_mandate_quotas():
-			# Le trimestre en cours porte la barre réelle (exigence comprise),
-			# les autres leur barème : afficher le barème pour le trimestre
-			# courant donnerait deux nombres pour la même échéance.
-			var expected: int = SprintState.get_current_quota() if bool(entry.get("current", false)) else int(entry.get("quota", 0))
-			if not String(mandate.text).contains(str(expected)):
-				_fail("Le panneau annonce le mandat sans l'objectif du T%d (attendu %d, lu « %s »)." % [
-					int(entry.get("quarter", 0)), expected, mandate.text
-				])
-
-	# Un portefeuille au-dessus de la barre : la jauge doit le représenter, pas
-	# le tronquer. On force le dépassement, sinon le test passerait aussi bien
-	# avec l'ancien clamp — un portefeuille sous l'objectif ne distingue rien.
-	var previous := SprintState.impact_wallet
-	SprintState.impact_wallet = SprintState.get_current_quota() * 3
-	panel.refresh()
-	var bar: Node = panel.find_child("QuotaProgress", true, false)
-	if bar == null:
-		_fail("La section de quota doit porter sa jauge.")
-	elif int(bar.value) < SprintState.impact_wallet:
-		_fail("La jauge de quota tronque le dépassement (%d affiché pour %d au portefeuille)." % [
-			int(bar.value), SprintState.impact_wallet
-		])
-	SprintState.impact_wallet = previous
-	panel.refresh()
 
 
 func _labels_of(node: Node) -> Array:
@@ -815,6 +752,182 @@ func _test_compendium_tab() -> void:
 	screen.queue_free()
 	viewport.queue_free()
 	await get_tree().process_frame
+
+
+## Le bureau n'avait **aucune** assertion au Lot A : les trois règles qui le
+## définissent tenaient sur la bonne volonté du relecteur (#59). Les voici
+## mécanisées, plus la seule qui protège le critère de recette n°1.
+func _test_desk_reads_as_a_room() -> void:
+	print("  → le bureau se lit comme une pièce")
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+	SprintState.committee_pending = false
+
+	var desk := await _open_desk()
+
+	# ① Trois valeurs permanentes, et pas une de plus. C'est TOUT le lot A :
+	# quinze valeurs à surveiller en permanence sont devenues trois plus une
+	# remontée par exception.
+	var vitals: Node = desk.readable_layer().get_node_or_null("Vitals")
+	if vitals == null:
+		_fail("Le bureau doit porter sa zone de valeurs permanentes.")
+	else:
+		var permanent := 0
+		for node in _descendants_of(vitals):
+			if String(node.name).begins_with("Vital_"):
+				permanent += 1
+		if permanent > 3:
+			_fail("Le bureau affiche %d valeurs permanentes : la règle est trois au maximum." % permanent)
+		if permanent == 0:
+			_fail("Le bureau n'affiche aucune valeur permanente — le compteur ne compte rien.")
+
+	# ② Le parapheur n'existe pas hors franchissement de trimestre. Objet
+	# absent, pas objet grisé : c'est ce qui fait qu'un sprint sur trois ne
+	# ressemble pas aux deux autres.
+	var folder: Node3D = desk.prop("committee")
+	if folder == null:
+		_fail("Le bureau doit porter le parapheur du Comité.")
+	else:
+		if folder.visible:
+			_fail("Hors fin de trimestre, le parapheur ne doit pas être posé sur la table.")
+		SprintState.committee_pending = true
+		desk.refresh()
+		if not folder.visible:
+			_fail("Au franchissement d'un trimestre, le parapheur doit être déposé sur la table.")
+		SprintState.committee_pending = false
+		desk.refresh()
+
+	# ③ Aucun élément ne prend la largeur ni la hauteur entière : une barre
+	# pleine fait interface web sur une scène de jeu.
+	_check_nothing_spans_the_frame(desk, "au repos")
+
+	# ④ Le critère de recette n°1, mécanisé. La dalle est un `SubViewport` :
+	# si sa taille en pixels et sa taille projetée divergent, tout le contenu
+	# des phases est rendu à l'échelle — c'est-à-dire flou — et **aucun autre
+	# test ne le dirait**. C'est le garde-fou que la relecture ne sait pas
+	# faire et qu'une capture ne prouve qu'à l'œil.
+	var projected: Vector2 = desk.room().dalle_projected_size()
+	var declared := Vector2(DeskRoom.SCREEN_PIXELS)
+	var drift: float = maxf(absf(projected.x - declared.x) / declared.x,
+		absf(projected.y - declared.y) / declared.y)
+	if drift > 0.06:
+		_fail("La dalle est rendue à %.0f×%.0f px pour un SubViewport de %.0f×%.0f (%.0f %% d'écart) : le texte des phases est redimensionné." % [
+			projected.x, projected.y, declared.x, declared.y, drift * 100.0])
+
+	# ⑤ Garde-fou de vision n°8 : à N=1, le mot « squad » ne doit apparaître
+	# nulle part — y compris dans ce qui est peint sur les papiers du mur.
+	for label in _labels_of(desk):
+		if "squad" in String(label.text).to_lower():
+			_fail("Le mot « squad » apparaît sur le bureau en mode une équipe : « %s »." % label.text)
+
+	desk.queue_free()
+	await get_tree().process_frame
+
+
+## La levée du poster (#59, spec §3) : le geste doit donner le détail SANS
+## cacher ce qui permet de décider. C'est le point de vigilance écrit dans la
+## spec, et c'est celui qu'une capture ne prouve pas.
+func _test_desk_paper_lift() -> void:
+	print("  → la levée d'un poster du mur")
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+	var desk := await _open_desk()
+
+	desk.lift_paper("team")
+	for i in 3:
+		await get_tree().process_frame
+	if desk.lifted_paper() == null:
+		_fail("Cliquer un papier du mur doit lever le poster.")
+	var detail: Control = desk.readable_layer().get_node_or_null("PaperDetail")
+	if detail == null or not detail.visible:
+		_fail("Le poster levé doit découvrir son détail à plat, en 2D.")
+	else:
+		# Les quatre critères par personne : c'est ce que le survol refuse de
+		# montrer, et donc précisément ce que la levée doit apporter.
+		var employee: Dictionary = SprintState.get_roster()[0]
+		if detail.find_child("PersonCard_%s" % employee.get("id", ""), true, false) == null:
+			_fail("Le trombinoscope levé doit porter la fiche de chaque personne.")
+		var read := ""
+		for label in _labels_of(detail):
+			read += String(label.text).to_lower() + " "
+		for criterion in SprintState.get_individual_team_conf().get("criteria", []):
+			if String(criterion).to_lower() not in read:
+				_fail("Le trombinoscope levé doit afficher le critère « %s »." % criterion)
+		if detail.find_child("SalaryRaiseAction", true, false) == null:
+			_fail("Le trombinoscope levé doit porter les actions jouables sur une personne.")
+
+	# Le bandeau et les alertes restent visibles par-dessus : aucune décision
+	# ne doit se prendre à l'aveugle pendant qu'un poster est levé.
+	var vitals: Control = desk.readable_layer().get_node_or_null("Vitals")
+	if vitals == null or not vitals.visible:
+		_fail("Les valeurs permanentes doivent rester visibles sous un poster levé.")
+	_check_nothing_spans_the_frame(desk, "poster levé")
+
+	# Annulation rapide : Échap referme, et rien ne reste levé.
+	desk._unhandled_input(_escape_event())
+	for i in 3:
+		await get_tree().process_frame
+	if desk.lifted_paper() != null or detail.visible:
+		_fail("Échap doit reposer la feuille immédiatement.")
+
+	# Le poster « Objectif » a hérité de ce que portait le Panneau de bord
+	# supprimé : les quatre objectifs du mandat, et la chaîne de Levier.
+	desk.lift_paper("goal")
+	for i in 3:
+		await get_tree().process_frame
+	var goal_detail: Control = desk.readable_layer().get_node_or_null("PaperDetail")
+	var mandate: Node = goal_detail.find_child("MandateLine", true, false) if goal_detail != null else null
+	if mandate == null:
+		_fail("L'objectif levé doit annoncer les objectifs des quatre trimestres dès le premier sprint.")
+	else:
+		for entry in SprintState.get_mandate_quotas():
+			# Le trimestre en cours porte la barre réelle (exigence comprise),
+			# les autres leur barème : afficher le barème pour le trimestre
+			# courant donnerait deux nombres pour la même échéance.
+			var expected: int = SprintState.get_current_quota() if bool(entry.get("current", false)) else int(entry.get("quota", 0))
+			if not String(mandate.text).contains(str(expected)):
+				_fail("Le mandat est annoncé sans l'objectif du T%d (attendu %d, lu « %s »)." % [
+					int(entry.get("quarter", 0)), expected, mandate.text])
+	if goal_detail == null or goal_detail.find_child("LeverChain", true, false) == null:
+		_fail("L'objectif levé doit porter la chaîne de Levier réellement jouée.")
+
+	desk.queue_free()
+	await get_tree().process_frame
+
+
+func _open_desk() -> DeskScreen:
+	var desk: DeskScreen = load("res://scenes/screens/desk_screen.tscn").instantiate()
+	get_tree().root.add_child(desk)
+	# Le bureau se construit en `call_deferred` — un `add_child()` pendant
+	# `_ready()` est rejeté par Godot **sans erreur GDScript**. Attendre une
+	# seule trame donnerait un arbre vide et des assertions qui passent.
+	for i in 8:
+		await get_tree().process_frame
+	return desk
+
+
+func _check_nothing_spans_the_frame(desk: DeskScreen, state: String) -> void:
+	for node in _descendants_of(desk.readable_layer()):
+		if not (node is Control) or not node.visible:
+			continue
+		var control: Control = node
+		if control.size.x >= 1600.0 or control.size.y >= 900.0:
+			_fail("Bureau (%s) : « %s » fait %d×%d et prend le cadre entier — une barre pleine fait interface web sur une scène de jeu." % [
+				state, control.name, int(control.size.x), int(control.size.y)])
+
+
+func _descendants_of(node: Node) -> Array:
+	var found: Array = []
+	for child in node.get_children():
+		found.append(child)
+		found.append_array(_descendants_of(child))
+	return found
+
+
+func _escape_event() -> InputEventKey:
+	var event := InputEventKey.new()
+	event.keycode = KEY_ESCAPE
+	event.physical_keycode = KEY_ESCAPE
+	event.pressed = true
+	return event
 
 
 func _primary_button_of(card: Control) -> Button:
