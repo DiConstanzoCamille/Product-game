@@ -30,6 +30,14 @@ sont en volume : ombres portées réelles, tranches, perspective. Trois valeurs
 permanentes en haut à gauche, et rien d'autre en permanence. Aucun élément ne
 prend la largeur ni la hauteur du cadre.
 
+Deux choses à vérifier ici en particulier :
+
+- **le sens de lecture** — l'étal du sprint est à gauche, la clôture à droite.
+  On achète avant de clore, et l'œil va de gauche à droite ;
+- **le rendu dessiné** — aplats francs séparés par des arêtes nettes, trait
+  d'encre autour de chaque silhouette. Ce n'est pas l'habillage (il n'y a
+  toujours ni matière ni ambiance), c'est une façon d'éclairer et de cerner.
+
 ### `alerte/desk_calme.png` — l'état d'alerte se lit sur le mur
 
 ![Le bureau en alerte](alerte/desk_calme.png)

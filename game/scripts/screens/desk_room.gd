@@ -66,12 +66,22 @@ const DESK_TOP_Y := 0.755
 
 ## Le mur est **plus sombre que le papier** : à teinte égale, une feuille
 ## blanche punaisée sur un mur blanc n'est plus une feuille, c'est une tache.
-## C'est le minimum de lecture, pas de l'habillage — celui-ci est un lot à part.
-const WALL := Color("#ced3cd")
-const FLOOR := Color("#bdb6aa")
-const WOOD := Color("#ab967e")
-const WOOD_DARK := Color("#7a6450")
-const ALU := Color("#9fa9b6")
+const WALL := Color("#c3ccc5")
+const FLOOR := Color("#aca596")
+const WOOD := Color("#bd9468")
+const WOOD_DARK := Color("#7d5735")
+const ALU := Color("#77839a")
+
+## L'encre du trait de contour. C'est la même que celle des écrans 2D
+## (`UIHelpers.COLOR_INK`) : un objet du monde et une carte de la Roadmap
+## doivent avoir l'air dessinés par la même main.
+const INK := Color("#2a2f38")
+## Épaisseur du trait **en pixels de composition**, pas en unités monde. Un
+## trait déclaré dans le monde s'amincit avec la distance : à 0,0055 il faisait
+## 6 px sur la tasse et 2 px sur les papiers du mur, où il se rasterisait en
+## pointillés. Un trait dessiné n'a pas de perspective — c'est de l'encre, pas
+## un objet — donc son épaisseur se déclare à l'écran et se convertit.
+const OUTLINE_PIXELS := 3.0
 
 var screen_viewport: SubViewport = null
 var camera: Camera3D = null
@@ -119,7 +129,7 @@ func _build_environment() -> void:
 	# La pièce tient dans cinq mètres : laisser la carte d'ombre couvrir cent
 	# mètres par défaut, c'est la gaspiller — et c'est ce qui donnait des
 	# ombres crénelées sous les papiers du mur, la seule ombre qu'on regarde.
-	sun.directional_shadow_max_distance = 7.0
+	sun.directional_shadow_max_distance = 4.5
 	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_ORTHOGONAL
 	sun.shadow_bias = 0.015
 	sun.shadow_normal_bias = 1.4
@@ -127,8 +137,11 @@ func _build_environment() -> void:
 
 
 func _build_room() -> void:
-	_box(Vector3(0, 1.7, WALL_Z - 0.04), Vector3(9.0, 3.4, 0.08), WALL)
-	_box(Vector3(0, -0.02, 0), Vector3(9.0, 0.04, 5.0), FLOOR)
+	# Le mur et le sol ne portent pas de trait : ce sont les surfaces sur
+	# lesquelles les silhouettes se détachent, pas des silhouettes. Les cerner
+	# dessinerait un cadre autour de la pièce.
+	_box(Vector3(0, 1.7, WALL_Z - 0.04), Vector3(9.0, 3.4, 0.08), WALL, false)
+	_box(Vector3(0, -0.02, 0), Vector3(9.0, 0.04, 5.0), FLOOR, false)
 	_box(Vector3(0, DESK_TOP_Y - 0.03, 0.10), Vector3(3.6, 0.06, 1.6), WOOD)
 	_box(Vector3(0, DESK_TOP_Y - 0.055, -0.68), Vector3(3.6, 0.03, 0.06), WOOD_DARK)
 	for x in [-1.68, 1.68]:
@@ -159,7 +172,7 @@ func _build_laptop() -> void:
 	var bezel := Vector2(0.055, 0.05)
 
 	_box(Vector3(0, 0.782, 0.30), Vector3(quad_size.x + 0.10, 0.024, 0.56), ALU)
-	_box(Vector3(0, 0.795, 0.36), Vector3(quad_size.x * 0.72, 0.006, 0.22), Color("#aab2bd"))
+	_box(Vector3(0, 0.795, 0.36), Vector3(quad_size.x * 0.72, 0.006, 0.22), Color("#66718a"))
 
 	_lid = Node3D.new()
 	_lid.name = "Lid"
@@ -173,8 +186,9 @@ func _build_laptop() -> void:
 	shell_mesh.size = Vector3(quad_size.x + bezel.x * 2.0, quad_size.y + bezel.y * 2.0, 0.016)
 	shell.mesh = shell_mesh
 	shell.position = DALLE_LOCAL - Vector3(0, 0, 0.014)
-	shell.material_override = _material(ALU)
+	shell.material_override = toon_material(ALU)
 	_lid.add_child(shell)
+	outline_at(shell, dalle_center())
 
 	screen_viewport = SubViewport.new()
 	screen_viewport.name = "ScreenViewport"
@@ -316,20 +330,73 @@ static func route_to_viewport(quad_node: MeshInstance3D, viewport: SubViewport, 
 	viewport.push_input(routed, true)
 
 
-func _box(at: Vector3, box_size: Vector3, color: Color) -> MeshInstance3D:
+func _box(at: Vector3, box_size: Vector3, color: Color, outlined: bool = true) -> MeshInstance3D:
 	var node := MeshInstance3D.new()
 	var mesh := BoxMesh.new()
 	mesh.size = box_size
 	node.mesh = mesh
 	node.position = at
-	node.material_override = _material(color)
+	node.material_override = toon_material(color)
 	add_child(node)
+	if outlined:
+		outline_at(node, at)
 	return node
 
 
 func _material(color: Color) -> StandardMaterial3D:
+	return toon_material(color)
+
+
+# ── Le parti pris de rendu : dessiné, pas photographié ───────────────────
+## Un dégradé continu sur une boîte, c'est une image de synthèse ; deux aplats
+## séparés par une arête franche, c'est un objet de jeu. `DIFFUSE_TOON` coupe
+## le dégradé en bandes, la rugosité à 1 supprime le reflet spéculaire qui
+## trahissait la primitive, et la couleur peut redevenir franche — un bois
+## réaliste est terne, un bois de jeu ne l'est pas.
+##
+## C'est volontairement le **minimum** : le lot d'habillage reste à faire, et
+## il apportera de la matière, pas seulement une façon d'éclairer.
+static func toon_material(color: Color) -> StandardMaterial3D:
 	var material := StandardMaterial3D.new()
 	material.albedo_color = color
-	material.roughness = 0.86
+	material.roughness = 1.0
 	material.metallic = 0.0
+	material.specular_mode = BaseMaterial3D.SPECULAR_DISABLED
+	material.diffuse_mode = BaseMaterial3D.DIFFUSE_TOON
 	return material
+
+
+## Le trait de contour, par coque inversée : une copie du maillage, grossie le
+## long de ses normales, peinte en encre unie et rendue **face arrière
+## seulement**. Elle dépasse partout où la silhouette se détache, et nulle part
+## ailleurs.
+##
+## Pourquoi cette technique et pas un filtre de contour en post-traitement :
+## `gl_compatibility` n'a pas de tampon de profondeur exploitable en
+## post-process, et le projet reste sur ce renderer (décision du 05/08). La
+## coque inversée, elle, ne dépend d'aucune fonctionnalité de renderer.
+##
+## Deux règles pour ne pas s'y brûler : ne jamais l'appliquer à un nœud dont on
+## anime la `scale` (le trait grossirait avec lui), et couper l'ombre — une
+## coque grossie projette une ombre plus grosse que l'objet.
+## Le même trait, déclaré en pixels de composition et converti à la profondeur
+## de l'objet. C'est la forme à utiliser : la variante en unités monde ne sert
+## qu'aux nœuds dont la profondeur n'est pas encore connue à la construction.
+func outline_at(target: MeshInstance3D, at: Vector3, pixels: float = OUTLINE_PIXELS) -> MeshInstance3D:
+	return add_outline(target, pixels / design_pixels_per_unit_at(at))
+
+
+static func add_outline(target: MeshInstance3D, thickness: float) -> MeshInstance3D:
+	var outline := MeshInstance3D.new()
+	outline.name = "Outline"
+	outline.mesh = target.mesh
+	var ink := StandardMaterial3D.new()
+	ink.albedo_color = INK
+	ink.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	ink.cull_mode = BaseMaterial3D.CULL_FRONT
+	ink.grow = true
+	ink.grow_amount = thickness
+	outline.material_override = ink
+	outline.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	target.add_child(outline)
+	return outline

@@ -217,6 +217,14 @@ score et de tous les écrans de phase.
   la taille du quad (jamais l'inverse) est la seule façon de ne pas rater ce
   défaut ; un test qui compare la taille projetée à la taille déclarée l'attrape
   mécaniquement (carnet §37.2).
+- **Un contour par coque inversée se déclare en pixels, pas en unités monde.**
+  Une épaisseur constante dans le monde s'amincit avec la distance : 6 px sur
+  un objet proche, 2 px sur un objet du fond — où elle se rasterise en
+  pointillés. Et deux cas où il ne faut pas l'employer du tout : sur un nœud
+  dont on anime la `scale` (le trait grossit avec lui), et sur une **plaque
+  fine vue par la tranche** — la face supérieure de la coque devient un
+  pointillé le long du bord. Là, un quad d'encre coplanaire à peine plus grand
+  fait mieux et coûte moins (carnet §37.10).
 - **Un cache `game/.godot` périmé ment.** Après l'ajout d'un script avec un
   `class_name` global, des erreurs du type `Nonexistent function … in base
   'Nil'` ou un autoload qui échoue au chargement **ressemblent** à une

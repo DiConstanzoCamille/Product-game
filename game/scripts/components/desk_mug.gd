@@ -15,6 +15,9 @@ extends Node3D
 
 signal hover_changed(entered: bool)
 
+## La pièce, pour convertir l'épaisseur du trait de contour en unités monde.
+var room: DeskRoom = null
+
 const RADIUS_TOP := 0.049
 const RADIUS_BOTTOM := 0.042
 const HEIGHT := 0.108
@@ -46,10 +49,12 @@ func build() -> void:
 	cylinder.cap_top = false
 	body.mesh = cylinder
 	body.position = Vector3(0, HEIGHT * 0.5, 0)
-	var porcelain := _material(PORCELAIN)
+	var porcelain := DeskRoom.toon_material(PORCELAIN)
 	porcelain.cull_mode = BaseMaterial3D.CULL_DISABLED
 	body.material_override = porcelain
 	add_child(body)
+	if room != null:
+		room.outline_at(body, global_position, 2.6)
 
 	var handle := MeshInstance3D.new()
 	handle.name = "Handle"
@@ -59,8 +64,10 @@ func build() -> void:
 	handle.mesh = torus
 	handle.position = Vector3(RADIUS_TOP + 0.012, HEIGHT * 0.55, 0)
 	handle.rotation_degrees = Vector3(0, 90, 0)
-	handle.material_override = _material(PORCELAIN)
+	handle.material_override = DeskRoom.toon_material(PORCELAIN)
 	add_child(handle)
+	if room != null:
+		room.outline_at(handle, global_position, 2.6)
 
 	_coffee = MeshInstance3D.new()
 	_coffee.name = "Coffee"
@@ -69,7 +76,9 @@ func build() -> void:
 	liquid.bottom_radius = RADIUS_BOTTOM - 0.006
 	liquid.height = 1.0
 	_coffee.mesh = liquid
-	_coffee.material_override = _material(COFFEE)
+	# Pas de contour sur le café : on anime sa `scale` pour le faire descendre,
+	# et une coque inversée s'étirerait avec lui.
+	_coffee.material_override = DeskRoom.toon_material(COFFEE)
 	add_child(_coffee)
 
 	var area := Area3D.new()
@@ -108,11 +117,3 @@ func refresh() -> void:
 	_coffee.scale = Vector3(1, depth, 1)
 	_coffee.position = Vector3(0, 0.008 + depth * 0.5, 0)
 	_coffee.visible = level > 0.0
-
-
-func _material(color: Color) -> StandardMaterial3D:
-	var material := StandardMaterial3D.new()
-	material.albedo_color = color
-	material.roughness = 0.72
-	material.metallic = 0.0
-	return material

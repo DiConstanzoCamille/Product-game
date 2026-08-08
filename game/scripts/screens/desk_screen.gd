@@ -45,13 +45,12 @@ const APPS := [
 	{"id": "dashboard", "name": "Tableau de bord", "icon": "dash"},
 ]
 
-## Les trois papiers, et où ils sont punaisés sur le mur du fond. Ils vivent
-## dans la bande dégagée au-dessus du portable — c'est `DeskRoom.CAMERA_AIM_UP`
-## qui la libère.
-## Le portable occupe la colonne centrale : les papiers vivent donc dans les
-## deux colonnes latérales et dans la bande au-dessus de lui. Ils sont **plus
-## bas que le premier jet** — punaisés en haut, ils passaient sous la zone de
-## valeurs, et la moitié du trombinoscope se lisait derrière un panneau.
+## Les trois papiers, et où ils sont punaisés sur le mur du fond. Le portable
+## occupe la colonne centrale : ils vivent donc dans les deux colonnes
+## latérales et dans la bande au-dessus de lui — c'est `DeskRoom.CAMERA_AIM_UP`
+## qui la dégage. Ils sont **plus bas que le premier jet** : punaisés en haut,
+## ils passaient sous la zone de valeurs, et la moitié du trombinoscope se
+## lisait derrière un panneau.
 const PAPERS := [
 	{"kind": "team", "at": Vector2(-1.26, 1.31)},
 	{"kind": "journal", "at": Vector2(0.00, 1.62)},
@@ -184,7 +183,8 @@ func _build_mug() -> void:
 	_mug = Node3D.new()
 	_mug.name = "Mug"
 	_mug.set_script(preload("res://scripts/components/desk_mug.gd"))
-	_mug.position = Vector3(-0.92, DeskRoom.DESK_TOP_Y, -0.16)
+	_mug.set("room", _room)
+	_mug.position = Vector3(-0.80, DeskRoom.DESK_TOP_Y, -0.06)
 	_room.add_child(_mug)
 	# Construit tout de suite, comme la pièce : ces nœuds se dimensionnent et
 	# se placent depuis la caméra, et `refresh()` projette leur position dans

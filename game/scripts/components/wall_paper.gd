@@ -53,7 +53,7 @@ const KINDS := {
 
 @export var kind: String = "team"
 
-var room: Node3D = null
+var room: DeskRoom = null
 
 var _sheet: Node3D = null
 var _viewport: SubViewport = null
@@ -89,11 +89,31 @@ func build() -> void:
 	back_mesh.size = Vector3(world.x, world.y, THICKNESS)
 	back.mesh = back_mesh
 	back.position = Vector3(0, -world.y * 0.5, -THICKNESS * 0.5)
-	var back_material := StandardMaterial3D.new()
-	back_material.albedo_color = color.darkened(0.06)
-	back_material.roughness = 0.94
-	back.material_override = back_material
+	back.material_override = DeskRoom.toon_material(color.darkened(0.06))
 	_sheet.add_child(back)
+
+	# Le trait d'encre autour de la feuille — c'est lui qui la fait lire comme
+	# un objet dessiné plutôt que comme une texture posée sur le mur.
+	#
+	# Ici, **pas** de coque inversée comme sur les autres objets : une feuille
+	# fait 8 mm d'épaisseur, la coque la grossit d'autant dans les trois axes,
+	# et sa face supérieure — vue presque par la tranche depuis une caméra qui
+	# plonge — se rasterise en pointillés le long du bord haut. Un quad d'encre
+	# à peine plus grand, dans le même plan, donne un trait franc et régulier
+	# pour deux fois moins de géométrie.
+	var border_pixels := 3.0 / _pixels_per_unit()
+	var border := MeshInstance3D.new()
+	border.name = "Border"
+	var border_quad := QuadMesh.new()
+	border_quad.size = world + Vector2.ONE * border_pixels * 2.0
+	border.mesh = border_quad
+	border.position = Vector3(0, -world.y * 0.5, 0.0004)
+	var ink := StandardMaterial3D.new()
+	ink.albedo_color = DeskRoom.INK
+	ink.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	border.material_override = ink
+	border.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_sheet.add_child(border)
 
 	_viewport = SubViewport.new()
 	_viewport.name = "PaperViewport"
@@ -107,7 +127,7 @@ func build() -> void:
 	var quad := QuadMesh.new()
 	quad.size = world
 	face.mesh = quad
-	face.position = Vector3(0, -world.y * 0.5, 0.0008)
+	face.position = Vector3(0, -world.y * 0.5, 0.0012)
 	var face_material := StandardMaterial3D.new()
 	face_material.albedo_texture = _viewport.get_texture()
 	face_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
@@ -133,9 +153,9 @@ func build() -> void:
 
 
 func _pixels_per_unit() -> float:
-	if room != null and room.has_method("design_pixels_per_unit_at"):
-		return maxf(room.design_pixels_per_unit_at(global_position), 1.0)
-	return 400.0
+	if room == null:
+		return 400.0
+	return maxf(room.design_pixels_per_unit_at(global_position), 1.0)
 
 
 func _on_area_input(_camera: Node, event: InputEvent, _at: Vector3, _normal: Vector3, _index: int) -> void:

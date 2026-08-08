@@ -4,13 +4,18 @@ extends Node3D
 ## Aucune mécanique n'ouvre un écran de plus : elle fait entrer un objet, et
 ## **la forme de l'objet dit ce qu'est la mécanique**.
 ##
-##  · 🛒 `shop` — une tablette dressée à droite du plateau. Ça se feuillette et
-##    ça se repousse : l'étal du sprint est ouvert en permanence.
-##  · 🏁 `closing` — une planche à pince, à gauche. On signe debout, une fois :
-##    c'est le seul point de non-retour du sprint.
+##  · 🛒 `shop` — une tablette dressée **à gauche** du plateau. Ça se feuillette
+##    et ça se repousse : l'étal du sprint est ouvert en permanence.
+##  · 🏁 `closing` — une planche à pince, **à droite**. On signe debout, une
+##    fois : c'est le seul point de non-retour du sprint.
 ##  · 🏛 `committee` — un parapheur, **déposé sur la table** un sprint sur
 ##    trois. Il n'arrive pas du bord : le board pose le dossier du trimestre
 ##    devant vous, il ne vous le tend pas.
+##
+## Le sens de lecture n'est pas un détail de mise en page : on achète avant de
+## clore, et l'œil va de gauche à droite. La première version plaçait l'étal à
+## droite et la clôture à gauche, ce qui demandait de traverser l'écran à
+## rebours pour finir son sprint.
 ##
 ## En volume, l'objet au repos a une tranche et une ombre — ce que les ombres
 ## décalées de la version 2D essayaient d'imiter. Ouvert, il **vient se
@@ -33,31 +38,33 @@ const PRESENT_DISTANCE := 0.95
 ## **pixels** (la taille du quad s'en déduit : cf. `DeskRoom`).
 const SHAPES := {
 	"shop": {
-		"rest_position": Vector3(0.94, 0.96, -0.34),
-		"rest_rotation": Vector3(-6, -19, 0),
+		"rest_position": Vector3(-0.98, 0.98, -0.38),
+		"rest_rotation": Vector3(-6, 19, 0),
 		"rest_size": Vector3(0.27, 0.38, 0.020),
-		"body": Color("#2b3240"), "frame": Color("#454d5c"),
+		"body": Color("#2f3a4d"), "frame": Color("#57657d"),
 		"pixels": Vector2i(1120, 690),
-		"entry_rotation": Vector3(0, -26, 4),
-		"hint": "◂ Boutique", "hint_offset": Vector3(0, -0.26, 0.10),
+		"entry_rotation": Vector3(0, 26, -4),
+		# Au-dessus, et pas dessous : la tablette est presque noire, et sous
+		# elle il y a la tasse.
+		"hint": "Boutique", "hint_offset": Vector3(0, 0.27, 0.08),
 	},
 	"closing": {
-		"rest_position": Vector3(-0.74, 0.79, -0.18),
-		"rest_rotation": Vector3(-78, 8, 0),
-		"rest_size": Vector3(0.26, 0.34, 0.018),
-		"body": Color("#e7dcc4"), "frame": Color("#5e4830"),
+		"rest_position": Vector3(0.78, 0.79, -0.30),
+		"rest_rotation": Vector3(-78, -8, 0),
+		"rest_size": Vector3(0.23, 0.30, 0.016),
+		"body": Color("#f3ead2"), "frame": Color("#7d5735"),
 		"pixels": Vector2i(760, 640),
-		"entry_rotation": Vector3(0, 22, -5),
-		"hint": "Fin de sprint ▸", "hint_offset": Vector3(0, 0.05, 0.26),
+		"entry_rotation": Vector3(0, -22, 5),
+		"hint": "Fin de sprint", "hint_offset": Vector3(0, 0.05, 0.24),
 	},
 	"committee": {
-		"rest_position": Vector3(0.70, 0.79, -0.02),
-		"rest_rotation": Vector3(-84, -7, 0),
+		"rest_position": Vector3(0.56, 0.79, -0.28),
+		"rest_rotation": Vector3(-84, 7, 0),
 		"rest_size": Vector3(0.36, 0.26, 0.028),
-		"body": Color("#7b3f3f"), "frame": Color("#4e2727"),
+		"body": Color("#a8434a"), "frame": Color("#6d262c"),
 		"pixels": Vector2i(1120, 690),
 		"entry_rotation": Vector3(6, -14, 3),
-		"hint": "Déposé sur votre table", "hint_offset": Vector3(0, 0.05, 0.24),
+		"hint": "Comité du trimestre", "hint_offset": Vector3(0, 0.05, 0.24),
 	},
 }
 
@@ -68,7 +75,7 @@ const HOSTED := {
 
 @export var kind: String = "shop"
 
-var room: Node3D = null
+var room: DeskRoom = null
 
 var _cover: MeshInstance3D = null
 var _panel: MeshInstance3D = null
@@ -95,8 +102,10 @@ func build() -> void:
 	var mesh := BoxMesh.new()
 	mesh.size = shape.get("rest_size", Vector3(0.3, 0.4, 0.02))
 	_cover.mesh = mesh
-	_cover.material_override = _material(shape.get("body", Color.GRAY))
+	_cover.material_override = DeskRoom.toon_material(shape.get("body", Color.GRAY))
 	add_child(_cover)
+	if room != null:
+		room.outline_at(_cover, global_position)
 
 	var trim := MeshInstance3D.new()
 	trim.name = "Trim"
@@ -105,7 +114,7 @@ func build() -> void:
 	trim_mesh.size = Vector3(rest_size.x * 1.06, rest_size.y * 1.06, rest_size.z * 0.6)
 	trim.mesh = trim_mesh
 	trim.position = Vector3(0, 0, -rest_size.z * 0.4)
-	trim.material_override = _material(shape.get("frame", Color.BLACK))
+	trim.material_override = DeskRoom.toon_material(shape.get("frame", Color.BLACK))
 	add_child(trim)
 
 	var area := Area3D.new()
@@ -161,8 +170,14 @@ func _build_panel() -> void:
 	frame_mesh.size = Vector3(quad.size.x + 0.022, quad.size.y + 0.022, 0.012)
 	frame.mesh = frame_mesh
 	frame.position = Vector3(0, 0, -0.008)
-	frame.material_override = _material(shape.get("frame", Color.BLACK))
+	frame.material_override = DeskRoom.toon_material(shape.get("frame", Color.BLACK))
 	_panel_pivot.add_child(frame)
+	# Le pivot est animé en `scale` à l'ouverture : le trait grossit donc avec
+	# le cadre pendant l'entrée, et se cale juste à l'arrivée. C'est le seul
+	# endroit du lot où un contour est posé sur un nœud animé en échelle.
+	if room != null:
+		var placement: Dictionary = room.presentation_placement(Vector2i.ONE, PRESENT_DISTANCE)
+		room.outline_at(frame, placement["position"])
 
 	var area := Area3D.new()
 	area.name = "PanelArea"
@@ -177,10 +192,10 @@ func _build_panel() -> void:
 
 
 func _pixels_per_unit() -> float:
-	if room != null and room.has_method("design_pixels_per_unit_at"):
-		var placement: Dictionary = room.presentation_placement(Vector2i.ONE, PRESENT_DISTANCE)
-		return maxf(room.design_pixels_per_unit_at(placement["position"]), 1.0)
-	return 1200.0
+	if room == null:
+		return 1200.0
+	var placement: Dictionary = room.presentation_placement(Vector2i.ONE, PRESENT_DISTANCE)
+	return maxf(room.design_pixels_per_unit_at(placement["position"]), 1.0)
 
 
 func _shape() -> Dictionary:
@@ -412,9 +427,3 @@ func _on_sign_pressed() -> void:
 	get_tree().change_scene_to_file("res://scenes/screens/resolution_screen.tscn")
 
 
-func _material(color: Color) -> StandardMaterial3D:
-	var material := StandardMaterial3D.new()
-	material.albedo_color = color
-	material.roughness = 0.8
-	material.metallic = 0.0
-	return material

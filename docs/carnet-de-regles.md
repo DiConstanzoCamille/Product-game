@@ -2225,3 +2225,43 @@ Cinq assertions mécaniques remplacent la bonne volonté du relecteur :
   n'appelait jamais `resolve_unanswered_events()` : il jouait donc un jeu où
   ignorer son courrier était gratuit, et la règle la plus anti-passivité du lot
   n'était vérifiée nulle part.
+
+### 37.9 Le sens de lecture ordonne le plateau
+
+L'étal du sprint est **à gauche**, la clôture **à droite**. Ce n'est pas de la
+mise en page : on achète avant de clore, et l'œil va de gauche à droite. La
+première version du lot faisait l'inverse et demandait de traverser l'écran à
+rebours pour finir son sprint. Le parapheur du Comité reste à droite, derrière
+la clôture : il appartient au même moment du sprint.
+
+### 37.10 Le parti pris de rendu — dessiné, pas photographié
+
+Un dégradé continu sur une boîte, c'est une image de synthèse ; deux aplats
+séparés par une arête franche et cernés d'encre, c'est un objet de jeu. Trois
+réglages suffisent, et ils sont mutualisés dans `DeskRoom` pour que rien ne
+diverge :
+
+- **`toon_material()`** — `DIFFUSE_TOON` coupe le dégradé en bandes,
+  `SPECULAR_DISABLED` supprime le reflet qui trahissait la primitive, et la
+  couleur peut redevenir franche : un bois réaliste est terne, un bois de jeu
+  ne l'est pas ;
+- **`outline_at()`** — le trait de contour, par coque inversée (une copie du
+  maillage grossie le long de ses normales, peinte en encre unie, rendue face
+  arrière seulement). `gl_compatibility` n'a pas de post-traitement de
+  profondeur exploitable, et le projet reste sur ce renderer : la coque
+  inversée, elle, ne dépend d'aucune fonctionnalité de renderer ;
+- **l'épaisseur du trait se déclare en pixels**, pas en unités monde. Déclarée
+  dans le monde, elle faisait 6 px sur la tasse et 2 px sur les papiers du mur,
+  où elle se rasterisait en pointillés. De l'encre n'a pas de perspective.
+
+Deux règles pour ne pas s'y brûler, et les deux ont été apprises ici :
+**ne jamais poser de coque inversée sur un nœud dont on anime la `scale`** (le
+trait grossirait avec lui), et **ne pas en poser sur une plaque fine vue par la
+tranche** — la face supérieure de la coque se rasterise en pointillés le long
+du bord. Les papiers du mur utilisent donc un liseré : un quad d'encre à peine
+plus grand, dans le même plan, pour deux fois moins de géométrie et un trait
+franc.
+
+**Ce que ce n'est pas** : le lot d'habillage. Il n'y a toujours ni matière, ni
+texture, ni ambiance — seulement une façon d'éclairer et de cerner. La
+différence est visible, elle ne rend pas le bureau beau pour autant.
