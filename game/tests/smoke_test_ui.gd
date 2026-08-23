@@ -59,6 +59,7 @@ func _ready() -> void:
 	await _test_committee_screen_interactions()
 	await _test_compendium_tab()
 	await _test_desk_reads_as_a_room()
+	await _test_desk_hosted_contracts()
 	await _test_desk_paper_lift()
 
 	if failures > 0:
@@ -818,6 +819,72 @@ func _test_desk_reads_as_a_room() -> void:
 	for label in _labels_of(desk):
 		if "squad" in String(label.text).to_lower():
 			_fail("Le mot « squad » apparaît sur le bureau en mode une équipe : « %s »." % label.text)
+
+	desk.queue_free()
+	await get_tree().process_frame
+
+
+## Régressions de l'intégration 3D : une phase hébergée doit conserver son
+## action métier, solder le badge courrier et rafraîchir le bureau en direct.
+func _test_desk_hosted_contracts() -> void:
+	print("  → les apps hébergées conservent leurs contrats")
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+	SprintState.pending_team_crises.clear()
+	SprintState.pending_team_concerns.clear()
+	var desk := await _open_desk()
+
+	desk.open_app("inbox")
+	for i in 3:
+		await get_tree().process_frame
+	var workstation: Control = desk.workstation()
+	var inbox: Control = workstation.hosted_app()
+	if inbox == null:
+		_fail("Le courrier doit s'ouvrir dans le poste de travail.")
+	else:
+		var event: Dictionary = inbox.event
+		var choices: Array = event.get("choices", [])
+		if choices.is_empty():
+			_fail("Le courrier du sprint doit proposer au moins une réponse.")
+		else:
+			inbox._on_choice_pressed(choices[0])
+			if SprintState.pending_inbox_count() != 0:
+				_fail("Répondre au courrier doit solder immédiatement le badge de messagerie.")
+			inbox._on_next_pressed()
+			await get_tree().process_frame
+			if workstation.hosted_app() != null:
+				_fail("Terminer le courrier hébergé doit revenir au bureau.")
+			desk.open_app("inbox")
+			await get_tree().process_frame
+			var reopened: Control = workstation.hosted_app()
+			if reopened == null or not reopened.choice_buttons.is_empty():
+				_fail("Rouvrir le courrier traité doit montrer la réponse, sans reproposer le choix.")
+
+	workstation.close_app()
+	desk.open_app("roadmap")
+	for i in 3:
+		await get_tree().process_frame
+	var roadmap: Control = workstation.hosted_app()
+	if roadmap == null:
+		_fail("La Roadmap doit s'ouvrir dans le poste de travail.")
+	else:
+		roadmap._on_next_pressed()
+		await get_tree().process_frame
+		if SprintState.last_roadmap_report.is_empty():
+			_fail("Le bouton Terminé de la Roadmap hébergée doit valider le plan.")
+		if workstation.hosted_app() != null:
+			_fail("La Roadmap ne doit se fermer qu'après validation du plan.")
+
+	# Une mutation économique dans un écran hébergé remonte jusqu'aux trois
+	# valeurs du bureau, sans exiger de reposer l'accessoire.
+	var refreshed := [0]
+	workstation.state_changed.connect(func(): refreshed[0] += 1)
+	desk.open_app("investments")
+	await get_tree().process_frame
+	var investments: Control = workstation.hosted_app()
+	if investments != null:
+		investments._refresh_all()
+	if refreshed[0] == 0:
+		_fail("Une mutation hébergée doit demander le rafraîchissement immédiat du bureau.")
 
 	desk.queue_free()
 	await get_tree().process_frame

@@ -346,18 +346,45 @@ func _fill_open() -> void:
 	screen.set_anchors_preset(Control.PRESET_FULL_RECT)
 	host.add_child(screen)
 	UIHelpers.hosted_in_desk = false
-	_rewire(screen, "Margin/VBox/TopBar/BackButton")
-	_rewire(screen, "Margin/VBox/BottomBar/NextButton")
-	_rewire(screen, "Margin/VBox/BottomBar/ContinueButton")
+	_apply_hosted_layout(screen)
+	if screen.has_signal("desk_state_changed"):
+		screen.connect("desk_state_changed", _on_hosted_state_changed)
 
 
-func _rewire(screen: Control, path: String) -> void:
-	var button: Node = screen.get_node_or_null(NodePath(path))
-	if button == null or not (button is BaseButton):
-		return
-	for connection in button.pressed.get_connections():
-		button.pressed.disconnect(connection.get("callable"))
-	button.pressed.connect(collapse)
+func hosted_screen() -> Control:
+	if _body == null:
+		return null
+	var host := _body.get_node_or_null("Host")
+	if host == null or host.get_child_count() == 0:
+		return null
+	return host.get_child(0) as Control
+
+
+func _apply_hosted_layout(screen: Control) -> void:
+	var margin := screen.get_node_or_null("Margin") as MarginContainer
+	if margin != null:
+		margin.add_theme_constant_override("margin_left", 24)
+		margin.add_theme_constant_override("margin_top", 14)
+		margin.add_theme_constant_override("margin_right", 24)
+		margin.add_theme_constant_override("margin_bottom", 18)
+	var vbox := screen.get_node_or_null("Margin/VBox") as VBoxContainer
+	if vbox != null:
+		vbox.add_theme_constant_override("separation", 10)
+	var top_bar := screen.get_node_or_null("Margin/VBox/TopBar") as Control
+	if top_bar != null:
+		top_bar.visible = false
+	for button_name in ["NextButton", "ContinueButton"]:
+		var button := screen.get_node_or_null("Margin/VBox/BottomBar/%s" % button_name) as Control
+		if button != null:
+			button.visible = false
+	if kind == "committee":
+		var bottom_bar := screen.get_node_or_null("Margin/VBox/BottomBar") as Control
+		if bottom_bar != null:
+			bottom_bar.visible = false
+
+
+func _on_hosted_state_changed() -> void:
+	state_changed.emit()
 
 
 ## La feuille de clôture. Elle dit **ce qu'on emporte**, y compris ce qu'on a

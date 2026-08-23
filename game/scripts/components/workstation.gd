@@ -251,6 +251,10 @@ func open_app(id: String) -> void:
 	state_changed.emit()
 
 
+func hosted_app() -> Control:
+	return _hosted
+
+
 func close_app() -> void:
 	if _hosted != null and is_instance_valid(_hosted):
 		_hosted = null
@@ -259,13 +263,10 @@ func close_app() -> void:
 	state_changed.emit()
 
 
-## Les phases existantes sont hébergées **telles quelles**. Deux neutralisations
-## suffisent, et elles évitent de rouvrir les neuf écrans dans ce lot :
-##  1. `UIHelpers.hosted_in_desk` fait rendre un panneau vide à
-##     `attach_side_panel()` — le Panneau de bord n'existe plus ;
-##  2. les boutons de navigation sont **débranchés puis recâblés** vers le
-##     retour au bureau : aucun `change_scene_to_file` ne doit survivre, il
-##     détruirait le hub.
+## Les phases gardent leur logique métier lorsqu'elles sont hébergées. Elles
+## exposent des signaux de fin et de mutation au bureau : débrancher leurs
+## boutons détruirait notamment la validation de la Roadmap et la lecture du
+## courrier.
 func _instantiate_app(id: String, host: Control) -> Control:
 	if id == "dashboard":
 		var dossier := UIHelpers.instantiate_company_dossier(host)
@@ -282,23 +283,31 @@ func _instantiate_app(id: String, host: Control) -> Control:
 	host.add_child(screen)
 	UIHelpers.hosted_in_desk = false
 
-	# Les libellés du tunnel mentent une fois hébergés : « ← Accueil » ne ramène
-	# plus à l'accueil, et « Suivant : Roadmap » n'est plus la suite de rien
-	# puisqu'on choisit son ordre. Le lot B refera ces écrans ; en attendant, on
-	# ne laisse pas une promesse fausse à l'écran.
-	_rewire(screen, "Margin/VBox/TopBar/BackButton", "← Bureau")
-	_rewire(screen, "Margin/VBox/BottomBar/NextButton", "Terminé")
+	_apply_hosted_layout(screen)
+	if screen.has_signal("desk_done"):
+		screen.connect("desk_done", close_app)
+	if screen.has_signal("desk_state_changed"):
+		screen.connect("desk_state_changed", _on_hosted_state_changed)
 	return screen
 
 
-## Un bouton hébergé garde son libellé et sa place — c'est le lot B qui refera
-## la forme des écrans. Seule sa destination change.
-func _rewire(screen: Control, path: String, label: String = "") -> void:
-	var button: Node = screen.get_node_or_null(NodePath(path))
-	if button == null or not (button is BaseButton):
-		return
-	for connection in button.pressed.get_connections():
-		button.pressed.disconnect(connection.get("callable"))
-	button.pressed.connect(close_app)
-	if label != "":
-		button.text = label
+func _apply_hosted_layout(screen: Control) -> void:
+	var margin := screen.get_node_or_null("Margin") as MarginContainer
+	if margin != null:
+		margin.add_theme_constant_override("margin_left", 22)
+		margin.add_theme_constant_override("margin_top", 12)
+		margin.add_theme_constant_override("margin_right", 22)
+		margin.add_theme_constant_override("margin_bottom", 16)
+	var vbox := screen.get_node_or_null("Margin/VBox") as VBoxContainer
+	if vbox != null:
+		vbox.add_theme_constant_override("separation", 9)
+	var top_bar := screen.get_node_or_null("Margin/VBox/TopBar") as Control
+	if top_bar != null:
+		top_bar.visible = false
+	var next := screen.get_node_or_null("Margin/VBox/BottomBar/NextButton") as Button
+	if next != null:
+		next.text = "Terminé"
+
+
+func _on_hosted_state_changed() -> void:
+	state_changed.emit()

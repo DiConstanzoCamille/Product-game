@@ -7,6 +7,9 @@ const NEXT_SCENE := "res://scenes/screens/desk_screen.tscn"
 const START_SCREEN_SCENE := "res://scenes/screens/start_screen.tscn"
 const DEFAULT_CHANNEL := "#direction-produit"
 
+signal desk_done
+signal desk_state_changed
+
 @onready var sprint_label: Label = $Margin/VBox/TopBar/SprintLabel
 @onready var back_button: Button = $Margin/VBox/TopBar/BackButton
 @onready var channel_label: Label = $Margin/VBox/Thread/ThreadBody/ChannelHeader/ChannelLabel
@@ -19,9 +22,12 @@ var event: Dictionary
 var choice_buttons: Array[Button] = []
 var choice_made := false
 var side_panel: Control = null
+var hosted_in_desk := false
+var _reading_primary_event := true
 
 
 func _ready() -> void:
+	hosted_in_desk = UIHelpers.hosted_in_desk
 	back_button.pressed.connect(func(): get_tree().change_scene_to_file(START_SCREEN_SCENE))
 	next_button.pressed.connect(_on_next_pressed)
 	next_button.disabled = true
@@ -37,8 +43,9 @@ func _ready() -> void:
 	_load_event()
 
 
-func _load_event() -> void:
-	event = SprintState.draw_inbox_event()
+func _load_event(primary_event: bool = true) -> void:
+	_reading_primary_event = primary_event
+	event = SprintState.get_sprint_event() if primary_event else SprintState.draw_inbox_event()
 	if event.is_empty():
 		channel_label.text = DEFAULT_CHANNEL
 		channel_meta_label.text = "Aucun message"
@@ -49,6 +56,16 @@ func _load_event() -> void:
 	channel_label.text = "💬 %s" % event.get("channel", DEFAULT_CHANNEL)
 	channel_meta_label.text = "Sprint %d · %s" % [SprintState.sprint_number, _timestamp()]
 	_append_incoming_message(sender, event.get("subject", ""), event.get("text", ""), event.get("status", ""))
+	if primary_event and SprintState.is_sprint_event_answered():
+		var resolution := SprintState.get_sprint_event_resolution()
+		if not resolution.is_empty():
+			_append_outgoing_message(String(resolution.get("label", "Réponse envoyée")))
+			_append_consequence_message(String(resolution.get("reveal", "Message traité.")))
+		else:
+			_append_system_note("Message déjà traité pour ce sprint.")
+		next_button.disabled = false
+		next_button.text = "Fermer"
+		return
 	_append_reply_drafts(event.get("choices", []))
 
 
@@ -155,6 +172,12 @@ func _on_choice_pressed(choice: Dictionary) -> void:
 
 	var note := "%s → %s" % [event.get("subject", ""), choice.get("label", "")]
 	SprintState.apply_inbox_choice(choice, note)
+	if _reading_primary_event:
+		SprintState.mark_sprint_event_answered({
+			"label": choice.get("label", ""),
+			"reveal": choice.get("reveal", ""),
+		})
+	desk_state_changed.emit()
 	if SprintState.has_pending_team_events():
 		next_button.text = "Traiter la demande suivante (%d) →" % SprintState.pending_team_event_count()
 	else:
@@ -164,14 +187,17 @@ func _on_choice_pressed(choice: Dictionary) -> void:
 
 func _on_next_pressed() -> void:
 	if not SprintState.has_pending_team_events():
-		get_tree().change_scene_to_file(NEXT_SCENE)
+		if hosted_in_desk:
+			desk_done.emit()
+		else:
+			get_tree().change_scene_to_file(NEXT_SCENE)
 		return
 	UIHelpers.clear_children(messages_container)
 	choice_buttons.clear()
 	choice_made = false
 	next_button.disabled = true
 	next_button.text = "Suivant : Roadmap →"
-	_load_event()
+	_load_event(false)
 
 
 func _append_outgoing_message(text: String) -> void:

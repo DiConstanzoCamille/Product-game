@@ -1,4 +1,6 @@
 extends Control
+
+signal desk_state_changed
 ## Le Comité d'investissement (spec-scoring-sprint.md §12, Lot 4) — l'écran qui
 ## répare « pas de gestion d'équipe » : entre deux trimestres, jamais au fil de
 ## l'eau. L'étal du sprint (investments_screen) ne change pas — le Comité ne
@@ -83,6 +85,7 @@ func _refresh() -> void:
 
 	if side_panel != null:
 		side_panel.refresh()
+	desk_state_changed.emit()
 
 
 ## Ce que le trimestre qui s'ouvre demandera. C'est de l'information sur la
