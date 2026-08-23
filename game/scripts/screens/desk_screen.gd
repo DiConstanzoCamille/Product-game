@@ -119,6 +119,7 @@ func refresh() -> void:
 	else:
 		_refresh_anchored_labels()
 	_refresh_prop_close()
+	_sync_interaction_scope()
 
 
 ## Les trois accès dont la recette a besoin. Le harnais de captures et le banc
@@ -147,17 +148,21 @@ func lifted_paper() -> Node3D:
 ## Les mêmes gestes que la souris, sans souris : la recette et le banc doivent
 ## pouvoir lever un poster ou ouvrir un accessoire sans simuler un raycast.
 func lift_paper(kind: String) -> void:
+	if _open_prop_node() != null:
+		return
 	var target := paper(kind)
 	if target != null:
 		_on_paper_clicked(target)
 
 
 func open_app(id: String) -> void:
-	if _workstation != null:
+	if _workstation != null and _open_prop_node() == null:
 		_workstation.call("open_app", id)
 
 
 func open_prop(kind: String) -> void:
+	if _open_prop_node() != null:
+		return
 	var target := prop(kind)
 	if target != null:
 		target.call("expand")
@@ -696,6 +701,43 @@ func _close_prop_unless_reclaimed(frame: int) -> void:
 	if _prop_click_frame == frame:
 		return
 	_close_open_prop()
+
+
+## Un accessoire présenté est modal dans la scène 3D : son panneau reste
+## interactif, tout ce qui est derrière devient temporairement du décor. On
+## neutralise aussi les Controls du CanvasLayer (hors « Reposer »), afin qu'un
+## clic sur les valeurs permanentes soit bien lu comme un clic extérieur.
+func _sync_interaction_scope() -> void:
+	if _room == null:
+		return
+	var opened := _open_prop_node()
+	var world_unlocked := opened == null
+	for area in _room.find_children("*", "Area3D", true, false):
+		(area as Area3D).input_ray_pickable = world_unlocked
+	for kind in _props:
+		var prop: Node3D = _props[kind]
+		prop.call("set_input_scope", world_unlocked, prop == opened)
+	_set_canvas_interactions_locked(not world_unlocked)
+
+
+func _set_canvas_interactions_locked(locked: bool) -> void:
+	if _layer == null:
+		return
+	var pending: Array[Node] = [_layer]
+	while not pending.is_empty():
+		var node: Node = pending.pop_back()
+		for child in node.get_children():
+			pending.append(child)
+		if not (node is Control) or node == _prop_close:
+			continue
+		var control := node as Control
+		if locked:
+			if not control.has_meta("desk_mouse_filter"):
+				control.set_meta("desk_mouse_filter", control.mouse_filter)
+			control.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		elif control.has_meta("desk_mouse_filter"):
+			control.mouse_filter = int(control.get_meta("desk_mouse_filter"))
+			control.remove_meta("desk_mouse_filter")
 
 
 # ── Petits utilitaires ───────────────────────────────────────────────────

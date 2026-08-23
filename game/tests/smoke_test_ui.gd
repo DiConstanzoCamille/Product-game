@@ -925,6 +925,18 @@ func _test_desk_hosted_contracts() -> void:
 			_fail("La Boutique hébergée ne doit pas afficher sa navigation Accueil historique.")
 		if investments.next_button.visible:
 			_fail("La Boutique hébergée ne doit pas afficher le bouton de tunnel Suivant.")
+	var shop_cover_area: Area3D = shop.get_node("Area")
+	var shop_panel_area: Area3D = shop.get_node("PanelPivot/PanelArea")
+	var closing_cover_area: Area3D = desk.prop("closing").get_node("Area")
+	var dalle_area: Area3D = desk.room().get_node("Lid/DalleArea")
+	if shop_cover_area.input_ray_pickable:
+		_fail("La zone de repos de la Boutique doit être neutralisée pendant sa présentation.")
+	if not shop_panel_area.input_ray_pickable:
+		_fail("Seul le panneau présenté de la Boutique doit rester interactif.")
+	if closing_cover_area.input_ray_pickable or dalle_area.input_ray_pickable:
+		_fail("Les objets 3D derrière un accessoire présenté doivent être verrouillés.")
+	if desk.readable_layer().get_node("Vitals").mouse_filter != Control.MOUSE_FILTER_IGNORE:
+		_fail("Les valeurs du bureau ne doivent pas intercepter un clic extérieur pendant une présentation.")
 
 	# Un clic dans l'accessoire est réclamé par lui et ne le repose pas ; un
 	# clic réellement extérieur, à la frame suivante, le fait.
@@ -938,6 +950,8 @@ func _test_desk_hosted_contracts() -> void:
 	await get_tree().process_frame
 	if shop.is_open():
 		_fail("Un clic extérieur doit reposer l'accessoire ouvert.")
+	if not shop_cover_area.input_ray_pickable or shop_panel_area.input_ray_pickable or not dalle_area.input_ray_pickable:
+		_fail("Reposer l'accessoire doit restaurer exactement les interactions du monde.")
 
 	# Le même contrat est garanti au clavier.
 	desk.open_prop("shop")
@@ -967,6 +981,36 @@ func _test_desk_hosted_contracts() -> void:
 	await get_tree().process_frame
 	if committee.is_open():
 		_fail("Échap doit reposer le Comité.")
+
+	# Le point de non-retour doit être un vrai bouton routé par le SubViewport,
+	# pas seulement une méthode que le test appelle directement.
+	var closing: Node3D = desk.prop("closing")
+	desk.open_prop("closing")
+	for i in 3:
+		await get_tree().process_frame
+	var sign_button: Button = closing.find_child("SignButton", true, false)
+	if sign_button == null:
+		_fail("La planche de fin de sprint doit exposer son bouton de signature.")
+	else:
+		var original_sign := Callable(closing, "_on_sign_pressed")
+		if sign_button.pressed.is_connected(original_sign):
+			sign_button.pressed.disconnect(original_sign)
+		var routed_press := [false]
+		sign_button.pressed.connect(func(): routed_press[0] = true)
+		var prop_viewport: SubViewport = closing.get_node("PanelPivot/PropViewport")
+		var click_position := sign_button.get_global_rect().get_center()
+		for pressed in [true, false]:
+			var click := InputEventMouseButton.new()
+			click.button_index = MOUSE_BUTTON_LEFT
+			click.position = click_position
+			click.global_position = click_position
+			click.pressed = pressed
+			prop_viewport.push_input(click, true)
+		await get_tree().process_frame
+		if not routed_press[0]:
+			_fail("Le clic routé dans la planche doit atteindre SIGNER ET LANCER.")
+	desk._unhandled_input(_escape_event())
+	await get_tree().process_frame
 
 	desk.queue_free()
 	await get_tree().process_frame

@@ -80,8 +80,10 @@ const HOSTED := {
 var room: DeskRoom = null
 
 var _cover: MeshInstance3D = null
+var _cover_area: Area3D = null
 var _panel: MeshInstance3D = null
 var _panel_pivot: Node3D = null
+var _panel_area: Area3D = null
 var _viewport: SubViewport = null
 var _body: Control = null
 var _open := false
@@ -123,17 +125,17 @@ func build() -> void:
 	trim.material_override = DeskRoom.toon_material(shape.get("frame", Color.BLACK))
 	add_child(trim)
 
-	var area := Area3D.new()
-	area.name = "Area"
+	_cover_area = Area3D.new()
+	_cover_area.name = "Area"
 	var collision := CollisionShape3D.new()
 	var box := BoxShape3D.new()
 	box.size = rest_size * 1.2
 	collision.shape = box
-	area.add_child(collision)
-	area.input_event.connect(_on_cover_input)
-	area.mouse_entered.connect(_on_cover_mouse_entered)
-	area.mouse_exited.connect(_on_cover_mouse_exited)
-	add_child(area)
+	_cover_area.add_child(collision)
+	_cover_area.input_event.connect(_on_cover_input)
+	_cover_area.mouse_entered.connect(_on_cover_mouse_entered)
+	_cover_area.mouse_exited.connect(_on_cover_mouse_exited)
+	add_child(_cover_area)
 
 	_build_panel()
 	refresh()
@@ -187,16 +189,18 @@ func _build_panel() -> void:
 		var placement: Dictionary = room.presentation_placement(Vector2i.ONE, PRESENT_DISTANCE)
 		room.outline_at(frame, placement["position"])
 
-	var area := Area3D.new()
-	area.name = "PanelArea"
+	_panel_area = Area3D.new()
+	_panel_area.name = "PanelArea"
 	var collision := CollisionShape3D.new()
 	var box := BoxShape3D.new()
 	box.size = Vector3(quad.size.x, quad.size.y, 0.01)
 	collision.shape = box
 	collision.position = Vector3(0, 0, 0.004)
-	area.add_child(collision)
-	area.input_event.connect(_on_panel_input)
-	_panel_pivot.add_child(area)
+	_panel_area.add_child(collision)
+	_panel_area.input_event.connect(_on_panel_input)
+	_panel_pivot.add_child(_panel_area)
+	# Un panneau invisible ne doit jamais intercepter un rayon destiné au monde.
+	_panel_area.input_ray_pickable = false
 
 
 func _pixels_per_unit() -> float:
@@ -243,6 +247,16 @@ func is_open() -> bool:
 
 func is_hovered() -> bool:
 	return _hovered
+
+
+## Le bureau fixe une portée d'interaction unique. Sans objet présenté, seule
+## la couverture posée est cliquable ; avec un objet présenté, seul son panneau
+## l'est. Les autres accessoires, bien que toujours dessinés, sont du décor.
+func set_input_scope(world_unlocked: bool, active: bool) -> void:
+	if _cover_area != null:
+		_cover_area.input_ray_pickable = world_unlocked and not _open and visible
+	if _panel_area != null:
+		_panel_area.input_ray_pickable = active and _open and visible
 
 
 ## Le survol déplace l'objet, jamais son échelle : les volumes portent un

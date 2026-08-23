@@ -2334,3 +2334,17 @@ la lecture.
 Enfin, chaque accessoire 3D interactif se soulève légèrement au survol et son
 étiquette s'accentue. Le retour ne change jamais l'échelle du volume : les
 contours restent donc stables, conformément au contrat visuel du bureau.
+
+Un accessoire présenté crée une **portée d'interaction modale**. Son panneau
+est la seule `Area3D` encore cliquable ; la dalle du laptop, les posters, la
+tasse et les couvertures de tous les accessoires deviennent temporairement du
+décor. Les valeurs permanentes restent lisibles mais ne capturent pas le clic.
+Un clic hors du panneau repose donc l'objet, même s'il tombe exactement sur la
+place que cet objet occupait avant de s'ouvrir. La commande globale « Reposer »
+et Échap restent disponibles.
+
+Cette portée corrige aussi une collision invisible : masquer la couverture de
+la Boutique ne suffisait pas, car son ancienne `Area3D` réclamait encore le
+clic et annulait le clic extérieur. Réciproquement, le bouton « SIGNER ET
+LANCER » de la planche de clôture est testé par un vrai événement souris routé
+dans son `SubViewport`, afin de garantir le point de non-retour du sprint.
