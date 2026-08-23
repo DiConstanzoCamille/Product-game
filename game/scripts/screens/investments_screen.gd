@@ -1,4 +1,6 @@
 extends Control
+
+signal desk_state_changed
 ## Phase 3 — Investissements (docs/proposition-ui-interface.md §3 ; carnet de
 ## règles §6.2, §21). L'écran unique de tout ce que l'organisation acquiert,
 ## en **un seul rayon où les trois types se mélangent** : candidats, pratiques
@@ -238,6 +240,7 @@ func _refresh_all() -> void:
 	_refresh_shelf()
 	if side_panel != null:
 		side_panel.refresh()
+	desk_state_changed.emit()
 
 
 func _fit_columns() -> void:

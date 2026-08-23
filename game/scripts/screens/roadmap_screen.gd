@@ -1,4 +1,6 @@
 extends Control
+
+signal desk_done
 ## Vue de la Roadmap profonde (§6). Les règles vivent dans SprintState : cet
 ## écran affiche le tirage persistant et lui remet seulement un plan de points.
 
@@ -18,12 +20,14 @@ const START_SCREEN_SCENE := "res://scenes/screens/start_screen.tscn"
 var effective_capacity: int = 0
 var backlog_controls: Array = []
 var side_panel: Control = null
+var hosted_in_desk := false
 var self_work_button: Button = null
 var ticket_dialog: Control = null
 var ticket_detail_content: VBoxContainer = null
 
 
 func _ready() -> void:
+	hosted_in_desk = UIHelpers.hosted_in_desk
 	back_button.pressed.connect(func(): get_tree().change_scene_to_file(START_SCREEN_SCENE))
 	next_button.pressed.connect(_on_next_pressed)
 	UIHelpers.style_primary_button(next_button)
@@ -577,4 +581,7 @@ func _on_next_pressed() -> void:
 	SprintState.set_piloted_squads([SprintState.get_primary_squad().get("id", "")])
 	SprintState.commit_backlog_plan(_current_plan())
 	SprintState.resolve_unpiloted_squads()
-	get_tree().change_scene_to_file(NEXT_SCENE)
+	if hosted_in_desk:
+		desk_done.emit()
+	else:
+		get_tree().change_scene_to_file(NEXT_SCENE)

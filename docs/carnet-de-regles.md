@@ -2265,3 +2265,28 @@ franc.
 **Ce que ce n'est pas** : le lot d'habillage. Il n'y a toujours ni matière, ni
 texture, ni ambiance — seulement une façon d'éclairer et de cerner. La
 différence est visible, elle ne rend pas le bureau beau pour autant.
+
+### 37.11 Héberger un écran ne permet pas de débrancher sa règle (issue #62)
+
+Le premier branchement du bureau remplaçait les callbacks des boutons de phase
+par `close_app()` ou `collapse()`. L'écran restait visible, mais son contrat
+disparaissait : « Terminé » fermait la Roadmap sans appeler
+`commit_backlog_plan()`, et répondre au courrier ne soldait jamais son badge.
+
+La règle est désormais explicite : **un hôte adapte la présentation, jamais
+la logique métier de son invité**. Les écrans hébergés gardent leurs callbacks
+et exposent seulement deux signaux au bureau :
+
+- `desk_done`, après exécution de l'action métier, demande le retour au bureau ;
+- `desk_state_changed` remonte une mutation afin de rafraîchir immédiatement
+  Impact, revenu et users, sans attendre la fermeture de l'accessoire.
+
+Le courrier du sprint est tiré une fois, sa réponse et sa conséquence sont
+mémorisées jusqu'au sprint suivant, et `pending_inbox_count()` tombe à zéro dès
+la réponse. Le rouvrir sert donc à relire l'échange, pas à rejouer le choix.
+
+Enfin, le chrome appartient à l'objet qui héberge : la barre du laptop ou le
+bouton « Reposer » de l'iPad remplace la barre « Accueil » de l'ancien tunnel.
+Les marges des invités sont compactées pour leur `SubViewport` et les CTA
+métier restent dans leur écran ; il ne doit plus y avoir deux boutons de retour
+concurrents dans le même cadre.

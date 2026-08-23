@@ -133,6 +133,7 @@ var self_work_capacity: int = 0        # points de capacité ajoutés par "Faire
 var _sprint_event: Dictionary = {}
 var _sprint_event_sprint: int = -1
 var _sprint_event_answered: bool = false
+var _sprint_event_resolution: Dictionary = {}
 var last_journal: Array = []           # les lignes du dernier sprint clos, punaisées au mur
 # 🏛 Le Comité n'est plus un écran qu'on traverse : c'est un parapheur déposé
 # sur la table. Il ne se déduit donc pas d'un numéro de sprint — le trimestre
@@ -179,6 +180,7 @@ func reset_run(chosen_era_id: String = "", chosen_company_id: String = "", chose
 	_sprint_event = {}
 	_sprint_event_sprint = -1
 	_sprint_event_answered = false
+	_sprint_event_resolution = {}
 	pending_deltas.clear()
 	pending_people_effects.clear()
 	pending_journal_lines.clear()
@@ -1525,6 +1527,7 @@ func advance_to_next_sprint() -> void:
 	_sprint_event = {}
 	_sprint_event_sprint = -1
 	_sprint_event_answered = false
+	_sprint_event_resolution = {}
 	_refresh_team_moral()
 
 
@@ -4267,6 +4270,7 @@ func get_sprint_event() -> Dictionary:
 	_sprint_event = draw_inbox_event()
 	_sprint_event_sprint = sprint_number
 	_sprint_event_answered = false
+	_sprint_event_resolution = {}
 	return _sprint_event
 
 
@@ -4279,8 +4283,17 @@ func pending_inbox_count() -> int:
 	return 1 if not get_sprint_event().is_empty() else 0
 
 
-func mark_sprint_event_answered() -> void:
+func mark_sprint_event_answered(resolution: Dictionary = {}) -> void:
 	_sprint_event_answered = true
+	_sprint_event_resolution = resolution.duplicate(true)
+
+
+func is_sprint_event_answered() -> bool:
+	return _sprint_event_sprint == sprint_number and _sprint_event_answered
+
+
+func get_sprint_event_resolution() -> Dictionary:
+	return _sprint_event_resolution.duplicate(true)
 
 
 ## 🏁 Ce qu'on emporte en signant. La feuille dit ce qui a été fait **et ce qui
