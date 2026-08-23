@@ -2290,3 +2290,61 @@ bouton « Reposer » de l'iPad remplace la barre « Accueil » de l'ancien tunne
 Les marges des invités sont compactées pour leur `SubViewport` et les CTA
 métier restent dans leur écran ; il ne doit plus y avoir deux boutons de retour
 concurrents dans le même cadre.
+
+## 38. Les interfaces appartiennent à leur objet (issue #10)
+
+Le hotfix #62 avait retiré la navigation en double, mais l'hôte cherchait
+encore `Margin/VBox/TopBar` et les anciens boutons dans l'arbre de chaque
+écran. Cette dépendance inversait la responsabilité : le laptop connaissait
+la structure de la Roadmap, la tablette celle des Investissements. Le moindre
+déplacement de conteneur pouvait donc refaire disparaître une action métier.
+
+Chaque invité expose maintenant `configure_for_host(context)`. **L'écran
+adapte lui-même son contenu à son cadre ; l'hôte ne touche plus à ses nœuds.**
+Les signaux `desk_done` et `desk_state_changed` gardent leurs rôles posés au
+§37.11.
+
+La même séparation s'applique à la sortie : « Reposer » n'est plus peint dans
+le `SubViewport` de la tablette ou du parapheur. Il vit dans le `CanvasLayer`
+du bureau, hors de la texture de l'objet, et trois gestes équivalents existent :
+
+- la commande visible « Reposer … · Échap » ;
+- Échap, avec priorité à ce qui est au premier plan ;
+- un clic hors de l'accessoire ouvert.
+
+Un clic **dans** l'accessoire est réclamé à la frame où l'`Area3D` le route
+vers son `SubViewport`. Le bureau diffère sa fermeture et compare cette frame,
+exactement comme pour les posters : sans cette précaution, acheter une carte
+reposerait la tablette dans le même clic.
+
+Les CTA métier restent dans l'objet et ne ferment rien implicitement. Inbox,
+Roadmap, Investissements et Comité compactent eux-mêmes leurs marges et leurs
+barres pour leur taille hébergée ; leurs versions autonomes conservent le
+tunnel historique tant que les anciens chemins de scène existent.
+
+La densité suit aussi ce contrat. Dans le laptop, la Roadmap est un **index de
+décision**, pas une pile de fiches : un ticket tient sur une ligne compacte
+(titre, coût, signaux, actions), et le dossier complet s'ouvre à la demande.
+Les sous-titres redondants et les grands espacements disparaissent uniquement
+dans ce cadre. L'Inbox applique la même échelle compacte à ses messages et à
+ses réponses. La dalle conserve son identité lumineuse, mais son intensité par
+défaut descend à `0,45` (`balance.json`) afin que l'effet ne concurrence plus
+la lecture.
+
+Enfin, chaque accessoire 3D interactif se soulève légèrement au survol et son
+étiquette s'accentue. Le retour ne change jamais l'échelle du volume : les
+contours restent donc stables, conformément au contrat visuel du bureau.
+
+Un accessoire présenté crée une **portée d'interaction modale**. Son panneau
+est la seule `Area3D` encore cliquable ; la dalle du laptop, les posters, la
+tasse et les couvertures de tous les accessoires deviennent temporairement du
+décor. Les valeurs permanentes restent lisibles mais ne capturent pas le clic.
+Un clic hors du panneau repose donc l'objet, même s'il tombe exactement sur la
+place que cet objet occupait avant de s'ouvrir. La commande globale « Reposer »
+et Échap restent disponibles.
+
+Cette portée corrige aussi une collision invisible : masquer la couverture de
+la Boutique ne suffisait pas, car son ancienne `Area3D` réclamait encore le
+clic et annulait le clic extérieur. Réciproquement, le bouton « SIGNER ET
+LANCER » de la planche de clôture est testé par un vrai événement souris routé
+dans son `SubViewport`, afin de garantir le point de non-retour du sprint.

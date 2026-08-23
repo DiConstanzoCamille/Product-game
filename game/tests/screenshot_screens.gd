@@ -102,7 +102,7 @@ func _shoot_team_management() -> void:
 ## `add_child()` pendant `_ready()` est **rejeté sans erreur GDScript**), donc
 ## la première trame ne montre rien. D'où l'attente avant chaque geste.
 func _shoot_desk_states() -> void:
-	for state in ["calme", "app", "shop", "committee", "poster"]:
+	for state in ["calme", "app", "roadmap", "shop", "closing", "committee", "poster"]:
 		_prepare_team_state()
 		if state == "committee":
 			SprintState.committee_pending = true
@@ -119,8 +119,12 @@ func _shoot_desk_states() -> void:
 		match state:
 			"app":
 				desk.open_app("inbox")
+			"roadmap":
+				desk.open_app("roadmap")
 			"shop":
 				desk.open_prop("shop")
+			"closing":
+				desk.open_prop("closing")
 			"committee":
 				desk.open_prop("committee")
 			"poster":

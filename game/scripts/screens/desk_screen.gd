@@ -65,6 +65,7 @@ var _alerts: Control = null
 var _tooltip: PanelContainer = null
 var _detail: PanelContainer = null
 var _energy: Label = null
+var _prop_close: Button = null
 var _workstation: Control = null
 var _mug: Node3D = null
 
@@ -72,6 +73,7 @@ var _papers: Array = []
 var _props: Dictionary = {}
 var _lifted: Node3D = null
 var _paper_click_frame := -1
+var _prop_click_frame := -1
 
 
 func _ready() -> void:
@@ -116,6 +118,8 @@ func refresh() -> void:
 		_fill_detail(_lifted)
 	else:
 		_refresh_anchored_labels()
+	_refresh_prop_close()
+	_sync_interaction_scope()
 
 
 ## Les trois accès dont la recette a besoin. Le harnais de captures et le banc
@@ -144,17 +148,21 @@ func lifted_paper() -> Node3D:
 ## Les mêmes gestes que la souris, sans souris : la recette et le banc doivent
 ## pouvoir lever un poster ou ouvrir un accessoire sans simuler un raycast.
 func lift_paper(kind: String) -> void:
+	if _open_prop_node() != null:
+		return
 	var target := paper(kind)
 	if target != null:
 		_on_paper_clicked(target)
 
 
 func open_app(id: String) -> void:
-	if _workstation != null:
+	if _workstation != null and _open_prop_node() == null:
 		_workstation.call("open_app", id)
 
 
 func open_prop(kind: String) -> void:
+	if _open_prop_node() != null:
+		return
 	var target := prop(kind)
 	if target != null:
 		target.call("expand")
@@ -243,6 +251,8 @@ func _build_props() -> void:
 		_room.add_child(prop)
 		prop.call("build")
 		prop.connect("state_changed", Callable(self, "refresh"))
+		prop.connect("interacted", Callable(self, "_on_prop_interacted"))
+		prop.connect("hover_changed", Callable(self, "_on_prop_hover"))
 		_props[kind] = prop
 
 
@@ -275,6 +285,21 @@ func _build_canvas() -> void:
 	UIHelpers.apply_mono(_energy, 12, true)
 	_energy.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_layer.add_child(_energy)
+
+	# La commande appartient au bureau, pas à la texture de l'accessoire. Elle
+	# reste donc nette, stable et au-dessus du monde quel que soit l'objet ouvert.
+	_prop_close = Button.new()
+	_prop_close.name = "PropClose"
+	_prop_close.text = "Reposer  ·  Échap"
+	_prop_close.visible = false
+	_prop_close.position = Vector2(DESIGN.x - 234, 92)
+	_prop_close.custom_minimum_size = Vector2(200, 42)
+	_prop_close.add_theme_font_size_override("font_size", 13)
+	_prop_close.add_theme_color_override("font_color", UIHelpers.COLOR_INK)
+	_prop_close.add_theme_stylebox_override("normal", _flat(Color(1, 1, 1, 0.94), 10))
+	_prop_close.add_theme_stylebox_override("hover", _flat(Color("#fff4cc"), 10))
+	_prop_close.pressed.connect(_close_open_prop)
+	_layer.add_child(_prop_close)
 
 	for kind in _props:
 		var hint := Label.new()
@@ -475,6 +500,17 @@ func _refresh_anchored_labels() -> void:
 		hint.position = _anchor(_room.project_to_design(prop.hint_anchor()), hint.size)
 
 
+func _refresh_prop_close() -> void:
+	if _prop_close == null:
+		return
+	var opened := _open_prop_node()
+	_prop_close.visible = opened != null
+	if opened != null:
+		_prop_close.text = "Reposer %s  ·  Échap" % String(opened.call("hint_text")).to_lower()
+		_prop_close.reset_size()
+		_prop_close.position.x = DESIGN.x - _prop_close.size.x - 34.0
+
+
 ## Centre une étiquette sur la projection d'un objet, **sans la laisser sortir
 ## du cadre** : un objet posé au bord du plateau projette son ancre hors champ,
 ## et l'étiquette disparaissait avec lui sans que rien ne le signale.
@@ -526,6 +562,15 @@ func _on_mug_hover(entered: bool) -> void:
 	_tooltip.position = Vector2(
 		clampf(at.x - _tooltip.size.x * 0.5, 20.0, DESIGN.x - _tooltip.size.x - 20.0),
 		at.y - _tooltip.size.y - 60.0)
+
+
+func _on_prop_hover(prop: Node3D, entered: bool) -> void:
+	var hint: Label = _layer.get_node_or_null("Hint_%s" % prop.kind)
+	if hint == null:
+		return
+	hint.add_theme_color_override("font_color", UIHelpers.COLOR_AMBER if entered else DESK_LABEL)
+	hint.add_theme_font_size_override("font_size", 12 if entered else 11)
+	_refresh_anchored_labels()
 
 
 # ── La levée du poster ───────────────────────────────────────────────────
@@ -607,20 +652,92 @@ func _fill_detail(paper: Node3D) -> void:
 ## physique (`Area3D`) et `_unhandled_input` ne sont pas ordonnés entre eux :
 ## refermer tout de suite refermerait aussi le poster qu'on vient d'ouvrir.
 func _unhandled_input(event: InputEvent) -> void:
-	if _lifted == null:
-		return
 	if event.is_action_pressed("ui_cancel"):
-		_close_lifted()
-		get_viewport().set_input_as_handled()
-		return
+		if _lifted != null:
+			_close_lifted()
+			get_viewport().set_input_as_handled()
+			return
+		if _open_prop_node() != null:
+			_close_open_prop()
+			get_viewport().set_input_as_handled()
+			return
+		if _workstation != null and bool(_workstation.call("is_open")):
+			_workstation.call("close_app")
+			get_viewport().set_input_as_handled()
+			return
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		_close_unless_reclaimed.call_deferred(Engine.get_process_frames())
+		var frame := Engine.get_process_frames()
+		if _lifted != null:
+			_close_unless_reclaimed.call_deferred(frame)
+		elif _open_prop_node() != null:
+			_close_prop_unless_reclaimed.call_deferred(frame)
 
 
 func _close_unless_reclaimed(frame: int) -> void:
 	if _paper_click_frame == frame:
 		return
 	_close_lifted()
+
+
+func _on_prop_interacted() -> void:
+	_prop_click_frame = Engine.get_process_frames()
+
+
+func _open_prop_node() -> Node3D:
+	for kind in _props:
+		var candidate: Node3D = _props[kind]
+		if bool(candidate.call("is_open")):
+			return candidate
+	return null
+
+
+func _close_open_prop() -> void:
+	var opened := _open_prop_node()
+	if opened != null:
+		opened.call("collapse")
+
+
+func _close_prop_unless_reclaimed(frame: int) -> void:
+	if _prop_click_frame == frame:
+		return
+	_close_open_prop()
+
+
+## Un accessoire présenté est modal dans la scène 3D : son panneau reste
+## interactif, tout ce qui est derrière devient temporairement du décor. On
+## neutralise aussi les Controls du CanvasLayer (hors « Reposer »), afin qu'un
+## clic sur les valeurs permanentes soit bien lu comme un clic extérieur.
+func _sync_interaction_scope() -> void:
+	if _room == null:
+		return
+	var opened := _open_prop_node()
+	var world_unlocked := opened == null
+	for area in _room.find_children("*", "Area3D", true, false):
+		(area as Area3D).input_ray_pickable = world_unlocked
+	for kind in _props:
+		var prop: Node3D = _props[kind]
+		prop.call("set_input_scope", world_unlocked, prop == opened)
+	_set_canvas_interactions_locked(not world_unlocked)
+
+
+func _set_canvas_interactions_locked(locked: bool) -> void:
+	if _layer == null:
+		return
+	var pending: Array[Node] = [_layer]
+	while not pending.is_empty():
+		var node: Node = pending.pop_back()
+		for child in node.get_children():
+			pending.append(child)
+		if not (node is Control) or node == _prop_close:
+			continue
+		var control := node as Control
+		if locked:
+			if not control.has_meta("desk_mouse_filter"):
+				control.set_meta("desk_mouse_filter", control.mouse_filter)
+			control.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		elif control.has_meta("desk_mouse_filter"):
+			control.mouse_filter = int(control.get_meta("desk_mouse_filter"))
+			control.remove_meta("desk_mouse_filter")
 
 
 # ── Petits utilitaires ───────────────────────────────────────────────────

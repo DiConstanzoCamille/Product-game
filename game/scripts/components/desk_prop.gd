@@ -28,6 +28,8 @@ extends Node3D
 ## droit à l'arrivée.
 
 signal state_changed
+signal interacted
+signal hover_changed(prop: Node3D, entered: bool)
 
 const SLIDE_SECONDS := 0.42
 ## Assez près pour occulter le portable — un dossier qu'on ouvre passe devant
@@ -78,12 +80,17 @@ const HOSTED := {
 var room: DeskRoom = null
 
 var _cover: MeshInstance3D = null
+var _cover_area: Area3D = null
 var _panel: MeshInstance3D = null
 var _panel_pivot: Node3D = null
+var _panel_area: Area3D = null
 var _viewport: SubViewport = null
 var _body: Control = null
 var _open := false
 var _tween: Tween = null
+var _hover_tween: Tween = null
+var _hovered := false
+var _rest_position := Vector3.ZERO
 
 
 func _ready() -> void:
@@ -95,6 +102,7 @@ func build() -> void:
 		return
 	var shape := _shape()
 	position = shape.get("rest_position", Vector3.ZERO)
+	_rest_position = position
 	rotation_degrees = shape.get("rest_rotation", Vector3.ZERO)
 
 	_cover = MeshInstance3D.new()
@@ -117,15 +125,17 @@ func build() -> void:
 	trim.material_override = DeskRoom.toon_material(shape.get("frame", Color.BLACK))
 	add_child(trim)
 
-	var area := Area3D.new()
-	area.name = "Area"
+	_cover_area = Area3D.new()
+	_cover_area.name = "Area"
 	var collision := CollisionShape3D.new()
 	var box := BoxShape3D.new()
 	box.size = rest_size * 1.2
 	collision.shape = box
-	area.add_child(collision)
-	area.input_event.connect(_on_cover_input)
-	add_child(area)
+	_cover_area.add_child(collision)
+	_cover_area.input_event.connect(_on_cover_input)
+	_cover_area.mouse_entered.connect(_on_cover_mouse_entered)
+	_cover_area.mouse_exited.connect(_on_cover_mouse_exited)
+	add_child(_cover_area)
 
 	_build_panel()
 	refresh()
@@ -179,16 +189,18 @@ func _build_panel() -> void:
 		var placement: Dictionary = room.presentation_placement(Vector2i.ONE, PRESENT_DISTANCE)
 		room.outline_at(frame, placement["position"])
 
-	var area := Area3D.new()
-	area.name = "PanelArea"
+	_panel_area = Area3D.new()
+	_panel_area.name = "PanelArea"
 	var collision := CollisionShape3D.new()
 	var box := BoxShape3D.new()
 	box.size = Vector3(quad.size.x, quad.size.y, 0.01)
 	collision.shape = box
 	collision.position = Vector3(0, 0, 0.004)
-	area.add_child(collision)
-	area.input_event.connect(_on_panel_input)
-	_panel_pivot.add_child(area)
+	_panel_area.add_child(collision)
+	_panel_area.input_event.connect(_on_panel_input)
+	_panel_pivot.add_child(_panel_area)
+	# Un panneau invisible ne doit jamais intercepter un rayon destiné au monde.
+	_panel_area.input_ray_pickable = false
 
 
 func _pixels_per_unit() -> float:
@@ -233,12 +245,55 @@ func is_open() -> bool:
 	return _open
 
 
+func is_hovered() -> bool:
+	return _hovered
+
+
+## Le bureau fixe une portée d'interaction unique. Sans objet présenté, seule
+## la couverture posée est cliquable ; avec un objet présenté, seul son panneau
+## l'est. Les autres accessoires, bien que toujours dessinés, sont du décor.
+func set_input_scope(world_unlocked: bool, active: bool) -> void:
+	if _cover_area != null:
+		_cover_area.input_ray_pickable = world_unlocked and not _open and visible
+	if _panel_area != null:
+		_panel_area.input_ray_pickable = active and _open and visible
+
+
+## Le survol déplace l'objet, jamais son échelle : les volumes portent un
+## contour, et grossir le nœud ferait grossir le trait avec lui.
+func _on_cover_mouse_entered() -> void:
+	_set_hovered(true)
+
+
+func _on_cover_mouse_exited() -> void:
+	_set_hovered(false)
+
+
+func _set_hovered(value: bool, animate := true) -> void:
+	if _hovered == value or _open:
+		return
+	_hovered = value
+	Input.set_default_cursor_shape(Input.CURSOR_POINTING_HAND if value else Input.CURSOR_ARROW)
+	if _hover_tween != null and _hover_tween.is_valid():
+		_hover_tween.kill()
+	var target := _rest_position + (Vector3.UP * 0.035 if value else Vector3.ZERO)
+	if animate:
+		_hover_tween = create_tween().set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		_hover_tween.tween_property(self, "position", target, 0.12)
+	else:
+		position = target
+	hover_changed.emit(self, value)
+
+
 func _on_cover_input(_camera: Node, event: InputEvent, _at: Vector3, _normal: Vector3, _index: int) -> void:
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		interacted.emit()
 		expand()
 
 
 func _on_panel_input(_camera: Node, event: InputEvent, event_position: Vector3, _normal: Vector3, _index: int) -> void:
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		interacted.emit()
 	DeskRoom.route_to_viewport(_panel, _viewport, event, event_position)
 
 
@@ -246,6 +301,8 @@ func _on_panel_input(_camera: Node, event: InputEvent, event_position: Vector3, 
 func expand() -> void:
 	if _open or room == null:
 		return
+	if _hovered:
+		_set_hovered(false, false)
 	_open = true
 	var placement: Dictionary = room.presentation_placement(
 		Vector2i(_shape().get("pixels", Vector2i(1000, 640))), PRESENT_DISTANCE)
@@ -316,21 +373,10 @@ func _fill_open() -> void:
 	background.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_body.add_child(background)
 
-	var bar := Button.new()
-	bar.name = "RestButton"
-	bar.text = "Reposer"
-	bar.flat = true
-	bar.position = Vector2(pixels.x - 150, 6)
-	bar.custom_minimum_size = Vector2(140, 30)
-	bar.add_theme_font_size_override("font_size", 12)
-	bar.add_theme_color_override("font_color", UIHelpers.PANEL_ACCENT)
-	bar.pressed.connect(collapse)
-	_body.add_child(bar)
-
 	var host := Control.new()
 	host.name = "Host"
-	host.position = Vector2(0, 40)
-	host.size = pixels - Vector2(0, 40)
+	host.position = Vector2.ZERO
+	host.size = pixels
 	host.clip_contents = true
 	_body.add_child(host)
 
@@ -346,7 +392,8 @@ func _fill_open() -> void:
 	screen.set_anchors_preset(Control.PRESET_FULL_RECT)
 	host.add_child(screen)
 	UIHelpers.hosted_in_desk = false
-	_apply_hosted_layout(screen)
+	if screen.has_method("configure_for_host"):
+		screen.call("configure_for_host", {"kind": kind, "size": host.size})
 	if screen.has_signal("desk_state_changed"):
 		screen.connect("desk_state_changed", _on_hosted_state_changed)
 
@@ -358,30 +405,6 @@ func hosted_screen() -> Control:
 	if host == null or host.get_child_count() == 0:
 		return null
 	return host.get_child(0) as Control
-
-
-func _apply_hosted_layout(screen: Control) -> void:
-	var margin := screen.get_node_or_null("Margin") as MarginContainer
-	if margin != null:
-		margin.add_theme_constant_override("margin_left", 24)
-		margin.add_theme_constant_override("margin_top", 14)
-		margin.add_theme_constant_override("margin_right", 24)
-		margin.add_theme_constant_override("margin_bottom", 18)
-	var vbox := screen.get_node_or_null("Margin/VBox") as VBoxContainer
-	if vbox != null:
-		vbox.add_theme_constant_override("separation", 10)
-	var top_bar := screen.get_node_or_null("Margin/VBox/TopBar") as Control
-	if top_bar != null:
-		top_bar.visible = false
-	for button_name in ["NextButton", "ContinueButton"]:
-		var button := screen.get_node_or_null("Margin/VBox/BottomBar/%s" % button_name) as Control
-		if button != null:
-			button.visible = false
-	if kind == "committee":
-		var bottom_bar := screen.get_node_or_null("Margin/VBox/BottomBar") as Control
-		if bottom_bar != null:
-			bottom_bar.visible = false
-
 
 func _on_hosted_state_changed() -> void:
 	state_changed.emit()

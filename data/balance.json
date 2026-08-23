@@ -673,7 +673,7 @@
     },
     "screen": {
       "_comment": "Piste 3 : le monde reste clair et papier, la dalle du poste de travail est le seul endroit saturé et animé. Un seul curseur pilote scanlines, bombé, halo et saturation.",
-      "glowIntensity": 0.95
+      "glowIntensity": 0.45
     }
   }
 }
