@@ -133,6 +133,7 @@ var self_work_capacity: int = 0        # points de capacité ajoutés par "Faire
 var _sprint_event: Dictionary = {}
 var _sprint_event_sprint: int = -1
 var _sprint_event_answered: bool = false
+var _sprint_event_resolution: Dictionary = {}
 var last_journal: Array = []           # les lignes du dernier sprint clos, punaisées au mur
 # 🏛 Le Comité n'est plus un écran qu'on traverse : c'est un parapheur déposé
 # sur la table. Il ne se déduit donc pas d'un numéro de sprint — le trimestre
@@ -179,6 +180,7 @@ func reset_run(chosen_era_id: String = "", chosen_company_id: String = "", chose
 	_sprint_event = {}
 	_sprint_event_sprint = -1
 	_sprint_event_answered = false
+	_sprint_event_resolution = {}
 	pending_deltas.clear()
 	pending_people_effects.clear()
 	pending_journal_lines.clear()
@@ -1525,6 +1527,7 @@ func advance_to_next_sprint() -> void:
 	_sprint_event = {}
 	_sprint_event_sprint = -1
 	_sprint_event_answered = false
+	_sprint_event_resolution = {}
 	_refresh_team_moral()
 
 
@@ -3592,6 +3595,7 @@ func apply_pending_and_check() -> String:
 		"text": " · ".join(pending_journal_lines) if not pending_journal_lines.is_empty() else "Sprint calme — aucune décision marquante.",
 		"deltas": EffectResolver.format_deltas(applied),
 	})
+	_record_desk_journal(applied)
 
 	pending_deltas.clear()
 	pending_journal_lines.clear()
@@ -4266,6 +4270,7 @@ func get_sprint_event() -> Dictionary:
 	_sprint_event = draw_inbox_event()
 	_sprint_event_sprint = sprint_number
 	_sprint_event_answered = false
+	_sprint_event_resolution = {}
 	return _sprint_event
 
 
@@ -4278,8 +4283,17 @@ func pending_inbox_count() -> int:
 	return 1 if not get_sprint_event().is_empty() else 0
 
 
-func mark_sprint_event_answered() -> void:
+func mark_sprint_event_answered(resolution: Dictionary = {}) -> void:
 	_sprint_event_answered = true
+	_sprint_event_resolution = resolution.duplicate(true)
+
+
+func is_sprint_event_answered() -> bool:
+	return _sprint_event_sprint == sprint_number and _sprint_event_answered
+
+
+func get_sprint_event_resolution() -> Dictionary:
+	return _sprint_event_resolution.duplicate(true)
 
 
 ## 🏁 Ce qu'on emporte en signant. La feuille dit ce qui a été fait **et ce qui
@@ -4320,3 +4334,41 @@ func get_last_journal() -> Array:
 
 func record_journal(lines: Array) -> void:
 	last_journal = lines.duplicate(true)
+
+
+## Le papier du mur, rempli à la clôture du sprint. Il vivait vide depuis le
+## Lot A : `record_journal()` existait, personne ne l'appelait.
+##
+## La règle est ici et pas dans l'écran de Résolution pour deux raisons. La
+## première est la convention du dépôt — la logique de jeu ne vit pas dans
+## l'UI, sinon rien de tout ça n'est testable en headless. La seconde est
+## qu'un `applied` complet n'existe qu'ici : c'est le seul endroit du sprint où
+## l'on connaît le delta **réellement appliqué** de chaque grandeur, bornes et
+## charges comprises. Le calculer ailleurs, ce serait le recalculer.
+##
+## On garde les mouvements les plus gros — un mur ne se lit pas, il se
+## survole — et le nombre de lignes est un réglage, donc il vit dans
+## `balance.json → desk.journal.maxLines`.
+func _record_desk_journal(applied: Dictionary) -> void:
+	var labels: Dictionary = {}
+	for resource in GameData.resources:
+		labels[String(resource.get("id", ""))] = "%s %s" % [
+			resource.get("icon", ""), resource.get("name", "")]
+	labels["impact"] = "💥 Impact"
+	labels["revenue"] = "💰 Revenue"
+	labels["energie"] = "⚡ Énergie"
+
+	var lines: Array = []
+	for resource_id in applied.keys():
+		var amount := int(round(float(applied[resource_id])))
+		if amount == 0:
+			continue
+		lines.append({
+			"id": resource_id,
+			"label": String(labels.get(resource_id, String(resource_id).capitalize())),
+			"amount": amount,
+		})
+	lines.sort_custom(func(a, b): return absi(int(a["amount"])) > absi(int(b["amount"])))
+
+	var maximum := int(get_desk_conf().get("journal", {}).get("maxLines", 4))
+	record_journal(lines.slice(0, maxi(maximum, 1)))

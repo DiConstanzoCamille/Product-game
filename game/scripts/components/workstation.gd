@@ -5,36 +5,22 @@ extends Control
 ## ce sont vraiment des écrans : la boîte mail, la roadmap, le tableau de bord.
 ## Tout le reste du jeu est du décor ou un accessoire qui entre dans le cadre.
 ##
-## Le moniteur a deux tailles, et c'est le point le plus discutable du lot :
-## posé sur le plateau il tiendrait dans ~670×400, où aucune phase existante
-## n'est lisible. Ouvrir une application **agrandit la dalle** au lieu de
-## réduire le contenu — le bureau reste visible tout autour, donc on n'a pas
-## quitté la pièce, mais la phase a la place de se lire. C'est ce qui permet
-## d'héberger les écrans existants *tels quels* et de les faire maigrir au lot
-## suivant (#10) sans retoucher le hub.
+## Depuis #59, ce nœud **vit dans le `SubViewport` de la dalle** du portable en
+## volume : il n'a plus à dessiner ni cadre ni coque — la machine est un objet
+## de la scène 3D, avec sa tranche et son ombre. Deux conséquences directes :
+##
+##  · il n'y a plus de « dalle qui s'agrandit » quand on ouvre une application.
+##    La taille de l'écran est celle d'un écran, elle ne change pas parce qu'on
+##    ouvre un logiciel. Le Lot A avait besoin de ce truc pour gagner de la
+##    place ; le cadrage 3D la donne (880×495 contre 762×415) ;
+##  · le contenu reste du `Control` net et de face. Il hérite de la perspective
+##    de la pièce **par la texture**, pas par une transformation de l'UI.
 ##
 ## Aucune phase n'est un `change_scene_to_file` : elles sont instanciées ici,
 ## leurs boutons de navigation sont recâblés vers « retour au bureau », et leur
 ## Panneau de bord est neutralisé (`UIHelpers.hosted_in_desk`).
 
 signal state_changed
-
-## `macbook-decision-frame.svg` : cadre 1600×1040 dont **le milieu est
-## transparent** — il est dessiné pour qu'une UI vive derrière. Sa dalle occupe
-## x 136→1464 et y 91→815 dans le viewBox, d'où les ratios ci-dessous. Le
-## cadre était dans le dépôt depuis le lot 1, marqué « conservé comme référence
-## mais non utilisé » : le dessiner à la main était un gâchis.
-const FRAME := preload("res://assets/decor/macbook-decision-frame.svg")
-const FRAME_ASPECT := 1040.0 / 1600.0
-const SCREEN_INSET := Vector2(136.0 / 1600.0, 91.0 / 1040.0)
-const SCREEN_SIZE := Vector2(1328.0 / 1600.0, 724.0 / 1040.0)
-
-## Largeur du **cadre**, pas de la dalle. Ouvert, la dalle doit tenir entre les
-## papiers du mur (le journal s'arrête à x=558, l'objectif commence à x=1358) :
-## un cadre plus large recouvrirait le bureau et annulerait l'intérêt du hub.
-const CLOSED_WIDTH := 660.0
-const OPEN_WIDTH := 918.0
-
 
 const SCREEN_BG := Color("#141a26")
 const APP_BG := Color(1, 1, 1, 0.06)
@@ -50,7 +36,6 @@ var apps: Array = []
 var _open_id := ""
 var _hosted: Control = null
 var _body: Control = null
-var _frame: TextureRect = null
 var _glow: ColorRect = null
 
 ## Piste 3 : combien la dalle brille. 0 = la pièce et l'écran ont la même
@@ -65,26 +50,24 @@ static func resolved_screen_intensity() -> float:
 	if screen_intensity >= 0.0:
 		return screen_intensity
 	return float(SprintState.get_desk_conf().get("screen", {}).get("glowIntensity", 0.95))
-var _rect := Rect2()
 
 
 func _ready() -> void:
-	set_anchors_preset(Control.PRESET_TOP_LEFT)
-	position = Vector2.ZERO
-	size = Vector2(1600, 900)
+	# Le poste occupe toute la dalle : c'est le `SubViewport` qui donne la
+	# taille, et lui seul. Rien ici ne connaît la géométrie de la pièce.
+	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 
-	_frame = TextureRect.new()
-	_frame.texture = FRAME
-	# Sans EXPAND_IGNORE_SIZE, le TextureRect impose la taille native du SVG et
-	# le cadre déborde de l'écran (piège relevé dans le spike prototype_2d).
-	_frame.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	_frame.stretch_mode = TextureRect.STRETCH_SCALE
-	_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(_frame)
+	var background := ColorRect.new()
+	background.name = "ScreenBackground"
+	background.color = SCREEN_BG
+	background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	background.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(background)
 
 	_body = Control.new()
 	_body.name = "Body"
+	_body.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_body.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_body)
 
@@ -92,6 +75,7 @@ func _ready() -> void:
 	# peint dessous (hint_screen_texture), donc son ordre dans l'arbre compte.
 	_glow = ColorRect.new()
 	_glow.name = "ScreenGlow"
+	_glow.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_glow.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var glow_material := ShaderMaterial.new()
 	glow_material.shader = preload("res://resources/shaders/screen_glow.gdshader")
@@ -99,46 +83,16 @@ func _ready() -> void:
 	_glow.material = glow_material
 	add_child(_glow)
 
-	_apply_frame(CLOSED_WIDTH, Vector2(800, 620))
-	_show_apps()
+	_show_apps.call_deferred()
 
 
 func is_open() -> bool:
 	return _open_id != ""
 
 
-# ── La dalle se déduit du cadre, jamais l'inverse ────────────────────────
-## `anchor` est le centre de la dalle voulue : c'est elle qu'on compose, le
-## cadre se place autour.
-func _apply_frame(frame_width: float, anchor: Vector2) -> void:
-	var frame_size := Vector2(frame_width, frame_width * FRAME_ASPECT)
-	var screen_size := frame_size * SCREEN_SIZE
-	var screen_position := anchor - screen_size * 0.5
-
-	_frame.position = screen_position - frame_size * SCREEN_INSET
-	_frame.size = frame_size
-
-	_rect = Rect2(screen_position, screen_size)
-	_body.position = screen_position
-	_body.size = screen_size
-	if _glow != null:
-		_glow.position = screen_position
-		_glow.size = screen_size
-		_glow.material.set_shader_parameter("intensity", resolved_screen_intensity())
-	queue_redraw()
-
-
-func _draw() -> void:
-	# Seule la dalle est peinte : tout le reste — coque, charnière, base,
-	# ombre portée — vient du SVG.
-	draw_rect(_rect, SCREEN_BG)
-
-
 # ── Le bureau du poste : trois tuiles ────────────────────────────────────
 func _show_apps() -> void:
 	UIHelpers.clear_children(_body)
-	_apply_frame(CLOSED_WIDTH, Vector2(800, 620))
-
 	move_child(_glow, get_child_count() - 1)
 	_body.add_child(_os_bar("POSTE DE TRAVAIL", false))
 
@@ -280,7 +234,6 @@ func open_app(id: String) -> void:
 		return
 	_open_id = id
 	UIHelpers.clear_children(_body)
-	_apply_frame(OPEN_WIDTH, Vector2(967, 336))
 
 	var title := "Poste de travail"
 	for app in apps:
@@ -298,6 +251,10 @@ func open_app(id: String) -> void:
 	state_changed.emit()
 
 
+func hosted_app() -> Control:
+	return _hosted
+
+
 func close_app() -> void:
 	if _hosted != null and is_instance_valid(_hosted):
 		_hosted = null
@@ -306,13 +263,10 @@ func close_app() -> void:
 	state_changed.emit()
 
 
-## Les phases existantes sont hébergées **telles quelles**. Deux neutralisations
-## suffisent, et elles évitent de rouvrir les neuf écrans dans ce lot :
-##  1. `UIHelpers.hosted_in_desk` fait rendre un panneau vide à
-##     `attach_side_panel()` — le Panneau de bord n'existe plus ;
-##  2. les boutons de navigation sont **débranchés puis recâblés** vers le
-##     retour au bureau : aucun `change_scene_to_file` ne doit survivre, il
-##     détruirait le hub.
+## Les phases gardent leur logique métier lorsqu'elles sont hébergées. Elles
+## exposent des signaux de fin et de mutation au bureau : débrancher leurs
+## boutons détruirait notamment la validation de la Roadmap et la lecture du
+## courrier.
 func _instantiate_app(id: String, host: Control) -> Control:
 	if id == "dashboard":
 		var dossier := UIHelpers.instantiate_company_dossier(host)
@@ -329,23 +283,31 @@ func _instantiate_app(id: String, host: Control) -> Control:
 	host.add_child(screen)
 	UIHelpers.hosted_in_desk = false
 
-	# Les libellés du tunnel mentent une fois hébergés : « ← Accueil » ne ramène
-	# plus à l'accueil, et « Suivant : Roadmap » n'est plus la suite de rien
-	# puisqu'on choisit son ordre. Le lot B refera ces écrans ; en attendant, on
-	# ne laisse pas une promesse fausse à l'écran.
-	_rewire(screen, "Margin/VBox/TopBar/BackButton", "← Bureau")
-	_rewire(screen, "Margin/VBox/BottomBar/NextButton", "Terminé")
+	_apply_hosted_layout(screen)
+	if screen.has_signal("desk_done"):
+		screen.connect("desk_done", close_app)
+	if screen.has_signal("desk_state_changed"):
+		screen.connect("desk_state_changed", _on_hosted_state_changed)
 	return screen
 
 
-## Un bouton hébergé garde son libellé et sa place — c'est le lot B qui refera
-## la forme des écrans. Seule sa destination change.
-func _rewire(screen: Control, path: String, label: String = "") -> void:
-	var button: Node = screen.get_node_or_null(NodePath(path))
-	if button == null or not (button is BaseButton):
-		return
-	for connection in button.pressed.get_connections():
-		button.pressed.disconnect(connection.get("callable"))
-	button.pressed.connect(close_app)
-	if label != "":
-		button.text = label
+func _apply_hosted_layout(screen: Control) -> void:
+	var margin := screen.get_node_or_null("Margin") as MarginContainer
+	if margin != null:
+		margin.add_theme_constant_override("margin_left", 22)
+		margin.add_theme_constant_override("margin_top", 12)
+		margin.add_theme_constant_override("margin_right", 22)
+		margin.add_theme_constant_override("margin_bottom", 16)
+	var vbox := screen.get_node_or_null("Margin/VBox") as VBoxContainer
+	if vbox != null:
+		vbox.add_theme_constant_override("separation", 9)
+	var top_bar := screen.get_node_or_null("Margin/VBox/TopBar") as Control
+	if top_bar != null:
+		top_bar.visible = false
+	var next := screen.get_node_or_null("Margin/VBox/BottomBar/NextButton") as Button
+	if next != null:
+		next.text = "Terminé"
+
+
+func _on_hosted_state_changed() -> void:
+	state_changed.emit()

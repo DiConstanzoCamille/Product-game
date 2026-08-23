@@ -2090,3 +2090,203 @@ déclarent leur `peopleTarget` dans leur JSON, et le défaut vit dans les donné
 vérifient : les cartes et pratiques qui produisent du Moral doivent déclarer
 leur cible, et un effet ciblé sur une équipe à deux équipes ne doit pas
 atteindre l'autre.
+
+---
+
+## 37. Le bureau en volume (issues #54 et #59)
+
+Le Lot A (#54) avait remplacé le tunnel de neuf écrans par un hub, mais il
+l'avait dessiné à plat et livré sans un seul garde-fou. #59 termine les deux
+moitiés : le passage en volume, et la recette qui manquait.
+
+### 37.1 Le partage : 3D pour le monde, 2D pour ce qu'on lit
+
+C'est la règle structurante, et tout le reste en découle
+(`docs/spec-bureau-3d.md` §2).
+
+| En 3D | En 2D |
+|---|---|
+| La pièce, la table, le portable, les papiers du mur, les objets posés | Les zones de valeurs, les alertes, les info-bulles, le détail d'un poster levé, **tout le contenu des applications** |
+
+La racine de `desk_screen` est un `Node3D` ; tout ce qui se lit vit dans un
+`CanvasLayer`, ce qui garantit qu'aucun objet du monde ne passe devant une
+alerte. Le contenu des phases, lui, n'est ni dans le monde ni dans le
+`CanvasLayer` : il vit dans le `SubViewport` de la dalle, donc il **hérite de
+la perspective par la texture** sans qu'une ligne des écrans existants soit
+réécrite, et sans que son texte soit incliné.
+
+**Critère de recette n°1 : si le texte d'une phase est flou ou incliné, le
+partage a été mal appliqué.** Ce n'est pas un défaut esthétique — c'est le
+signe qu'on a basculé l'interface dans le monde.
+
+### 37.2 La netteté est une propriété calculée, pas un réglage
+
+Un `SubViewport` de 880 px affiché sur 600 px de dalle rend tout le contenu à
+68 % de sa taille. Aucun test ne bronche, et c'est exactement comme ça qu'on
+rate le critère de recette n°1.
+
+La règle est donc inversée : **`SCREEN_PIXELS` est déclaré, la taille du quad
+s'en déduit** (`DeskRoom._pixels_to_world()`), à la profondeur réelle de la
+dalle vue par la caméra. Déplacer la caméra ne peut plus dérégler la netteté :
+le quad se redimensionne avec elle. Les papiers du mur et les panneaux
+d'accessoires suivent la même règle.
+
+Un garde-fou mécanique le vérifie : `dalle_projected_size()` compare la taille
+projetée à `SCREEN_PIXELS`, et le banc UI échoue au-delà de 6 % d'écart.
+
+### 37.3 Le cadrage impose de coucher la dalle, pas de plonger la caméra
+
+Une caméra perpendiculaire à un écran qui remplit le cadre ne voit plus la
+table : le plateau tombe hors champ dès qu'on regarde l'écran de face. Plonger
+la caméra sans toucher au capot rendrait le texte trapézoïdal.
+
+La sortie est de **coucher le capot en arrière (22°) et de plonger la caméra
+d'autant** : l'axe de vue reste sur la normale de la dalle — donc pas de
+déformation — et le plateau rentre dans le cadre parce que la caméra le
+survole. `CAMERA_AIM_UP` vise ensuite légèrement au-dessus du centre de la
+dalle pour dégager la bande de mur où vivent les papiers ; le désaxement qui en
+résulte (~5°) est le seul écart à la perpendicularité.
+
+### 37.4 Les papiers du mur : trois niveaux, et la levée raconte le geste
+
+| Geste | Ce qu'on voit | Dimension |
+|---|---|---|
+| Rien | Le papier et son état synthétique | 3D |
+| Survol | Une info-bulle : le nom, la ligne qui résume | 2D, de face |
+| Clic | Le poster **se lève**, le détail apparaît dessous | 2D sous un geste 3D |
+
+La feuille pivote sur son bord haut, comme une page de paperboard. Elle ne
+coûte ni Énergie ni sprint : c'est de l'information qu'on détient déjà (règle
+de consultation du Lot A). Elle s'annule par Échap ou par un clic ailleurs, et
+le bandeau reste visible par-dessus — aucune décision ne doit se prendre à
+l'aveugle pendant qu'un poster est levé.
+
+Le seul modal du bureau est le hub d'équipe, appelé depuis le trombinoscope
+levé, et il l'est pour une raison : « se séparer de quelqu'un » est
+irréversible et demande une confirmation. Le poster porte le quotidien, le hub
+porte l'irréversible.
+
+### 37.5 L'interaction change de nature
+
+En volume, un objet cliquable a besoin d'une `Area3D` et de
+`get_viewport().physics_object_picking = true` ; **un objet 3D n'a ni survol ni
+clic gratuits**. Et un quad texturé par un `SubViewport` ne reçoit rien : le
+clic s'arrête sur l'`Area3D` et n'entre jamais dans l'UI qui vit dedans. C'est
+`DeskRoom.route_to_viewport()` qui fait le transfert — sans elle, les
+applications du poste de travail seraient un décor.
+
+### 37.6 Le journal du mur, enfin rempli
+
+`record_journal()` existait depuis le Lot A, la clôture ne l'appelait pas : le
+papier affichait « Rien encore » à tous les sprints. Le remplissage vit dans
+`SprintState.apply_pending_and_check()` et pas dans l'écran de Résolution, pour
+deux raisons : la convention du dépôt (la logique de jeu ne vit pas dans l'UI,
+sinon rien n'est testable en headless), et le fait qu'un `applied` complet
+n'existe qu'à cet endroit — c'est le seul point du sprint où l'on connaît le
+delta **réellement appliqué** de chaque grandeur, bornes et charges comprises.
+
+Le nombre de lignes gardées est un réglage : `balance.json → desk.journal.maxLines`.
+
+### 37.7 Le Panneau de bord est mort, son information est rangée ailleurs
+
+Les 830 lignes de `side_panel.gd` étaient neutralisées par
+`UIHelpers.hosted_in_desk` depuis #54 et ne servaient plus que sur un chemin
+que le jeu n'emprunte plus. Deux choses qu'il portait n'étaient pas
+remplaçables et ont été rangées **sous le poster « Objectif »**, qu'on lève
+quand on veut les lire :
+
+- **le mandat des quatre trimestres**, connu dès le premier sprint — la marche
+  suivante est bien plus haute que la précédente, et c'est une information sur
+  la règle, pas un hasard qu'on dévoilerait ;
+- **la chaîne de Levier réellement jouée** au dernier sprint. Jamais celle du
+  prochain : le jeu montre ce qu'un choix a rapporté, pas ce qu'il va rapporter.
+
+L'appel `attach_side_panel()` survit et rend un talon vide, parce que quatre
+écrans de phase l'appellent encore et gardent `side_panel.refresh()` : un
+`null` les ferait planter au premier achat. C'est le Lot B (#10) qui les refera.
+
+### 37.8 Les garde-fous qui manquaient au Lot A
+
+Cinq assertions mécaniques remplacent la bonne volonté du relecteur :
+
+- **≤ 3 valeurs permanentes** dans la zone de valeurs. C'est tout le Lot A :
+  quinze valeurs à surveiller sont devenues trois plus une remontée par
+  exception ;
+- **le parapheur n'apparaît qu'au franchissement d'un trimestre** — objet
+  absent, pas objet grisé ;
+- **aucun élément ne prend la largeur ni la hauteur entière**, vérifié au repos
+  *et* poster levé ;
+- **la marge d'alerte** : entre le seuil qui déclenche et le mur qui tue, il
+  doit rester au moins `marginPerSprint` points. Vérifié dans les deux sens —
+  l'alerte se lève au-delà du seuil, et ne crie pas encore à une marge de
+  distance ;
+- **sauter le jeu doit perdre.** La stratégie `skip` du banc ne répond même pas
+  au courrier, et elle est jugée à la même barre que `careful`. Le banc
+  n'appelait jamais `resolve_unanswered_events()` : il jouait donc un jeu où
+  ignorer son courrier était gratuit, et la règle la plus anti-passivité du lot
+  n'était vérifiée nulle part.
+
+### 37.9 Le sens de lecture ordonne le plateau
+
+L'étal du sprint est **à gauche**, la clôture **à droite**. Ce n'est pas de la
+mise en page : on achète avant de clore, et l'œil va de gauche à droite. La
+première version du lot faisait l'inverse et demandait de traverser l'écran à
+rebours pour finir son sprint. Le parapheur du Comité reste à droite, derrière
+la clôture : il appartient au même moment du sprint.
+
+### 37.10 Le parti pris de rendu — dessiné, pas photographié
+
+Un dégradé continu sur une boîte, c'est une image de synthèse ; deux aplats
+séparés par une arête franche et cernés d'encre, c'est un objet de jeu. Trois
+réglages suffisent, et ils sont mutualisés dans `DeskRoom` pour que rien ne
+diverge :
+
+- **`toon_material()`** — `DIFFUSE_TOON` coupe le dégradé en bandes,
+  `SPECULAR_DISABLED` supprime le reflet qui trahissait la primitive, et la
+  couleur peut redevenir franche : un bois réaliste est terne, un bois de jeu
+  ne l'est pas ;
+- **`outline_at()`** — le trait de contour, par coque inversée (une copie du
+  maillage grossie le long de ses normales, peinte en encre unie, rendue face
+  arrière seulement). `gl_compatibility` n'a pas de post-traitement de
+  profondeur exploitable, et le projet reste sur ce renderer : la coque
+  inversée, elle, ne dépend d'aucune fonctionnalité de renderer ;
+- **l'épaisseur du trait se déclare en pixels**, pas en unités monde. Déclarée
+  dans le monde, elle faisait 6 px sur la tasse et 2 px sur les papiers du mur,
+  où elle se rasterisait en pointillés. De l'encre n'a pas de perspective.
+
+Deux règles pour ne pas s'y brûler, et les deux ont été apprises ici :
+**ne jamais poser de coque inversée sur un nœud dont on anime la `scale`** (le
+trait grossirait avec lui), et **ne pas en poser sur une plaque fine vue par la
+tranche** — la face supérieure de la coque se rasterise en pointillés le long
+du bord. Les papiers du mur utilisent donc un liseré : un quad d'encre à peine
+plus grand, dans le même plan, pour deux fois moins de géométrie et un trait
+franc.
+
+**Ce que ce n'est pas** : le lot d'habillage. Il n'y a toujours ni matière, ni
+texture, ni ambiance — seulement une façon d'éclairer et de cerner. La
+différence est visible, elle ne rend pas le bureau beau pour autant.
+
+### 37.11 Héberger un écran ne permet pas de débrancher sa règle (issue #62)
+
+Le premier branchement du bureau remplaçait les callbacks des boutons de phase
+par `close_app()` ou `collapse()`. L'écran restait visible, mais son contrat
+disparaissait : « Terminé » fermait la Roadmap sans appeler
+`commit_backlog_plan()`, et répondre au courrier ne soldait jamais son badge.
+
+La règle est désormais explicite : **un hôte adapte la présentation, jamais
+la logique métier de son invité**. Les écrans hébergés gardent leurs callbacks
+et exposent seulement deux signaux au bureau :
+
+- `desk_done`, après exécution de l'action métier, demande le retour au bureau ;
+- `desk_state_changed` remonte une mutation afin de rafraîchir immédiatement
+  Impact, revenu et users, sans attendre la fermeture de l'accessoire.
+
+Le courrier du sprint est tiré une fois, sa réponse et sa conséquence sont
+mémorisées jusqu'au sprint suivant, et `pending_inbox_count()` tombe à zéro dès
+la réponse. Le rouvrir sert donc à relire l'échange, pas à rejouer le choix.
+
+Enfin, le chrome appartient à l'objet qui héberge : la barre du laptop ou le
+bouton « Reposer » de l'iPad remplace la barre « Accueil » de l'ancien tunnel.
+Les marges des invités sont compactées pour leur `SubViewport` et les CTA
+métier restent dans leur écran ; il ne doit plus y avoir deux boutons de retour
+concurrents dans le même cadre.

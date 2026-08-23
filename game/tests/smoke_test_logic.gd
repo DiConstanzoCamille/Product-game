@@ -45,6 +45,13 @@ extends Node
 ##                feature livrée, aucune embauche, aucun achat, aucune
 ##                action personnelle. Depuis la Phase A ("la pression"),
 ##                ne rien faire DOIT perdre avant la fin du mandat.
+##  - "skip"    : le degré au-dessus de "careful" — il ne **répond même pas**
+##                au courrier. C'est le cas que `resolve_unanswered_events()`
+##                existe pour punir : un message laissé sans réponse se résout
+##                dans sa pire branche et coûte du Capital politique. Sans ce
+##                profil au banc, la règle du skip n'était jouée nulle part et
+##                sauter le jeu restait la stratégie la moins risquée. Il DOIT
+##                perdre, au même titre que "careful" (#59).
 const GOOD_ENDINGS := ["ipo", "rachat"]
 
 ## Combien des quatre mandats du thésauriseur (#36) ont le droit de franchir
@@ -96,10 +103,12 @@ func _ready() -> void:
 	_test_inter_squad_combos_reachable_lot5()
 	_test_multi_squad_mandate_playthrough_lot5()
 	_test_attention_and_autopilot_lot5()
+	_test_desk_alert_margin()
+	_test_desk_journal_records_the_sprint()
 
 	var quarters_reached: Dictionary = {}
 	var mandates_past_t3: Dictionary = {}  # portefeuille / quota au verdict qui a tué le mandat
-	for strategy in ["stress", "greedy", "economie", "levier", "outillage", "generaliste", "thesauriseur", "careful"]:
+	for strategy in ["stress", "greedy", "economie", "levier", "outillage", "generaliste", "thesauriseur", "careful", "skip"]:
 		print("\n=== SMOKE TEST LOGIQUE — %s ===" % strategy.to_upper())
 		var endings: Array = []
 		var run_index := 0
@@ -177,6 +186,86 @@ func _fail(message: String) -> void:
 	failures += 1
 	push_error(message)
 	print("ASSERTION ÉCHOUÉE : %s" % message)
+
+
+## Une alerte doit **prévenir**, pas constater. La règle est écrite dans
+## `balance.json → desk.alerts.marginPerSprint` : entre le seuil qui déclenche
+## et le mur qui tue, il doit rester au moins un sprint de dégradation.
+##
+## Le test prend la règle par ses deux bouts, comme l'exige la convention du
+## dépôt pour une règle à double conséquence : la marge doit exister **dans les
+## données** (sinon l'alerte arrive trop tard quoi qu'il se passe), et le seuil
+## doit **réellement** faire basculer `get_active_alerts()` — une marge
+## configurée que personne ne lit ne prévient personne.
+func _test_desk_alert_margin() -> void:
+	print("=== SMOKE TEST LOGIQUE — MARGE D'ALERTE DU BUREAU ===")
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+	var conf := SprintState.get_alerts_conf()
+	var margin := float(conf.get("marginPerSprint", 0))
+	if margin <= 0.0:
+		_fail("desk.alerts.marginPerSprint doit être positif : sans marge, une alerte constate au lieu de prévenir.")
+
+	for gauge in conf.get("gauges", []):
+		var gauge_id := String(gauge.get("id", ""))
+		var at := float(gauge.get("at", 0))
+		var bound := float(gauge.get("bound", 0))
+		if absf(at - bound) < margin:
+			_fail("L'alerte '%s' se déclenche à %d pour un mur à %d : il reste moins de %d points, soit moins d'un sprint pour réagir." % [
+				gauge_id, int(at), int(bound), int(margin)])
+
+		# 🫶 Le Moral n'est pas une jauge qu'on écrit : il est la moyenne des
+		# personnes. Le pousser d'autorité demanderait de bricoler le roster, ce
+		# qui testerait le bricolage. Les quatre autres suffisent à la règle.
+		if gauge_id == "moral":
+			continue
+		var below := String(gauge.get("direction", "below")) == "below"
+		var previous: float = SprintState.resource_values.get(gauge_id, 0.0)
+
+		SprintState.resource_values[gauge_id] = at - 1.0 if below else at + 1.0
+		if not _has_alert(gauge_id):
+			_fail("Au-delà du seuil, l'alerte '%s' doit être levée." % gauge_id)
+		# L'autre sens : sans lui, un `get_active_alerts()` qui renverrait TOUT
+		# passerait aussi bien ce test qu'une implémentation correcte.
+		SprintState.resource_values[gauge_id] = at + margin if below else at - margin
+		if _has_alert(gauge_id):
+			_fail("À %d points du seuil, l'alerte '%s' ne doit pas encore crier." % [int(margin), gauge_id])
+		SprintState.resource_values[gauge_id] = previous
+	print("Marge d'alerte : %s" % ("OK" if failures == 0 else "ÉCHEC"))
+
+
+func _has_alert(alert_id: String) -> bool:
+	for alert in SprintState.get_active_alerts():
+		if String(alert.get("id", "")) == alert_id:
+			return true
+	return false
+
+
+## Le journal punaisé au mur était vide depuis le Lot A : `record_journal()`
+## existait, la clôture ne l'appelait pas (#59). On asserte la **relation**, pas
+## le contenu d'un tirage : un sprint qui a bougé quelque chose laisse une
+## trace, un sprint qui n'a rien bougé n'en invente pas.
+func _test_desk_journal_records_the_sprint() -> void:
+	print("=== SMOKE TEST LOGIQUE — JOURNAL DU MUR ===")
+	SprintState.reset_run("agile-transformation", "meridia-corp")
+	if not SprintState.get_last_journal().is_empty():
+		_fail("Au premier sprint, aucun sprint n'est clos : le journal du mur doit être vide.")
+
+	SprintState.add_pending({"capital-politique": -7.0}, "Test du journal")
+	SprintState.apply_pending_and_check()
+	var journal := SprintState.get_last_journal()
+	if journal.is_empty():
+		_fail("Un sprint qui déplace une jauge doit laisser une ligne au journal du mur.")
+	else:
+		var found := false
+		for line in journal:
+			if String(line.get("id", "")) == "capital-politique" and int(line.get("amount", 0)) == -7:
+				found = true
+		if not found:
+			_fail("Le journal du mur doit porter le mouvement réellement appliqué (attendu 🎯 −7, lu %s)." % str(journal))
+	var maximum := int(SprintState.get_desk_conf().get("journal", {}).get("maxLines", 4))
+	if journal.size() > maximum:
+		_fail("Le journal du mur affiche %d lignes pour un maximum configuré à %d." % [journal.size(), maximum])
+	print("Journal du mur : %s" % ("OK" if failures == 0 else "ÉCHEC"))
 
 
 func _test_inbox_channels() -> void:
@@ -2064,10 +2153,11 @@ func _play_one_mandate(run_index: int, strategy: String, company_id: String) -> 
 		_fail("Roster au-dessus du cap : %d/%d" % [SprintState.get_roster().size(), SprintState.get_team_cap()])
 
 	# Critère de recette Phase A : "careful" (ne rien faire) doit perdre
-	# avant la fin du mandat — pas de fin positive, pas de survie.
-	if strategy == "careful" and SprintState.ending_id in GOOD_ENDINGS:
-		_fail("Run %d (careful, %s) a survécu au mandat (fin '%s' au sprint %d) — 'ne rien faire' doit perdre." % [
-			run_index, company_id, SprintState.ending_id, SprintState.sprint_number
+	# avant la fin du mandat — pas de fin positive, pas de survie. "skip"
+	# (ne même pas lire son courrier) est jugé à la même barre depuis #59.
+	if strategy in ["careful", "skip"] and SprintState.ending_id in GOOD_ENDINGS:
+		_fail("Run %d (%s, %s) a survécu au mandat (fin '%s' au sprint %d) — sauter le jeu doit perdre." % [
+			run_index, strategy, company_id, SprintState.ending_id, SprintState.sprint_number
 		])
 
 
@@ -2075,7 +2165,9 @@ func _play_sprint(strategy: String) -> void:
 	# Phase 1 — Inbox (pioche sac réelle). "stress" prend systématiquement
 	# le choix le plus toxique pour le Moral — la spirale commence là.
 	var event: Dictionary = SprintState.draw_inbox_event()
-	if not event.is_empty():
+	# "skip" tire son courrier et ne le traite pas : c'est tout ce qui le
+	# sépare de "careful", et c'est ce que la clôture doit lui facturer.
+	if not event.is_empty() and strategy != "skip":
 		var choices: Array = event.get("choices", [])
 		var choice: Dictionary = choices[0]
 		if strategy in ["careful", "levier", "outillage", "generaliste"]:
@@ -2122,7 +2214,7 @@ func _play_sprint(strategy: String) -> void:
 		if strategy == "stress" or (strategy in ["greedy", "economie", "levier", "outillage", "generaliste", "thesauriseur"] and used + points <= capacity):
 			plan.append({"id": item.get("id", ""), "points": points})
 			used += points
-	if strategy != "careful":
+	if strategy not in ["careful", "skip"]:
 		SprintState.commit_backlog_plan(plan)
 
 	# Phase 3 — Investissements : une seule offre pour les deux rayons, tirée
@@ -2278,7 +2370,11 @@ func _play_sprint(strategy: String) -> void:
 		if SprintState.impact_wallet < 2 and SprintState.resource_values.get("capital-politique", 0.0) > 40.0 and SprintState.personal_action_refusal() == "":
 			SprintState.do_negotiate_extension()
 
-	# Phase 4 — Résolution.
+	# Phase 4 — Résolution. La signature de la clôture passe d'abord par le
+	# malus de skip, exactement comme la planche du bureau : sans cet appel, le
+	# banc jouait un jeu où ignorer son courrier était gratuit — et la règle la
+	# plus anti-passivité du lot n'était vérifiée nulle part.
+	SprintState.resolve_unanswered_events()
 	var ending := SprintState.apply_pending_and_check()
 	if ending != "":
 		return

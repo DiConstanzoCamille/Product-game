@@ -1,46 +1,70 @@
-extends Control
-## Un accessoire qui entre dans le cadre (#54 §3).
+extends Node3D
+## Un accessoire qui entre dans le cadre (#54 §3, passé en volume par #59).
 ##
 ## Aucune mécanique n'ouvre un écran de plus : elle fait entrer un objet, et
 ## **la forme de l'objet dit ce qu'est la mécanique**.
 ##
-##  · 🛒 `shop` — une tablette, à droite. Ça se feuillette et ça se repousse :
-##    l'étal du sprint est ouvert en permanence.
-##  · 🏁 `closing` — une planche à pince, à gauche. On signe debout, une fois :
-##    c'est le seul point de non-retour du sprint.
+##  · 🛒 `shop` — une tablette dressée **à gauche** du plateau. Ça se feuillette
+##    et ça se repousse : l'étal du sprint est ouvert en permanence.
+##  · 🏁 `closing` — une planche à pince, **à droite**. On signe debout, une
+##    fois : c'est le seul point de non-retour du sprint.
 ##  · 🏛 `committee` — un parapheur, **déposé sur la table** un sprint sur
 ##    trois. Il n'arrive pas du bord : le board pose le dossier du trimestre
 ##    devant vous, il ne vous le tend pas.
 ##
-## Au repos, l'objet affleure le bord — assez pour qu'on sache qu'il est là,
-## pas assez pour encombrer. Ouvert, il occupe une grande dalle : les écrans
-## hébergés (Investissements, Comité) sont ceux du jeu actuel et ont besoin de
-## place. C'est un nœud de la scène animé par `Tween`, jamais un `Popup` — un
-## popup Godot ne sait pas glisser depuis le bord.
+## Le sens de lecture n'est pas un détail de mise en page : on achète avant de
+## clore, et l'œil va de gauche à droite. La première version plaçait l'étal à
+## droite et la clôture à gauche, ce qui demandait de traverser l'écran à
+## rebours pour finir son sprint.
+##
+## En volume, l'objet au repos a une tranche et une ombre — ce que les ombres
+## décalées de la version 2D essayaient d'imiter. Ouvert, il **vient se
+## présenter de face** : sa dalle est un `SubViewport` qui héberge l'écran de
+## phase existant, sans que celui-ci soit réécrit.
+##
+## L'inclinaison appartient à l'animation d'entrée, **jamais à l'état posé** :
+## un panneau qui reste de biais donne du texte de biais, et c'est l'échec du
+## critère de recette n°1. On tourne pendant les 0,42 s du `Tween`, on se cale
+## droit à l'arrivée.
 
 signal state_changed
 
 const SLIDE_SECONDS := 0.42
+## Assez près pour occulter le portable — un dossier qu'on ouvre passe devant
+## l'écran, il ne s'affiche pas à côté.
+const PRESENT_DISTANCE := 0.95
 
-## Géométrie par nature : repos (affleurant), ouvert (grande dalle), matière.
+## Géométrie de repos par nature, en unités monde, et taille de présentation en
+## **pixels** (la taille du quad s'en déduit : cf. `DeskRoom`).
 const SHAPES := {
 	"shop": {
-		"rest": Rect2(Vector2(1560, 300), Vector2(334, 456)),
-		"open": Rect2(Vector2(700, 150), Vector2(640, 700)),
-		"body": Color("#2b3240"), "frame": Color("#454d5c"), "radius": 22,
-		"hint": "◂ Boutique", "hint_at": Vector2(-104, 168),
+		"rest_position": Vector3(-0.98, 0.98, -0.38),
+		"rest_rotation": Vector3(-6, 19, 0),
+		"rest_size": Vector3(0.27, 0.38, 0.020),
+		"body": Color("#2f3a4d"), "frame": Color("#57657d"),
+		"pixels": Vector2i(1120, 690),
+		"entry_rotation": Vector3(0, 26, -4),
+		# Au-dessus, et pas dessous : la tablette est presque noire, et sous
+		# elle il y a la tasse.
+		"hint": "Boutique", "hint_offset": Vector3(0, 0.27, 0.08),
 	},
 	"closing": {
-		"rest": Rect2(Vector2(-266, 380), Vector2(306, 426)),
-		"open": Rect2(Vector2(330, 210), Vector2(420, 620)),
-		"body": Color("#8a6a45"), "frame": Color("#5e4830"), "radius": 8,
-		"hint": "Fin de sprint ▸", "hint_at": Vector2(48, 154),
+		"rest_position": Vector3(0.78, 0.79, -0.30),
+		"rest_rotation": Vector3(-78, -8, 0),
+		"rest_size": Vector3(0.23, 0.30, 0.016),
+		"body": Color("#f3ead2"), "frame": Color("#7d5735"),
+		"pixels": Vector2i(760, 640),
+		"entry_rotation": Vector3(0, -22, 5),
+		"hint": "Fin de sprint", "hint_offset": Vector3(0, 0.05, 0.24),
 	},
 	"committee": {
-		"rest": Rect2(Vector2(1150, 660), Vector2(274, 186)),
-		"open": Rect2(Vector2(600, 170), Vector2(740, 660)),
-		"body": Color("#7b3f3f"), "frame": Color("#4e2727"), "radius": 8,
-		"hint": "Déposé sur votre table", "hint_at": Vector2(6, -26),
+		"rest_position": Vector3(0.56, 0.79, -0.28),
+		"rest_rotation": Vector3(-84, 7, 0),
+		"rest_size": Vector3(0.36, 0.26, 0.028),
+		"body": Color("#a8434a"), "frame": Color("#6d262c"),
+		"pixels": Vector2i(1120, 690),
+		"entry_rotation": Vector3(6, -14, 3),
+		"hint": "Comité du trimestre", "hint_offset": Vector3(0, 0.05, 0.24),
 	},
 }
 
@@ -51,42 +75,145 @@ const HOSTED := {
 
 @export var kind: String = "shop"
 
-var _open := false
-var _rect := Rect2()
+var room: DeskRoom = null
+
+var _cover: MeshInstance3D = null
+var _panel: MeshInstance3D = null
+var _panel_pivot: Node3D = null
+var _viewport: SubViewport = null
 var _body: Control = null
-var _hint: Label = null
+var _open := false
 var _tween: Tween = null
 
 
 func _ready() -> void:
-	set_anchors_preset(Control.PRESET_TOP_LEFT)
-	position = Vector2.ZERO
-	size = Vector2(1600, 900)
-	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	build.call_deferred()
 
-	_rect = _shape().get("rest", Rect2())
 
-	_body = Control.new()
-	_body.name = "Body"
-	_body.clip_contents = true
-	_body.mouse_filter = Control.MOUSE_FILTER_STOP
-	_body.gui_input.connect(_on_body_input)
-	add_child(_body)
+func build() -> void:
+	if _cover != null:
+		return
+	var shape := _shape()
+	position = shape.get("rest_position", Vector3.ZERO)
+	rotation_degrees = shape.get("rest_rotation", Vector3.ZERO)
 
-	_hint = Label.new()
-	_hint.text = String(_shape().get("hint", ""))
-	_hint.add_theme_font_size_override("font_size", 11)
-	_hint.add_theme_color_override("font_color", Color("#6b5a45"))
-	UIHelpers.apply_mono(_hint, 11, true)
-	_hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(_hint)
+	_cover = MeshInstance3D.new()
+	_cover.name = "Cover"
+	var mesh := BoxMesh.new()
+	mesh.size = shape.get("rest_size", Vector3(0.3, 0.4, 0.02))
+	_cover.mesh = mesh
+	_cover.material_override = DeskRoom.toon_material(shape.get("body", Color.GRAY))
+	add_child(_cover)
+	if room != null:
+		room.outline_at(_cover, global_position)
 
-	_apply(_rect)
+	var trim := MeshInstance3D.new()
+	trim.name = "Trim"
+	var trim_mesh := BoxMesh.new()
+	var rest_size: Vector3 = shape.get("rest_size", Vector3(0.3, 0.4, 0.02))
+	trim_mesh.size = Vector3(rest_size.x * 1.06, rest_size.y * 1.06, rest_size.z * 0.6)
+	trim.mesh = trim_mesh
+	trim.position = Vector3(0, 0, -rest_size.z * 0.4)
+	trim.material_override = DeskRoom.toon_material(shape.get("frame", Color.BLACK))
+	add_child(trim)
+
+	var area := Area3D.new()
+	area.name = "Area"
+	var collision := CollisionShape3D.new()
+	var box := BoxShape3D.new()
+	box.size = rest_size * 1.2
+	collision.shape = box
+	area.add_child(collision)
+	area.input_event.connect(_on_cover_input)
+	add_child(area)
+
+	_build_panel()
 	refresh()
+
+
+## Le panneau de présentation vit **hors de l'accessoire** : il doit arriver de
+## face devant la caméra, or l'objet au repos est couché sur la table. Le
+## laisser enfant de l'accessoire lui ferait hériter d'une rotation de 82°.
+func _build_panel() -> void:
+	var shape := _shape()
+	var pixels: Vector2i = shape.get("pixels", Vector2i(1000, 640))
+
+	_panel_pivot = Node3D.new()
+	_panel_pivot.name = "PanelPivot"
+	_panel_pivot.top_level = true
+	_panel_pivot.visible = false
+	add_child(_panel_pivot)
+
+	_viewport = SubViewport.new()
+	_viewport.name = "PropViewport"
+	_viewport.size = pixels
+	_viewport.transparent_bg = false
+	_viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	_viewport.handle_input_locally = true
+	_viewport.gui_embed_subwindows = true
+	_panel_pivot.add_child(_viewport)
+
+	_panel = MeshInstance3D.new()
+	_panel.name = "Panel"
+	var quad := QuadMesh.new()
+	quad.size = Vector2(pixels) / _pixels_per_unit()
+	_panel.mesh = quad
+	var material := StandardMaterial3D.new()
+	material.albedo_texture = _viewport.get_texture()
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_panel.material_override = material
+	_panel_pivot.add_child(_panel)
+
+	var frame := MeshInstance3D.new()
+	frame.name = "PanelFrame"
+	var frame_mesh := BoxMesh.new()
+	frame_mesh.size = Vector3(quad.size.x + 0.022, quad.size.y + 0.022, 0.012)
+	frame.mesh = frame_mesh
+	frame.position = Vector3(0, 0, -0.008)
+	frame.material_override = DeskRoom.toon_material(shape.get("frame", Color.BLACK))
+	_panel_pivot.add_child(frame)
+	# Le pivot est animé en `scale` à l'ouverture : le trait grossit donc avec
+	# le cadre pendant l'entrée, et se cale juste à l'arrivée. C'est le seul
+	# endroit du lot où un contour est posé sur un nœud animé en échelle.
+	if room != null:
+		var placement: Dictionary = room.presentation_placement(Vector2i.ONE, PRESENT_DISTANCE)
+		room.outline_at(frame, placement["position"])
+
+	var area := Area3D.new()
+	area.name = "PanelArea"
+	var collision := CollisionShape3D.new()
+	var box := BoxShape3D.new()
+	box.size = Vector3(quad.size.x, quad.size.y, 0.01)
+	collision.shape = box
+	collision.position = Vector3(0, 0, 0.004)
+	area.add_child(collision)
+	area.input_event.connect(_on_panel_input)
+	_panel_pivot.add_child(area)
+
+
+func _pixels_per_unit() -> float:
+	if room == null:
+		return 1200.0
+	var placement: Dictionary = room.presentation_placement(Vector2i.ONE, PRESENT_DISTANCE)
+	return maxf(room.design_pixels_per_unit_at(placement["position"]), 1.0)
 
 
 func _shape() -> Dictionary:
 	return SHAPES.get(kind, SHAPES["shop"])
+
+
+func hint_text() -> String:
+	return String(_shape().get("hint", ""))
+
+
+## Le point du monde auquel accrocher l'étiquette 2D de l'accessoire — **jamais
+## dessus** : la tablette est presque noire, et un libellé posé dessus s'y
+## perdait. Le décalage est déclaré par nature parce que le bon côté dépend de
+## la pose : sous la tablette dressée, devant les objets couchés à plat, qui
+## sinon poussent leur étiquette hors du cadre par le bas. Le texte reste de
+## face et net, seul l'objet est en perspective.
+func hint_anchor() -> Vector3:
+	return global_position + _shape().get("hint_offset", Vector3(0, 0.05, 0.2))
 
 
 ## Le parapheur du Comité **n'existe pas** hors fin de trimestre : ce n'est pas
@@ -94,32 +221,53 @@ func _shape() -> Dictionary:
 ## trois ne ressemble pas aux deux autres.
 func refresh() -> void:
 	if kind == "committee":
-		var available := _committee_open()
+		var available := SprintState.committee_pending
 		visible = available
+		if _panel_pivot != null:
+			_panel_pivot.visible = available and _open
 		if not available and _open:
 			collapse()
-	if not _open:
-		_fill_rest()
-	queue_redraw()
 
 
-func _committee_open() -> bool:
-	return SprintState.committee_pending
+func is_open() -> bool:
+	return _open
 
 
-func _on_body_input(event: InputEvent) -> void:
+func _on_cover_input(_camera: Node, event: InputEvent, _at: Vector3, _normal: Vector3, _index: int) -> void:
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		if _open:
-			return
 		expand()
+
+
+func _on_panel_input(_camera: Node, event: InputEvent, event_position: Vector3, _normal: Vector3, _index: int) -> void:
+	DeskRoom.route_to_viewport(_panel, _viewport, event, event_position)
 
 
 # ── Entrer, sortir ───────────────────────────────────────────────────────
 func expand() -> void:
-	if _open:
+	if _open or room == null:
 		return
 	_open = true
-	_slide_to(_shape().get("open", Rect2()), _fill_open)
+	var placement: Dictionary = room.presentation_placement(
+		Vector2i(_shape().get("pixels", Vector2i(1000, 640))), PRESENT_DISTANCE)
+
+	_cover.visible = false
+	get_node("Trim").visible = false
+	_panel_pivot.visible = true
+	# L'objet part de sa place sur la table, de biais, et se redresse : c'est
+	# ce redressement qu'on lit comme « un objet entre », là où un panneau qui
+	# s'affiche n'a aucune matière.
+	_panel_pivot.global_position = global_position
+	_panel_pivot.global_basis = placement["basis"] * Basis.from_euler(
+		Vector3(deg_to_rad(_shape().get("entry_rotation", Vector3.ZERO).x),
+			deg_to_rad(_shape().get("entry_rotation", Vector3.ZERO).y),
+			deg_to_rad(_shape().get("entry_rotation", Vector3.ZERO).z)))
+	_panel_pivot.scale = Vector3.ONE * 0.35
+
+	_fill_open()
+	_slide_to(placement["position"], placement["basis"], Vector3.ONE)
+	# Le bureau doit rafraîchir ses étiquettes 2D : celle de cet accessoire
+	# nomme un objet qui vient de quitter la table.
+	state_changed.emit()
 
 
 func collapse() -> void:
@@ -130,95 +278,49 @@ func collapse() -> void:
 	if kind == "committee":
 		SprintState.committee_pending = false
 	_open = false
-	_slide_to(_shape().get("rest", Rect2()), _fill_rest)
+	if _tween != null and _tween.is_valid():
+		_tween.kill()
+	UIHelpers.clear_children(_viewport)
+	_panel_pivot.visible = false
+	_cover.visible = true
+	get_node("Trim").visible = true
+	refresh()
 	state_changed.emit()
 
 
-func _slide_to(target: Rect2, then: Callable) -> void:
-	UIHelpers.clear_children(_body)
+func _slide_to(target_position: Vector3, target_basis: Basis, target_scale: Vector3) -> void:
 	if _tween != null and _tween.is_valid():
 		_tween.kill()
-	_tween = create_tween()
+	_tween = create_tween().set_parallel(true)
 	# L'accessoire dépasse sa position puis se cale : un objet qu'on pousse a
 	# de l'inertie, un panneau qui s'affiche n'en a pas. C'est tout l'écart.
 	_tween.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	_tween.tween_method(_apply_interpolated.bind(_rect, target), 0.0, 1.0, SLIDE_SECONDS)
-	_tween.finished.connect(func():
-		_rect = target
-		_apply(target)
-		then.call())
-
-
-func _apply_interpolated(t: float, from: Rect2, to: Rect2) -> void:
-	_apply(Rect2(from.position.lerp(to.position, t), from.size.lerp(to.size, t)))
-
-
-func _apply(rect: Rect2) -> void:
-	_rect = rect
-	_body.position = rect.position + Vector2(12, 12)
-	_body.size = rect.size - Vector2(24, 24)
-	_hint.position = rect.position + Vector2(_shape().get("hint_at", Vector2.ZERO))
-	_hint.visible = not _open
-	queue_redraw()
-
-
-func _draw() -> void:
-	var shape := _shape()
-	var radius := float(shape.get("radius", 8))
-	draw_rect_rounded(_rect, shape.get("frame", Color.BLACK), radius)
-	draw_rect_rounded(Rect2(_rect.position + Vector2(10, 10), _rect.size - Vector2(20, 20)),
-		shape.get("body", Color.GRAY), maxf(radius - 4.0, 2.0))
-	if kind == "closing":
-		# La pince : c'est elle qui fait lire « planche » plutôt que « panneau ».
-		var clip := Rect2(Vector2(_rect.position.x + _rect.size.x * 0.5 - 52, _rect.position.y - 13),
-			Vector2(104, 26))
-		draw_rect(clip, Color("#b9bec6"))
-		draw_rect(clip, shape.get("frame", Color.BLACK), false, 3.0)
-
-
-func draw_rect_rounded(rect: Rect2, color: Color, radius: float) -> void:
-	# Godot ne dessine pas de rectangle arrondi en immédiat : trois rectangles
-	# et quatre disques suffisent, et restent nets à toute échelle.
-	draw_rect(Rect2(rect.position + Vector2(radius, 0), rect.size - Vector2(radius * 2.0, 0)), color)
-	draw_rect(Rect2(rect.position + Vector2(0, radius), Vector2(radius, rect.size.y - radius * 2.0)), color)
-	draw_rect(Rect2(rect.position + Vector2(rect.size.x - radius, radius), Vector2(radius, rect.size.y - radius * 2.0)), color)
-	for corner in [Vector2(radius, radius), Vector2(rect.size.x - radius, radius),
-			Vector2(radius, rect.size.y - radius), Vector2(rect.size.x - radius, rect.size.y - radius)]:
-		draw_circle(rect.position + corner, radius, color)
-
-
-# ── Ce qu'on voit au repos ───────────────────────────────────────────────
-func _fill_rest() -> void:
-	UIHelpers.clear_children(_body)
-	var label := Label.new()
-	label.text = {"shop": "ÉTAL", "closing": "CLORE", "committee": "COMITÉ D'INVESTISSEMENT"}.get(kind, "")
-	label.add_theme_font_size_override("font_size", 13)
-	label.add_theme_color_override("font_color", Color("#f3e4e4") if kind == "committee" else UIHelpers.PANEL_FG)
-	UIHelpers.apply_mono(label, 13, true)
-	label.position = Vector2(14, 14)
-	_body.add_child(label)
-
-	if kind == "committee":
-		var sub := Label.new()
-		sub.text = "Trimestre %d franchi · 💥 %d à engager" % [
-			SprintState.quarter_index, SprintState.impact_wallet]
-		sub.position = Vector2(14, 44)
-		sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		sub.custom_minimum_size = Vector2(220, 0)
-		sub.size = Vector2(220, 90)
-		sub.add_theme_font_size_override("font_size", 12)
-		sub.add_theme_color_override("font_color", Color("#f3e4e4", 0.82))
-		_body.add_child(sub)
+	_tween.tween_property(_panel_pivot, "global_position", target_position, SLIDE_SECONDS)
+	_tween.tween_property(_panel_pivot, "quaternion", target_basis.get_rotation_quaternion(), SLIDE_SECONDS)
+	_tween.tween_property(_panel_pivot, "scale", target_scale, SLIDE_SECONDS)
 
 
 # ── Ce qu'on voit ouvert ─────────────────────────────────────────────────
 func _fill_open() -> void:
-	UIHelpers.clear_children(_body)
+	UIHelpers.clear_children(_viewport)
+	var pixels := Vector2(_viewport.size)
+
+	_body = Control.new()
+	_body.name = "Body"
+	_body.size = pixels
+	_viewport.add_child(_body)
+
+	var background := ColorRect.new()
+	background.color = UIHelpers.COLOR_SCREEN_BG
+	background.size = pixels
+	background.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_body.add_child(background)
 
 	var bar := Button.new()
+	bar.name = "RestButton"
 	bar.text = "Reposer"
 	bar.flat = true
-	bar.position = Vector2(_body.size.x - 150, 6)
+	bar.position = Vector2(pixels.x - 150, 6)
 	bar.custom_minimum_size = Vector2(140, 30)
 	bar.add_theme_font_size_override("font_size", 12)
 	bar.add_theme_color_override("font_color", UIHelpers.PANEL_ACCENT)
@@ -226,8 +328,9 @@ func _fill_open() -> void:
 	_body.add_child(bar)
 
 	var host := Control.new()
+	host.name = "Host"
 	host.position = Vector2(0, 40)
-	host.size = _body.size - Vector2(0, 40)
+	host.size = pixels - Vector2(0, 40)
 	host.clip_contents = true
 	_body.add_child(host)
 
@@ -243,18 +346,45 @@ func _fill_open() -> void:
 	screen.set_anchors_preset(Control.PRESET_FULL_RECT)
 	host.add_child(screen)
 	UIHelpers.hosted_in_desk = false
-	_rewire(screen, "Margin/VBox/TopBar/BackButton")
-	_rewire(screen, "Margin/VBox/BottomBar/NextButton")
-	_rewire(screen, "Margin/VBox/BottomBar/ContinueButton")
+	_apply_hosted_layout(screen)
+	if screen.has_signal("desk_state_changed"):
+		screen.connect("desk_state_changed", _on_hosted_state_changed)
 
 
-func _rewire(screen: Control, path: String) -> void:
-	var button: Node = screen.get_node_or_null(NodePath(path))
-	if button == null or not (button is BaseButton):
-		return
-	for connection in button.pressed.get_connections():
-		button.pressed.disconnect(connection.get("callable"))
-	button.pressed.connect(collapse)
+func hosted_screen() -> Control:
+	if _body == null:
+		return null
+	var host := _body.get_node_or_null("Host")
+	if host == null or host.get_child_count() == 0:
+		return null
+	return host.get_child(0) as Control
+
+
+func _apply_hosted_layout(screen: Control) -> void:
+	var margin := screen.get_node_or_null("Margin") as MarginContainer
+	if margin != null:
+		margin.add_theme_constant_override("margin_left", 24)
+		margin.add_theme_constant_override("margin_top", 14)
+		margin.add_theme_constant_override("margin_right", 24)
+		margin.add_theme_constant_override("margin_bottom", 18)
+	var vbox := screen.get_node_or_null("Margin/VBox") as VBoxContainer
+	if vbox != null:
+		vbox.add_theme_constant_override("separation", 10)
+	var top_bar := screen.get_node_or_null("Margin/VBox/TopBar") as Control
+	if top_bar != null:
+		top_bar.visible = false
+	for button_name in ["NextButton", "ContinueButton"]:
+		var button := screen.get_node_or_null("Margin/VBox/BottomBar/%s" % button_name) as Control
+		if button != null:
+			button.visible = false
+	if kind == "committee":
+		var bottom_bar := screen.get_node_or_null("Margin/VBox/BottomBar") as Control
+		if bottom_bar != null:
+			bottom_bar.visible = false
+
+
+func _on_hosted_state_changed() -> void:
+	state_changed.emit()
 
 
 ## La feuille de clôture. Elle dit **ce qu'on emporte**, y compris ce qu'on a
@@ -322,3 +452,5 @@ func _on_sign_pressed() -> void:
 	SprintState.resolve_unanswered_events()
 	collapse()
 	get_tree().change_scene_to_file("res://scenes/screens/resolution_screen.tscn")
+
+

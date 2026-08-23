@@ -259,6 +259,80 @@ func _build_personality(detail: VBoxContainer, employee: Dictionary) -> void:
 	detail.add_child(box)
 
 
+## Les actions possibles sur une personne — leur libellé, leur coût et la
+## raison qui les refuse. **Une seule description, deux rendus** : cette fiche
+## et le trombinoscope levé du bureau (#59). Les dupliquer ferait diverger deux
+## écrans qui énoncent les mêmes règles, et celui qu'on oublierait de mettre à
+## jour serait toujours celui que le joueur a sous les yeux.
+static func management_actions(employee: Dictionary) -> Array:
+	var one_refusal: String = SprintState.personal_action_refusal()
+	if one_refusal == "":
+		one_refusal = SprintState.employee_management_refusal(employee, "one-on-one")
+	var ownership_cost := int(SprintState.get_individual_team_conf().get("managementActions", {}).get("ownership", {}).get("cpoEnergyCost", 0))
+	var severance: int = SprintState.resolved_price("severance")
+
+	var actions: Array = [
+		{
+			"id": "one-on-one", "node": "OneOnOneAction",
+			"label": "🤝 Faire un 1:1 · %d ⚡" % SprintState.get_personal_action_cost("oneOnOne"),
+			"refusal": one_refusal,
+		},
+		{
+			"id": "ownership", "node": "OwnershipAction",
+			"label": "🧭 Confier un périmètre · %d ⚡" % ownership_cost,
+			"refusal": SprintState.employee_management_refusal(employee, "ownership"),
+		},
+		{
+			"id": "time-off", "node": "TimeOffAction",
+			"label": "⚡ Donner le sprint de repos",
+			"refusal": SprintState.employee_management_refusal(employee, "time-off"),
+		},
+		{
+			"id": "salary-raise", "node": "SalaryRaiseAction",
+			"label": "💸 Augmenter · +1 💰/sprint",
+			"refusal": SprintState.employee_management_refusal(employee, "salary-raise"),
+		},
+	]
+	if employee.get("seniority", "junior") == "junior":
+		actions.append({
+			"id": "promote", "node": "PromoteAction",
+			"label": "📈 Promouvoir · %d 💥" % SprintState.promotion_cost(),
+			"refusal": "impact" if SprintState.impact_wallet < SprintState.promotion_cost() else "",
+		})
+	actions.append({
+		"id": "fire", "node": "FireAction",
+		"label": "🚪 Se séparer · %d 💥" % severance,
+		"refusal": "impact" if SprintState.impact_wallet < severance else "",
+	})
+	return actions
+
+
+## Joue une action et dit si l'état a bougé. Le départ est le seul cas exclu :
+## il est irréversible, donc c'est à l'écran appelant de le faire confirmer.
+static func run_management_action(action_id: String, employee_id: String) -> bool:
+	match action_id:
+		"one-on-one":
+			var employee := SprintState.find_employee(employee_id)
+			return not employee.is_empty() and SprintState.do_one_on_one(employee) == ""
+		"ownership":
+			return SprintState.grant_ownership(employee_id) == ""
+		"time-off":
+			return SprintState.grant_time_off(employee_id) == ""
+		"salary-raise":
+			return SprintState.grant_salary_raise(employee_id) == ""
+		"promote":
+			return SprintState.promote_employee(employee_id) == ""
+	return false
+
+
+static func refusal_label(refusal: String) -> String:
+	match refusal:
+		"deja-ce-sprint": return "Cette action a déjà été utilisée avec cette personne ce sprint."
+		"impact": return "Pas assez d'Impact disponible."
+		"epuise": return "Votre Énergie est trop basse."
+	return "Action indisponible pour l'instant."
+
+
 func _build_actions(detail: VBoxContainer, employee: Dictionary) -> void:
 	var heading := _label("AGIR MAINTENANT", 11, UIHelpers.COLOR_SHELF)
 	UIHelpers.apply_mono(heading, 11, true)
@@ -268,20 +342,13 @@ func _build_actions(detail: VBoxContainer, employee: Dictionary) -> void:
 	grid.add_theme_constant_override("h_separation", 10)
 	grid.add_theme_constant_override("v_separation", 8)
 	detail.add_child(grid)
+
 	var employee_id := String(employee.get("id", ""))
-	var one_cost := SprintState.get_personal_action_cost("oneOnOne")
-	var one_refusal := SprintState.personal_action_refusal()
-	if one_refusal == "":
-		one_refusal = SprintState.employee_management_refusal(employee, "one-on-one")
-	grid.add_child(_action_button("🤝 Faire un 1:1 · %d ⚡" % one_cost, one_refusal, _one_on_one.bind(employee_id), "OneOnOneAction"))
-	var ownership_cost := int(SprintState.get_individual_team_conf().get("managementActions", {}).get("ownership", {}).get("cpoEnergyCost", 0))
-	grid.add_child(_action_button("🧭 Confier un périmètre · %d ⚡" % ownership_cost, SprintState.employee_management_refusal(employee, "ownership"), _ownership.bind(employee_id), "OwnershipAction"))
-	grid.add_child(_action_button("⚡ Donner le sprint de repos", SprintState.employee_management_refusal(employee, "time-off"), _time_off.bind(employee_id), "TimeOffAction"))
-	grid.add_child(_action_button("💸 Augmenter · +1 💰/sprint", SprintState.employee_management_refusal(employee, "salary-raise"), _salary_raise.bind(employee_id), "SalaryRaiseAction"))
-	if employee.get("seniority", "junior") == "junior":
-		var promote_refusal := "impact" if SprintState.impact_wallet < SprintState.promotion_cost() else ""
-		grid.add_child(_action_button("📈 Promouvoir · %d 💥" % SprintState.promotion_cost(), promote_refusal, _promote.bind(employee_id), "PromoteAction"))
-	grid.add_child(_action_button("🚪 Se séparer · %d 💥" % SprintState.resolved_price("severance"), "impact" if SprintState.impact_wallet < SprintState.resolved_price("severance") else "", _confirm_fire.bind(employee_id), "FireAction"))
+	for action in management_actions(employee):
+		var callback: Callable = _confirm_fire.bind(employee_id) if action["id"] == "fire" \
+			else _run.bind(String(action["id"]), employee_id)
+		grid.add_child(_action_button(String(action["label"]), String(action["refusal"]),
+			callback, String(action["node"])))
 
 
 func _action_button(text: String, refusal: String, callback: Callable, node_name: String) -> Button:
@@ -290,48 +357,19 @@ func _action_button(text: String, refusal: String, callback: Callable, node_name
 	button.text = text
 	button.custom_minimum_size = Vector2(0, 42)
 	button.disabled = refusal != ""
-	button.tooltip_text = _refusal_label(refusal) if refusal != "" else text
+	button.tooltip_text = refusal_label(refusal) if refusal != "" else text
 	button.pressed.connect(callback)
 	return button
 
 
-func _refusal_label(refusal: String) -> String:
-	match refusal:
-		"deja-ce-sprint": return "Cette action a déjà été utilisée avec cette personne ce sprint."
-		"impact": return "Pas assez d'Impact disponible."
-		"epuise": return "Votre Énergie est trop basse."
-	return "Action indisponible pour l'instant."
+func _run(action_id: String, employee_id: String) -> void:
+	if run_management_action(action_id, employee_id):
+		_after_action()
 
 
 func _select_employee(employee_id: String) -> void:
 	selected_employee_id = employee_id
 	_build()
-
-
-func _one_on_one(employee_id: String) -> void:
-	var employee := SprintState.find_employee(employee_id)
-	if not employee.is_empty() and SprintState.do_one_on_one(employee) == "":
-		_after_action()
-
-
-func _ownership(employee_id: String) -> void:
-	if SprintState.grant_ownership(employee_id) == "":
-		_after_action()
-
-
-func _time_off(employee_id: String) -> void:
-	if SprintState.grant_time_off(employee_id) == "":
-		_after_action()
-
-
-func _salary_raise(employee_id: String) -> void:
-	if SprintState.grant_salary_raise(employee_id) == "":
-		_after_action()
-
-
-func _promote(employee_id: String) -> void:
-	if SprintState.promote_employee(employee_id) == "":
-		_after_action()
 
 
 func _confirm_fire(employee_id: String) -> void:
