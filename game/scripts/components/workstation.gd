@@ -16,9 +16,10 @@ extends Control
 ##  · le contenu reste du `Control` net et de face. Il hérite de la perspective
 ##    de la pièce **par la texture**, pas par une transformation de l'UI.
 ##
-## Aucune phase n'est un `change_scene_to_file` : elles sont instanciées ici,
-## leurs boutons de navigation sont recâblés vers « retour au bureau », et leur
-## Panneau de bord est neutralisé (`UIHelpers.hosted_in_desk`).
+## Aucune phase n'est un `change_scene_to_file` : elles sont instanciées ici et
+## configurées par leur contrat `configure_for_host()`. L'hôte ne cherche ni ne
+## modifie leurs boutons : le chrome du laptop et la logique métier de l'app
+## restent deux responsabilités distinctes.
 
 signal state_changed
 
@@ -283,31 +284,13 @@ func _instantiate_app(id: String, host: Control) -> Control:
 	host.add_child(screen)
 	UIHelpers.hosted_in_desk = false
 
-	_apply_hosted_layout(screen)
+	if screen.has_method("configure_for_host"):
+		screen.call("configure_for_host", {"kind": "workstation", "size": host.size})
 	if screen.has_signal("desk_done"):
 		screen.connect("desk_done", close_app)
 	if screen.has_signal("desk_state_changed"):
 		screen.connect("desk_state_changed", _on_hosted_state_changed)
 	return screen
-
-
-func _apply_hosted_layout(screen: Control) -> void:
-	var margin := screen.get_node_or_null("Margin") as MarginContainer
-	if margin != null:
-		margin.add_theme_constant_override("margin_left", 22)
-		margin.add_theme_constant_override("margin_top", 12)
-		margin.add_theme_constant_override("margin_right", 22)
-		margin.add_theme_constant_override("margin_bottom", 16)
-	var vbox := screen.get_node_or_null("Margin/VBox") as VBoxContainer
-	if vbox != null:
-		vbox.add_theme_constant_override("separation", 9)
-	var top_bar := screen.get_node_or_null("Margin/VBox/TopBar") as Control
-	if top_bar != null:
-		top_bar.visible = false
-	var next := screen.get_node_or_null("Margin/VBox/BottomBar/NextButton") as Button
-	if next != null:
-		next.text = "Terminé"
-
 
 func _on_hosted_state_changed() -> void:
 	state_changed.emit()

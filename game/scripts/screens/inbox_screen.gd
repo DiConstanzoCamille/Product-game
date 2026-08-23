@@ -43,6 +43,17 @@ func _ready() -> void:
 	_load_event()
 
 
+func configure_for_host(context: Dictionary) -> void:
+	hosted_in_desk = true
+	$Margin.add_theme_constant_override("margin_left", 22)
+	$Margin.add_theme_constant_override("margin_top", 12)
+	$Margin.add_theme_constant_override("margin_right", 22)
+	$Margin.add_theme_constant_override("margin_bottom", 16)
+	$Margin/VBox.add_theme_constant_override("separation", 9)
+	$Margin/VBox/TopBar.visible = false
+	next_button.text = "Terminé"
+
+
 func _load_event(primary_event: bool = true) -> void:
 	_reading_primary_event = primary_event
 	event = SprintState.get_sprint_event() if primary_event else SprintState.draw_inbox_event()

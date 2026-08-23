@@ -39,6 +39,7 @@ const MAX_COLUMNS := 4
 
 var offer: Dictionary = {}
 var side_panel: Control = null
+var hosted_in_desk := false
 
 # Chaque entrée garde son `placement` (angle, décalage du scotch) : une carte
 # qui change de rang dans le rayon reste le même objet posé sur le tableau.
@@ -46,6 +47,7 @@ var _cards: Array = []  # [{node: AssetCard, kind, id, data, placement}]
 
 
 func _ready() -> void:
+	hosted_in_desk = UIHelpers.hosted_in_desk
 	back_button.pressed.connect(func(): get_tree().change_scene_to_file(START_SCREEN_SCENE))
 	next_button.pressed.connect(func(): get_tree().change_scene_to_file(NEXT_SCENE))
 	reroll_button.pressed.connect(_on_reroll_pressed)
@@ -73,6 +75,23 @@ func _ready() -> void:
 	# défilement horizontale dès que le Panneau de bord a pris sa place.
 	scroll.resized.connect(_fit_columns)
 	_fit_columns()
+
+
+func configure_for_host(context: Dictionary) -> void:
+	hosted_in_desk = true
+	$Margin.add_theme_constant_override("margin_left", 24)
+	$Margin.add_theme_constant_override("margin_top", 14)
+	$Margin.add_theme_constant_override("margin_right", 24)
+	$Margin.add_theme_constant_override("margin_bottom", 18)
+	$Margin/VBox.add_theme_constant_override("separation", 10)
+	$Margin/VBox/TopBar.visible = false
+	next_button.visible = false
+	$Margin/VBox/Scroll/Pad.add_theme_constant_override("margin_left", 10)
+	$Margin/VBox/Scroll/Pad.add_theme_constant_override("margin_top", 8)
+	$Margin/VBox/Scroll/Pad.add_theme_constant_override("margin_right", 10)
+	$Margin/VBox/Scroll/Pad.add_theme_constant_override("margin_bottom", 8)
+	$Margin/VBox/Scroll/Pad/Shelves.add_theme_constant_override("separation", 16)
+	_fit_columns.call_deferred()
 
 
 # ── Le rayon ──────────────────────────────────────────────────────────────

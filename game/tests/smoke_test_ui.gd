@@ -841,6 +841,8 @@ func _test_desk_hosted_contracts() -> void:
 	if inbox == null:
 		_fail("Le courrier doit s'ouvrir dans le poste de travail.")
 	else:
+		if inbox.get_node("Margin/VBox/TopBar").visible:
+			_fail("L'application hébergée ne doit pas redessiner une barre Retour dans le laptop.")
 		var event: Dictionary = inbox.event
 		var choices: Array = event.get("choices", [])
 		if choices.is_empty():
@@ -874,17 +876,82 @@ func _test_desk_hosted_contracts() -> void:
 		if workstation.hosted_app() != null:
 			_fail("La Roadmap ne doit se fermer qu'après validation du plan.")
 
-	# Une mutation économique dans un écran hébergé remonte jusqu'aux trois
-	# valeurs du bureau, sans exiger de reposer l'accessoire.
-	var refreshed := [0]
-	workstation.state_changed.connect(func(): refreshed[0] += 1)
-	desk.open_app("investments")
+	# Échap appartient au chrome du laptop, pas à l'application.
+	desk.open_app("inbox")
 	await get_tree().process_frame
-	var investments: Control = workstation.hosted_app()
+	desk._unhandled_input(_escape_event())
+	await get_tree().process_frame
+	if workstation.hosted_app() != null:
+		_fail("Échap doit fermer l'application du laptop et revenir à son lanceur.")
+
+	# Une mutation économique dans un accessoire hébergé remonte jusqu'aux
+	# trois valeurs du bureau, sans exiger de le reposer.
+	var refreshed := [0]
+	var shop: Node3D = desk.prop("shop")
+	shop.state_changed.connect(func(): refreshed[0] += 1)
+	desk.open_prop("shop")
+	for i in 3:
+		await get_tree().process_frame
+	var investments: Control = shop.hosted_screen()
 	if investments != null:
 		investments._refresh_all()
 	if refreshed[0] == 0:
 		_fail("Une mutation hébergée doit demander le rafraîchissement immédiat du bureau.")
+
+	# La sortie vit dans le CanvasLayer du bureau. La texture de l'accessoire
+	# ne doit porter ni bouton Reposer ni navigation héritée.
+	var global_close: Button = desk.readable_layer().get_node_or_null("PropClose")
+	if global_close == null or not global_close.visible:
+		_fail("Un accessoire ouvert doit exposer une commande Reposer hors de sa texture.")
+	if shop.find_child("RestButton", true, false) != null:
+		_fail("Le bouton Reposer ne doit plus être peint dans le SubViewport de l'accessoire.")
+	if investments != null:
+		if investments.get_node("Margin/VBox/TopBar").visible:
+			_fail("La Boutique hébergée ne doit pas afficher sa navigation Accueil historique.")
+		if investments.next_button.visible:
+			_fail("La Boutique hébergée ne doit pas afficher le bouton de tunnel Suivant.")
+
+	# Un clic dans l'accessoire est réclamé par lui et ne le repose pas ; un
+	# clic réellement extérieur, à la frame suivante, le fait.
+	desk._on_prop_interacted()
+	desk._unhandled_input(_left_click_event())
+	await get_tree().process_frame
+	if not shop.is_open():
+		_fail("Un clic dans le contenu d'un accessoire ne doit pas le fermer.")
+	await get_tree().process_frame
+	desk._unhandled_input(_left_click_event())
+	await get_tree().process_frame
+	if shop.is_open():
+		_fail("Un clic extérieur doit reposer l'accessoire ouvert.")
+
+	# Le même contrat est garanti au clavier.
+	desk.open_prop("shop")
+	await get_tree().process_frame
+	desk._unhandled_input(_escape_event())
+	await get_tree().process_frame
+	if shop.is_open():
+		_fail("Échap doit reposer l'accessoire ouvert.")
+
+	SprintState.committee_pending = true
+	desk.refresh()
+	var committee: Node3D = desk.prop("committee")
+	desk.open_prop("committee")
+	for i in 3:
+		await get_tree().process_frame
+	var committee_screen: Control = committee.hosted_screen()
+	if committee_screen == null:
+		_fail("Le Comité doit s'ouvrir dans son accessoire.")
+	else:
+		if committee_screen.get_node("Margin/VBox/TopBar").visible:
+			_fail("Le Comité hébergé ne doit pas afficher sa navigation Accueil historique.")
+		if committee_screen.continue_button.is_visible_in_tree():
+			_fail("Le Comité hébergé ne doit pas afficher le bouton de tunnel Continuer.")
+	if desk.readable_layer().get_node("PropClose").get_parent() != desk.readable_layer():
+		_fail("La commande Reposer doit appartenir au CanvasLayer du bureau.")
+	desk._unhandled_input(_escape_event())
+	await get_tree().process_frame
+	if committee.is_open():
+		_fail("Échap doit reposer le Comité.")
 
 	desk.queue_free()
 	await get_tree().process_frame
@@ -993,6 +1060,13 @@ func _escape_event() -> InputEventKey:
 	var event := InputEventKey.new()
 	event.keycode = KEY_ESCAPE
 	event.physical_keycode = KEY_ESCAPE
+	event.pressed = true
+	return event
+
+
+func _left_click_event() -> InputEventMouseButton:
+	var event := InputEventMouseButton.new()
+	event.button_index = MOUSE_BUTTON_LEFT
 	event.pressed = true
 	return event
 

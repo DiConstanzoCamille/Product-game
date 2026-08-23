@@ -26,9 +26,11 @@ const START_SCREEN_SCENE := "res://scenes/screens/start_screen.tscn"
 
 var side_panel: Control = null
 var next_quarter_label: Label = null
+var hosted_in_desk := false
 
 
 func _ready() -> void:
+	hosted_in_desk = UIHelpers.hosted_in_desk
 	back_button.pressed.connect(func(): get_tree().change_scene_to_file(START_SCREEN_SCENE))
 	continue_button.pressed.connect(func(): get_tree().change_scene_to_file(NEXT_SCENE))
 	UIHelpers.style_primary_button(continue_button)
@@ -56,6 +58,19 @@ func _ready() -> void:
 	side_panel.state_changed.connect(_refresh)
 
 	_refresh()
+
+
+func configure_for_host(context: Dictionary) -> void:
+	hosted_in_desk = true
+	$Margin.add_theme_constant_override("margin_left", 24)
+	# Les valeurs permanentes du bureau restent au-dessus de l'objet ouvert :
+	# le titre commence sous cette zone au lieu d'être peint derrière elle.
+	$Margin.add_theme_constant_override("margin_top", 64)
+	$Margin.add_theme_constant_override("margin_right", 24)
+	$Margin.add_theme_constant_override("margin_bottom", 18)
+	$Margin/VBox.add_theme_constant_override("separation", 10)
+	$Margin/VBox/TopBar.visible = false
+	$Margin/VBox/BottomBar.visible = false
 
 
 # ── Rafraîchissement complet ──────────────────────────────────────────────
