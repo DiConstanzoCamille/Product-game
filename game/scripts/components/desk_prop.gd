@@ -29,6 +29,7 @@ extends Node3D
 
 signal state_changed
 signal interacted
+signal hover_changed(prop: Node3D, entered: bool)
 
 const SLIDE_SECONDS := 0.42
 ## Assez près pour occulter le portable — un dossier qu'on ouvre passe devant
@@ -85,6 +86,9 @@ var _viewport: SubViewport = null
 var _body: Control = null
 var _open := false
 var _tween: Tween = null
+var _hover_tween: Tween = null
+var _hovered := false
+var _rest_position := Vector3.ZERO
 
 
 func _ready() -> void:
@@ -96,6 +100,7 @@ func build() -> void:
 		return
 	var shape := _shape()
 	position = shape.get("rest_position", Vector3.ZERO)
+	_rest_position = position
 	rotation_degrees = shape.get("rest_rotation", Vector3.ZERO)
 
 	_cover = MeshInstance3D.new()
@@ -126,6 +131,8 @@ func build() -> void:
 	collision.shape = box
 	area.add_child(collision)
 	area.input_event.connect(_on_cover_input)
+	area.mouse_entered.connect(_on_cover_mouse_entered)
+	area.mouse_exited.connect(_on_cover_mouse_exited)
 	add_child(area)
 
 	_build_panel()
@@ -234,6 +241,36 @@ func is_open() -> bool:
 	return _open
 
 
+func is_hovered() -> bool:
+	return _hovered
+
+
+## Le survol déplace l'objet, jamais son échelle : les volumes portent un
+## contour, et grossir le nœud ferait grossir le trait avec lui.
+func _on_cover_mouse_entered() -> void:
+	_set_hovered(true)
+
+
+func _on_cover_mouse_exited() -> void:
+	_set_hovered(false)
+
+
+func _set_hovered(value: bool, animate := true) -> void:
+	if _hovered == value or _open:
+		return
+	_hovered = value
+	Input.set_default_cursor_shape(Input.CURSOR_POINTING_HAND if value else Input.CURSOR_ARROW)
+	if _hover_tween != null and _hover_tween.is_valid():
+		_hover_tween.kill()
+	var target := _rest_position + (Vector3.UP * 0.035 if value else Vector3.ZERO)
+	if animate:
+		_hover_tween = create_tween().set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		_hover_tween.tween_property(self, "position", target, 0.12)
+	else:
+		position = target
+	hover_changed.emit(self, value)
+
+
 func _on_cover_input(_camera: Node, event: InputEvent, _at: Vector3, _normal: Vector3, _index: int) -> void:
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		interacted.emit()
@@ -250,6 +287,8 @@ func _on_panel_input(_camera: Node, event: InputEvent, event_position: Vector3, 
 func expand() -> void:
 	if _open or room == null:
 		return
+	if _hovered:
+		_set_hovered(false, false)
 	_open = true
 	var placement: Dictionary = room.presentation_placement(
 		Vector2i(_shape().get("pixels", Vector2i(1000, 640))), PRESENT_DISTANCE)

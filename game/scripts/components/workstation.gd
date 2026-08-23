@@ -50,7 +50,7 @@ static var screen_intensity := -1.0
 static func resolved_screen_intensity() -> float:
 	if screen_intensity >= 0.0:
 		return screen_intensity
-	return float(SprintState.get_desk_conf().get("screen", {}).get("glowIntensity", 0.95))
+	return float(SprintState.get_desk_conf().get("screen", {}).get("glowIntensity", 0.45))
 
 
 func _ready() -> void:

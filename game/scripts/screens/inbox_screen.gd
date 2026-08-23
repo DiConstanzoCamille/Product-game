@@ -45,11 +45,11 @@ func _ready() -> void:
 
 func configure_for_host(context: Dictionary) -> void:
 	hosted_in_desk = true
-	$Margin.add_theme_constant_override("margin_left", 22)
-	$Margin.add_theme_constant_override("margin_top", 12)
-	$Margin.add_theme_constant_override("margin_right", 22)
-	$Margin.add_theme_constant_override("margin_bottom", 16)
-	$Margin/VBox.add_theme_constant_override("separation", 9)
+	$Margin.add_theme_constant_override("margin_left", 14)
+	$Margin.add_theme_constant_override("margin_top", 8)
+	$Margin.add_theme_constant_override("margin_right", 14)
+	$Margin.add_theme_constant_override("margin_bottom", 10)
+	$Margin/VBox.add_theme_constant_override("separation", 5)
 	$Margin/VBox/TopBar.visible = false
 	next_button.text = "Terminé"
 
@@ -85,7 +85,7 @@ func _append_incoming_message(sender: String, subject: String, body: String, sta
 	row.add_theme_constant_override("separation", 10)
 	messages_container.add_child(row)
 
-	var avatar := UIHelpers.make_sender_badge(sender, 38)
+	var avatar := UIHelpers.make_sender_badge(sender, 30 if hosted_in_desk else 38)
 	avatar.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	row.add_child(avatar)
 
@@ -97,7 +97,7 @@ func _append_incoming_message(sender: String, subject: String, body: String, sta
 	var meta := Label.new()
 	meta.text = "%s  ·  %s" % [sender, _timestamp()]
 	meta.add_theme_color_override("font_color", UIHelpers.COLOR_SOFT_TEXT)
-	meta.add_theme_font_size_override("font_size", 13)
+	meta.add_theme_font_size_override("font_size", 11 if hosted_in_desk else 13)
 	column.add_child(meta)
 
 	var bubble := PanelContainer.new()
@@ -117,7 +117,7 @@ func _append_incoming_message(sender: String, subject: String, body: String, sta
 	subject_label.text = subject
 	subject_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	subject_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	UIHelpers.apply_heading(subject_label, 18, 600.0)
+	UIHelpers.apply_heading(subject_label, 15 if hosted_in_desk else 18, 600.0)
 	subject_row.add_child(subject_label)
 	if status.to_lower() == "urgent":
 		subject_row.add_child(UIHelpers.make_stamp("urgent", 78))
@@ -126,14 +126,14 @@ func _append_incoming_message(sender: String, subject: String, body: String, sta
 	body_label.text = body
 	body_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	body_label.add_theme_color_override("font_color", UIHelpers.COLOR_FLAVOR)
-	body_label.add_theme_font_size_override("font_size", 15)
+	body_label.add_theme_font_size_override("font_size", 13 if hosted_in_desk else 15)
 	copy.add_child(body_label)
 
 
 func _append_reply_drafts(choices: Array) -> void:
 	var composer := VBoxContainer.new()
 	composer.name = "ReplyComposer"
-	composer.add_theme_constant_override("separation", 8)
+	composer.add_theme_constant_override("separation", 5 if hosted_in_desk else 8)
 	messages_container.add_child(composer)
 
 	var separator := HSeparator.new()
@@ -156,9 +156,9 @@ func _append_reply_drafts(choices: Array) -> void:
 		button.flat = true
 		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		button.custom_minimum_size = Vector2(0, 38)
+		button.custom_minimum_size = Vector2(0, 30 if hosted_in_desk else 38)
 		button.tooltip_text = "Envoyer cette réponse"
-		button.add_theme_font_size_override("font_size", 15)
+		button.add_theme_font_size_override("font_size", 13 if hosted_in_desk else 15)
 		button.add_theme_color_override("font_hover_color", UIHelpers.COLOR_SHELF)
 		button.pressed.connect(_on_choice_pressed.bind(choice))
 		replies.add_child(button)
@@ -230,7 +230,7 @@ func _append_outgoing_message(text: String) -> void:
 	meta.text = "Vous  ·  %s" % _timestamp()
 	meta.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	meta.add_theme_color_override("font_color", UIHelpers.COLOR_SOFT_TEXT)
-	meta.add_theme_font_size_override("font_size", 13)
+	meta.add_theme_font_size_override("font_size", 11 if hosted_in_desk else 13)
 	column.add_child(meta)
 
 	var bubble := PanelContainer.new()
@@ -241,7 +241,7 @@ func _append_outgoing_message(text: String) -> void:
 	label.text = text
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	label.add_theme_color_override("font_color", UIHelpers.COLOR_INK)
-	label.add_theme_font_size_override("font_size", 15)
+	label.add_theme_font_size_override("font_size", 13 if hosted_in_desk else 15)
 	bubble.add_child(label)
 
 
@@ -250,7 +250,7 @@ func _append_consequence_message(text: String) -> void:
 	row.add_theme_constant_override("separation", 10)
 	messages_container.add_child(row)
 
-	var avatar := UIHelpers.make_person_badge("Mise à jour", 30, UIHelpers.COLOR_SHELF)
+	var avatar := UIHelpers.make_person_badge("Mise à jour", 26 if hosted_in_desk else 30, UIHelpers.COLOR_SHELF)
 	avatar.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	row.add_child(avatar)
 
@@ -262,7 +262,7 @@ func _append_consequence_message(text: String) -> void:
 	var meta := Label.new()
 	meta.text = "Mise à jour du fil  ·  %s" % _timestamp()
 	meta.add_theme_color_override("font_color", UIHelpers.COLOR_SOFT_TEXT)
-	meta.add_theme_font_size_override("font_size", 13)
+	meta.add_theme_font_size_override("font_size", 11 if hosted_in_desk else 13)
 	column.add_child(meta)
 
 	var bubble := PanelContainer.new()
@@ -277,7 +277,7 @@ func _append_consequence_message(text: String) -> void:
 	label.text = text
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	label.add_theme_color_override("font_color", UIHelpers.COLOR_FLAVOR)
-	label.add_theme_font_size_override("font_size", 15)
+	label.add_theme_font_size_override("font_size", 13 if hosted_in_desk else 15)
 	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	header.add_child(label)
 	header.add_child(UIHelpers.make_stamp("validated", 82))
@@ -297,10 +297,10 @@ func _bubble_style(background: Color, border: Color, radius: int) -> StyleBoxFla
 	style.border_color = border
 	style.set_border_width_all(1)
 	style.set_corner_radius_all(radius)
-	style.content_margin_left = 14
-	style.content_margin_right = 14
-	style.content_margin_top = 11
-	style.content_margin_bottom = 11
+	style.content_margin_left = 9 if hosted_in_desk else 14
+	style.content_margin_right = 9 if hosted_in_desk else 14
+	style.content_margin_top = 7 if hosted_in_desk else 11
+	style.content_margin_bottom = 7 if hosted_in_desk else 11
 	return style
 
 

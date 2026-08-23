@@ -2321,3 +2321,16 @@ Les CTA métier restent dans l'objet et ne ferment rien implicitement. Inbox,
 Roadmap, Investissements et Comité compactent eux-mêmes leurs marges et leurs
 barres pour leur taille hébergée ; leurs versions autonomes conservent le
 tunnel historique tant que les anciens chemins de scène existent.
+
+La densité suit aussi ce contrat. Dans le laptop, la Roadmap est un **index de
+décision**, pas une pile de fiches : un ticket tient sur une ligne compacte
+(titre, coût, signaux, actions), et le dossier complet s'ouvre à la demande.
+Les sous-titres redondants et les grands espacements disparaissent uniquement
+dans ce cadre. L'Inbox applique la même échelle compacte à ses messages et à
+ses réponses. La dalle conserve son identité lumineuse, mais son intensité par
+défaut descend à `0,45` (`balance.json`) afin que l'effet ne concurrence plus
+la lecture.
+
+Enfin, chaque accessoire 3D interactif se soulève légèrement au survol et son
+étiquette s'accentue. Le retour ne change jamais l'échelle du volume : les
+contours restent donc stables, conformément au contrat visuel du bureau.

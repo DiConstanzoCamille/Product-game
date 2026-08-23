@@ -247,6 +247,7 @@ func _build_props() -> void:
 		prop.call("build")
 		prop.connect("state_changed", Callable(self, "refresh"))
 		prop.connect("interacted", Callable(self, "_on_prop_interacted"))
+		prop.connect("hover_changed", Callable(self, "_on_prop_hover"))
 		_props[kind] = prop
 
 
@@ -556,6 +557,15 @@ func _on_mug_hover(entered: bool) -> void:
 	_tooltip.position = Vector2(
 		clampf(at.x - _tooltip.size.x * 0.5, 20.0, DESIGN.x - _tooltip.size.x - 20.0),
 		at.y - _tooltip.size.y - 60.0)
+
+
+func _on_prop_hover(prop: Node3D, entered: bool) -> void:
+	var hint: Label = _layer.get_node_or_null("Hint_%s" % prop.kind)
+	if hint == null:
+		return
+	hint.add_theme_color_override("font_color", UIHelpers.COLOR_AMBER if entered else DESK_LABEL)
+	hint.add_theme_font_size_override("font_size", 12 if entered else 11)
+	_refresh_anchored_labels()
 
 
 # ── La levée du poster ───────────────────────────────────────────────────

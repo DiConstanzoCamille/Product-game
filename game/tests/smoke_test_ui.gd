@@ -869,6 +869,14 @@ func _test_desk_hosted_contracts() -> void:
 	if roadmap == null:
 		_fail("La Roadmap doit s'ouvrir dans le poste de travail.")
 	else:
+		if roadmap.backlog_controls.is_empty():
+			_fail("La Roadmap hébergée doit afficher ses tickets.")
+		else:
+			var first_ticket: Control = roadmap.backlog_controls[0]["ticket"]
+			if first_ticket.custom_minimum_size.y > 100.0:
+				_fail("Un ticket Roadmap hébergé doit rester compact pour en montrer plusieurs.")
+		if roadmap.get_node("Margin/VBox/Board/BacklogPanel/Margin/VBox/Subtitle").visible:
+			_fail("Le sous-titre redondant du Backlog doit disparaître dans le laptop.")
 		roadmap._on_next_pressed()
 		await get_tree().process_frame
 		if SprintState.last_roadmap_report.is_empty():
@@ -888,6 +896,13 @@ func _test_desk_hosted_contracts() -> void:
 	# trois valeurs du bureau, sans exiger de le reposer.
 	var refreshed := [0]
 	var shop: Node3D = desk.prop("shop")
+	var shop_rest_position: Vector3 = shop.position
+	shop._set_hovered(true, false)
+	if not shop.is_hovered() or shop.position == shop_rest_position:
+		_fail("Survoler un accessoire 3D doit produire un retour visuel sans clic.")
+	shop._set_hovered(false, false)
+	if shop.position != shop_rest_position:
+		_fail("Quitter un accessoire 3D doit le remettre exactement à sa place.")
 	shop.state_changed.connect(func(): refreshed[0] += 1)
 	desk.open_prop("shop")
 	for i in 3:

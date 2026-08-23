@@ -50,12 +50,25 @@ func _ready() -> void:
 
 func configure_for_host(context: Dictionary) -> void:
 	hosted_in_desk = true
-	$Margin.add_theme_constant_override("margin_left", 22)
-	$Margin.add_theme_constant_override("margin_top", 12)
-	$Margin.add_theme_constant_override("margin_right", 22)
-	$Margin.add_theme_constant_override("margin_bottom", 16)
-	$Margin/VBox.add_theme_constant_override("separation", 8)
+	$Margin.add_theme_constant_override("margin_left", 14)
+	$Margin.add_theme_constant_override("margin_top", 8)
+	$Margin.add_theme_constant_override("margin_right", 14)
+	$Margin.add_theme_constant_override("margin_bottom", 10)
+	$Margin/VBox.add_theme_constant_override("separation", 5)
 	$Margin/VBox/TopBar.visible = false
+	$Margin/VBox/Board.add_theme_constant_override("separation", 9)
+	for panel_path in ["Margin/VBox/Board/BacklogPanel/Margin", "Margin/VBox/Board/SprintDropZone/Margin"]:
+		var panel_margin: MarginContainer = get_node(panel_path)
+		panel_margin.add_theme_constant_override("margin_left", 9)
+		panel_margin.add_theme_constant_override("margin_top", 7)
+		panel_margin.add_theme_constant_override("margin_right", 9)
+		panel_margin.add_theme_constant_override("margin_bottom", 7)
+	for column_path in ["Margin/VBox/Board/BacklogPanel/Margin/VBox", "Margin/VBox/Board/SprintDropZone/Margin/VBox"]:
+		get_node(column_path).add_theme_constant_override("separation", 4)
+	$Margin/VBox/Board/BacklogPanel/Margin/VBox/Subtitle.visible = false
+	$Margin/VBox/Board/SprintDropZone/Margin/VBox/Subtitle.visible = false
+	backlog_list.add_theme_constant_override("separation", 5)
+	sprint_list.add_theme_constant_override("separation", 5)
 	next_button.text = "Terminé"
 
 
@@ -202,40 +215,41 @@ func _add_backlog_card(item: Dictionary) -> void:
 	card.ticket_title = item.get("name", "")
 	# Le board est un index, pas la fiche complete : cette hauteur garantit que
 	# toutes les actions restent visibles, sans transformer le board en fiche.
-	card.custom_minimum_size = Vector2(0, 202)
+	card.custom_minimum_size = Vector2(0, 96 if hosted_in_desk else 202)
 	card.add_theme_stylebox_override("panel", _ticket_style(item))
 	card.opened.connect(_open_ticket)
 	backlog_list.add_child(card)
 
 	var content := MarginContainer.new()
-	content.add_theme_constant_override("margin_left", 14)
-	content.add_theme_constant_override("margin_top", 12)
-	content.add_theme_constant_override("margin_right", 14)
-	content.add_theme_constant_override("margin_bottom", 12)
+	content.add_theme_constant_override("margin_left", 8 if hosted_in_desk else 14)
+	content.add_theme_constant_override("margin_top", 6 if hosted_in_desk else 12)
+	content.add_theme_constant_override("margin_right", 8 if hosted_in_desk else 14)
+	content.add_theme_constant_override("margin_bottom", 6 if hosted_in_desk else 12)
 	card.add_child(content)
 	var body := VBoxContainer.new()
-	body.add_theme_constant_override("separation", 6)
+	body.add_theme_constant_override("separation", 2 if hosted_in_desk else 6)
 	content.add_child(body)
 
 	var title := Label.new()
 	title.text = "%s  %s" % [item.get("icon", "📌"), item.get("name", "")]
-	title.autowrap_mode = TextServer.AUTOWRAP_WORD
-	UIHelpers.apply_heading(title, 16, 600.0)
+	title.autowrap_mode = TextServer.AUTOWRAP_OFF if hosted_in_desk else TextServer.AUTOWRAP_WORD
+	title.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	UIHelpers.apply_heading(title, 13 if hosted_in_desk else 16, 600.0)
 	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	body.add_child(title)
 
 	var schedule_band := PanelContainer.new()
-	schedule_band.custom_minimum_size = Vector2(0, 38)
+	schedule_band.custom_minimum_size = Vector2(0, 20 if hosted_in_desk else 38)
 	var schedule_style := StyleBoxFlat.new()
 	schedule_style.bg_color = UIHelpers.COLOR_SHELF
 	schedule_style.set_corner_radius_all(5)
-	schedule_style.content_margin_left = 10
-	schedule_style.content_margin_right = 10
+	schedule_style.content_margin_left = 7 if hosted_in_desk else 10
+	schedule_style.content_margin_right = 7 if hosted_in_desk else 10
 	schedule_band.add_theme_stylebox_override("panel", schedule_style)
 	body.add_child(schedule_band)
 	var schedule := Label.new()
 	schedule.autowrap_mode = TextServer.AUTOWRAP_WORD
-	schedule.add_theme_font_size_override("font_size", 14)
+	schedule.add_theme_font_size_override("font_size", 10 if hosted_in_desk else 14)
 	schedule.add_theme_color_override("font_color", Color.WHITE)
 	schedule.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	schedule.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -243,8 +257,9 @@ func _add_backlog_card(item: Dictionary) -> void:
 
 	var attributes := Label.new()
 	attributes.autowrap_mode = TextServer.AUTOWRAP_WORD
-	attributes.add_theme_font_size_override("font_size", 12)
+	attributes.add_theme_font_size_override("font_size", 10 if hosted_in_desk else 12)
 	attributes.text = _attribute_summary(item)
+	attributes.visible = not hosted_in_desk
 	attributes.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	body.add_child(attributes)
 
@@ -269,10 +284,15 @@ func _add_backlog_card(item: Dictionary) -> void:
 	)
 	actions.add_child(dive)
 	var open_button := Button.new()
-	open_button.text = "Ouvrir"
+	open_button.text = "Détail" if hosted_in_desk else "Ouvrir"
 	open_button.tooltip_text = "Ouvrir le dossier complet du ticket. Double-cliquer sur le ticket fait la même chose."
 	open_button.pressed.connect(func(): _open_ticket(item.get("id", "")))
 	actions.add_child(open_button)
+	if hosted_in_desk:
+		for compact_button in [dive, open_button]:
+			compact_button.flat = true
+			compact_button.custom_minimum_size = Vector2(0, 24)
+			compact_button.add_theme_font_size_override("font_size", 11)
 	dive.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	open_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 
@@ -282,7 +302,7 @@ func _add_backlog_card(item: Dictionary) -> void:
 		var started_at := SprintState.get_epic_started_sprint(item.get("id", ""))
 		var plan_button := Button.new()
 		plan_button.pressed.connect(func(): _toggle_epic(control))
-		body.add_child(plan_button)
+		(actions if hosted_in_desk else body).add_child(plan_button)
 		control["plan_button"] = plan_button
 		if started_at > 0:
 			var abandon := Button.new()
@@ -298,7 +318,7 @@ func _add_backlog_card(item: Dictionary) -> void:
 	else:
 		var select := Button.new()
 		select.pressed.connect(func(): _toggle_feature(control))
-		body.add_child(select)
+		(actions if hosted_in_desk else body).add_child(select)
 		control["select"] = select
 	backlog_controls.append(control)
 	_refresh_ticket_control(control)
@@ -364,7 +384,7 @@ func _refresh_action_button(control: Dictionary) -> void:
 	var dive: Button = control["dive"]
 	var item: Dictionary = control["item"]
 	var cost := SprintState.get_personal_action_cost("featureDive")
-	dive.text = "🔬 Plonger (%d ⚡)" % cost
+	dive.text = "🔬 %d ⚡" % cost if hosted_in_desk else "🔬 Plonger (%d ⚡)" % cost
 	dive.disabled = SprintState.personal_action_refusal() != "" or int(SprintState.revealed_backlog_sprint.get(item.get("id", ""), -1)) == SprintState.sprint_number
 
 
@@ -406,17 +426,27 @@ func _refresh_ticket_control(control: Dictionary) -> void:
 		var plan_button: Button = control["plan_button"]
 		selected = bool(plan_button.get_meta("planned", false))
 		scheduled_points = _epic_next_stage_points(item) if selected else 0
-		plan_button.text = "Retirer du sprint" if selected else "Planifier étape %d/%d · %d pts" % [
-			_epic_completed_stage_count(item) + 1, _epic_stages(item).size(), _epic_next_stage_points(item)
-		]
+		if hosted_in_desk:
+			plan_button.text = "− Sprint" if selected else "+ Étape · %d pts" % _epic_next_stage_points(item)
+			plan_button.add_theme_font_size_override("font_size", 11)
+		else:
+			plan_button.text = "Retirer du sprint" if selected else "Planifier étape %d/%d · %d pts" % [
+				_epic_completed_stage_count(item) + 1, _epic_stages(item).size(), _epic_next_stage_points(item)
+			]
 	else:
 		var select: Button = control["select"]
 		selected = bool(select.get_meta("planned", false))
 		scheduled_points = int(item.get("costPoints", 0)) if selected else 0
-		select.text = "Retirer du sprint" if selected else "Ajouter au sprint · %d pts" % int(item.get("costPoints", 0))
+		if hosted_in_desk:
+			select.text = "− Sprint" if selected else "+ Sprint · %d pts" % int(item.get("costPoints", 0))
+			select.add_theme_font_size_override("font_size", 11)
+		else:
+			select.text = "Retirer du sprint" if selected else "Ajouter au sprint · %d pts" % int(item.get("costPoints", 0))
 
 	var schedule: Label = control["schedule"]
 	schedule.text = _schedule_text(item, scheduled_points)
+	if hosted_in_desk:
+		schedule.text += "  ·  %s" % _attribute_summary(item)
 	var planned_stamp: TextureRect = control["planned_stamp"]
 	var was_planned_visible := planned_stamp.visible
 	planned_stamp.visible = selected
