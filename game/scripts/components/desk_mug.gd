@@ -38,23 +38,17 @@ func build() -> void:
 
 	var body := MeshInstance3D.new()
 	body.name = "Body"
-	var cylinder := CylinderMesh.new()
-	cylinder.top_radius = RADIUS_TOP
-	cylinder.bottom_radius = RADIUS_BOTTOM
-	cylinder.height = HEIGHT
 	# Sans ouvrir le haut et sans dessiner l'intérieur, la tasse est un plot :
 	# le café ne se voit pas, et c'est pourtant lui qui porte l'Énergie. La
 	# caméra plonge de 22°, elle voit dedans — encore faut-il qu'il y ait un
 	# dedans.
-	cylinder.cap_top = false
-	body.mesh = cylinder
-	body.position = Vector3(0, HEIGHT * 0.5, 0)
+	body.mesh = preload("res://scripts/components/desk_art.gd").mug_body()
 	var porcelain := DeskRoom.toon_material(PORCELAIN)
-	porcelain.cull_mode = BaseMaterial3D.CULL_DISABLED
 	body.material_override = porcelain
 	add_child(body)
 	if room != null:
-		room.outline_at(body, global_position, 2.6)
+		room.outline_at(body, global_position, 1.1)
+	preload("res://scripts/components/desk_art.gd").cylinder(self, "CorkCoaster", Vector3(0, 0.002, 0), 0.005, 0.064, 0.064, Color("#a17b52"))
 
 	var handle := MeshInstance3D.new()
 	handle.name = "Handle"
@@ -63,11 +57,12 @@ func build() -> void:
 	torus.outer_radius = 0.030
 	handle.mesh = torus
 	handle.position = Vector3(RADIUS_TOP + 0.012, HEIGHT * 0.55, 0)
-	handle.rotation_degrees = Vector3(0, 90, 0)
+	handle.rotation_degrees = Vector3(90, 0, 0)
+	handle.scale = Vector3(1, 1, 1.22)
 	handle.material_override = DeskRoom.toon_material(PORCELAIN)
 	add_child(handle)
 	if room != null:
-		room.outline_at(handle, global_position, 2.6)
+		room.outline_at(handle, global_position, 1.1)
 
 	_coffee = MeshInstance3D.new()
 	_coffee.name = "Coffee"

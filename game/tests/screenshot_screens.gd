@@ -75,6 +75,8 @@ func _shoot_team_management() -> void:
 	for i in range(12):
 		await get_tree().process_frame
 	screen.lift_paper("team")
+	if screen.view_controller().transitioning():
+		await screen.view_controller().settled
 	for i in range(12):
 		await get_tree().process_frame
 	var open_button: Button = screen.readable_layer().find_child("OpenTeamManagement", true, false)
@@ -129,10 +131,10 @@ func _shoot_desk_states() -> void:
 				desk.open_prop("committee")
 			"poster":
 				desk.lift_paper("team")
-		# Les accessoires glissent en 0,42 s : capturer avant la fin du Tween
-		# montrerait un objet à mi-course, ce qui ne prouve rien.
-		for _i in range(48):
-			await get_tree().process_frame
+		# Attendre une durée réelle : 48 frames peuvent prendre moins de 0,1 s.
+		if desk.view_controller().transitioning():
+			await desk.view_controller().settled
+		await get_tree().create_timer(0.50).timeout
 		await RenderingServer.frame_post_draw
 
 		var image := get_tree().root.get_texture().get_image()

@@ -40,7 +40,7 @@ const PRESENT_DISTANCE := 0.95
 ## **pixels** (la taille du quad s'en déduit : cf. `DeskRoom`).
 const SHAPES := {
 	"shop": {
-		"rest_position": Vector3(-0.98, 0.98, -0.38),
+		"rest_position": Vector3(-1.00, 0.98, -0.04),
 		"rest_rotation": Vector3(-6, 19, 0),
 		"rest_size": Vector3(0.27, 0.38, 0.020),
 		"body": Color("#2f3a4d"), "frame": Color("#57657d"),
@@ -51,16 +51,16 @@ const SHAPES := {
 		"hint": "Boutique", "hint_offset": Vector3(0, 0.27, 0.08),
 	},
 	"closing": {
-		"rest_position": Vector3(0.78, 0.79, -0.30),
+		"rest_position": Vector3(0.95, 0.79, 0.22),
 		"rest_rotation": Vector3(-78, -8, 0),
 		"rest_size": Vector3(0.23, 0.30, 0.016),
-		"body": Color("#f3ead2"), "frame": Color("#7d5735"),
+		"body": Color("#967052"), "frame": Color("#75563e"),
 		"pixels": Vector2i(760, 640),
 		"entry_rotation": Vector3(0, -22, 5),
 		"hint": "Fin de sprint", "hint_offset": Vector3(0, 0.05, 0.24),
 	},
 	"committee": {
-		"rest_position": Vector3(0.56, 0.79, -0.28),
+		"rest_position": Vector3(1.13, 0.80, -0.20),
 		"rest_rotation": Vector3(-84, 7, 0),
 		"rest_size": Vector3(0.36, 0.26, 0.028),
 		"body": Color("#a8434a"), "frame": Color("#6d262c"),
@@ -91,6 +91,8 @@ var _tween: Tween = null
 var _hover_tween: Tween = null
 var _hovered := false
 var _rest_position := Vector3.ZERO
+var presentation_seconds := SLIDE_SECONDS
+var _presenting := false
 
 
 func _ready() -> void:
@@ -107,20 +109,18 @@ func build() -> void:
 
 	_cover = MeshInstance3D.new()
 	_cover.name = "Cover"
-	var mesh := BoxMesh.new()
-	mesh.size = shape.get("rest_size", Vector3(0.3, 0.4, 0.02))
-	_cover.mesh = mesh
+	var model := preload("res://scripts/components/laptop_model.gd")
+	var rest_size: Vector3 = shape.get("rest_size", Vector3(0.3, 0.4, 0.02))
+	_cover.mesh = model.rounded_mesh(rest_size, 0.014)
 	_cover.material_override = DeskRoom.toon_material(shape.get("body", Color.GRAY))
 	add_child(_cover)
 	if room != null:
-		room.outline_at(_cover, global_position)
+		room.outline_at(_cover, global_position, 1.3)
+	preload("res://scripts/components/desk_art.gd").dress_prop(_cover, kind, rest_size)
 
 	var trim := MeshInstance3D.new()
 	trim.name = "Trim"
-	var trim_mesh := BoxMesh.new()
-	var rest_size: Vector3 = shape.get("rest_size", Vector3(0.3, 0.4, 0.02))
-	trim_mesh.size = Vector3(rest_size.x * 1.06, rest_size.y * 1.06, rest_size.z * 0.6)
-	trim.mesh = trim_mesh
+	trim.mesh = model.rounded_mesh(Vector3(rest_size.x * 1.02, rest_size.y * 1.02, rest_size.z * 0.6), 0.014)
 	trim.position = Vector3(0, 0, -rest_size.z * 0.4)
 	trim.material_override = DeskRoom.toon_material(shape.get("frame", Color.BLACK))
 	add_child(trim)
@@ -176,9 +176,7 @@ func _build_panel() -> void:
 
 	var frame := MeshInstance3D.new()
 	frame.name = "PanelFrame"
-	var frame_mesh := BoxMesh.new()
-	frame_mesh.size = Vector3(quad.size.x + 0.022, quad.size.y + 0.022, 0.012)
-	frame.mesh = frame_mesh
+	frame.mesh = preload("res://scripts/components/laptop_model.gd").rounded_mesh(Vector3(quad.size.x + 0.035, quad.size.y + 0.035, 0.012), 0.013)
 	frame.position = Vector3(0, 0, -0.008)
 	frame.material_override = DeskRoom.toon_material(shape.get("frame", Color.BLACK))
 	_panel_pivot.add_child(frame)
@@ -187,7 +185,7 @@ func _build_panel() -> void:
 	# endroit du lot où un contour est posé sur un nœud animé en échelle.
 	if room != null:
 		var placement: Dictionary = room.presentation_placement(Vector2i.ONE, PRESENT_DISTANCE)
-		room.outline_at(frame, placement["position"])
+		room.outline_at(frame, placement["position"], 1.3)
 
 	_panel_area = Area3D.new()
 	_panel_area.name = "PanelArea"
@@ -243,6 +241,15 @@ func refresh() -> void:
 
 func is_open() -> bool:
 	return _open
+
+
+func is_presenting() -> bool:
+	return _presenting
+
+
+func focus_pose() -> Dictionary:
+	# L'accessoire rejoint le regard de référence avant d'être présenté de face.
+	return room.reading_pose()
 
 
 func is_hovered() -> bool:
@@ -335,6 +342,7 @@ func collapse() -> void:
 	if kind == "committee":
 		SprintState.committee_pending = false
 	_open = false
+	_presenting = false
 	if _tween != null and _tween.is_valid():
 		_tween.kill()
 	UIHelpers.clear_children(_viewport)
@@ -348,13 +356,23 @@ func collapse() -> void:
 func _slide_to(target_position: Vector3, target_basis: Basis, target_scale: Vector3) -> void:
 	if _tween != null and _tween.is_valid():
 		_tween.kill()
+	if presentation_seconds <= 0.0:
+		_panel_pivot.global_position = target_position
+		_panel_pivot.global_basis = target_basis
+		_panel_pivot.scale = target_scale
+		_presenting = false
+		return
+	_presenting = true
 	_tween = create_tween().set_parallel(true)
 	# L'accessoire dépasse sa position puis se cale : un objet qu'on pousse a
 	# de l'inertie, un panneau qui s'affiche n'en a pas. C'est tout l'écart.
 	_tween.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	_tween.tween_property(_panel_pivot, "global_position", target_position, SLIDE_SECONDS)
-	_tween.tween_property(_panel_pivot, "quaternion", target_basis.get_rotation_quaternion(), SLIDE_SECONDS)
-	_tween.tween_property(_panel_pivot, "scale", target_scale, SLIDE_SECONDS)
+	_tween.tween_property(_panel_pivot, "global_position", target_position, presentation_seconds)
+	_tween.tween_property(_panel_pivot, "quaternion", target_basis.get_rotation_quaternion(), presentation_seconds)
+	_tween.tween_property(_panel_pivot, "scale", target_scale, presentation_seconds)
+	_tween.chain().tween_callback(func():
+		_presenting = false
+		state_changed.emit())
 
 
 # ── Ce qu'on voit ouvert ─────────────────────────────────────────────────
@@ -474,6 +492,8 @@ func _closing_sheet(area: Vector2) -> Control:
 func _on_sign_pressed() -> void:
 	SprintState.resolve_unanswered_events()
 	collapse()
-	get_tree().change_scene_to_file("res://scenes/screens/resolution_screen.tscn")
+	# Le clic est encore dans push_input() du SubViewport : attendre sa sortie
+	# avant de retirer l'hôte de l'arbre, sinon Godot poursuit sur un viewport mort.
+	get_tree().change_scene_to_file.call_deferred("res://scenes/screens/resolution_screen.tscn")
 
 

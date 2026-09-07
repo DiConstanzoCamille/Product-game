@@ -806,6 +806,7 @@ func _test_desk_reads_as_a_room() -> void:
 	# des phases est rendu à l'échelle — c'est-à-dire flou — et **aucun autre
 	# test ne le dirait**. C'est le garde-fou que la relecture ne sait pas
 	# faire et qu'une capture ne prouve qu'à l'œil.
+	desk._activate_target("laptop")
 	var projected: Vector2 = desk.room().dalle_projected_size()
 	var declared := Vector2(DeskRoom.SCREEN_PIXELS)
 	var drift: float = maxf(absf(projected.x - declared.x) / declared.x,
@@ -950,7 +951,7 @@ func _test_desk_hosted_contracts() -> void:
 	await get_tree().process_frame
 	if shop.is_open():
 		_fail("Un clic extérieur doit reposer l'accessoire ouvert.")
-	if not shop_cover_area.input_ray_pickable or shop_panel_area.input_ray_pickable or not dalle_area.input_ray_pickable:
+	if shop_cover_area.collision_layer != 1 or shop_panel_area.input_ray_pickable or dalle_area.collision_layer != 1:
 		_fail("Reposer l'accessoire doit restaurer exactement les interactions du monde.")
 
 	# Le même contrat est garanti au clavier.
@@ -1094,6 +1095,11 @@ func _open_desk() -> DeskScreen:
 	# seule trame donnerait un arbre vide et des assertions qui passent.
 	for i in 8:
 		await get_tree().process_frame
+	# Les contrats métier n'attendent pas les animations. La recette FPS dédiée
+	# éprouve aussi les transitions temporelles avec leur vraie durée.
+	desk.view_controller().transition_seconds = 0.0
+	for kind in ["shop", "closing", "committee"]:
+		desk.prop(kind).presentation_seconds = 0.0
 	return desk
 
 
