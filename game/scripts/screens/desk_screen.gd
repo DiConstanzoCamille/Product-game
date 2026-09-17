@@ -79,6 +79,9 @@ var _reticle: Label
 var _view_hint: Label
 var _view_mode: Button
 var _aimed: Area3D
+var _last_activity: Dictionary = {}
+var _activity_elapsed := 0.0
+var _delta_feed: VBoxContainer
 var _surface_input = preload("res://scripts/components/desk_surface_input.gd").new()
 
 
@@ -152,6 +155,7 @@ func _on_view_state_changed() -> void:
 	_clear_aim()
 	_sync_interaction_scope()
 	_refresh_prop_close()
+	_refresh_anchored_labels()
 	_view_mode.disabled = not _view.observing()
 	_view_mode.text = "Regard : clic droit maintenu" if _view.comfort else "Regard : immersif"
 	_reticle.visible = _view.state == DeskViewController.State.LOOK
@@ -162,6 +166,10 @@ func _on_view_state_changed() -> void:
 
 
 func _process(_delta: float) -> void:
+	_activity_elapsed += _delta
+	if _activity_elapsed >= 0.15 and _delta_feed != null:
+		_activity_elapsed = 0.0
+		_observe_activity()
 	if _view == null or not _view.observing():
 		return
 	var at := get_viewport().get_mouse_position() if _view.state == DeskViewController.State.FREE else get_viewport().get_visible_rect().size * 0.5
@@ -229,6 +237,20 @@ func refresh() -> void:
 		_refresh_anchored_labels()
 	_refresh_prop_close()
 	_sync_interaction_scope()
+	_observe_activity()
+
+
+func _observe_activity() -> void:
+	if _delta_feed == null:
+		return
+	var activity := SprintState.get_desk_activity()
+	if activity == _last_activity:
+		return
+	_delta_feed.observe(_last_activity, activity)
+	_last_activity = activity
+	_workstation.refresh_status()
+	_refresh_vitals()
+	_refresh_anchored_labels()
 
 
 ## Les trois accès dont la recette a besoin. Le harnais de captures et le banc
@@ -387,6 +409,10 @@ func _build_canvas() -> void:
 	_alerts.position = Vector2(34, 98)
 	_alerts.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_layer.add_child(_alerts)
+	_delta_feed = preload("res://scripts/components/hud_delta_feed.gd").new()
+	_delta_feed.name = "ResourceChanges"
+	_delta_feed.position = Vector2(34, 154)
+	_layer.add_child(_delta_feed)
 
 	_energy = Label.new()
 	_energy.name = "EnergyCaption"
@@ -440,12 +466,9 @@ func _build_canvas() -> void:
 	_layer.add_child(_reticle)
 
 	for kind in _props:
-		var hint := Label.new()
+		var hint := preload("res://scripts/components/desk_object_badge.gd").new()
 		hint.name = "Hint_%s" % kind
-		hint.add_theme_font_size_override("font_size", 11)
-		hint.add_theme_color_override("font_color", DESK_LABEL)
-		UIHelpers.apply_mono(hint, 11, true)
-		hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		hint.pressed.connect(func(): open_prop(kind))
 		_layer.add_child(hint)
 
 	_tooltip = _zone(Vector2.ZERO)
@@ -509,13 +532,13 @@ func _refresh_vitals() -> void:
 	impact.add_theme_constant_override("separation", 9)
 	impact.tooltip_text = "💥 Impact — solde du portefeuille.\nLe board compare ce solde au quota du trimestre : %d / %d." % [
 		vitals.get("impact", 0), vitals.get("quota", 0)]
-	impact.add_child(_value_label("💥 %d" % int(vitals.get("impact", 0))))
+	impact.add_child(_value_label("💥 Impact %d" % int(vitals.get("impact", 0))))
 	impact.add_child(_progress_bar(float(vitals.get("quotaRatio", 0.0))))
 	row.add_child(impact)
 
 	row.add_child(_separator())
 
-	var cash := _value_label("💰 %s" % _short_money(int(vitals.get("revenue", 0))))
+	var cash := _value_label("💰 Trésorerie %s" % _short_money(int(vitals.get("revenue", 0))))
 	cash.name = "Vital_revenue"
 	cash.tooltip_text = "💰 Trésorerie — ce qui paie les salaires, les licences et le support.\nCharges du sprint : %d." % int(SprintState.get_recurring_charges().get("total", 0))
 	cash.mouse_filter = Control.MOUSE_FILTER_STOP
@@ -523,7 +546,7 @@ func _refresh_vitals() -> void:
 
 	row.add_child(_separator())
 
-	var users := _value_label("👥 %s" % _short_count(int(vitals.get("users", 0))))
+	var users := _value_label("👥 Utilisateurs %s" % _short_count(int(vitals.get("users", 0))))
 	users.name = "Vital_users"
 	users.tooltip_text = "👥 Utilisateurs — la population qui paie chaque sprint.\nElle grandit par les livraisons, elle s'érode au churn."
 	users.mouse_filter = Control.MOUSE_FILTER_STOP
@@ -633,12 +656,16 @@ func _refresh_anchored_labels() -> void:
 
 	for kind in _props:
 		var prop: Node3D = _props[kind]
-		var hint: Label = _layer.get_node("Hint_%s" % kind)
+		var hint: Button = _layer.get_node("Hint_%s" % kind)
 		var point := _room.project_to_design(prop.hint_anchor())
-		hint.visible = _lifted == null and prop.visible and not prop.is_open() and Rect2(Vector2.ZERO, _room.canvas_size()).has_point(point)
+		hint.visible = (_view == null or _view.observing()) and _lifted == null and prop.visible and not prop.is_open() and Rect2(Vector2.ZERO, _room.canvas_size()).has_point(point)
 		if not hint.visible:
 			continue
-		hint.text = prop.hint_text()
+		hint.text = {"shop": "BOUTIQUE  ›\nRecruter · outils · pratiques", "committee": "COMITÉ  ›\nInvestissements du trimestre", "closing": "FIN DE SPRINT  ›"}.get(kind, prop.hint_text())
+		if kind == "closing":
+			var activity := SprintState.get_desk_activity()
+			var plan_text := "%d ticket%s enregistré%s" % [activity["tickets"], "s" if activity["tickets"] != 1 else "", "s" if activity["tickets"] != 1 else ""] if activity["saved"] else "Plan non enregistré"
+			hint.text += "\n%s\n%d message%s en attente" % [plan_text, activity["pending"], "s" if activity["pending"] != 1 else ""]
 		hint.reset_size()
 		hint.position = _anchor(point, hint.size)
 
@@ -665,7 +692,7 @@ func _anchor(at: Vector2, size: Vector2) -> Vector2:
 	var canvas := _room.canvas_size()
 	return Vector2(
 		clampf(at.x - size.x * 0.5, 16.0, canvas.x - size.x - 16.0),
-		clampf(at.y, 16.0, canvas.y - size.y - 12.0))
+		clampf(at.y, 16.0, maxf(16.0, canvas.y - size.y - 80.0)))
 
 
 # ── Le survol : deux lignes, en 2D, de face ──────────────────────────────
@@ -713,11 +740,10 @@ func _on_mug_hover(entered: bool) -> void:
 
 
 func _on_prop_hover(prop: Node3D, entered: bool) -> void:
-	var hint: Label = _layer.get_node_or_null("Hint_%s" % prop.kind)
+	var hint: Button = _layer.get_node_or_null("Hint_%s" % prop.kind)
 	if hint == null:
 		return
-	hint.add_theme_color_override("font_color", UIHelpers.COLOR_AMBER if entered else DESK_LABEL)
-	hint.add_theme_font_size_override("font_size", 12 if entered else 11)
+	hint.set_world_hover(entered)
 	_refresh_anchored_labels()
 
 

@@ -7,10 +7,29 @@ signal opened(ticket_id: String)
 
 var ticket_id: String = ""
 var ticket_title: String = ""
+const HUD := preload("res://scripts/components/hud_language.gd")
+var planned := false
+var _hovered := false
 
 
 func _ready() -> void:
 	mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	mouse_entered.connect(func():
+		_hovered = true
+		_refresh_visual())
+	mouse_exited.connect(func():
+		_hovered = get_global_rect().has_point(get_global_mouse_position())
+		_refresh_visual())
+	_refresh_visual()
+
+
+func set_planned(value: bool) -> void:
+	planned = value
+	_refresh_visual()
+
+
+func _refresh_visual() -> void:
+	add_theme_stylebox_override("panel", HUD.ticket_style(planned, _hovered))
 
 
 func _gui_input(event: InputEvent) -> void:

@@ -6,6 +6,7 @@ signal desk_done
 
 const NEXT_SCENE := "res://scenes/screens/desk_screen.tscn"
 const START_SCREEN_SCENE := "res://scenes/screens/start_screen.tscn"
+const HUD := preload("res://scripts/components/hud_language.gd")
 
 @onready var sprint_label: Label = $Margin/VBox/TopBar/SprintLabel
 @onready var back_button: Button = $Margin/VBox/TopBar/BackButton
@@ -69,7 +70,8 @@ func configure_for_host(context: Dictionary) -> void:
 	$Margin/VBox/Board/SprintDropZone/Margin/VBox/Subtitle.visible = false
 	backlog_list.add_theme_constant_override("separation", 5)
 	sprint_list.add_theme_constant_override("separation", 5)
-	next_button.text = "Terminé"
+	next_button.text = "Enregistrer le plan"
+	next_button.tooltip_text = "Enregistre les tickets prévus et revient aux applications. Quitter sans ce bouton ne valide pas les changements."
 
 
 func _load_backlog() -> void:
@@ -269,6 +271,12 @@ func _add_backlog_card(item: Dictionary) -> void:
 	var planned_stamp := UIHelpers.make_stamp("validated", 92)
 	planned_stamp.visible = false
 	status_row.add_child(planned_stamp)
+	var state_label := Label.new()
+	state_label.name = "PlanState"
+	state_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	state_label.add_theme_font_size_override("font_size", 11 if hosted_in_desk else 13)
+	state_label.add_theme_color_override("font_color", HUD.CHOICE)
+	status_row.add_child(state_label)
 	var risk_stamp := UIHelpers.make_stamp("risk", 82)
 	risk_stamp.visible = false
 	status_row.add_child(risk_stamp)
@@ -297,6 +305,7 @@ func _add_backlog_card(item: Dictionary) -> void:
 	open_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 
 	var control: Dictionary = {"item": item, "ticket": card, "schedule": schedule, "dive": dive, "planned_stamp": planned_stamp, "risk_stamp": risk_stamp}
+	control["state_label"] = state_label
 	control["open"] = open_button
 	if SprintState.is_backlog_epic(item):
 		var started_at := SprintState.get_epic_started_sprint(item.get("id", ""))
@@ -447,11 +456,19 @@ func _refresh_ticket_control(control: Dictionary) -> void:
 	schedule.text = _schedule_text(item, scheduled_points)
 	if hosted_in_desk:
 		schedule.text += "  ·  %s" % _attribute_summary(item)
+		schedule.text = schedule.text.replace("  ·  PLANIFIÉ", "")
+	var schedule_style := (schedule.get_parent().get_theme_stylebox("panel") as StyleBoxFlat).duplicate() as StyleBoxFlat
+	schedule_style.bg_color = HUD.CHOICE if selected else Color("#e9eef1")
+	schedule.get_parent().add_theme_stylebox_override("panel", schedule_style)
+	schedule.add_theme_color_override("font_color", Color.WHITE if selected else HUD.INK)
 	var planned_stamp: TextureRect = control["planned_stamp"]
-	var was_planned_visible := planned_stamp.visible
-	planned_stamp.visible = selected
-	if selected and not was_planned_visible:
-		_punch_small_stamp(planned_stamp)
+	# Prévu n'est ni enregistré ni livré : pas de tampon de réussite vert.
+	planned_stamp.visible = false
+	ticket.set_planned(selected)
+	var state_label: Label = control["state_label"]
+	var type_label := "EPIC · " if SprintState.is_backlog_epic(item) else ""
+	state_label.text = type_label + ("✓ PRÉVU CE SPRINT" if selected else "DISPONIBLE")
+	state_label.add_theme_color_override("font_color", HUD.CHOICE if selected else UIHelpers.COLOR_SOFT_TEXT)
 	var risk_stamp: TextureRect = control["risk_stamp"]
 	risk_stamp.visible = SprintState.backlog_attribute_revealed(item.get("id", ""), "risk") and int(item.get("risk", 0)) >= 6
 	var destination: VBoxContainer = sprint_list if selected else backlog_list
@@ -607,11 +624,15 @@ func _planned_points(item_id: String) -> int:
 
 func _update_capacity() -> void:
 	var selected := SprintState.backlog_plan_points(_current_plan())
-	capacity_label.text = "Panier : %d pts / %d produits par l'équipe" % [selected, effective_capacity]
+	var remainder := effective_capacity - selected
+	capacity_label.text = "%d / %d pts engagés · %s" % [selected, effective_capacity, ("%d disponibles" % remainder) if remainder >= 0 else ("+%d en surcharge" % -remainder)]
+	var count := _current_plan().size()
+	$Margin/VBox/Board/SprintDropZone/Margin/VBox/Title.text = "CE SPRINT · %d TICKET%s" % [count, "S" if count != 1 else ""]
 	capacity_bar.value = min(selected, capacity_bar.max_value)
 	var over := selected > effective_capacity
 	warning_label.visible = over
-	capacity_bar.add_theme_stylebox_override("fill", UIHelpers.make_bar_fill_style(UIHelpers.COLOR_DANGER if over else UIHelpers.COLOR_GOOD))
+	capacity_bar.add_theme_stylebox_override("fill", UIHelpers.make_bar_fill_style(HUD.RISK if over else HUD.CHOICE))
+	warning_label.add_theme_color_override("font_color", HUD.RISK)
 
 
 func _on_next_pressed() -> void:

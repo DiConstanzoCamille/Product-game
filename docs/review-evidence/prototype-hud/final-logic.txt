@@ -1,0 +1,162 @@
+Godot Engine v4.7.1.stable.official.a13da4feb - https://godotengine.org
+
+GameData: données chargées — 5 ressources, 7 cartes, 3 époques, 9 fins de mandat.
+=== SMOKE TEST LOGIQUE — RÈGLES D'ÉNERGIE (Phase B) ===
+Règles d'Énergie : OK
+=== SMOKE TEST LOGIQUE — ÉQUIPE INDIVIDUELLE ===
+Équipe individuelle : OK
+=== SMOKE TEST LOGIQUE — ROSTER MULTI-EQUIPE ===
+=== SMOKE TEST LOGIQUE — BACKLOG PROFOND ===
+=== SMOKE TEST LOGIQUE — PIVOT DE MODELE ECONOMIQUE ===
+=== SMOKE TEST LOGIQUE — TIRAGE DES INVESTISSEMENTS ===
+  dosages de rayon observés sur 200 sprints (candidats-pratiques-décisions) : 14 combinaisons
+  taux observés sur 600 sprints (poids { "commune": 100.0, "notable": 40.0, "rare": 12.0 }) : { "daily-standup": 368, "jira": 333, "sprint-retro": 201, "rice": 353, "shape-up": 38, "socle-technique-commun": 68 }
+Tirage des Investissements : OK (6 emplacements par sprint, re-tirage 8 💥 +8)
+=== SMOKE TEST LOGIQUE — INTEGRATION SCORE ===
+=== SMOKE TEST LOGIQUE — LOT 3 : FAMILLES DE DECISIONS ===
+=== SMOKE TEST LOGIQUE — ACTIVATION DES STRATÉGIES ===
+=== SMOKE TEST LOGIQUE — INDEXATION DES PRIX (#36) ===
+=== SMOKE TEST LOGIQUE — QUOTAS TRIMESTRIELS ===
+=== SMOKE TEST LOGIQUE — LOT 4 : COMITE D'INVESTISSEMENT ===
+=== SMOKE TEST LOGIQUE — LOT 4 : EQUIPES SUBIES ET COMPENDIUM ===
+=== SMOKE TEST LOGIQUE — LOT 5 : PROGRESSION DE CARRIERE ===
+=== SMOKE TEST LOGIQUE — LOT 5 : BACKLOG PAR EQUIPE ===
+=== SMOKE TEST LOGIQUE — LOT 5 : COMBOS INTER-SQUADS ===
+=== SMOKE TEST LOGIQUE — LOT 5 : MANDAT A N>1 (LEAD-PM) ===
+  → mandat lead-pm terminé au sprint 9, fin='remercie'
+=== SMOKE TEST LOGIQUE — MARGE D'ALERTE DU BUREAU ===
+Marge d'alerte : OK
+=== SMOKE TEST LOGIQUE — JOURNAL DU MUR ===
+Journal du mur : OK
+
+=== SMOKE TEST LOGIQUE — STRESS ===
+
+--- Run 0 (stress) — meridia-corp — 💥 0, 👥 5/7, capacité 7 — Départ : { "moral": 62.4, "dette-organisationnelle": 15.0, "capital-politique": 55.0, "reputation-produit": 50.0, "cynisme": 10.0 } ---
+Run 0 (stress, meridia-corp) terminé — sprint 4, fin='burnout-fondateur', 💥 354, 💰 140 (clients paient 49, charges 18), ⚡ 0, 👥 2, outils=["jira"], revue de board='passed', ressources finales={ "moral": 34.5, "dette-organisationnelle": 68.0, "capital-politique": 55.0, "reputation-produit": 72.0, "cynisme": 32.0 }
+
+--- Run 1 (stress) — meridia-corp — 💥 0, 👥 5/7, capacité 7 — Départ : { "moral": 62.4, "dette-organisationnelle": 15.0, "capital-politique": 55.0, "reputation-produit": 50.0, "cynisme": 10.0 } ---
+Run 1 (stress, meridia-corp) terminé — sprint 6, fin='remercie', 💥 570, 💰 211 (clients paient 61, charges 20), ⚡ 6, 👥 1, outils=["jira"], revue de board='passed', ressources finales={ "moral": 39.0, "dette-organisationnelle": 69.0, "capital-politique": 59.0, "reputation-produit": 75.0, "cynisme": 39.0 }
+
+--- Run 2 (stress) — karavel-scaleup — 💥 0, 👥 5/6, capacité 7 — Départ : { "moral": 76.4, "dette-organisationnelle": 15.0, "capital-politique": 55.0, "reputation-produit": 50.0, "cynisme": 10.0 } ---
+Run 2 (stress, karavel-scaleup) terminé — sprint 6, fin='burnout-fondateur', 💥 798, 💰 132 (clients paient 43, charges 21), ⚡ 0, 👥 1, outils=["notion"], revue de board='failed', ressources finales={ "moral": 44.0, "dette-organisationnelle": 76.0, "capital-politique": 64.0, "reputation-produit": 92.0, "cynisme": 50.0 }
+
+--- Run 3 (stress) — karavel-scaleup — 💥 0, 👥 5/6, capacité 7 — Départ : { "moral": 76.4, "dette-organisationnelle": 15.0, "capital-politique": 55.0, "reputation-produit": 50.0, "cynisme": 10.0 } ---
+Run 3 (stress, karavel-scaleup) terminé — sprint 5, fin='remercie', 💥 541, 💰 94 (clients paient 43, charges 21), ⚡ 6, 👥 1, outils=["notion"], revue de board='failed', ressources finales={ "moral": 53.0, "dette-organisationnelle": 64.0, "capital-politique": 54.0, "reputation-produit": 91.0, "cynisme": 39.0 }
+
+=== SMOKE TEST LOGIQUE — GREEDY ===
+
+--- Run 0 (greedy) — meridia-corp — 💥 0, 👥 5/7, capacité 7 — Départ : { "moral": 62.4, "dette-organisationnelle": 15.0, "capital-politique": 55.0, "reputation-produit": 50.0, "cynisme": 10.0 } ---
+Run 0 (greedy, meridia-corp) terminé — sprint 5, fin='remercie', 💥 273, 💰 109 (clients paient 44, charges 35), ⚡ 41, 👥 6, outils=["jira", "daily-standup", "notion"], revue de board='passed', ressources finales={ "moral": 53.6666666666667, "dette-organisationnelle": 54.0, "capital-politique": 56.0, "reputation-produit": 68.0, "cynisme": 14.0 }
+
+--- Run 1 (greedy) — meridia-corp — 💥 0, 👥 5/7, capacité 7 — Départ : { "moral": 62.4, "dette-organisationnelle": 15.0, "capital-politique": 55.0, "reputation-produit": 50.0, "cynisme": 10.0 } ---
+Run 1 (greedy, meridia-corp) terminé — sprint 5, fin='remercie', 💥 717, 💰 100 (clients paient 54, charges 42), ⚡ 41, 👥 7, outils=["jira", "notion", "rice"], revue de board='passed', ressources finales={ "moral": 38.1428571428571, "dette-organisationnelle": 45.0, "capital-politique": 54.0, "reputation-produit": 50.0, "cynisme": 7.0 }
+
+--- Run 2 (greedy) — karavel-scaleup — 💥 0, 👥 5/6, capacité 7 — Départ : { "moral": 76.4, "dette-organisationnelle": 15.0, "capital-politique": 55.0, "reputation-produit": 50.0, "cynisme": 10.0 } ---
+Run 2 (greedy, karavel-scaleup) terminé — sprint 9, fin='remercie', 💥 1676, 💰 15 (clients paient 34, charges 33), ⚡ 36, 👥 6, outils=["notion", "jira"], revue de board='passed', ressources finales={ "moral": 59.8333333333333, "dette-organisationnelle": 23.0, "capital-politique": 69.0, "reputation-produit": 87.0, "cynisme": 18.0 }
+
+--- Run 3 (greedy) — karavel-scaleup — 💥 0, 👥 5/6, capacité 7 — Départ : { "moral": 76.4, "dette-organisationnelle": 15.0, "capital-politique": 55.0, "reputation-produit": 50.0, "cynisme": 10.0 } ---
+Run 3 (greedy, karavel-scaleup) terminé — sprint 9, fin='remercie', 💥 2457, 💰 193 (clients paient 53, charges 37), ⚡ 38, 👥 6, outils=["notion", "sprint-retro", "daily-standup"], revue de board='passed', ressources finales={ "moral": 100.0, "dette-organisationnelle": 31.0, "capital-politique": 69.0, "reputation-produit": 97.0, "cynisme": 21.0 }
+
+=== SMOKE TEST LOGIQUE — ECONOMIE ===
+
+--- Run 0 (economie) — meridia-corp — 💥 0, 👥 5/7, capacité 7 — Départ : { "moral": 62.4, "dette-organisationnelle": 15.0, "capital-politique": 55.0, "reputation-produit": 50.0, "cynisme": 10.0 } ---
+Run 0 (economie, meridia-corp) terminé — sprint 8, fin='remercie', 💥 1757, 💰 95 (clients paient 60, charges 50), ⚡ 55, 👥 7, outils=["jira", "sprint-retro", "rice", "notion"], revue de board='passed', ressources finales={ "moral": 51.1428571428571, "dette-organisationnelle": 39.0, "capital-politique": 90.0, "reputation-produit": 62.0, "cynisme": 15.0 }
+
+--- Run 1 (economie) — meridia-corp — 💥 0, 👥 5/7, capacité 7 — Départ : { "moral": 62.4, "dette-organisationnelle": 15.0, "capital-politique": 55.0, "reputation-produit": 50.0, "cynisme": 10.0 } ---
+Run 1 (economie, meridia-corp) terminé — sprint 11, fin='remercie', 💥 4826, 💰 117 (clients paient 56, charges 47), ⚡ 46, 👥 7, outils=["jira", "daily-standup", "sprint-retro", "notion"], revue de board='passed', ressources finales={ "moral": 75.8571428571429, "dette-organisationnelle": 24.0, "capital-politique": 93.0, "reputation-produit": 88.0, "cynisme": 19.0 }
+
+--- Run 2 (economie) — karavel-scaleup — 💥 0, 👥 5/6, capacité 7 — Départ : { "moral": 76.4, "dette-organisationnelle": 15.0, "capital-politique": 55.0, "reputation-produit": 50.0, "cynisme": 10.0 } ---
+Run 2 (economie, karavel-scaleup) terminé — sprint 9, fin='remercie', 💥 602, 💰 163 (clients paient 66, charges 43), ⚡ 53, 👥 6, outils=["notion", "daily-standup", "jira"], revue de board='failed', ressources finales={ "moral": 77.1666666666667, "dette-organisationnelle": 39.0, "capital-politique": 63.0, "reputation-produit": 91.0, "cynisme": 20.0 }
+
+--- Run 3 (economie) — karavel-scaleup — 💥 0, 👥 5/6, capacité 7 — Départ : { "moral": 76.4, "dette-organisationnelle": 15.0, "capital-politique": 55.0, "reputation-produit": 50.0, "cynisme": 10.0 } ---
+Run 3 (economie, karavel-scaleup) terminé — sprint 8, fin='remercie', 💥 703, 💰 400 (clients paient 88, charges 41), ⚡ 35, 👥 6, outils=["notion", "rice", "sprint-retro", "daily-standup"], revue de board='passed', ressources finales={ "moral": 100.0, "dette-organisationnelle": 0.0, "capital-politique": 65.0, "reputation-produit": 95.0, "cynisme": 20.0 }
+
+=== SMOKE TEST LOGIQUE — LEVIER ===
+
+--- Run 0 (levier) — meridia-corp — 💥 0, 👥 5/7, capacité 7 — Départ : { "moral": 62.4, "dette-organisationnelle": 15.0, "capital-politique": 55.0, "reputation-produit": 50.0, "cynisme": 10.0 } ---
+Run 0 (levier, meridia-corp) terminé — sprint 12, fin='remercie', 💥 5439, 💰 28 (clients paient 50, charges 50), ⚡ 40, 👥 7, outils=["jira", "daily-standup", "notion"], revue de board='passed', ressources finales={ "moral": 64.0, "dette-organisationnelle": 62.0, "capital-politique": 100.0, "reputation-produit": 90.0, "cynisme": 41.0 }
+
+--- Run 1 (levier) — meridia-corp — 💥 0, 👥 5/7, capacité 7 — Départ : { "moral": 62.4, "dette-organisationnelle": 15.0, "capital-politique": 55.0, "reputation-produit": 50.0, "cynisme": 10.0 } ---
+Run 1 (levier, meridia-corp) terminé — sprint 12, fin='remercie', 💥 3373, 💰 21 (clients paient 56, charges 59), ⚡ 39, 👥 7, outils=["jira", "notion", "shape-up"], revue de board='passed', ressources finales={ "moral": 99.5714285714286, "dette-organisationnelle": 19.0, "capital-politique": 97.0, "reputation-produit": 80.0, "cynisme": 45.0 }
+
+--- Run 2 (levier) — karavel-scaleup — 💥 0, 👥 5/6, capacité 7 — Départ : { "moral": 76.4, "dette-organisationnelle": 15.0, "capital-politique": 55.0, "reputation-produit": 50.0, "cynisme": 10.0 } ---
+Run 2 (levier, karavel-scaleup) terminé — sprint 7, fin='faillite', 💥 2460, 💰 -2 (clients paient 29, charges 37), ⚡ 54, 👥 6, outils=["notion", "daily-standup", "jira"], revue de board='passed', ressources finales={ "moral": 93.8333333333333, "dette-organisationnelle": 15.0, "capital-politique": 83.0, "reputation-produit": 51.0, "cynisme": 41.0 }
+
+--- Run 3 (levier) — karavel-scaleup — 💥 0, 👥 5/6, capacité 7 — Départ : { "moral": 76.4, "dette-organisationnelle": 15.0, "capital-politique": 55.0, "reputation-produit": 50.0, "cynisme": 10.0 } ---
+Run 3 (levier, karavel-scaleup) terminé — sprint 9, fin='remercie', 💥 1709, 💰 0 (clients paient 39, charges 41), ⚡ 53, 👥 6, outils=["notion", "rice", "sprint-retro", "daily-standup"], revue de board='failed', ressources finales={ "moral": 96.1666666666667, "dette-organisationnelle": 48.0, "capital-politique": 92.0, "reputation-produit": 91.0, "cynisme": 48.0 }
+
+=== SMOKE TEST LOGIQUE — OUTILLAGE ===
+
+--- Run 0 (outillage) — meridia-corp — 💥 0, 👥 5/7, capacité 7 — Départ : { "moral": 62.4, "dette-organisationnelle": 15.0, "capital-politique": 55.0, "reputation-produit": 50.0, "cynisme": 10.0 } ---
+Run 0 (outillage, meridia-corp) terminé — sprint 6, fin='remercie', 💥 451, 💰 75 (clients paient 44, charges 33), ⚡ 61, 👥 5, outils=["jira", "daily-standup"], revue de board='passed', ressources finales={ "moral": 68.4, "dette-organisationnelle": 25.0, "capital-politique": 52.0, "reputation-produit": 70.0, "cynisme": 35.0 }
+
+--- Run 1 (outillage) — meridia-corp — 💥 0, 👥 5/7, capacité 7 — Départ : { "moral": 62.4, "dette-organisationnelle": 15.0, "capital-politique": 55.0, "reputation-produit": 50.0, "cynisme": 10.0 } ---
+Run 1 (outillage, meridia-corp) terminé — sprint 6, fin='remercie', 💥 649, 💰 38 (clients paient 35, charges 29), ⚡ 42, 👥 5, outils=["jira", "shape-up"], revue de board='passed', ressources finales={ "moral": 94.4, "dette-organisationnelle": 25.0, "capital-politique": 69.0, "reputation-produit": 52.0, "cynisme": 25.0 }
+
+--- Run 2 (outillage) — karavel-scaleup — 💥 0, 👥 5/6, capacité 7 — Départ : { "moral": 76.4, "dette-organisationnelle": 15.0, "capital-politique": 55.0, "reputation-produit": 50.0, "cynisme": 10.0 } ---
+Run 2 (outillage, karavel-scaleup) terminé — sprint 6, fin='faillite', 💥 1434, 💰 -14 (clients paient 31, charges 31), ⚡ 43, 👥 5, outils=["notion", "jira", "socle-technique-commun"], revue de board='passed', ressources finales={ "moral": 51.4, "dette-organisationnelle": 6.0, "capital-politique": 60.0, "reputation-produit": 41.0, "cynisme": 37.0 }
+
+--- Run 3 (outillage) — karavel-scaleup — 💥 0, 👥 5/6, capacité 7 — Départ : { "moral": 76.4, "dette-organisationnelle": 15.0, "capital-politique": 55.0, "reputation-produit": 50.0, "cynisme": 10.0 } ---
+Run 3 (outillage, karavel-scaleup) terminé — sprint 9, fin='remercie', 💥 1036, 💰 83 (clients paient 33, charges 31), ⚡ 53, 👥 5, outils=["notion", "rice"], revue de board='passed', ressources finales={ "moral": 100.0, "dette-organisationnelle": 34.0, "capital-politique": 78.0, "reputation-produit": 90.0, "cynisme": 49.0 }
+
+=== SMOKE TEST LOGIQUE — GENERALISTE ===
+
+--- Run 0 (generaliste) — meridia-corp — 💥 0, 👥 5/7, capacité 7 — Départ : { "moral": 62.4, "dette-organisationnelle": 15.0, "capital-politique": 55.0, "reputation-produit": 50.0, "cynisme": 10.0 } ---
+Run 0 (generaliste, meridia-corp) terminé — sprint 11, fin='remercie', 💥 3371, 💰 166 (clients paient 48, charges 43), ⚡ 52, 👥 7, outils=["jira"], revue de board='failed', ressources finales={ "moral": 90.4285714285714, "dette-organisationnelle": 33.0, "capital-politique": 94.0, "reputation-produit": 96.0, "cynisme": 48.0 }
+
+--- Run 1 (generaliste) — meridia-corp — 💥 0, 👥 5/7, capacité 7 — Départ : { "moral": 62.4, "dette-organisationnelle": 15.0, "capital-politique": 55.0, "reputation-produit": 50.0, "cynisme": 10.0 } ---
+Run 1 (generaliste, meridia-corp) terminé — sprint 3, fin='remercie', 💥 64, 💰 63 (clients paient 28, charges 25), ⚡ 56, 👥 6, outils=["jira"], revue de board='passed', ressources finales={ "moral": 69.8333333333333, "dette-organisationnelle": 12.0, "capital-politique": 57.0, "reputation-produit": 43.0, "cynisme": 27.0 }
+
+--- Run 2 (generaliste) — karavel-scaleup — 💥 0, 👥 5/6, capacité 7 — Départ : { "moral": 76.4, "dette-organisationnelle": 15.0, "capital-politique": 55.0, "reputation-produit": 50.0, "cynisme": 10.0 } ---
+Run 2 (generaliste, karavel-scaleup) terminé — sprint 9, fin='remercie', 💥 1146, 💰 70 (clients paient 33, charges 31), ⚡ 53, 👥 6, outils=["notion"], revue de board='failed', ressources finales={ "moral": 95.6666666666667, "dette-organisationnelle": 65.0, "capital-politique": 81.0, "reputation-produit": 94.0, "cynisme": 45.0 }
+
+--- Run 3 (generaliste) — karavel-scaleup — 💥 0, 👥 5/6, capacité 7 — Départ : { "moral": 76.4, "dette-organisationnelle": 15.0, "capital-politique": 55.0, "reputation-produit": 50.0, "cynisme": 10.0 } ---
+Run 3 (generaliste, karavel-scaleup) terminé — sprint 8, fin='remercie', 💥 1337, 💰 55 (clients paient 31, charges 29), ⚡ 41, 👥 6, outils=["notion"], revue de board='failed', ressources finales={ "moral": 99.2727272727273, "dette-organisationnelle": 36.0, "capital-politique": 71.0, "reputation-produit": 93.0, "cynisme": 41.0 }
+
+=== SMOKE TEST LOGIQUE — THESAURISEUR ===
+
+--- Run 0 (thesauriseur) — meridia-corp — 💥 0, 👥 5/7, capacité 7 — Départ : { "moral": 62.4, "dette-organisationnelle": 15.0, "capital-politique": 55.0, "reputation-produit": 50.0, "cynisme": 10.0 } ---
+Run 0 (thesauriseur, meridia-corp) terminé — sprint 9, fin='remercie', 💥 1343, 💰 185 (clients paient 58, charges 34), ⚡ 53, 👥 5, outils=["jira"], revue de board='passed', ressources finales={ "moral": 78.8, "dette-organisationnelle": 10.0, "capital-politique": 61.0, "reputation-produit": 78.0, "cynisme": 6.0 }
+
+--- Run 1 (thesauriseur) — meridia-corp — 💥 0, 👥 5/7, capacité 7 — Départ : { "moral": 62.4, "dette-organisationnelle": 15.0, "capital-politique": 55.0, "reputation-produit": 50.0, "cynisme": 10.0 } ---
+Run 1 (thesauriseur, meridia-corp) terminé — sprint 9, fin='remercie', 💥 1152, 💰 172 (clients paient 50, charges 27), ⚡ 53, 👥 5, outils=["jira"], revue de board='passed', ressources finales={ "moral": 80.4, "dette-organisationnelle": 40.0, "capital-politique": 62.0, "reputation-produit": 88.0, "cynisme": 10.0 }
+
+--- Run 2 (thesauriseur) — karavel-scaleup — 💥 0, 👥 5/6, capacité 7 — Départ : { "moral": 76.4, "dette-organisationnelle": 15.0, "capital-politique": 55.0, "reputation-produit": 50.0, "cynisme": 10.0 } ---
+Run 2 (thesauriseur, karavel-scaleup) terminé — sprint 9, fin='remercie', 💥 1239, 💰 381 (clients paient 73, charges 23), ⚡ 53, 👥 5, outils=["notion"], revue de board='failed', ressources finales={ "moral": 91.0, "dette-organisationnelle": 48.0, "capital-politique": 64.0, "reputation-produit": 100.0, "cynisme": 10.0 }
+
+--- Run 3 (thesauriseur) — karavel-scaleup — 💥 0, 👥 5/6, capacité 7 — Départ : { "moral": 76.4, "dette-organisationnelle": 15.0, "capital-politique": 55.0, "reputation-produit": 50.0, "cynisme": 10.0 } ---
+Run 3 (thesauriseur, karavel-scaleup) terminé — sprint 3, fin='faillite', 💥 800, 💰 -4 (clients paient 16, charges 26), ⚡ 56, 👥 5, outils=["notion"], revue de board='failed', ressources finales={ "moral": 78.8, "dette-organisationnelle": 28.0, "capital-politique": 63.0, "reputation-produit": 82.0, "cynisme": 6.0 }
+
+=== SMOKE TEST LOGIQUE — CAREFUL ===
+
+--- Run 0 (careful) — meridia-corp — 💥 0, 👥 5/7, capacité 7 — Départ : { "moral": 62.4, "dette-organisationnelle": 15.0, "capital-politique": 55.0, "reputation-produit": 50.0, "cynisme": 10.0 } ---
+Run 0 (careful, meridia-corp) terminé — sprint 3, fin='remercie', 💥 0, 💰 74 (clients paient 30, charges 21), ⚡ 100, 👥 5, outils=["jira"], revue de board='passed', ressources finales={ "moral": 66.0, "dette-organisationnelle": 15.0, "capital-politique": 55.0, "reputation-produit": 44.0, "cynisme": 17.0 }
+
+--- Run 1 (careful) — meridia-corp — 💥 0, 👥 5/7, capacité 7 — Départ : { "moral": 62.4, "dette-organisationnelle": 15.0, "capital-politique": 55.0, "reputation-produit": 50.0, "cynisme": 10.0 } ---
+Run 1 (careful, meridia-corp) terminé — sprint 3, fin='remercie', 💥 0, 💰 51 (clients paient 33, charges 22), ⚡ 100, 👥 5, outils=["jira"], revue de board='passed', ressources finales={ "moral": 65.4, "dette-organisationnelle": 17.0, "capital-politique": 55.0, "reputation-produit": 46.0, "cynisme": 22.0 }
+
+--- Run 2 (careful) — karavel-scaleup — 💥 0, 👥 5/6, capacité 7 — Départ : { "moral": 76.4, "dette-organisationnelle": 15.0, "capital-politique": 55.0, "reputation-produit": 50.0, "cynisme": 10.0 } ---
+Run 2 (careful, karavel-scaleup) terminé — sprint 2, fin='remercie', 💥 0, 💰 43 (clients paient 25, charges 19), ⚡ 94, 👥 5, outils=["notion"], revue de board='failed', ressources finales={ "moral": 81.4, "dette-organisationnelle": 19.0, "capital-politique": 55.0, "reputation-produit": 46.0, "cynisme": 22.0 }
+
+--- Run 3 (careful) — karavel-scaleup — 💥 0, 👥 5/6, capacité 7 — Départ : { "moral": 76.4, "dette-organisationnelle": 15.0, "capital-politique": 55.0, "reputation-produit": 50.0, "cynisme": 10.0 } ---
+Run 3 (careful, karavel-scaleup) terminé — sprint 3, fin='remercie', 💥 16, 💰 49 (clients paient 25, charges 18), ⚡ 100, 👥 5, outils=["notion"], revue de board='failed', ressources finales={ "moral": 75.0, "dette-organisationnelle": 27.0, "capital-politique": 60.0, "reputation-produit": 44.0, "cynisme": 15.0 }
+
+=== SMOKE TEST LOGIQUE — SKIP ===
+
+--- Run 0 (skip) — meridia-corp — 💥 0, 👥 5/7, capacité 7 — Départ : { "moral": 62.4, "dette-organisationnelle": 15.0, "capital-politique": 55.0, "reputation-produit": 50.0, "cynisme": 10.0 } ---
+Run 0 (skip, meridia-corp) terminé — sprint 3, fin='remercie', 💥 0, 💰 75 (clients paient 30, charges 21), ⚡ 100, 👥 5, outils=["jira"], revue de board='passed', ressources finales={ "moral": 62.4, "dette-organisationnelle": 12.0, "capital-politique": 55.0, "reputation-produit": 44.0, "cynisme": 10.0 }
+
+--- Run 1 (skip) — meridia-corp — 💥 0, 👥 5/7, capacité 7 — Départ : { "moral": 62.4, "dette-organisationnelle": 15.0, "capital-politique": 55.0, "reputation-produit": 50.0, "cynisme": 10.0 } ---
+Run 1 (skip, meridia-corp) terminé — sprint 3, fin='remercie', 💥 0, 💰 45 (clients paient 30, charges 21), ⚡ 100, 👥 5, outils=["jira"], revue de board='passed', ressources finales={ "moral": 62.4, "dette-organisationnelle": 12.0, "capital-politique": 55.0, "reputation-produit": 44.0, "cynisme": 10.0 }
+
+--- Run 2 (skip) — karavel-scaleup — 💥 0, 👥 5/6, capacité 7 — Départ : { "moral": 76.4, "dette-organisationnelle": 15.0, "capital-politique": 55.0, "reputation-produit": 50.0, "cynisme": 10.0 } ---
+Run 2 (skip, karavel-scaleup) terminé — sprint 3, fin='remercie', 💥 0, 💰 49 (clients paient 24, charges 18), ⚡ 100, 👥 5, outils=["notion"], revue de board='failed', ressources finales={ "moral": 76.4, "dette-organisationnelle": 21.0, "capital-politique": 55.0, "reputation-produit": 44.0, "cynisme": 10.0 }
+
+--- Run 3 (skip) — karavel-scaleup — 💥 0, 👥 5/6, capacité 7 — Départ : { "moral": 76.4, "dette-organisationnelle": 15.0, "capital-politique": 55.0, "reputation-produit": 50.0, "cynisme": 10.0 } ---
+Run 3 (skip, karavel-scaleup) terminé — sprint 3, fin='remercie', 💥 0, 💰 34 (clients paient 24, charges 18), ⚡ 100, 👥 5, outils=["notion"], revue de board='failed', ressources finales={ "moral": 76.4, "dette-organisationnelle": 21.0, "capital-politique": 55.0, "reputation-produit": 44.0, "cynisme": 10.0 }
+Thésauriseur (#36) — meilleur T3, 0/4 mandats au-delà de T3, sans un seul achat (le vrai critère est le taux sur 200 runs, carnet §35.2).
+
+Trajectoires — économie : meilleur T4 · Levier : meilleur T4 (critère de recette 2 de #42 ; la comparaison des deux se lit sur 40 runs, pas ici)
+Archétypes #37 — outillage : meilleur T3 · généraliste : meilleur T4 (la domination se mesure sur 40 runs)
+
+=== SMOKE TEST LOGIQUE : OK ===

@@ -2474,3 +2474,65 @@ de ne pas dépendre du nombre aléatoire de tickets. Les suites logique, UI et
 FPS restent requises, ainsi que les parcours et captures rendus. Preuves :
 `docs/review-evidence/interactions-bureau/`. Le curseur natif du système n'est
 pas inclus dans les captures du framebuffer ; son mode est asserté par les tests.
+
+## 42. Prototype de langage HUD : rendre les choix visibles (07/09/2026)
+
+À la demande de Camille, développement d'une tranche visuelle pour aider à
+valider la vision globale, pas d'une refonte de gameplay. Intention : « le
+décor situe, le HUD oriente, le geste laisse une trace ». La proposition et
+ses limites sont dans `docs/vision-hud-prototype.md` ; elle reste à valider.
+
+Les cartes de roadmap distinguent maintenant disponible (papier neutre),
+survol (contour), déplacement (destination renforcée) et prévu (fond bleu,
+bande latérale, coche et texte). Le type epic reste explicite sans emprunter
+le rouge d'alerte. Les bandeaux de coût et la capacité sont bleus lorsqu'ils
+expriment un engagement ; l'ambre signale la surcharge, toujours autorisée.
+Le tampon vert de réussite est retiré de la planification. Le compteur des
+tickets et les points disponibles/excédentaires sont exposés sans calculer
+de nouvelle règle. Les tokens sont regroupés dans `hud_language.gd`.
+
+Le HUD nomme ses trois ressources. Les apps sont lues sans l'effet de dalle,
+qui reste sur le lanceur. « Applications » indique la destination du retour
+et « Enregistrer le plan » nomme le bouton de validation déjà existant.
+Attention : le brouillon n'est pas encore préservé à la fermeture et ce lot
+ne change pas ce contrat ; il faut utiliser ce bouton avant de quitter.
+L'enregistrement automatique reste un arbitrage distinct.
+
+Recette du prototype : les suites logique, UI, FPS et interactions, captures
+du bureau et des états sélection/surcharge en 1920×1080, lecture en 1280×900,
+et tour visuel des écrans. Les tests d'interactions vérifient aussi le cadre
+de destination, la bande persistante et le libellé de sélection après un
+vrai drag. Les preuves sont dans `docs/review-evidence/prototype-hud/`.
+La sauvegarde du plan et la généralisation à boutique/Comité/clôture/RH
+restent hors du prototype, sur la branche `codex/prototype-hud-lisibilite`.
+
+## 43. Le bureau reflète l'activité et nomme ses objets (prototype)
+
+Suite validée par Camille : afficher l'activité sur l'accueil et rendre les
+textes Boutique/Fin de sprint/Comité visibles et compréhensibles. La vue
+publique `get_desk_activity()` lit uniquement les faits du sprint courant :
+rapport de roadmap enregistré, points, capacité, courrier et ressources
+réelles. Le décompte déduplique les epics présents dans les livraisons et les
+progressions. Aucun attribut caché ni score anticipé n'est exposé.
+
+Les tuiles du portable affichent le plan enregistré, le courrier restant,
+les utilisateurs et l'Impact disponible. Leurs textes sont actualisés sans
+reconstruire l'application en cours. Un fil visuel non interactif montre
+brièvement les variations nettes réellement observées au bureau (maximum
+trois retours) ; l'entrée dans la scène ne produit aucun faux gain et une
+valeur inchangée ne rejoue pas son retour. Aucun historique inter-scènes
+ni changement de règle d'enregistrement de la roadmap n'est ajouté.
+
+Les objets de gestion ont désormais des étiquettes opaques à texte sombre,
+avec rôle ou état, et contour bleu au survol. Elles sont aussi cliquables et
+ouvrent le même objet que la visée 3D. Leur taille ne varie pas au survol,
+elles se masquent pendant la lecture et reviennent à la fin du retour caméra.
+Le bas du canevas reste réservé aux commandes de regard. La planche indique
+combien de tickets sont enregistrés et combien de messages restent en attente.
+
+Recette dédiée : `hud_activity_preview.tscn` vérifie les rapports anciens,
+la déduplication des epics, brouillon vs enregistré, absence de gain fictif,
+dépense d'énergie réelle, non-répétition et disparition des retours, clic de
+fenêtre sur l'étiquette Boutique et non-chevauchement des étiquettes de droite
+en 1280×900. S'ajoutent les suites logique/UI/FPS/interactions et la recette
+rendue. Preuves : `docs/review-evidence/hud-activite/`. Prototype non commité.

@@ -93,6 +93,7 @@ func is_open() -> bool:
 
 # ── Le bureau du poste : trois tuiles ────────────────────────────────────
 func _show_apps() -> void:
+	_glow.visible = true
 	UIHelpers.clear_children(_body)
 	move_child(_glow, get_child_count() - 1)
 	_body.add_child(_os_bar("POSTE DE TRAVAIL", false))
@@ -130,7 +131,8 @@ func _app_tile(app: Dictionary) -> Control:
 	style.content_margin_top = 14
 	style.content_margin_bottom = 14
 	tile.add_theme_stylebox_override("panel", style)
-	tile.custom_minimum_size = Vector2(156, 0)
+	tile.name = "App_" + id
+	tile.custom_minimum_size = Vector2(210, 0)
 	tile.mouse_filter = Control.MOUSE_FILTER_STOP
 
 	var box := VBoxContainer.new()
@@ -154,13 +156,14 @@ func _app_tile(app: Dictionary) -> Control:
 
 	var status := _app_status(id)
 	var status_label := Label.new()
+	status_label.name = "ActivityStatus"
 	status_label.text = String(status.get("text", ""))
 	status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	status_label.custom_minimum_size = Vector2(128, 0)
-	status_label.add_theme_font_size_override("font_size", 11)
+	status_label.custom_minimum_size = Vector2(180, 0)
+	status_label.add_theme_font_size_override("font_size", 13)
 	status_label.add_theme_color_override("font_color",
-		UIHelpers.PANEL_DANGER if bool(status.get("hot", false)) else UIHelpers.PANEL_MUTED)
+		_activity_color(status))
 	box.add_child(status_label)
 
 	tile.add_child(box)
@@ -186,21 +189,40 @@ func _lift(node: Control, offset: float, scale_to: float) -> void:
 
 
 func _app_status(id: String) -> Dictionary:
+	var activity := SprintState.get_desk_activity()
 	match id:
 		"inbox":
-			var pending := SprintState.pending_inbox_count() if SprintState.has_method("pending_inbox_count") else 0
+			var pending := int(activity["pending"])
 			if pending > 0:
 				return {"text": "%d message%s en attente" % [pending, "s" if pending > 1 else ""], "hot": true}
-			return {"text": "Rien en attente", "hot": false}
+			return {"text": "✓ Courrier traité", "done": true}
 		"roadmap":
-			var debt := SprintState.get_resource_value("dette-organisationnelle")
-			var capacity := SprintState.get_effective_capacity()
-			if debt >= 64.0:
-				return {"text": "Congestionnée · capacité %d" % capacity, "hot": true}
-			return {"text": "Capacité %d ce sprint" % capacity, "hot": false}
+			if not activity["saved"]:
+				return {"text": "Plan à enregistrer\n%d pts disponibles" % activity["capacity"]}
+			return {"text": "%d ticket%s · %d/%d pts\nPlan enregistré" % [activity["tickets"], "s" if activity["tickets"] != 1 else "", activity["points"], activity["capacity"]], "planned": true, "hot": activity["points"] > activity["capacity"]}
 		_:
-			var vitals := SprintState.get_desk_vitals()
-			return {"text": "%d utilisateurs" % int(vitals.get("users", 0)), "hot": false}
+			return {"text": "%d utilisateurs\n%d Impact disponible" % [activity["users"], activity["impact"]]}
+
+
+func _activity_color(status: Dictionary) -> Color:
+	if status.get("hot", false):
+		return Color("#efbe72")
+	if status.get("done", false):
+		return Color("#8adbb4")
+	return Color("#9bc8f0") if status.get("planned", false) else Color("#c0ccd9")
+
+
+func refresh_status() -> void:
+	if is_open() or _body == null:
+		return
+	for app in apps:
+		var tile := _body.find_child("App_" + String(app["id"]), true, false)
+		if tile == null:
+			continue
+		var label: Label = tile.find_child("ActivityStatus", true, false)
+		var status := _app_status(String(app["id"]))
+		label.text = status["text"]
+		label.add_theme_color_override("font_color", _activity_color(status))
 
 
 func _os_bar(text: String, closable: bool) -> Control:
@@ -218,7 +240,7 @@ func _os_bar(text: String, closable: bool) -> Control:
 
 	if closable:
 		var close := Button.new()
-		close.text = "◂  RETOUR AU BUREAU"
+		close.text = "◂  APPLICATIONS"
 		close.flat = true
 		close.position = Vector2(_body.size.x - 210, 2)
 		close.custom_minimum_size = Vector2(200, 30)
@@ -234,6 +256,8 @@ func open_app(id: String) -> void:
 	if _open_id == id:
 		return
 	_open_id = id
+	# Prototype : garder la lumière sur le lanceur, lire les apps sans filtre.
+	_glow.visible = false
 	UIHelpers.clear_children(_body)
 
 	var title := "Poste de travail"

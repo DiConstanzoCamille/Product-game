@@ -88,10 +88,13 @@ func _run() -> void:
 		check(desk.room().screen_viewport.gui_is_dragging(), "Un déplacement réel doit démarrer le drag du ticket.")
 		var destination := point(desk, app.sprint_drop_zone.get_global_rect().get_center())
 		await move(destination)
+		check(app.sprint_drop_zone.drop_highlight, "La destination du glissement est mise en évidence.")
 		await shot("roadmap_drag_" + str(comfort))
 		await button(false)
 		check(desk.room().screen_viewport.gui_is_drag_successful(), "Le drop réel doit atteindre la colonne sprint.")
 		check(ticket.get_parent() == app.sprint_list, "Le ticket déposé est réellement planifié dans la colonne sprint.")
+		check(ticket.planned and ticket.get_theme_stylebox("panel").border_width_left == 6, "La sélection conserve son repère visuel après le drop.")
+		check("PRÉVU CE SPRINT" in ticket.find_child("PlanState", true, false).text, "La carte sélectionnée porte un état textuel explicite.")
 		check(desk.room().camera.global_transform.is_equal_approx(fixed), "La souris ne fait pas tourner la caméra sur l'ordinateur.")
 		# Second geste : relâcher hors dalle, même au-dessus d'un Control parent.
 		var remaining: Array = app.backlog_list.get_children()
