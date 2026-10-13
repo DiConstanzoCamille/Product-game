@@ -1,0 +1,30 @@
+Godot Engine v4.7.1.stable.official.a13da4feb - https://godotengine.org
+
+GameData: données chargées — 5 ressources, 7 cartes, 3 époques, 9 fins de mandat.
+=== SMOKE TEST UI ===
+  → res://scenes/screens/start_screen.tscn
+  → res://scenes/screens/career_select_screen.tscn
+  → res://scenes/screens/scenario_screen.tscn
+  → res://scenes/screens/company_select_screen.tscn
+  → res://scenes/screens/inbox_screen.tscn
+  → res://scenes/screens/roadmap_screen.tscn
+  → res://scenes/screens/investments_screen.tscn
+  → res://scenes/screens/resolution_screen.tscn
+  → res://scenes/screens/foundations_screen.tscn
+  → res://scenes/screens/mandate_end_screen.tscn
+  → res://scenes/screens/committee_screen.tscn
+  → gestes de l'écran Roadmap
+  → gestes de l'écran Investissements
+  → gestion d'équipe de bout en bout
+  → demandes d'équipe successives dans l'Inbox
+  → lecture animee de la Resolution
+  → lecture multi-equipe de la Resolution
+  → verdict trimestriel au sprint global 6
+  → gels d'investissement
+  → choix T4 sortie ou mandat long
+  → gestes de l'écran Comité d'investissement
+  → onglet Compendium du Dossier entreprise
+  → le bureau se lit comme une pièce
+  → les apps hébergées conservent leurs contrats
+  → la levée d'un poster du mur
+=== SMOKE TEST UI : OK — 11 écrans instanciés, gestes Roadmap/Investissements joués ===

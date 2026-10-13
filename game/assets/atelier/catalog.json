@@ -1,0 +1,51 @@
+{
+  "collection": "Atelier",
+  "units": "metres",
+  "up": "Y",
+  "front": "+Z",
+  "origin": "floor",
+  "assets": [
+    {
+      "asset": "task_lamp",
+      "meshes": 5,
+      "vertices": 5440,
+      "triangles": 10520,
+      "bytes": 366740
+    },
+    {
+      "asset": "rubber_plant",
+      "meshes": 7,
+      "vertices": 6736,
+      "triangles": 12264,
+      "bytes": 291716
+    },
+    {
+      "asset": "pencil_cup",
+      "meshes": 8,
+      "vertices": 4512,
+      "triangles": 8532,
+      "bytes": 224764
+    },
+    {
+      "asset": "field_notebooks",
+      "meshes": 7,
+      "vertices": 3916,
+      "triangles": 6340,
+      "bytes": 418364
+    },
+    {
+      "asset": "headphone_stand",
+      "meshes": 8,
+      "vertices": 2336,
+      "triangles": 4484,
+      "bytes": 207208
+    },
+    {
+      "asset": "valet_tray",
+      "meshes": 6,
+      "vertices": 1188,
+      "triangles": 2288,
+      "bytes": 131408
+    }
+  ]
+}

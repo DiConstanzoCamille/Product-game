@@ -4299,6 +4299,26 @@ func get_sprint_event_resolution() -> Dictionary:
 ## 🏁 Ce qu'on emporte en signant. La feuille dit ce qui a été fait **et ce qui
 ## a été ignoré** : découvrir à la Résolution qu'un événement non traité s'est
 ## résolu au pire serait un piège, pas un pari (question de vision n°4).
+## Vue publique des faits du sprint, commune au lanceur et à la clôture.
+## Ne consomme rien, ne tire aucun contenu et n'expose aucun attribut caché.
+func get_desk_activity() -> Dictionary:
+	var saved := int(last_roadmap_report.get("sprint", -1)) == sprint_number
+	var tickets: Dictionary = {}
+	if saved:
+		for item in last_roadmap_report.get("delivered", []):
+			tickets[String(item.get("id", ""))] = true
+		for update in last_roadmap_report.get("epicUpdates", []):
+			tickets[String(update.get("item", {}).get("id", ""))] = true
+	var vitals := get_desk_vitals()
+	return {
+		"sprint": sprint_number, "saved": saved, "tickets": tickets.size(),
+		"points": int(last_roadmap_report.get("plannedPoints", 0)) if saved else 0,
+		"capacity": get_effective_capacity(), "pending": pending_inbox_count(),
+		"impact": int(vitals.get("impact", 0)), "cash": int(vitals.get("revenue", 0)),
+		"users": int(vitals.get("users", 0)), "energy": energy,
+	}
+
+
 func get_closing_summary() -> Array:
 	var pending := pending_inbox_count()
 	var capacity := get_effective_capacity()

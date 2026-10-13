@@ -88,6 +88,8 @@ var camera: Camera3D = null
 
 var _lid: Node3D = null
 var _dalle: MeshInstance3D = null
+var _reading_transform := Transform3D.IDENTITY
+var _reference_canvas_height := DESIGN.y
 
 
 ## Godot rejette `add_child()` sur un nœud encore en train d'installer ses
@@ -106,7 +108,20 @@ func build() -> void:
 	# La caméra avant la dalle : c'est elle qui donne l'échelle pixel/unité
 	# dont la taille du quad se déduit.
 	_build_camera()
+	_reference_canvas_height = canvas_size().y
+	_reading_transform = camera.global_transform
 	_build_laptop()
+
+
+func reading_pose() -> Dictionary:
+	# Avec stretch/expand, une fenêtre plus haute agrandit le canevas logique.
+	# Adapter le FOV garde la dalle à la même taille lisible sans refaire le mesh.
+	var fov := rad_to_deg(2.0 * atan(canvas_size().y / _reference_canvas_height * tan(deg_to_rad(CAMERA_FOV) * 0.5)))
+	return {"transform": _reading_transform, "fov": fov}
+
+
+func canvas_size() -> Vector2:
+	return get_viewport().get_visible_rect().size if is_inside_tree() else DESIGN
 
 
 func _build_environment() -> void:
@@ -137,15 +152,7 @@ func _build_environment() -> void:
 
 
 func _build_room() -> void:
-	# Le mur et le sol ne portent pas de trait : ce sont les surfaces sur
-	# lesquelles les silhouettes se détachent, pas des silhouettes. Les cerner
-	# dessinerait un cadre autour de la pièce.
-	_box(Vector3(0, 1.7, WALL_Z - 0.04), Vector3(9.0, 3.4, 0.08), WALL, false)
-	_box(Vector3(0, -0.02, 0), Vector3(9.0, 0.04, 5.0), FLOOR, false)
-	_box(Vector3(0, DESK_TOP_Y - 0.03, 0.10), Vector3(3.6, 0.06, 1.6), WOOD)
-	_box(Vector3(0, DESK_TOP_Y - 0.055, -0.68), Vector3(3.6, 0.03, 0.06), WOOD_DARK)
-	for x in [-1.68, 1.68]:
-		_box(Vector3(x, 0.36, 0.10), Vector3(0.08, 0.73, 1.5), WOOD_DARK)
+	preload("res://scripts/components/desk_art.gd").build_room(self)
 
 
 func _build_camera() -> void:
@@ -169,10 +176,10 @@ func _build_camera() -> void:
 
 func _build_laptop() -> void:
 	var quad_size := _pixels_to_world(Vector2(SCREEN_PIXELS), dalle_center())
-	var bezel := Vector2(0.055, 0.05)
+	var bezel := Vector2(0.026, 0.031)
+	var model := preload("res://scripts/components/laptop_model.gd")
 
-	_box(Vector3(0, 0.782, 0.30), Vector3(quad_size.x + 0.10, 0.024, 0.56), ALU)
-	_box(Vector3(0, 0.795, 0.36), Vector3(quad_size.x * 0.72, 0.006, 0.22), Color("#66718a"))
+	model.build_base(self, quad_size.x + bezel.x * 2.0)
 
 	_lid = Node3D.new()
 	_lid.name = "Lid"
@@ -180,15 +187,11 @@ func _build_laptop() -> void:
 	_lid.rotation_degrees = Vector3(LID_TILT_DEGREES, 0, 0)
 	add_child(_lid)
 
-	var shell := MeshInstance3D.new()
-	shell.name = "LidShell"
-	var shell_mesh := BoxMesh.new()
-	shell_mesh.size = Vector3(quad_size.x + bezel.x * 2.0, quad_size.y + bezel.y * 2.0, 0.016)
-	shell.mesh = shell_mesh
-	shell.position = DALLE_LOCAL - Vector3(0, 0, 0.014)
-	shell.material_override = toon_material(ALU)
-	_lid.add_child(shell)
-	outline_at(shell, dalle_center())
+	var shell := model.part(_lid, "LidShell", DALLE_LOCAL - Vector3(0, 0, 0.014), Vector3(quad_size.x + bezel.x * 2.0, quad_size.y + bezel.y * 2.0, 0.022), Color("#9daeb6"), 0.025)
+	outline_at(shell, dalle_center(), 1.5)
+	model.part(_lid, "GlassBezel", DALLE_LOCAL - Vector3(0, 0, 0.004), Vector3(quad_size.x + 0.027, quad_size.y + 0.037, 0.004), Color("#202c38"), 0.014)
+	model.part(_lid, "CameraHousing", DALLE_LOCAL + Vector3(0, quad_size.y * 0.5 + 0.010, 0.002), Vector3(0.037, 0.009, 0.003), Color("#111d27"), 0.004)
+	model.part(_lid, "CameraLens", DALLE_LOCAL + Vector3(0, quad_size.y * 0.5 + 0.010, 0.004), Vector3(0.005, 0.005, 0.002), Color("#526e7d"), 0.002)
 
 	screen_viewport = SubViewport.new()
 	screen_viewport.name = "ScreenViewport"
@@ -225,6 +228,17 @@ func _build_laptop() -> void:
 	area.add_child(shape)
 	area.input_event.connect(_on_dalle_input)
 	_lid.add_child(area)
+	# Le clavier et le repose-poignets appartiennent aussi à l'ordinateur.
+	var base: Node3D = get_node("LaptopBase")
+	var base_area := Area3D.new()
+	base_area.name = "BaseArea"
+	base_area.set_meta("desk_target", "laptop")
+	var base_shape := CollisionShape3D.new()
+	var base_box := BoxShape3D.new()
+	base_box.size = (base.get_node("LowerShell") as MeshInstance3D).mesh.get_aabb().size + Vector3(0, 0, 0.035)
+	base_shape.shape = base_box
+	base_area.add_child(base_shape)
+	base.add_child(base_area)
 
 
 # ── Géométrie publique ───────────────────────────────────────────────────
@@ -249,7 +263,7 @@ func design_pixels_per_unit_at(point: Vector3) -> float:
 	var depth: float = -camera.global_transform.basis.z.dot(point - camera.global_position)
 	if depth <= 0.01:
 		return 1.0
-	return DESIGN.y / (2.0 * depth * tan(deg_to_rad(camera.fov) * 0.5))
+	return canvas_size().y / (2.0 * depth * tan(deg_to_rad(camera.fov) * 0.5))
 
 
 func _pixels_to_world(pixels: Vector2, at: Vector3) -> Vector2:
@@ -268,8 +282,8 @@ func project_to_design(point: Vector3) -> Vector2:
 	var depth: float = -basis.z.dot(delta)
 	if depth <= 0.01:
 		return Vector2(-9999, -9999)
-	var scale := DESIGN.y / (2.0 * depth * tan(deg_to_rad(camera.fov) * 0.5))
-	return DESIGN * 0.5 + Vector2(basis.x.dot(delta) * scale, -basis.y.dot(delta) * scale)
+	var scale := canvas_size().y / (2.0 * depth * tan(deg_to_rad(camera.fov) * 0.5))
+	return canvas_size() * 0.5 + Vector2(basis.x.dot(delta) * scale, -basis.y.dot(delta) * scale)
 
 
 ## Le placement d'un panneau présenté au joueur : plein cadre ou presque, **de
@@ -325,8 +339,9 @@ static func route_to_viewport(quad_node: MeshInstance3D, viewport: SubViewport, 
 	var uv := Vector2((local.x / quad.size.x) + 0.5, 0.5 - (local.y / quad.size.y))
 	var routed: InputEvent = event.duplicate()
 	routed.position = uv * Vector2(viewport.size)
+	routed.global_position = routed.position
 	if routed is InputEventMouseMotion:
-		routed.relative = Vector2.ZERO
+		routed.relative = routed.position - viewport.get_mouse_position()
 	viewport.push_input(routed, true)
 
 

@@ -1,0 +1,4 @@
+Godot Engine v4.7.1.stable.official.a13da4feb - https://godotengine.org
+
+GameData: données chargées — 5 ressources, 7 cartes, 3 époques, 9 fins de mandat.
+=== SMOKE FPS : OK ===

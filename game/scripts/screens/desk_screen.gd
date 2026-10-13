@@ -74,12 +74,21 @@ var _props: Dictionary = {}
 var _lifted: Node3D = null
 var _paper_click_frame := -1
 var _prop_click_frame := -1
+var _view: DeskViewController
+var _reticle: Label
+var _view_hint: Label
+var _view_mode: Button
+var _aimed: Area3D
+var _last_activity: Dictionary = {}
+var _activity_elapsed := 0.0
+var _delta_feed: VBoxContainer
+var _surface_input = preload("res://scripts/components/desk_surface_input.gd").new()
 
 
 func _ready() -> void:
-	# Sans ça, aucune `Area3D` ne reçoit jamais `input_event` ni `mouse_entered` :
-	# le monde entier devient un décor cliquable nulle part, et rien ne le dit.
-	get_viewport().physics_object_picking = true
+	# Observation par rayon explicite ; lecture par relais de surface. Ne pas
+	# rejouer une seconde fois les mêmes clics via le picking physique différé.
+	get_viewport().physics_object_picking = false
 	_build.call_deferred()
 
 
@@ -99,7 +108,115 @@ func _build() -> void:
 	_build_papers()
 	_build_props()
 	_build_canvas()
+	_view = DeskViewController.new()
+	_view.name = "SeatedView"
+	add_child(_view)
+	_view.setup(_room.camera, SprintState.get_desk_conf()["camera"])
+	_view.target_requested.connect(_activate_target)
+	_view.state_changed.connect(_on_view_state_changed)
+	_view.pose_changed.connect(_refresh_anchored_labels)
+	get_viewport().size_changed.connect(_on_canvas_resized)
+	_room.get_node("Lid/DalleArea").set_meta("desk_target", "laptop")
+	_mug.get_node("Area").set_meta("desk_target", "mug")
+	for entry in _papers:
+		entry.get_node("Sheet/Area").set_meta("desk_target", "paper:" + String(entry.kind))
+	for kind in _props:
+		_props[kind].get_node("Area").set_meta("desk_target", "prop:" + kind)
 	refresh()
+	_on_view_state_changed()
+	_on_canvas_resized()
+
+
+func _on_canvas_resized() -> void:
+	if _view == null:
+		return
+	var canvas := _room.canvas_size()
+	_reticle.position = canvas * 0.5 - Vector2(7, 15)
+	_view_mode.position.y = canvas.y - 64
+	_view_hint.position.y = canvas.y - 50
+	_chip.position.x = canvas.x - _chip.size.x - 34
+	if _view.state == DeskViewController.State.FOCUS:
+		_room.camera.fov = float(_room.reading_pose()["fov"])
+	_refresh_prop_close()
+	_refresh_anchored_labels()
+
+
+func view_controller() -> DeskViewController:
+	return _view
+
+
+func _on_view_state_changed() -> void:
+	if _view == null:
+		return
+	if _view.state != DeskViewController.State.FOCUS:
+		_surface_input.reset()
+	if _view.state == DeskViewController.State.FOCUS:
+		_room.camera.fov = float(_room.reading_pose()["fov"])
+	_clear_aim()
+	_sync_interaction_scope()
+	_refresh_prop_close()
+	_refresh_anchored_labels()
+	_view_mode.disabled = not _view.observing()
+	_view_mode.text = "Regard : clic droit maintenu" if _view.comfort else "Regard : immersif"
+	_reticle.visible = _view.state == DeskViewController.State.LOOK
+	if _view.observing():
+		_view_hint.text = "Visez un objet · clic pour l'utiliser · Échap : libérer la souris" if _reticle.visible else ("Clic droit maintenu : regarder · clic gauche : utiliser" if _view.comfort else "Cliquez sur un objet pour l'utiliser · ailleurs pour regarder")
+	else:
+		_view_hint.text = "Mode curseur · cliquez, glissez, faites défiler · Échap : revenir" if not _view.transitioning() else ""
+
+
+func _process(_delta: float) -> void:
+	_activity_elapsed += _delta
+	if _activity_elapsed >= 0.15 and _delta_feed != null:
+		_activity_elapsed = 0.0
+		_observe_activity()
+	if _view == null or not _view.observing():
+		return
+	var at := get_viewport().get_mouse_position() if _view.state == DeskViewController.State.FREE else get_viewport().get_visible_rect().size * 0.5
+	var hit := _view.hit_at(at)
+	var area: Area3D = hit.get("collider") as Area3D
+	if area != _aimed:
+		_clear_aim()
+		_aimed = area
+		if _aimed != null:
+			_aimed.mouse_entered.emit()
+	_reticle.modulate = Color("#e4b578") if _aimed != null else Color.WHITE
+
+
+func _clear_aim() -> void:
+	if is_instance_valid(_aimed):
+		_aimed.mouse_exited.emit()
+	_aimed = null
+
+
+func _activate_target(id: String) -> void:
+	if id == "laptop":
+		_focus_on("laptop", func(): pass)
+	elif id.begins_with("prop:"):
+		open_prop(id.trim_prefix("prop:"))
+	elif id.begins_with("paper:"):
+		lift_paper(id.trim_prefix("paper:"))
+	elif id == "mug":
+		_focus_on("mug", func(): _on_mug_hover(true))
+
+
+func _focus_on(id: String, action: Callable) -> void:
+	if _view == null:
+		action.call()
+		return
+	if _view.focus_target == id and _view.state == DeskViewController.State.FOCUS:
+		action.call()
+		return
+	var pose := _room.reading_pose()
+	if id.begins_with("prop:"):
+		pose = prop(id.trim_prefix("prop:")).focus_pose()
+	_view.begin_focus(id, pose, action)
+
+
+func _leave_focus() -> void:
+	_tooltip.visible = false
+	if _view != null:
+		_view.return_to_observation()
 
 
 ## Un seul point de reconstruction : tout écran hôte ou accessoire qui modifie
@@ -120,6 +237,20 @@ func refresh() -> void:
 		_refresh_anchored_labels()
 	_refresh_prop_close()
 	_sync_interaction_scope()
+	_observe_activity()
+
+
+func _observe_activity() -> void:
+	if _delta_feed == null:
+		return
+	var activity := SprintState.get_desk_activity()
+	if activity == _last_activity:
+		return
+	_delta_feed.observe(_last_activity, activity)
+	_last_activity = activity
+	_workstation.refresh_status()
+	_refresh_vitals()
+	_refresh_anchored_labels()
 
 
 ## Les trois accès dont la recette a besoin. Le harnais de captures et le banc
@@ -152,20 +283,20 @@ func lift_paper(kind: String) -> void:
 		return
 	var target := paper(kind)
 	if target != null:
-		_on_paper_clicked(target)
+		_focus_on("paper:" + kind, func(): _on_paper_clicked(target))
 
 
 func open_app(id: String) -> void:
 	if _workstation != null and _open_prop_node() == null:
-		_workstation.call("open_app", id)
+		_focus_on("laptop", func(): _workstation.call("open_app", id))
 
 
 func open_prop(kind: String) -> void:
 	if _open_prop_node() != null:
 		return
 	var target := prop(kind)
-	if target != null:
-		target.call("expand")
+	if target != null and target.visible:
+		_focus_on("prop:" + kind, func(): target.call("expand"))
 
 
 func readable_layer() -> CanvasLayer:
@@ -192,7 +323,7 @@ func _build_mug() -> void:
 	_mug.name = "Mug"
 	_mug.set_script(preload("res://scripts/components/desk_mug.gd"))
 	_mug.set("room", _room)
-	_mug.position = Vector3(-0.80, DeskRoom.DESK_TOP_Y, -0.06)
+	_mug.position = Vector3(-0.87, DeskRoom.DESK_TOP_Y, 0.43)
 	_room.add_child(_mug)
 	# Construit tout de suite, comme la pièce : ces nœuds se dimensionnent et
 	# se placent depuis la caméra, et `refresh()` projette leur position dans
@@ -278,6 +409,10 @@ func _build_canvas() -> void:
 	_alerts.position = Vector2(34, 98)
 	_alerts.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_layer.add_child(_alerts)
+	_delta_feed = preload("res://scripts/components/hud_delta_feed.gd").new()
+	_delta_feed.name = "ResourceChanges"
+	_delta_feed.position = Vector2(34, 154)
+	_layer.add_child(_delta_feed)
 
 	_energy = Label.new()
 	_energy.name = "EnergyCaption"
@@ -298,16 +433,42 @@ func _build_canvas() -> void:
 	_prop_close.add_theme_color_override("font_color", UIHelpers.COLOR_INK)
 	_prop_close.add_theme_stylebox_override("normal", _flat(Color(1, 1, 1, 0.94), 10))
 	_prop_close.add_theme_stylebox_override("hover", _flat(Color("#fff4cc"), 10))
-	_prop_close.pressed.connect(_close_open_prop)
+	_prop_close.pressed.connect(_close_focused_object)
 	_layer.add_child(_prop_close)
 
+	_view_mode = Button.new()
+	_view_mode.name = "ViewMode"
+	_view_mode.position = Vector2(34, 836)
+	_view_mode.custom_minimum_size = Vector2(240, 40)
+	_view_mode.pressed.connect(func(): _view.set_comfort(not _view.comfort))
+	_layer.add_child(_view_mode)
+	_view_hint = Label.new()
+	_view_hint.name = "ViewHint"
+	_view_hint.position = Vector2(390, 850)
+	_view_hint.add_theme_font_size_override("font_size", 13)
+	_view_hint.add_theme_color_override("font_color", Color("#fff7e7"))
+	_view_hint.add_theme_color_override("font_shadow_color", Color("#242e35"))
+	_view_hint.add_theme_constant_override("shadow_offset_x", 1)
+	_view_hint.add_theme_constant_override("shadow_offset_y", 1)
+	_view_hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_layer.add_child(_view_hint)
+	_reticle = Label.new()
+	_reticle.name = "Reticle"
+	_reticle.text = "+"
+	_reticle.position = DESIGN * 0.5 - Vector2(7, 15)
+	_reticle.add_theme_font_size_override("font_size", 22)
+	_reticle.add_theme_color_override("font_color", Color.WHITE)
+	_reticle.add_theme_color_override("font_shadow_color", Color("#242e35"))
+	_reticle.add_theme_constant_override("shadow_offset_x", 1)
+	_reticle.add_theme_constant_override("shadow_offset_y", 1)
+	_reticle.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_reticle.visible = false
+	_layer.add_child(_reticle)
+
 	for kind in _props:
-		var hint := Label.new()
+		var hint := preload("res://scripts/components/desk_object_badge.gd").new()
 		hint.name = "Hint_%s" % kind
-		hint.add_theme_font_size_override("font_size", 11)
-		hint.add_theme_color_override("font_color", DESK_LABEL)
-		UIHelpers.apply_mono(hint, 11, true)
-		hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		hint.pressed.connect(func(): open_prop(kind))
 		_layer.add_child(hint)
 
 	_tooltip = _zone(Vector2.ZERO)
@@ -371,13 +532,13 @@ func _refresh_vitals() -> void:
 	impact.add_theme_constant_override("separation", 9)
 	impact.tooltip_text = "💥 Impact — solde du portefeuille.\nLe board compare ce solde au quota du trimestre : %d / %d." % [
 		vitals.get("impact", 0), vitals.get("quota", 0)]
-	impact.add_child(_value_label("💥 %d" % int(vitals.get("impact", 0))))
+	impact.add_child(_value_label("💥 Impact %d" % int(vitals.get("impact", 0))))
 	impact.add_child(_progress_bar(float(vitals.get("quotaRatio", 0.0))))
 	row.add_child(impact)
 
 	row.add_child(_separator())
 
-	var cash := _value_label("💰 %s" % _short_money(int(vitals.get("revenue", 0))))
+	var cash := _value_label("💰 Trésorerie %s" % _short_money(int(vitals.get("revenue", 0))))
 	cash.name = "Vital_revenue"
 	cash.tooltip_text = "💰 Trésorerie — ce qui paie les salaires, les licences et le support.\nCharges du sprint : %d." % int(SprintState.get_recurring_charges().get("total", 0))
 	cash.mouse_filter = Control.MOUSE_FILTER_STOP
@@ -385,7 +546,7 @@ func _refresh_vitals() -> void:
 
 	row.add_child(_separator())
 
-	var users := _value_label("👥 %s" % _short_count(int(vitals.get("users", 0))))
+	var users := _value_label("👥 Utilisateurs %s" % _short_count(int(vitals.get("users", 0))))
 	users.name = "Vital_users"
 	users.tooltip_text = "👥 Utilisateurs — la population qui paie chaque sprint.\nElle grandit par les livraisons, elle s'érode au churn."
 	users.mouse_filter = Control.MOUSE_FILTER_STOP
@@ -484,40 +645,54 @@ func _refresh_alerts() -> void:
 ## projection, mais restent **de face et nettes**. C'est le partage 3D/2D
 ## appliqué à la plus petite échelle qui soit — un mot sous une tasse.
 func _refresh_anchored_labels() -> void:
+	if _energy == null or _room == null:
+		return
 	_energy.text = "⚡ ÉNERGIE %d" % SprintState.energy
 	_energy.tooltip_text = UIHelpers.energy_tooltip()
 	_energy.reset_size()
-	_energy.position = _anchor(_room.project_to_design(_mug.global_position) + Vector2(0, 30), _energy.size)
+	var mug_point := _room.project_to_design(_mug.global_position)
+	_energy.visible = _lifted == null and Rect2(Vector2.ZERO, _room.canvas_size()).has_point(mug_point)
+	_energy.position = _anchor(mug_point + Vector2(0, 30), _energy.size)
 
 	for kind in _props:
 		var prop: Node3D = _props[kind]
-		var hint: Label = _layer.get_node("Hint_%s" % kind)
-		hint.visible = prop.visible and not prop.is_open()
+		var hint: Button = _layer.get_node("Hint_%s" % kind)
+		var point := _room.project_to_design(prop.hint_anchor())
+		hint.visible = (_view == null or _view.observing()) and _lifted == null and prop.visible and not prop.is_open() and Rect2(Vector2.ZERO, _room.canvas_size()).has_point(point)
 		if not hint.visible:
 			continue
-		hint.text = prop.hint_text()
+		hint.text = {"shop": "BOUTIQUE  ›\nRecruter · outils · pratiques", "committee": "COMITÉ  ›\nInvestissements du trimestre", "closing": "FIN DE SPRINT  ›"}.get(kind, prop.hint_text())
+		if kind == "closing":
+			var activity := SprintState.get_desk_activity()
+			var plan_text := "%d ticket%s enregistré%s" % [activity["tickets"], "s" if activity["tickets"] != 1 else "", "s" if activity["tickets"] != 1 else ""] if activity["saved"] else "Plan non enregistré"
+			hint.text += "\n%s\n%d message%s en attente" % [plan_text, activity["pending"], "s" if activity["pending"] != 1 else ""]
 		hint.reset_size()
-		hint.position = _anchor(_room.project_to_design(prop.hint_anchor()), hint.size)
+		hint.position = _anchor(point, hint.size)
 
 
 func _refresh_prop_close() -> void:
 	if _prop_close == null:
 		return
 	var opened := _open_prop_node()
-	_prop_close.visible = opened != null
+	_prop_close.visible = opened != null or (_view != null and _view.state == DeskViewController.State.FOCUS and _lifted == null)
 	if opened != null:
 		_prop_close.text = "Reposer %s  ·  Échap" % String(opened.call("hint_text")).to_lower()
 		_prop_close.reset_size()
-		_prop_close.position.x = DESIGN.x - _prop_close.size.x - 34.0
+		_prop_close.position.x = _room.canvas_size().x - _prop_close.size.x - 34.0
+	elif _prop_close.visible:
+		_prop_close.text = "Quitter l'ordinateur · Échap" if _view.focus_target == "laptop" else "Reposer · Échap"
+		_prop_close.reset_size()
+		_prop_close.position.x = _room.canvas_size().x - _prop_close.size.x - 34.0
 
 
 ## Centre une étiquette sur la projection d'un objet, **sans la laisser sortir
 ## du cadre** : un objet posé au bord du plateau projette son ancre hors champ,
 ## et l'étiquette disparaissait avec lui sans que rien ne le signale.
 func _anchor(at: Vector2, size: Vector2) -> Vector2:
+	var canvas := _room.canvas_size()
 	return Vector2(
-		clampf(at.x - size.x * 0.5, 16.0, DESIGN.x - size.x - 16.0),
-		clampf(at.y, 16.0, DESIGN.y - size.y - 12.0))
+		clampf(at.x - size.x * 0.5, 16.0, canvas.x - size.x - 16.0),
+		clampf(at.y, 16.0, maxf(16.0, canvas.y - size.y - 80.0)))
 
 
 # ── Le survol : deux lignes, en 2D, de face ──────────────────────────────
@@ -565,11 +740,10 @@ func _on_mug_hover(entered: bool) -> void:
 
 
 func _on_prop_hover(prop: Node3D, entered: bool) -> void:
-	var hint: Label = _layer.get_node_or_null("Hint_%s" % prop.kind)
+	var hint: Button = _layer.get_node_or_null("Hint_%s" % prop.kind)
 	if hint == null:
 		return
-	hint.add_theme_color_override("font_color", UIHelpers.COLOR_AMBER if entered else DESK_LABEL)
-	hint.add_theme_font_size_override("font_size", 12 if entered else 11)
+	hint.set_world_hover(entered)
 	_refresh_anchored_labels()
 
 
@@ -599,6 +773,7 @@ func _close_lifted() -> void:
 	_detail.visible = false
 	_set_anchored_labels_visible(true)
 	_refresh_anchored_labels()
+	_leave_focus()
 
 
 func _set_anchored_labels_visible(value: bool) -> void:
@@ -651,7 +826,42 @@ func _fill_detail(paper: Node3D) -> void:
 ## clic ailleurs. Le clic passe par un `call_deferred` parce que la sélection
 ## physique (`Area3D`) et `_unhandled_input` ne sont pas ordonnés entre eux :
 ## refermer tout de suite refermerait aussi le poster qu'on vient d'ouvrir.
+func _input(event: InputEvent) -> void:
+	# Un geste commencé dans l'ordinateur lui appartient jusqu'au relâchement,
+	# même si la souris passe sur le bouton Reposer du CanvasLayer.
+	if _surface_input.held and event is InputEventMouse and _room != null:
+		if _surface_input.route(_room.camera, event):
+			get_viewport().set_input_as_handled()
+
+
 func _unhandled_input(event: InputEvent) -> void:
+	if _view != null and _view.state == DeskViewController.State.FOCUS:
+		if event.is_action_pressed("ui_cancel") and is_instance_valid(_surface_input.viewport) and _surface_input.viewport.gui_is_dragging():
+			_surface_input.reset()
+			get_viewport().set_input_as_handled()
+			return
+		var surface: MeshInstance3D
+		var target: SubViewport
+		if _view.focus_target == "laptop":
+			surface = _room.get_node("Lid/Dalle")
+			target = _room.screen_viewport
+		elif _open_prop_node() != null:
+			surface = _open_prop_node().get_node("PanelPivot/Panel")
+			target = _open_prop_node().get_node("PanelPivot/PropViewport")
+		if target != null:
+			_surface_input.bind(surface, target)
+			if _surface_input.route(_room.camera, event):
+				get_viewport().set_input_as_handled()
+				return
+	if _view != null and _view.handle_observation(event):
+		get_viewport().set_input_as_handled()
+		return
+	if _view != null and _view.transitioning():
+		if event.is_action_pressed("ui_cancel"):
+			_view.release_look()
+			_leave_focus()
+		get_viewport().set_input_as_handled()
+		return
 	if event.is_action_pressed("ui_cancel"):
 		if _lifted != null:
 			_close_lifted()
@@ -665,12 +875,42 @@ func _unhandled_input(event: InputEvent) -> void:
 			_workstation.call("close_app")
 			get_viewport().set_input_as_handled()
 			return
+		if _view != null and _view.state == DeskViewController.State.FOCUS:
+			_leave_focus()
+			get_viewport().set_input_as_handled()
+			return
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		var frame := Engine.get_process_frames()
 		if _lifted != null:
 			_close_unless_reclaimed.call_deferred(frame)
 		elif _open_prop_node() != null:
 			_close_prop_unless_reclaimed.call_deferred(frame)
+		elif _view != null and _view.state == DeskViewController.State.FOCUS:
+			_close_laptop_unless_hit.call_deferred(event.position)
+
+
+func _close_laptop_unless_hit(at: Vector2) -> void:
+	if _view == null or _view.state != DeskViewController.State.FOCUS:
+		return
+	# La dalle a la couche 2 en focus : le rayon d'observation ne la sélectionne pas.
+	var camera := _room.camera
+	var origin := camera.project_ray_origin(at)
+	var query := PhysicsRayQueryParameters3D.create(origin, origin + camera.project_ray_normal(at) * float(SprintState.get_desk_conf()["camera"]["rayLength"]), 2)
+	query.collide_with_areas = true
+	query.collide_with_bodies = false
+	if camera.get_world_3d().direct_space_state.intersect_ray(query).is_empty():
+		_close_focused_object()
+
+
+func _close_focused_object() -> void:
+	if _open_prop_node() != null:
+		_close_open_prop()
+	elif _lifted != null:
+		_close_lifted()
+	else:
+		if _workstation != null and _workstation.is_open():
+			_workstation.close_app()
+		_leave_focus()
 
 
 func _close_unless_reclaimed(frame: int) -> void:
@@ -695,6 +935,7 @@ func _close_open_prop() -> void:
 	var opened := _open_prop_node()
 	if opened != null:
 		opened.call("collapse")
+	_leave_focus()
 
 
 func _close_prop_unless_reclaimed(frame: int) -> void:
@@ -711,13 +952,34 @@ func _sync_interaction_scope() -> void:
 	if _room == null:
 		return
 	var opened := _open_prop_node()
-	var world_unlocked := opened == null
+	var observing := _view == null or _view.observing()
+	var ready_focus := _view != null and _view.state == DeskViewController.State.FOCUS
+	var world_unlocked := opened == null and observing
 	for area in _room.find_children("*", "Area3D", true, false):
-		(area as Area3D).input_ray_pickable = world_unlocked
+		(area as Area3D).input_ray_pickable = false
+		(area as Area3D).collision_layer = 1 if world_unlocked and area.has_meta("desk_target") and area.is_visible_in_tree() else 0
 	for kind in _props:
 		var prop: Node3D = _props[kind]
-		prop.call("set_input_scope", world_unlocked, prop == opened)
+		var prop_ready: bool = ready_focus and prop == opened and not prop.is_presenting()
+		prop.call("set_input_scope", false, prop_ready)
+		var panel_area: Area3D = prop.get_node("PanelPivot/PanelArea")
+		panel_area.collision_layer = 2 if panel_area.input_ray_pickable else 0
+		var viewport: SubViewport = prop.get_node("PanelPivot/PropViewport")
+		viewport.gui_disable_input = not prop_ready
+	var dalle_area: Area3D = _room.get_node("Lid/DalleArea")
+	dalle_area.input_ray_pickable = ready_focus and _view.focus_target == "laptop"
+	if dalle_area.input_ray_pickable:
+		dalle_area.collision_layer = 2
+	_room.screen_viewport.gui_disable_input = not dalle_area.input_ray_pickable
 	_set_canvas_interactions_locked(not world_unlocked)
+	# Le relais géométrique traite les événements immédiatement, sans attendre
+	# le picking physique ni perdre le relâchement à l'extérieur du panneau.
+	get_viewport().physics_object_picking = false
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_APPLICATION_FOCUS_OUT or what == NOTIFICATION_EXIT_TREE:
+		_surface_input.reset()
 
 
 func _set_canvas_interactions_locked(locked: bool) -> void:
@@ -728,7 +990,7 @@ func _set_canvas_interactions_locked(locked: bool) -> void:
 		var node: Node = pending.pop_back()
 		for child in node.get_children():
 			pending.append(child)
-		if not (node is Control) or node == _prop_close:
+		if not (node is Control) or node == _prop_close or node == _view_mode or node == _detail or _detail.is_ancestor_of(node) or node.name == "TeamManagementDialog" or (_layer.get_node_or_null("TeamManagementDialog") != null and _layer.get_node("TeamManagementDialog").is_ancestor_of(node)):
 			continue
 		var control := node as Control
 		if locked:

@@ -621,6 +621,19 @@
     "okrCapitalPolitiqueBonus": 2
   },
   "desk": {
+    "camera": {
+      "_comment": "Vue assise : pose d'observation, bornes de tête et transitions. La pose de lecture du laptop est calculée par DeskRoom.",
+      "position": [0.0, 1.62, 1.8],
+      "aim": [0.0, 1.05, -0.18],
+      "fov": 52.0,
+      "yawLimit": 42.0,
+      "pitchUpLimit": 24.0,
+      "pitchDownLimit": 32.0,
+      "sensitivity": 0.10,
+      "transitionSeconds": 0.32,
+      "rayLength": 8.0,
+      "invertY": false
+    },
     "_comment": "Le bureau (issue #54). Aucune de ces valeurs n'est une constante de script : elles pilotent la remontée par exception du HUD et le coût du skip. Le Cynisme est volontairement absent de `alerts.gauges` — resources.json le définit comme « la jauge invisible », et l'afficher était un défaut.",
     "alerts": {
       "_comment": "Une alerte doit prévenir avec au moins `marginPerSprint` points d'avance sur l'échec : arrivée plus tard, elle punit au lieu d'informer. score_resolver_cases le vérifie pour chaque jauge.",

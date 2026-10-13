@@ -1,0 +1,5 @@
+smoke_test_logic: exit=0, errors=0
+smoke_test_ui: exit=0, errors=0
+smoke_test_fps: exit=0, errors=0
+smoke_test_desk_input: exit=0, errors=0
+score_resolver_cases: exit=0, errors=0

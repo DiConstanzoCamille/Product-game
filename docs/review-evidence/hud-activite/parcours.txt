@@ -1,0 +1,7 @@
+Godot Engine v4.7.1.stable.official.a13da4feb - https://godotengine.org
+OpenGL API 3.3.0 NVIDIA 610.74 - Compatibility - Using Device: NVIDIA - NVIDIA GeForce RTX 3080
+
+GameData: données chargées — 5 ressources, 7 cartes, 3 époques, 9 fins de mandat.
+RUN VISUEL immersif : fin remercie, sprint 3
+RUN VISUEL confort : fin remercie, sprint 3
+=== RECETTE FPS RENDUE : OK ===

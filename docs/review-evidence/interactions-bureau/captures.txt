@@ -1,0 +1,29 @@
+Godot Engine v4.7.1.stable.official.a13da4feb - https://godotengine.org
+OpenGL API 3.3.0 NVIDIA 610.74 - Compatibility - Using Device: NVIDIA - NVIDIA GeForce RTX 3080
+
+GameData: données chargées — 5 ressources, 7 cartes, 3 époques, 9 fins de mandat.
+=== CAPTURES — sortie : C:/Users/camil/Ai Project/game/docs/review-evidence/interactions-bureau ===
+  ✓ desk_screen (1920x1080)
+  ✓ start_screen (1920x1080)
+  ✓ career_select_screen (1920x1080)
+  ✓ scenario_screen (1920x1080)
+  ✓ company_select_screen (1920x1080)
+  ✓ inbox_screen (1920x1080)
+  ✓ roadmap_screen (1920x1080)
+  ✓ investments_screen (1920x1080)
+  ✓ resolution_screen (1920x1080)
+  ✓ foundations_screen (1920x1080)
+  ✓ mandate_end_screen (1920x1080)
+  ✓ committee_screen (1920x1080)
+  ✓ team_management_screen (1920x1080)
+  ✓ desk_calme (1920x1080)
+  ✓ desk_app (1920x1080)
+  ✓ desk_roadmap (1920x1080)
+  ✓ desk_shop (1920x1080)
+  ✓ desk_closing (1920x1080)
+  ✓ desk_committee (1920x1080)
+  ✓ desk_poster (1920x1080)
+  ✓ ecran_0-sobre (intensité 0.00)
+  ✓ ecran_1-mesure (intensité 0.45)
+  ✓ ecran_2-franc (intensité 0.95)
+=== CAPTURES : TERMINÉ ===

@@ -91,6 +91,11 @@ func build() -> void:
 	back.position = Vector3(0, -world.y * 0.5, -THICKNESS * 0.5)
 	back.material_override = DeskRoom.toon_material(color.darkened(0.06))
 	_sheet.add_child(back)
+	var model := preload("res://scripts/components/laptop_model.gd")
+	model.part(self, "CorkBacking", Vector3(0, 0, -0.028), Vector3(world.x + 0.07, world.y + 0.07, 0.028), Color("#ae9270"), 0.018)
+	model.part(self, "FrameInset", Vector3(0, 0, -0.012), Vector3(world.x + 0.027, world.y + 0.027, 0.006), Color("#e5dac0"), 0.008)
+	for side in [-1.0, 1.0]:
+		model.part(_sheet, "BrassPin", Vector3(side * world.x * 0.37, -0.017, 0.007), Vector3(0.015, 0.015, 0.009), Color("#b99760"), 0.006)
 
 	# Le trait d'encre autour de la feuille — c'est lui qui la fait lire comme
 	# un objet dessiné plutôt que comme une texture posée sur le mur.
@@ -101,7 +106,7 @@ func build() -> void:
 	# plonge — se rasterise en pointillés le long du bord haut. Un quad d'encre
 	# à peine plus grand, dans le même plan, donne un trait franc et régulier
 	# pour deux fois moins de géométrie.
-	var border_pixels := 3.0 / _pixels_per_unit()
+	var border_pixels := 1.2 / _pixels_per_unit()
 	var border := MeshInstance3D.new()
 	border.name = "Border"
 	var border_quad := QuadMesh.new()

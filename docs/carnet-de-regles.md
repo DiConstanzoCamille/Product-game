@@ -2348,3 +2348,220 @@ la Boutique ne suffisait pas, car son ancienne `Area3D` réclamait encore le
 clic et annulait le clic extérieur. Réciproquement, le bouton « SIGNER ET
 LANCER » de la planche de clôture est testé par un vrai événement souris routé
 dans son `SubViewport`, afin de garantir le point de non-retour du sprint.
+
+## 39. Premier asset retravaillé : le portable (05/09/2026)
+
+Le portable quitte les deux boîtes du prototype. Son modèle procédural vit
+dans `game/scripts/components/laptop_model.gd` : coques à coins arrondis et
+chanfreins, cadre sombre aminci, webcam, charnières, touches individuelles,
+barre d'espace, trackpad et grilles de haut-parleurs. La palette associe un
+aluminium bleu-gris clair, des touches ardoise et une touche Échap terre cuite.
+Les dimensions sont des paramètres artistiques ; aucune règle ou donnée
+d'équilibrage n'est modifiée.
+
+Le modèle reste compatible avec le rendu toon `gl_compatibility`. Le contour
+du capot est réduit à 1,5 pixel de composition. La dalle conserve exactement
+son repère, sa taille calculée, son `SubViewport` et sa zone interactive.
+Le fond du cadre doit rester derrière la dalle : son épaisseur ne doit jamais
+recouvrir le logiciel, défaut repéré et corrigé lors de la première capture.
+
+La caméra de jeu reste inchangée : elle coupe encore presque tout le clavier.
+La scène `tests/laptop_asset_preview.tscn` fournit donc une vue trois-quarts
+du modèle entier, uniquement pour sa relecture. Ce lot n'implémente pas la vue
+FPS assise et ne remplace pas encore les autres accessoires.
+
+Recette : les deux smoke tests headless passent sous Godot 4.7.1, notamment
+les contrats d'hébergement, la dimension projetée de la dalle, la défaite
+`careful` et le burn-out `stress`. Le harnais visuel a rendu tous les écrans
+et les états du bureau ; planche de contact relue et captures du laptop, au
+repos et avec Roadmap, inspectées en grand. Il s'agit d'un parcours automatisé
+des écrans, pas d'une partie humaine complète. Les preuves sont dans
+`docs/review-evidence/laptop-qualite/`.
+
+## 40. Habiter le bureau : assets cohérents et vue FPS assise (07/09/2026)
+
+Le lot étend le portable du §39 à l'ensemble de la pièce : plateau biseauté,
+sous-main, fenêtre avec rideaux, murs sauge et soubassement, lampe de bureau,
+plante, livres à tranches visibles et stylo. La tablette possède une façade
+de verre et des repères d'applications ; la planche de clôture porte ses
+feuilles et sa pince ; le parapheur possède un dos, des coutures et un
+porte-étiquette. Les papiers du mur ont un support et des attaches. La tasse
+possède une vraie paroi intérieure, une lèvre, une anse verticale et un
+sous-verre ; le café conserve son niveau piloté par l'Énergie.
+
+La géométrie procédurale vit dans `desk_art.gd` et `laptop_model.gd`.
+Les grandes surfaces mates utilisent un éclairage continu, les objets gardent
+le rendu dessiné. Les faces planes des modèles arrondis ont des normales
+distinctes des chanfreins pour éviter de faire apparaître leur triangulation.
+Le renderer reste `gl_compatibility`. Les murs latéraux et le plafond ferment
+la pièce aux limites du regard ; ils ne projettent pas d'ombre afin de
+conserver l'éclairage illustré existant.
+
+Le joueur est désormais assis devant le clavier. Il peut tourner la tête,
+sans se déplacer, puis viser un objet et cliquer pour le lire. Un premier clic
+dans la pièce capture la souris ; Échap la libère. Le mode confort remplace
+la capture permanente par un clic droit maintenu, avec le même accès aux
+objets. Le choix du mode reste en mémoire durant la session.
+
+Le contrôleur `DeskViewController` possède seul le curseur et le tween de
+caméra. Ses états explicites séparent observation libre, regard capturé,
+transition d'entrée, lecture et retour. Les angles, la pose, le FOV, la
+sensibilité et la durée vivent dans `balance.json → desk.camera`. Les limites
+retenues sont ±42° en horizontal et +24°/−32° en vertical, vérifiées par le
+rayon physique sur chaque cible. Aucun coût de gameplay n'est lié au regard.
+
+Le laptop retrouve la pose historique et la taille de dalle calculée avant
+de recevoir des entrées. Fermer son application revient au lanceur sans
+bouger la caméra ; quitter le laptop retrouve le regard précédent. Les
+accessoires sont présentés de face et leurs entrées restent bloquées jusqu'à
+la fin de leur déplacement. Le décor ne reçoit aucun clic en lecture. Une
+transition interrompue ne peut pas ouvrir tardivement une application ; la
+perte de focus ou la sortie de scène rend la souris visible.
+
+Le redimensionnement ajuste le FOV de lecture au canevas logique pour garder
+la dalle à son échelle, et recale le réticule ainsi que les commandes ancrées.
+La signature de clôture diffère maintenant le changement de scène jusqu'à
+la fin du routage du clic : retirer immédiatement le `SubViewport` de l'arbre
+provoquait une erreur moteur lors d'un vrai clic sur « SIGNER ET LANCER ».
+
+Recette : les suites headless logique, UI et FPS passent. Les critères
+`careful` et `stress` restent couverts. Deux parties rendues automatisées ont
+atteint une fin de run, une par mode ; la réponse au courrier et la signature
+sont cliquées à travers le rayon et le `SubViewport`, sans appeler directement
+leur effet métier. Les 100 alternances, les bornes, l'interruption, la sortie
+de scène et le redimensionnement en 1280×900 sont vérifiés. Les preuves sont
+dans `docs/review-evidence/bureau-fps/`.
+
+La recette ne remplace pas encore une évaluation humaine du confort à la
+souris. Réglages fins dans une interface dédiée et support manette restent
+hors du lot ; le comportement du Comité à la fermeture demeure celui du §38.
+
+## 41. Interactions du bureau : curseur et gestes continus (07/09/2026)
+
+Retour de recette humaine : curseur peu clair sur l'ordinateur, glisser-déposer
+Roadmap inopérant, entrée de clôture difficile hors du texte. Le relais 3D
+annulait `InputEventMouseMotion.relative` et dépendait du picking physique,
+qui cesse de fournir les événements dès que le pointeur quitte la surface.
+Le premier clic en observation libre capturait aussi la souris au lieu
+d'activer l'objet visé par le curseur.
+
+Un clic sur un objet en observation libre l'ouvre désormais directement,
+dans les deux modes. Seul un clic ailleurs capture le regard en mode immersif.
+En regard capturé, la visée centrale reste la référence. Le clavier et le
+repose-poignets ouvrent aussi le portable ; la planche de clôture se sélectionne
+sur son corps, pas uniquement près de son étiquette.
+
+En lecture, la caméra est fixe et la souris reste en `MOUSE_MODE_VISIBLE`.
+Le nouveau relais `desk_surface_input.gd`, commun à la dalle et aux accessoires,
+projette les événements sur le plan du quad, conserve le déplacement relatif
+en pixels du SubViewport et notifie ses entrées/sorties de souris. Il transmet
+les survols, clics, molette et glisser-déposer immédiatement, sans doublon
+de picking. Un geste commencé sur la surface conserve ses mouvements et son
+relâchement même hors dalle ou au-dessus d'un contrôle du HUD. Un dépôt hors
+écran annule le geste sans fermer l'application. Échap pendant un drag annule
+seulement ce drag ; les Échap suivants retrouvent la navigation habituelle.
+La perte de focus annule le geste en cours et le retour de focus rétablit
+explicitement le mode souris approprié. Aucune règle métier n'est modifiée.
+
+Recette ajoutée : `smoke_test_desk_input.tscn` pousse des événements souris
+dans le viewport de fenêtre, sans appeler les callbacks de planification.
+Elle vérifie, dans les deux modes, le premier clic sur le centre et les quatre
+coins de la planche, l'entrée par le clavier, le curseur visible, la caméra
+immobile, le survol, le drag réel, le déplacement du ticket dans la colonne
+sprint, le relâchement extérieur, Échap, la perte de focus et la molette.
+Le test de molette ajoute un espace de débordement au seul fixture UI afin
+de ne pas dépendre du nombre aléatoire de tickets. Les suites logique, UI et
+FPS restent requises, ainsi que les parcours et captures rendus. Preuves :
+`docs/review-evidence/interactions-bureau/`. Le curseur natif du système n'est
+pas inclus dans les captures du framebuffer ; son mode est asserté par les tests.
+
+## 42. Prototype de langage HUD : rendre les choix visibles (07/09/2026)
+
+À la demande de Camille, développement d'une tranche visuelle pour aider à
+valider la vision globale, pas d'une refonte de gameplay. Intention : « le
+décor situe, le HUD oriente, le geste laisse une trace ». La proposition et
+ses limites sont dans `docs/vision-hud-prototype.md` ; elle reste à valider.
+
+Les cartes de roadmap distinguent maintenant disponible (papier neutre),
+survol (contour), déplacement (destination renforcée) et prévu (fond bleu,
+bande latérale, coche et texte). Le type epic reste explicite sans emprunter
+le rouge d'alerte. Les bandeaux de coût et la capacité sont bleus lorsqu'ils
+expriment un engagement ; l'ambre signale la surcharge, toujours autorisée.
+Le tampon vert de réussite est retiré de la planification. Le compteur des
+tickets et les points disponibles/excédentaires sont exposés sans calculer
+de nouvelle règle. Les tokens sont regroupés dans `hud_language.gd`.
+
+Le HUD nomme ses trois ressources. Les apps sont lues sans l'effet de dalle,
+qui reste sur le lanceur. « Applications » indique la destination du retour
+et « Enregistrer le plan » nomme le bouton de validation déjà existant.
+Attention : le brouillon n'est pas encore préservé à la fermeture et ce lot
+ne change pas ce contrat ; il faut utiliser ce bouton avant de quitter.
+L'enregistrement automatique reste un arbitrage distinct.
+
+Recette du prototype : les suites logique, UI, FPS et interactions, captures
+du bureau et des états sélection/surcharge en 1920×1080, lecture en 1280×900,
+et tour visuel des écrans. Les tests d'interactions vérifient aussi le cadre
+de destination, la bande persistante et le libellé de sélection après un
+vrai drag. Les preuves sont dans `docs/review-evidence/prototype-hud/`.
+La sauvegarde du plan et la généralisation à boutique/Comité/clôture/RH
+restent hors du prototype, sur la branche `codex/prototype-hud-lisibilite`.
+
+## 43. Le bureau reflète l'activité et nomme ses objets (prototype)
+
+Suite validée par Camille : afficher l'activité sur l'accueil et rendre les
+textes Boutique/Fin de sprint/Comité visibles et compréhensibles. La vue
+publique `get_desk_activity()` lit uniquement les faits du sprint courant :
+rapport de roadmap enregistré, points, capacité, courrier et ressources
+réelles. Le décompte déduplique les epics présents dans les livraisons et les
+progressions. Aucun attribut caché ni score anticipé n'est exposé.
+
+Les tuiles du portable affichent le plan enregistré, le courrier restant,
+les utilisateurs et l'Impact disponible. Leurs textes sont actualisés sans
+reconstruire l'application en cours. Un fil visuel non interactif montre
+brièvement les variations nettes réellement observées au bureau (maximum
+trois retours) ; l'entrée dans la scène ne produit aucun faux gain et une
+valeur inchangée ne rejoue pas son retour. Aucun historique inter-scènes
+ni changement de règle d'enregistrement de la roadmap n'est ajouté.
+
+Les objets de gestion ont désormais des étiquettes opaques à texte sombre,
+avec rôle ou état, et contour bleu au survol. Elles sont aussi cliquables et
+ouvrent le même objet que la visée 3D. Leur taille ne varie pas au survol,
+elles se masquent pendant la lecture et reviennent à la fin du retour caméra.
+Le bas du canevas reste réservé aux commandes de regard. La planche indique
+combien de tickets sont enregistrés et combien de messages restent en attente.
+
+Recette dédiée : `hud_activity_preview.tscn` vérifie les rapports anciens,
+la déduplication des epics, brouillon vs enregistré, absence de gain fictif,
+dépense d'énergie réelle, non-répétition et disparition des retours, clic de
+fenêtre sur l'étiquette Boutique et non-chevauchement des étiquettes de droite
+en 1280×900. S'ajoutent les suites logique/UI/FPS/interactions et la recette
+rendue. Preuves : `docs/review-evidence/hud-activite/`. Prototype non commité.
+
+
+## 44. Collection Atelier — assets 3D importés (13/10/2026)
+
+Le bureau accueille une collection originale de six modèles GLB : lampe
+articulée, plante en pot cannelé, papeterie, carnets reliés, casque sur support
+et vide-poche. Le joueur trouve un poste de travail plus habité et détaillé,
+avec des silhouettes lisibles lorsqu'il regarde autour de lui.
+
+La collection remplace les anciennes lampe, plante et pile de livres générées
+au runtime. Les autres objets occupent les espaces latéraux. Les placements
+vivent dans `game/scenes/components/atelier_collection.tscn`, éditable dans
+Godot. La lampe conserve une lumière locale douce. Ces objets sont décoratifs :
+aucun état métier, interaction, coût ou comportement de caméra supplémentaire.
+
+Les modèles sont fabriqués dans Blender par
+`tools/desk_assets/build_collection.py`, avec géométrie, normales et matériaux
+PBR embarqués. Ils ne dépendent d'aucun catalogue tiers, plugin ou téléchargement
+au lancement. L'import GLB constitue désormais un point d'entrée concret pour
+le travail artistique. Les pièces sont regroupées par matériau à l'export ;
+`game/assets/atelier/catalog.json` donne les budgets réels de chaque modèle.
+
+Recette : suites logique, UI, FPS, interactions et scoring ; 40/40 simulations
+logiques ; parcours rendus en modes immersif et confort jusqu'à une fin de
+mandat. Captures de la collection, du bureau nominal et en alerte, de la lecture
+et des bornes du regard dans `docs/review-evidence/atelier/`. Validation locale
+avec Godot 4.6.3, GL Compatibility et rendu logiciel ; le projet cible 4.7.
+Cela ne remplace pas un playtest humain ni une mesure de performances sur une
+machine cible. Avertissement ObjectDB déjà présent sur la baseline.
