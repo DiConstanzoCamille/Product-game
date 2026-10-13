@@ -61,19 +61,8 @@ static func build_room(parent: Node3D) -> void:
 	for x in [-3.28, -1.82]:
 		for fold in range(5):
 			Model.part(parent, "Curtain", Vector3(x + fold * 0.032, 1.83, -1.16), Vector3(0.055, 1.79, 0.055), Color("#a29c84") if fold % 2 else Color("#b9b29c"))
-	build_lamp(parent, Vector3(1.53, 0.755, -0.52))
-	build_plant(parent, Vector3(-1.48, 0.755, -0.44))
-	for index in range(3):
-		var book := Node3D.new()
-		book.name = "Book"
-		book.position = Vector3(1.39, 0.775 + index * 0.041, 0.39)
-		book.rotation_degrees.y = -8 + index * 8
-		parent.add_child(book)
-		var cover_color: Color = [Color("#3b6469"), Color("#a67855"), Color("#afbdad")][index]
-		flat_part(book, "BackCover", Vector3(0, -0.018, 0), Vector3(0.32, 0.004, 0.24), cover_color)
-		flat_part(book, "FrontCover", Vector3(0, 0.018, 0), Vector3(0.32, 0.004, 0.24), cover_color)
-		flat_part(book, "Spine", Vector3(-0.155, 0, 0), Vector3(0.010, 0.036, 0.23), cover_color, 0.004)
-		flat_part(book, "Pages", Vector3(0.003, 0, 0), Vector3(0.296, 0.029, 0.219), Color("#dfd8c4"), 0.004)
+	# Collection GLB originale : placements éditables dans une scène dédiée.
+	parent.add_child(preload("res://scenes/components/atelier_collection.tscn").instantiate())
 	var pen := cylinder(parent, "DeskPen", Vector3(0.94, 0.77, 0.53), 0.23, 0.006, 0.006, Color("#253d4b"))
 	pen.rotation_degrees = Vector3(90, 0, 24)
 
@@ -84,49 +73,6 @@ static func matte(color: Color) -> StandardMaterial3D:
 	material.roughness = 0.95
 	material.specular_mode = BaseMaterial3D.SPECULAR_DISABLED
 	return material
-
-
-static func build_lamp(parent: Node3D, at: Vector3) -> void:
-	var lamp := Node3D.new()
-	lamp.name = "DeskLamp"
-	lamp.position = at
-	parent.add_child(lamp)
-	cylinder(lamp, "Foot", Vector3(0, 0.018, 0), 0.036, 0.12, 0.11, Color("#3a5156"))
-	cylinder(lamp, "Stem", Vector3(0, 0.28, 0), 0.53, 0.013, 0.013, Color("#ad9160"))
-	var shade := cylinder(lamp, "Shade", Vector3(-0.055, 0.55, 0), 0.13, 0.14, 0.075, Color("#496963"))
-	shade.rotation_degrees.z = -16
-	cylinder(lamp, "Diffuser", Vector3(-0.055, 0.491, 0), 0.006, 0.13, 0.13, Color("#f1d8a0"))
-	var glow := OmniLight3D.new()
-	glow.position = Vector3(-0.055, 0.42, 0)
-	glow.light_color = Color("#ffcf8a")
-	glow.light_energy = 0.35
-	glow.omni_range = 0.95
-	lamp.add_child(glow)
-
-
-static func build_plant(parent: Node3D, at: Vector3) -> void:
-	var plant := Node3D.new()
-	plant.name = "Plant"
-	plant.position = at
-	parent.add_child(plant)
-	cylinder(plant, "Saucer", Vector3(0, 0.009, 0), 0.018, 0.105, 0.105, Color("#915e47"))
-	cylinder(plant, "Terracotta", Vector3(0, 0.085, 0), 0.15, 0.07, 0.095, Color("#ad7657"))
-	cylinder(plant, "Soil", Vector3(0, 0.16, 0), 0.006, 0.086, 0.086, Color("#403c30"))
-	for index in range(9):
-		var a := index * TAU / 9.0
-		var leaf := MeshInstance3D.new()
-		leaf.name = "Leaf"
-		var mesh := SphereMesh.new()
-		mesh.radius = 0.047
-		mesh.height = 0.094
-		mesh.radial_segments = 12
-		mesh.rings = 8
-		leaf.mesh = mesh
-		leaf.position = Vector3(cos(a) * 0.07, 0.27 + (index % 3) * 0.045, sin(a) * 0.07)
-		leaf.scale = Vector3(0.65, 2.7, 0.30)
-		leaf.rotation = Vector3(sin(a) * 0.5, a, cos(a) * 0.65)
-		leaf.material_override = DeskRoom.toon_material(Color("#446950") if index % 2 else Color("#65815a"))
-		plant.add_child(leaf)
 
 
 static func dress_prop(cover: MeshInstance3D, kind: String, size: Vector3) -> void:

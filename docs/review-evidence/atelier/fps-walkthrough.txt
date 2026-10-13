@@ -1,0 +1,7 @@
+Godot 4.6.3 — parcours rendu, GL Compatibility, 1600x900
+GameData: données chargées — 5 ressources, 7 cartes, 3 époques, 9 fins de mandat.
+RUN VISUEL immersif : fin remercie, sprint 2
+RUN VISUEL confort : fin remercie, sprint 3
+=== RECETTE FPS RENDUE : OK ===
+WARNING: ObjectDB instances leaked at exit (run with --verbose for details).
+   at: cleanup (core/object/object.cpp:2663)

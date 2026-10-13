@@ -2536,3 +2536,32 @@ dépense d'énergie réelle, non-répétition et disparition des retours, clic d
 fenêtre sur l'étiquette Boutique et non-chevauchement des étiquettes de droite
 en 1280×900. S'ajoutent les suites logique/UI/FPS/interactions et la recette
 rendue. Preuves : `docs/review-evidence/hud-activite/`. Prototype non commité.
+
+
+## 44. Collection Atelier — assets 3D importés (13/10/2026)
+
+Le bureau accueille une collection originale de six modèles GLB : lampe
+articulée, plante en pot cannelé, papeterie, carnets reliés, casque sur support
+et vide-poche. Le joueur trouve un poste de travail plus habité et détaillé,
+avec des silhouettes lisibles lorsqu'il regarde autour de lui.
+
+La collection remplace les anciennes lampe, plante et pile de livres générées
+au runtime. Les autres objets occupent les espaces latéraux. Les placements
+vivent dans `game/scenes/components/atelier_collection.tscn`, éditable dans
+Godot. La lampe conserve une lumière locale douce. Ces objets sont décoratifs :
+aucun état métier, interaction, coût ou comportement de caméra supplémentaire.
+
+Les modèles sont fabriqués dans Blender par
+`tools/desk_assets/build_collection.py`, avec géométrie, normales et matériaux
+PBR embarqués. Ils ne dépendent d'aucun catalogue tiers, plugin ou téléchargement
+au lancement. L'import GLB constitue désormais un point d'entrée concret pour
+le travail artistique. Les pièces sont regroupées par matériau à l'export ;
+`game/assets/atelier/catalog.json` donne les budgets réels de chaque modèle.
+
+Recette : suites logique, UI, FPS, interactions et scoring ; 40/40 simulations
+logiques ; parcours rendus en modes immersif et confort jusqu'à une fin de
+mandat. Captures de la collection, du bureau nominal et en alerte, de la lecture
+et des bornes du regard dans `docs/review-evidence/atelier/`. Validation locale
+avec Godot 4.6.3, GL Compatibility et rendu logiciel ; le projet cible 4.7.
+Cela ne remplace pas un playtest humain ni une mesure de performances sur une
+machine cible. Avertissement ObjectDB déjà présent sur la baseline.

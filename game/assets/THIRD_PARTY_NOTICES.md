@@ -82,3 +82,11 @@ Pour ajouter un personnage : `npm install @dicebear/core @dicebear/collection` p
 Utilisé en production par la carte d'Actif (`scenes/components/asset_card.tscn`) : une icône d'objet par grande décision et par pratique, mappée dans `scripts/asset_view.gd` → `DECISION_ICONS` / `PRACTICE_ICONS` (le choix d'icône est de la présentation, il n'a pas sa place dans `data/`). Le spike `scenes/prototype_2d/market_screen_proto.tscn` s'en sert aussi.
 
 Le [UI Pack](https://kenney.nl/assets/ui-pack) du même auteur a été évalué le 30/07/2026 puis **écarté** : ses boutons ronds et colorés jurent avec le ton corporate/satirique du jeu. Ne pas le réintroduire comme chrome des écrans sans nouvelle validation.
+
+
+## Collection originale — `atelier/`
+
+Les six modèles GLB de cette collection sont des créations originales pour
+Product Tycoon, générées par `tools/desk_assets/build_collection.py`. Aucun
+modèle ou texture de catalogue tiers n'est intégré. Sources, procédure de
+régénération et budgets : [`atelier/README.md`](atelier/README.md).

@@ -1,0 +1,40 @@
+[gd_scene load_steps=7 format=3]
+
+[ext_resource type="PackedScene" path="res://assets/atelier/task_lamp.glb" id="1_lamp"]
+[ext_resource type="PackedScene" path="res://assets/atelier/rubber_plant.glb" id="2_plant"]
+[ext_resource type="PackedScene" path="res://assets/atelier/pencil_cup.glb" id="3_cup"]
+[ext_resource type="PackedScene" path="res://assets/atelier/field_notebooks.glb" id="4_notes"]
+[ext_resource type="PackedScene" path="res://assets/atelier/headphone_stand.glb" id="5_headphones"]
+[ext_resource type="PackedScene" path="res://assets/atelier/valet_tray.glb" id="6_tray"]
+
+[node name="AtelierCollection" type="Node3D"]
+
+[node name="TaskLamp" parent="." instance=ExtResource("1_lamp")]
+position = Vector3(1.53, 0.755, -0.52)
+rotation = Vector3(0, 0.2, 0)
+
+[node name="WarmPool" type="OmniLight3D" parent="TaskLamp"]
+position = Vector3(0, 0.38, 0.11)
+light_color = Color(1, 0.82, 0.57, 1)
+light_energy = 0.3
+omni_range = 0.85
+
+[node name="RubberPlant" parent="." instance=ExtResource("2_plant")]
+position = Vector3(-1.48, 0.755, -0.44)
+rotation = Vector3(0, 0.4, 0)
+
+[node name="PencilCup" parent="." instance=ExtResource("3_cup")]
+position = Vector3(-1.29, 0.755, -0.06)
+rotation = Vector3(0, -0.3, 0)
+
+[node name="FieldNotebooks" parent="." instance=ExtResource("4_notes")]
+position = Vector3(1.39, 0.755, 0.39)
+rotation = Vector3(0, -0.12, 0)
+
+[node name="HeadphoneStand" parent="." instance=ExtResource("5_headphones")]
+position = Vector3(1.53, 0.755, -0.02)
+rotation = Vector3(0, -0.28, 0)
+
+[node name="ValetTray" parent="." instance=ExtResource("6_tray")]
+position = Vector3(-1.12, 0.755, 0.32)
+rotation = Vector3(0, 0.14, 0)
