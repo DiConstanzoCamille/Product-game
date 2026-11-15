@@ -1,0 +1,491 @@
+{
+  "renderer": "pen.dev natif",
+  "revision": "Emblèmes et harmonisation des écrans secondaires",
+  "screens": [
+    {
+      "code": "J01",
+      "id": "8810d5a423f849",
+      "name": "J01 · Préparer la journée — scène plein écran",
+      "issues": []
+    },
+    {
+      "code": "J02",
+      "id": "bc6e2b4101574e",
+      "name": "J02 · Choisir les sujets — cartes sur le plateau",
+      "issues": []
+    },
+    {
+      "code": "J03",
+      "id": "10cd406cca4345",
+      "name": "J03 · Sélectionner Lina — commande contextuelle",
+      "issues": []
+    },
+    {
+      "code": "J04",
+      "id": "kl6H3",
+      "name": "J04 · Ordonner la roadmap",
+      "issues": []
+    },
+    {
+      "code": "J05",
+      "id": "RFWwx",
+      "name": "J05 · Comprendre un sujet et ses descendants",
+      "issues": []
+    },
+    {
+      "code": "J06",
+      "id": "meUwZ",
+      "name": "J06 · Choisir une solution pour le connecteur",
+      "issues": []
+    },
+    {
+      "code": "J07",
+      "id": "BbEtJ",
+      "name": "J07 · Lire et transformer l’organisation",
+      "issues": []
+    },
+    {
+      "code": "J08",
+      "id": "cUz2t",
+      "name": "J08 · Investir dans une pratique",
+      "issues": []
+    },
+    {
+      "code": "J09",
+      "id": "Lgsg4",
+      "name": "J09 · Ouvrir la file de conception",
+      "issues": []
+    },
+    {
+      "code": "J10",
+      "id": "skyIQ",
+      "name": "J10 · Comprendre la file de réalisation",
+      "issues": []
+    },
+    {
+      "code": "J11",
+      "id": "G271p",
+      "name": "J11 · Examiner son équipe",
+      "issues": []
+    },
+    {
+      "code": "J12",
+      "id": "JQ1Hk",
+      "name": "J12 · Choisir une recrue",
+      "issues": []
+    },
+    {
+      "code": "J13",
+      "id": "K0H9pF",
+      "name": "J13 · Préparer un poste de travail",
+      "issues": []
+    },
+    {
+      "code": "J14",
+      "id": "YafeH",
+      "name": "J14 · Choisir une amélioration dans l’atelier",
+      "issues": []
+    },
+    {
+      "code": "J15",
+      "id": "qHp5X",
+      "name": "J15 · Examiner un objet et son effet",
+      "issues": []
+    },
+    {
+      "code": "J16",
+      "id": "Hml2j",
+      "name": "J16 · Voir le coût d’un objet sélectionné",
+      "issues": []
+    },
+    {
+      "code": "J17",
+      "id": "rCLpq",
+      "name": "J17 · Installer le tableau dans le bureau",
+      "issues": []
+    },
+    {
+      "code": "J18",
+      "id": "FDcHh",
+      "name": "J18 · Observer un bonus actif",
+      "issues": []
+    },
+    {
+      "code": "J19",
+      "id": "a9WNrf",
+      "name": "J19 · Regarder la journée se dérouler",
+      "issues": []
+    },
+    {
+      "code": "J20",
+      "id": "r0ElU",
+      "name": "J20 · Mettre en pause et comprendre une attente",
+      "issues": []
+    },
+    {
+      "code": "J21",
+      "id": "xXptU",
+      "name": "J21 · Célébrer une livraison concrète",
+      "issues": []
+    },
+    {
+      "code": "J22",
+      "id": "i9bxiv",
+      "name": "J22 · Lire le bilan de journée",
+      "issues": []
+    },
+    {
+      "code": "J23",
+      "id": "ZScRd",
+      "name": "J23 · Préparer le lendemain avec une absence",
+      "issues": []
+    },
+    {
+      "code": "J24",
+      "id": "Pphf9",
+      "name": "J24 · Retrouver ce qui existe dans le produit",
+      "issues": []
+    },
+    {
+      "code": "J25",
+      "id": "a8Eb4",
+      "name": "J25 · Lire les dépenses et les revenus",
+      "issues": []
+    },
+    {
+      "code": "J26",
+      "id": "X0TeSO",
+      "name": "J26 · Terminer un trimestre réussi",
+      "issues": []
+    },
+    {
+      "code": "J27",
+      "id": "L6x1g",
+      "name": "J27 · Comprendre un objectif manqué",
+      "issues": []
+    },
+    {
+      "code": "J28",
+      "id": "A8a1v",
+      "name": "J28 · Préparer un nouveau trimestre",
+      "issues": []
+    },
+    {
+      "code": "J29",
+      "id": "XswaJ",
+      "name": "J29 · Commencer ou reprendre une partie",
+      "issues": []
+    },
+    {
+      "code": "J30",
+      "id": "Nh5pr",
+      "name": "J30 · Découvrir les premières interactions",
+      "issues": []
+    },
+    {
+      "code": "J31",
+      "id": "h360YD",
+      "name": "J31 · Mettre le jeu en pause et régler sa lisibilité",
+      "issues": []
+    },
+    {
+      "code": "J32",
+      "id": "cohKQ",
+      "name": "J32 · Comprendre un achat impossible",
+      "issues": []
+    },
+    {
+      "code": "J33",
+      "id": "HCeTU",
+      "name": "J33 · N’avoir encore aucun sujet engagé",
+      "issues": []
+    },
+    {
+      "code": "J34",
+      "id": "z20uj",
+      "name": "J34 · Déplier le calcul d’une récompense",
+      "issues": []
+    },
+    {
+      "code": "J35",
+      "id": "AlcRk",
+      "name": "J35 · Transformer une enquête en décision",
+      "issues": []
+    },
+    {
+      "code": "J36",
+      "id": "jccZR",
+      "name": "J36 · Confirmer un changement de pratique",
+      "issues": []
+    },
+    {
+      "code": "J37",
+      "id": "YtFWL",
+      "name": "J37 · Confirmer une arrivée dans l’équipe",
+      "issues": []
+    },
+    {
+      "code": "J38",
+      "id": "i5BMV",
+      "name": "J38 · Adapter le travail à une absence",
+      "issues": []
+    },
+    {
+      "code": "J39",
+      "id": "qmJLh",
+      "name": "J39 · Clore et comprendre un mandat",
+      "issues": []
+    },
+    {
+      "code": "J40",
+      "id": "Klqk2",
+      "name": "J40 · Voir une trésorerie sous tension",
+      "issues": []
+    },
+    {
+      "code": "J41",
+      "id": "s16o0",
+      "name": "J41 · Voir une priorité modifiée",
+      "issues": []
+    },
+    {
+      "code": "J42",
+      "id": "KZlgt",
+      "name": "J42 · Mettre un sujet en réserve",
+      "issues": []
+    },
+    {
+      "code": "J43",
+      "id": "ZQPzm",
+      "name": "J43 · Comprendre les clients et les charges",
+      "issues": []
+    },
+    {
+      "code": "J44",
+      "id": "b4gp9n",
+      "name": "J44 · Voir le détail d’une carte au survol",
+      "issues": []
+    }
+  ],
+  "changes": [
+    {
+      "code": "J43",
+      "type": "composition harmonisée"
+    },
+    {
+      "code": "J43",
+      "label": "Sélectionner les vendeurs actifs",
+      "target": "J05"
+    },
+    {
+      "code": "J25",
+      "type": "composition harmonisée"
+    },
+    {
+      "node": "q1kWjY",
+      "target": "J43",
+      "label": "Clients et charges"
+    },
+    {
+      "code": "J21",
+      "type": "composition harmonisée"
+    },
+    {
+      "node": "bzKjc",
+      "target": "J22",
+      "label": "Bilan de la journée"
+    },
+    {
+      "code": "J21",
+      "label": "Sélectionner le combo",
+      "target": "J34"
+    },
+    {
+      "code": "J22",
+      "type": "composition harmonisée"
+    },
+    {
+      "node": "QjLyZ",
+      "target": "J23",
+      "label": "Préparer demain"
+    },
+    {
+      "code": "J26",
+      "type": "composition harmonisée"
+    },
+    {
+      "node": "Iafix",
+      "target": "J28",
+      "label": "Trimestre suivant"
+    },
+    {
+      "code": "J27",
+      "type": "composition harmonisée"
+    },
+    {
+      "node": "dh5L4",
+      "target": "J39",
+      "label": "Bilan du mandat"
+    },
+    {
+      "code": "J39",
+      "type": "composition harmonisée"
+    },
+    {
+      "node": "JqRUS",
+      "target": "J30",
+      "label": "Un autre mandat"
+    },
+    {
+      "code": "J34",
+      "type": "composition harmonisée"
+    },
+    {
+      "node": "Hpc6B",
+      "target": "J24",
+      "label": "Voir mon produit"
+    },
+    {
+      "code": "J32",
+      "type": "composition harmonisée"
+    },
+    {
+      "code": "J04",
+      "label": "Monter le paiement",
+      "target": "J41"
+    },
+    {
+      "code": "J04",
+      "label": "Mettre en réserve",
+      "target": "J42"
+    },
+    {
+      "node": "RhyEg",
+      "target": "J02",
+      "label": "Explorer les sujets"
+    },
+    {
+      "node": "ZwGuW",
+      "target": "J02",
+      "label": "Explorer les sujets"
+    },
+    {
+      "code": "J37",
+      "type": "composition harmonisée"
+    },
+    {
+      "node": "YSSwz",
+      "target": "J11",
+      "label": "Accueillir Alex"
+    },
+    {
+      "code": "J36",
+      "type": "composition harmonisée"
+    },
+    {
+      "node": "sVKGX",
+      "target": "J07",
+      "label": "Adopter la pratique"
+    },
+    {
+      "code": "J42",
+      "type": "composition harmonisée"
+    },
+    {
+      "node": "EwuEG",
+      "target": "J04",
+      "label": "Mettre en réserve"
+    },
+    {
+      "code": "J29",
+      "type": "composition harmonisée"
+    },
+    {
+      "node": "Y7iZ4",
+      "target": "J01",
+      "label": "Reprendre · jour 6"
+    },
+    {
+      "node": "YSCFE",
+      "target": "J30",
+      "label": "Nouveau mandat"
+    },
+    {
+      "node": "Bo916",
+      "target": "J31",
+      "label": "Réglages"
+    },
+    {
+      "code": "J31",
+      "type": "composition harmonisée"
+    },
+    {
+      "node": "DyCpB",
+      "target": "J31",
+      "label": "Standard"
+    },
+    {
+      "node": "UnjMW",
+      "target": "J31",
+      "label": "Grande"
+    },
+    {
+      "node": "zJ1z5",
+      "target": "J31",
+      "label": "Complètes"
+    },
+    {
+      "node": "py24f",
+      "target": "J31",
+      "label": "Réduites"
+    },
+    {
+      "code": "J31",
+      "label": "Sauvegarder et quitter",
+      "target": "J29"
+    },
+    {
+      "node": "xULzR",
+      "target": "J25",
+      "label": "Voir la caisse"
+    },
+    {
+      "node": "sI3WK",
+      "target": "J37",
+      "label": "Équiper puis recruter"
+    },
+    {
+      "node": "j9BcD",
+      "target": "J18",
+      "label": "Placer ici"
+    },
+    {
+      "code": "J30",
+      "type": "composition harmonisée"
+    },
+    {
+      "node": "HrY5W",
+      "target": "J02",
+      "label": "Voir les sujets"
+    },
+    {
+      "code": "J33",
+      "label": "Sélectionner la pile de sujets",
+      "target": "J02"
+    }
+  ],
+  "components": {
+    "impact": "D9DRl",
+    "iv": "Ou84U",
+    "iq": "tjqTX",
+    "ib": "mqiOp",
+    "cash": "cHSCW",
+    "cv": "qo4cr",
+    "time": "N6wKPg",
+    "dn": "BBckf",
+    "dl": "aFjF7",
+    "qt": "mqFgc",
+    "ph": "G3PSP"
+  },
+  "resourceKit": "uwf4j"
+}

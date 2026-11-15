@@ -8,13 +8,32 @@ les documents de conception (`docs/`), les données de jeu (`data/`), le jeu
 
 ## Où est la vérité
 
-Trois documents, trois rôles — en cas de contradiction, cet ordre tranche :
+Pour les prochains développements, distinguer la cible du rework et le
+comportement déjà implémenté. Lire aussi [`AGENTS.md`](AGENTS.md).
 
 | Document | Ce qu'il décrit |
 |---|---|
-| [`docs/carnet-de-regles.md`](docs/carnet-de-regles.md) | **L'état actuel** du jeu. Référence en cas de désaccord sur ce qui existe. |
-| [`docs/spec-scoring-sprint.md`](docs/spec-scoring-sprint.md) | **La cible de gameplay validée** (31/07/2026) : Traction × Levier = Impact. C'est la direction du produit. |
-| [`docs/spec-profondeur-gameplay.md`](docs/spec-profondeur-gameplay.md) | Les phases A→D. **Sa phase D est remplacée** par la spec de scoring. Sa phase C (roadmap profonde) reste valide et devient le prérequis du chantier scoring. |
+| [`docs/contrat-rework-bureau.md`](docs/contrat-rework-bureau.md) | **La cible des prochains développements** : bureau, cartes, ressources et gestes retenus ; portée des validations. |
+| [`docs/plan-integration-rework.md`](docs/plan-integration-rework.md) | **L'ordre d'intégration**, l'avancement et la recette par parcours. Le parcours commence par **R0, socle visuel et interactions** ; reprendre le prochain lot indiqué dans le plan. |
+| [`docs/maquettes/product-tycoon-jeu/README.md`](docs/maquettes/product-tycoon-jeu/README.md) | **La référence visuelle** : `.pen`, 44 états, gestes et manifeste d'assets. |
+| [`docs/carnet-de-regles.md`](docs/carnet-de-regles.md) | **L'état actuel** du jeu. Référence sur ce qui existe tant qu'une règle n'est pas explicitement remplacée. |
+| [`docs/spec-scoring-sprint.md`](docs/spec-scoring-sprint.md) | Le moteur de score et ses invariants à préserver pendant le raccord : Traction × Levier, Impact dépensable, économies distinctes. Son calendrier ne définit pas automatiquement le futur calendrier. |
+| [`docs/spec-profondeur-gameplay.md`](docs/spec-profondeur-gameplay.md) | Historique des phases A→D et des mécanismes existants. La roadmap du rework suit le contrat et la spec de travail actuelle. |
+
+**Conception du futur rework, consolidée le 15/11/2026 :** lire
+[`docs/vision-bureau-organisation.md`](docs/vision-bureau-organisation.md), puis
+[`docs/spec-journee-travail-livraison.md`](docs/spec-journee-travail-livraison.md).
+Ces documents distinguent les orientations retenues des règles à discuter.
+Les prototypes HTML restent figés. La direction graphique et les assets sont
+validés : ne pas redemander cet accord pour intégrer le socle lors d'une demande
+de développement. Les chiffres et dialogues des prototypes ne sont pas des
+règles de production. Les règles encore ouvertes se tranchent avant le lot qui
+en dépend ; elles ne bloquent pas le travail UI indépendant déjà validé.
+
+Les anciennes directions FPS, thème clair, panneau permanent et cartes à six
+zones décrivent l'existant ou l'historique. **Les nouveaux écrans suivent le
+rework par défaut.** Une correction de maintenance conserve un périmètre ciblé.
+Le contrat du rework prime pour la cible ; le carnet reste la vérité sur l'existant.
 
 Deux specs descendaient d'un cran là où une grandeur abstraite ne raconte rien.
 [`spec-clients-revenue.md`](docs/spec-clients-revenue.md) (le Revenue cache des
@@ -44,11 +63,13 @@ aucune règle : sa mise en œuvre est l'issue #59, **implémentée** — carnet 
 
 ---
 
-## La direction de gameplay (résumé)
+## Le moteur existant à préserver pendant la migration
 
-Le jeu passe de « survivre 12 sprints » à **un moteur de score à combos**.
-Le détail est dans [`docs/spec-scoring-sprint.md`](docs/spec-scoring-sprint.md) ;
-ce qui suit est le minimum à avoir en tête avant de toucher au gameplay.
+Le moteur actuel repose sur **un score à combos**. Le détail est dans
+[`docs/spec-scoring-sprint.md`](docs/spec-scoring-sprint.md). Les points ci-dessous
+décrivent ses règles et garde-fous, pas une obligation de conserver les écrans,
+le calendrier ou le passage au Comité dans la cible du rework. Leur remplacement
+éventuel doit être spécifié avant le lot concerné ; ne pas les changer par reskin.
 
 - **`📊 Traction × ⚙️ Levier = 💥 Impact`** — *ce que j'ai produit* ×
   *l'organisation que j'ai construite*. La Traction vient des features

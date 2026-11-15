@@ -4,6 +4,34 @@
 
 Ce dépôt rassemble les documents de conception du jeu. **C'est un document de travail** : rien n'est encore équilibré ni final, l'objectif est de garder une base de réflexion partagée sur le concept et le gameplay.
 
+## Conception du prochain rework
+
+**Entrée des prochains développements :** [contrat du rework](docs/contrat-rework-bureau.md)
+et [plan d’intégration](docs/plan-integration-rework.md). Le parcours commence par
+**R0 — socle visuel et interactions** ; le plan indique l’avancement et la reprise.
+Les consignes de reprise sont
+dans [AGENTS.md](AGENTS.md) et [CLAUDE.md](CLAUDE.md).
+
+Le 15 novembre 2026, les essais ont conduit à une direction centrée sur un bureau
+vu du dessus, des backlogs à plusieurs niveaux et une organisation qui fait
+progresser les sujets produit. **Les prototypes HTML restent figés.** La direction
+graphique et les assets validés deviennent la cible des prochains développements ;
+les règles encore ouvertes sont traitées avant les lots qui en dépendent.
+
+- [Vision du bureau et de l’organisation](docs/vision-bureau-organisation.md) :
+  orientations retenues, limites et décisions encore ouvertes.
+- [Journée, découpage et livraison](docs/spec-journee-travail-livraison.md) :
+  proposition détaillée et cas à relire avant tout développement.
+- [Historique des prototypes](docs/prototype-bureau-flux.md) : ce qui a été essayé,
+  ce qui fonctionne et ce qui n’est pas repris comme règle finale.
+- [Direction interface de jeu `.pen`](docs/maquettes/product-tycoon-jeu/README.md) :
+  44 vues et états avec un bureau plein écran, des cartes de choix, des gestes
+  directs et des détails à la demande. Le [premier pack de 16 vues](docs/maquettes/product-tycoon-ui/README.md)
+  reste une exploration antérieure, jugée trop web. Les prototypes restent figés.
+
+Cette conception ne décrit pas encore le jeu implémenté. Le
+[carnet de règles](docs/carnet-de-regles.md) reste la référence sur son état actuel.
+
 ## Structure du dépôt
 
 ```
@@ -51,8 +79,8 @@ Product-game/
 - [`docs/carnet-de-regles.md`](docs/carnet-de-regles.md) — le carnet de règles complet : structure temporelle, ressources, système de cartes, effets persistants, roadmap, recrutement, époques, fins de mandat, et les questions ouvertes encore à trancher.
 - [`docs/data-schema.md`](docs/data-schema.md) — le détail du schéma de chaque fichier JSON.
 - [`docs/tech-stack.md`](docs/tech-stack.md) — le choix du moteur de jeu (Godot 4) et les alternatives écartées (Three.js, Unity, Unreal, stack web).
-- [`docs/spec-profondeur-gameplay.md`](docs/spec-profondeur-gameplay.md) — la spécification de la prochaine phase de gameplay (économie de pièces, équipe/roster à rôles, shop à tirage aléatoire, roadmap profonde avec epics et informations cachées) — les phases A et B sont implémentées, la phase C reste à faire, la phase D est remplacée par la spec ci-dessous.
-- [`docs/spec-scoring-sprint.md`](docs/spec-scoring-sprint.md) — **la vision de gameplay en cours d'implémentation** : le sprint se résout en un score à combos (`📊 Traction × ⚙️ Levier = 💥 Impact`) et le board impose un quota d'Impact tous les 3 sprints. Le score, son replay, les quotas PM et leurs exigences sont jouables ; l'organisation multi-squad reste un lot ultérieur.
+- [`docs/spec-profondeur-gameplay.md`](docs/spec-profondeur-gameplay.md) — l’historique des phases de profondeur et des mécanismes existants. L’ordre des prochains lots est désormais celui du plan d’intégration du rework.
+- [`docs/spec-scoring-sprint.md`](docs/spec-scoring-sprint.md) — le moteur actuel de score à combos (`📊 Traction × ⚙️ Levier = 💥 Impact`) et les invariants à préserver lors du raccord. Le calendrier futur et les interfaces suivent le contrat du rework ; le carnet décrit ce qui est déjà jouable.
 - [`landing/index.html`](landing/index.html) — une page de présentation interactive du concept : cartes retournables, jauges de ressources, aperçu d'écrans de jeu (inbox, roadmap, recrutement), présentation des époques et des fins de mandat. Toutes ses données viennent de `data/`, pas de contenu codé en dur.
 - [`game/`](game/README.md) — le projet Godot 4 : un mandat complet est jouable de bout en bout (Accueil → Inbox → Roadmap → Investissements → Résolution → sprint suivant → fin de mandat), avec une vraie simulation persistante des deux monnaies et des cinq jauges et les mêmes `data/*.json` que la landing page (plus `data/balance.json`, propre au jeu), une identité visuelle propre (polices de marque, icônes, portraits, fond quadrillé, animations légères — toutes licences libres, détail dans `game/assets/THIRD_PARTY_NOTICES.md`). Pas encore équilibré (tous les nombres sont dans `data/balance.json`, ajustables sans toucher au code) — voir `game/README.md` pour le détail et les limites connues.
 
@@ -72,7 +100,7 @@ python3 -m http.server 8000
 
 Chaque bonne pratique a un prix. Le·la joueur·se le découvre en le payant : une carte de décision (méthodologie, outil, recrutement) affiche une promesse théorique, mais son effet réel dépend du profil de l'équipe qui la reçoit, de l'époque du run, et des décisions déjà prises.
 
-## Structure temporelle
+## Structure temporelle du jeu existant
 
 | Échelle | Durée fictive | Rôle |
 |---|---|---|

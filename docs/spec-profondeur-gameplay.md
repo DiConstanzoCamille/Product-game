@@ -1,5 +1,10 @@
 # Spécification — Profondeur de gameplay (v2)
 
+**Historique des phases de conception et référence des mécanismes existants.**
+Pour le prochain développement, le [contrat du rework](contrat-rework-bureau.md)
+et son plan remplacent l’ancien ordre de lots et la cible d’interface. Consulter
+le carnet pour l’état implémenté et la spec de travail pour les arbitrages ouverts.
+
 > Document de travail issu du playtest du 29/07/2026, révisé après un second
 > passage de conception ("il ne doit pas être simple de faire une entreprise
 > qui fonctionne"). Rien de ce qui suit n'est implémenté : c'est la cible de

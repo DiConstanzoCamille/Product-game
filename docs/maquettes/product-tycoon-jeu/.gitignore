@@ -1,0 +1,7 @@
+# Sources : .pen, assets, manifeste et guides.
+# Les JPEG natifs de revue sont versionnables ; pas leurs doubles PNG ni les ZIP.
+apercus/
+apercus-natifs/*.png
+
+# Scripts de session pen.dev : historique local d'édition, pas un générateur du jeu.
+sources/*.js

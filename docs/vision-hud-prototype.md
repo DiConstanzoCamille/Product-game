@@ -1,5 +1,10 @@
 # Vision HUD — « Un bureau qui répond »
 
+**Exploration antérieure du HUD.** Les principes d’orientation et de retour
+visible restent utiles ; la disposition, les compteurs et les interactions
+des prochains développements suivent le [contrat du rework](contrat-rework-bureau.md)
+et les maquettes actuelles.
+
 Prototype jouable du 07/09/2026, à valider. Branche :
 `codex/prototype-hud-lisibilite`. Ce document distingue la direction globale
 des morceaux effectivement développés. Il ne change aucune règle de gameplay.

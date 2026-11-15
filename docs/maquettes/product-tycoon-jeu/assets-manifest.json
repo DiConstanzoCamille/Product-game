@@ -1,0 +1,178 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-15",
+  "design_status": "Direction et assets retenus ; règles et détails des parcours à relire",
+  "runtime_import_status": "Aucun import réalisé — lot R0",
+  "source_design": "product-tycoon-direction-jeu.pen",
+  "values_are_editable": true,
+  "gameplay_values_in_this_manifest": false,
+  "assets": [
+    {
+      "id": "bureau_reference",
+      "source": "assets/studio-jeu.png",
+      "usage": "reference_artistique",
+      "width": 1536,
+      "height": 1024,
+      "mode": "RGB",
+      "sha256": "3b62c5d537119d620ac35c4667fe0ed9d5aa55a47401a8710a1bd61247192084",
+      "note": "Ne remplace pas le bureau 3D ou la simulation."
+    },
+    {
+      "id": "illustrations_sujets",
+      "source": "assets/cartes-roadmap.png",
+      "usage": "candidat_runtime",
+      "width": 1536,
+      "height": 1024,
+      "mode": "RGB",
+      "sha256": "11f7956ec5498f6998b4576929869dcc5aa4c281012112f9d03a523d4841d460",
+      "note": "Illustrations sans valeurs ou libellés de jeu.",
+      "atlas": {
+        "columns": 3,
+        "rows": 1,
+        "coordinate_system": "normalise",
+        "tiles": [
+          {
+            "id": "stocks",
+            "column": 0,
+            "row": 0
+          },
+          {
+            "id": "paiement",
+            "column": 1,
+            "row": 0
+          },
+          {
+            "id": "retours",
+            "column": 2,
+            "row": 0
+          }
+        ]
+      }
+    },
+    {
+      "id": "illustrations_atelier",
+      "source": "assets/cartes-atelier.png",
+      "usage": "candidat_runtime",
+      "width": 1774,
+      "height": 887,
+      "mode": "RGB",
+      "sha256": "3f6e9dbf02db6f485310bea4ef55fe8aacc2cba2535eca292b58898bd8a8ed7d",
+      "note": "Illustrations d’objets sans effets calculés.",
+      "atlas": {
+        "columns": 3,
+        "rows": 1,
+        "coordinate_system": "normalise",
+        "tiles": [
+          {
+            "id": "tableau_partage",
+            "column": 0,
+            "row": 0
+          },
+          {
+            "id": "poste_travail",
+            "column": 1,
+            "row": 0
+          },
+          {
+            "id": "outillage_test",
+            "column": 2,
+            "row": 0
+          }
+        ]
+      }
+    },
+    {
+      "id": "emblemes_ressources",
+      "source": "assets/emblemes-ressources.png",
+      "usage": "candidat_runtime",
+      "width": 2172,
+      "height": 724,
+      "mode": "RGBA",
+      "sha256": "ad7bdf9d3b541c94736f2da4712f5187a2b570f4b385699311d5534ce3f8d247",
+      "note": "Même symbole pour coût, gain et solde ; valeurs séparées.",
+      "atlas": {
+        "columns": 3,
+        "rows": 1,
+        "coordinate_system": "normalise",
+        "tiles": [
+          {
+            "id": "impact",
+            "column": 0,
+            "row": 0
+          },
+          {
+            "id": "tresorerie",
+            "column": 1,
+            "row": 0
+          },
+          {
+            "id": "calendrier",
+            "column": 2,
+            "row": 0
+          }
+        ]
+      }
+    },
+    {
+      "id": "emblemes_travail",
+      "source": "assets/emblemes-travail.png",
+      "usage": "candidat_runtime",
+      "width": 2172,
+      "height": 724,
+      "mode": "RGBA",
+      "sha256": "7d20f5d4804176a5884e6f7a5a0a609b4c7475b742eb1edca5a3e617108ef5c6",
+      "note": "Symboles de travail, sans imposer un chemin unique.",
+      "atlas": {
+        "columns": 3,
+        "rows": 1,
+        "coordinate_system": "normalise",
+        "tiles": [
+          {
+            "id": "tickets",
+            "column": 0,
+            "row": 0
+          },
+          {
+            "id": "conception_recherche",
+            "column": 1,
+            "row": 0
+          },
+          {
+            "id": "realisation_technique",
+            "column": 2,
+            "row": 0
+          }
+        ]
+      }
+    },
+    {
+      "id": "cadre_historique",
+      "source": "assets/cadre-bureau.png",
+      "usage": "historique_ne_pas_importer",
+      "width": 1586,
+      "height": 992,
+      "mode": "RGBA",
+      "sha256": "bc64ae6812cce67a299a936842aa3580a48bc32869259b4d806bec591a1814e4",
+      "note": "Ancienne déclinaison de panneaux, conservée pour provenance."
+    }
+  ],
+  "fonts": [
+    {
+      "family": "Fredoka",
+      "role": "titres et chiffres expressifs",
+      "status": "a_integrer_avec_notice"
+    },
+    {
+      "family": "IBM Plex Sans",
+      "role": "corps et explications",
+      "status": "deja_present",
+      "source": "../../../game/assets/fonts/IBMPlexSans-Variable.ttf"
+    },
+    {
+      "family": "IBM Plex Mono",
+      "role": "lectures numeriques detaillees",
+      "status": "deja_present",
+      "source": "../../../game/assets/fonts/IBMPlexMono-Medium.ttf"
+    }
+  ]
+}

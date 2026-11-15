@@ -1,0 +1,893 @@
+{
+  "mode": "Maquettes statiques, interactions documentées et non exécutées",
+  "version": "Harmonisation des ressources et des écrans secondaires",
+  "vues": [
+    {
+      "code": "J01",
+      "id": "8810d5a423f849",
+      "name": "J01 · Préparer la journée — scène plein écran",
+      "issues": [],
+      "apercu": "apercus-natifs/J01.jpg"
+    },
+    {
+      "code": "J02",
+      "id": "bc6e2b4101574e",
+      "name": "J02 · Choisir les sujets — cartes sur le plateau",
+      "issues": [],
+      "apercu": "apercus-natifs/J02.jpg"
+    },
+    {
+      "code": "J03",
+      "id": "10cd406cca4345",
+      "name": "J03 · Sélectionner Lina — commande contextuelle",
+      "issues": [],
+      "apercu": "apercus-natifs/J03.jpg"
+    },
+    {
+      "code": "J04",
+      "id": "kl6H3",
+      "name": "J04 · Ordonner la roadmap",
+      "issues": [],
+      "apercu": "apercus-natifs/J04.jpg"
+    },
+    {
+      "code": "J05",
+      "id": "RFWwx",
+      "name": "J05 · Comprendre un sujet et ses descendants",
+      "issues": [],
+      "apercu": "apercus-natifs/J05.jpg"
+    },
+    {
+      "code": "J06",
+      "id": "meUwZ",
+      "name": "J06 · Choisir une solution pour le connecteur",
+      "issues": [],
+      "apercu": "apercus-natifs/J06.jpg"
+    },
+    {
+      "code": "J07",
+      "id": "BbEtJ",
+      "name": "J07 · Lire et transformer l’organisation",
+      "issues": [],
+      "apercu": "apercus-natifs/J07.jpg"
+    },
+    {
+      "code": "J08",
+      "id": "cUz2t",
+      "name": "J08 · Investir dans une pratique",
+      "issues": [],
+      "apercu": "apercus-natifs/J08.jpg"
+    },
+    {
+      "code": "J09",
+      "id": "Lgsg4",
+      "name": "J09 · Ouvrir la file de conception",
+      "issues": [],
+      "apercu": "apercus-natifs/J09.jpg"
+    },
+    {
+      "code": "J10",
+      "id": "skyIQ",
+      "name": "J10 · Comprendre la file de réalisation",
+      "issues": [],
+      "apercu": "apercus-natifs/J10.jpg"
+    },
+    {
+      "code": "J11",
+      "id": "G271p",
+      "name": "J11 · Examiner son équipe",
+      "issues": [],
+      "apercu": "apercus-natifs/J11.jpg"
+    },
+    {
+      "code": "J12",
+      "id": "JQ1Hk",
+      "name": "J12 · Choisir une recrue",
+      "issues": [],
+      "apercu": "apercus-natifs/J12.jpg"
+    },
+    {
+      "code": "J13",
+      "id": "K0H9pF",
+      "name": "J13 · Préparer un poste de travail",
+      "issues": [],
+      "apercu": "apercus-natifs/J13.jpg"
+    },
+    {
+      "code": "J14",
+      "id": "YafeH",
+      "name": "J14 · Choisir une amélioration dans l’atelier",
+      "issues": [],
+      "apercu": "apercus-natifs/J14.jpg"
+    },
+    {
+      "code": "J15",
+      "id": "qHp5X",
+      "name": "J15 · Examiner un objet et son effet",
+      "issues": [],
+      "apercu": "apercus-natifs/J15.jpg"
+    },
+    {
+      "code": "J16",
+      "id": "Hml2j",
+      "name": "J16 · Voir le coût d’un objet sélectionné",
+      "issues": [],
+      "apercu": "apercus-natifs/J16.jpg"
+    },
+    {
+      "code": "J17",
+      "id": "rCLpq",
+      "name": "J17 · Installer le tableau dans le bureau",
+      "issues": [],
+      "apercu": "apercus-natifs/J17.jpg"
+    },
+    {
+      "code": "J18",
+      "id": "FDcHh",
+      "name": "J18 · Observer un bonus actif",
+      "issues": [],
+      "apercu": "apercus-natifs/J18.jpg"
+    },
+    {
+      "code": "J19",
+      "id": "a9WNrf",
+      "name": "J19 · Regarder la journée se dérouler",
+      "issues": [],
+      "apercu": "apercus-natifs/J19.jpg"
+    },
+    {
+      "code": "J20",
+      "id": "r0ElU",
+      "name": "J20 · Mettre en pause et comprendre une attente",
+      "issues": [],
+      "apercu": "apercus-natifs/J20.jpg"
+    },
+    {
+      "code": "J21",
+      "id": "xXptU",
+      "name": "J21 · Célébrer une livraison concrète",
+      "issues": [],
+      "apercu": "apercus-natifs/J21.jpg"
+    },
+    {
+      "code": "J22",
+      "id": "i9bxiv",
+      "name": "J22 · Lire le bilan de journée",
+      "issues": [],
+      "apercu": "apercus-natifs/J22.jpg"
+    },
+    {
+      "code": "J23",
+      "id": "ZScRd",
+      "name": "J23 · Préparer le lendemain avec une absence",
+      "issues": [],
+      "apercu": "apercus-natifs/J23.jpg"
+    },
+    {
+      "code": "J24",
+      "id": "Pphf9",
+      "name": "J24 · Retrouver ce qui existe dans le produit",
+      "issues": [],
+      "apercu": "apercus-natifs/J24.jpg"
+    },
+    {
+      "code": "J25",
+      "id": "a8Eb4",
+      "name": "J25 · Lire les dépenses et les revenus",
+      "issues": [],
+      "apercu": "apercus-natifs/J25.jpg"
+    },
+    {
+      "code": "J26",
+      "id": "X0TeSO",
+      "name": "J26 · Terminer un trimestre réussi",
+      "issues": [],
+      "apercu": "apercus-natifs/J26.jpg"
+    },
+    {
+      "code": "J27",
+      "id": "L6x1g",
+      "name": "J27 · Comprendre un objectif manqué",
+      "issues": [],
+      "apercu": "apercus-natifs/J27.jpg"
+    },
+    {
+      "code": "J28",
+      "id": "A8a1v",
+      "name": "J28 · Préparer un nouveau trimestre",
+      "issues": [],
+      "apercu": "apercus-natifs/J28.jpg"
+    },
+    {
+      "code": "J29",
+      "id": "XswaJ",
+      "name": "J29 · Commencer ou reprendre une partie",
+      "issues": [],
+      "apercu": "apercus-natifs/J29.jpg"
+    },
+    {
+      "code": "J30",
+      "id": "Nh5pr",
+      "name": "J30 · Découvrir les premières interactions",
+      "issues": [],
+      "apercu": "apercus-natifs/J30.jpg"
+    },
+    {
+      "code": "J31",
+      "id": "h360YD",
+      "name": "J31 · Mettre le jeu en pause et régler sa lisibilité",
+      "issues": [],
+      "apercu": "apercus-natifs/J31.jpg"
+    },
+    {
+      "code": "J32",
+      "id": "cohKQ",
+      "name": "J32 · Comprendre un achat impossible",
+      "issues": [],
+      "apercu": "apercus-natifs/J32.jpg"
+    },
+    {
+      "code": "J33",
+      "id": "HCeTU",
+      "name": "J33 · N’avoir encore aucun sujet engagé",
+      "issues": [],
+      "apercu": "apercus-natifs/J33.jpg"
+    },
+    {
+      "code": "J34",
+      "id": "z20uj",
+      "name": "J34 · Déplier le calcul d’une récompense",
+      "issues": [],
+      "apercu": "apercus-natifs/J34.jpg"
+    },
+    {
+      "code": "J35",
+      "id": "AlcRk",
+      "name": "J35 · Transformer une enquête en décision",
+      "issues": [],
+      "apercu": "apercus-natifs/J35.jpg"
+    },
+    {
+      "code": "J36",
+      "id": "jccZR",
+      "name": "J36 · Confirmer un changement de pratique",
+      "issues": [],
+      "apercu": "apercus-natifs/J36.jpg"
+    },
+    {
+      "code": "J37",
+      "id": "YtFWL",
+      "name": "J37 · Confirmer une arrivée dans l’équipe",
+      "issues": [],
+      "apercu": "apercus-natifs/J37.jpg"
+    },
+    {
+      "code": "J38",
+      "id": "i5BMV",
+      "name": "J38 · Adapter le travail à une absence",
+      "issues": [],
+      "apercu": "apercus-natifs/J38.jpg"
+    },
+    {
+      "code": "J39",
+      "id": "qmJLh",
+      "name": "J39 · Clore et comprendre un mandat",
+      "issues": [],
+      "apercu": "apercus-natifs/J39.jpg"
+    },
+    {
+      "code": "J40",
+      "id": "Klqk2",
+      "name": "J40 · Voir une trésorerie sous tension",
+      "issues": [],
+      "apercu": "apercus-natifs/J40.jpg"
+    },
+    {
+      "code": "J41",
+      "id": "s16o0",
+      "name": "J41 · Voir une priorité modifiée",
+      "issues": [],
+      "apercu": "apercus-natifs/J41.jpg"
+    },
+    {
+      "code": "J42",
+      "id": "KZlgt",
+      "name": "J42 · Mettre un sujet en réserve",
+      "issues": [],
+      "apercu": "apercus-natifs/J42.jpg"
+    },
+    {
+      "code": "J43",
+      "id": "ZQPzm",
+      "name": "J43 · Comprendre les clients et les charges",
+      "issues": [],
+      "apercu": "apercus-natifs/J43.jpg"
+    },
+    {
+      "code": "J44",
+      "id": "b4gp9n",
+      "name": "J44 · Voir le détail d’une carte au survol",
+      "issues": [],
+      "apercu": "apercus-natifs/J44.jpg"
+    }
+  ],
+  "parcours": [
+    {
+      "node": "tNdXC",
+      "target": "J06",
+      "label": "Choisir un connecteur",
+      "origine": "J05"
+    },
+    {
+      "node": "Nlp9V",
+      "target": "J08",
+      "label": "Voir les pratiques",
+      "origine": "J07"
+    },
+    {
+      "node": "c4Ig5",
+      "target": "J09",
+      "label": "Voir une file",
+      "origine": "J07"
+    },
+    {
+      "node": "cXAB1",
+      "target": "J04",
+      "label": "Prioriser les sujets",
+      "origine": "J09"
+    },
+    {
+      "node": "oT5wE",
+      "target": "J05",
+      "label": "Voir le sujet parent",
+      "origine": "J10"
+    },
+    {
+      "node": "mXfBh",
+      "target": "J11",
+      "label": "Examiner l’équipe",
+      "origine": "J10"
+    },
+    {
+      "node": "Rx6W7",
+      "target": "J10",
+      "label": "Voir la file de Noé",
+      "origine": "J18"
+    },
+    {
+      "node": "W8gKDn",
+      "target": "J19",
+      "label": "Lancer la journée",
+      "origine": "J18"
+    },
+    {
+      "node": "z42zok",
+      "target": "J20",
+      "label": "Pause",
+      "origine": "J19"
+    },
+    {
+      "node": "v1Zxw",
+      "target": "J19",
+      "label": "Vitesse ×2",
+      "origine": "J19"
+    },
+    {
+      "node": "yJBEj",
+      "target": "J22",
+      "label": "Voir le bilan",
+      "origine": "J19"
+    },
+    {
+      "node": "fBTpB",
+      "target": "J10",
+      "label": "Inspecter la file",
+      "origine": "J20"
+    },
+    {
+      "node": "E6Zi1",
+      "target": "J19",
+      "label": "Reprendre",
+      "origine": "J20"
+    },
+    {
+      "node": "ET3vZ",
+      "target": "J38",
+      "label": "Adapter les priorités",
+      "origine": "J23"
+    },
+    {
+      "node": "MUpyg",
+      "target": "J19",
+      "label": "Lancer la journée",
+      "origine": "J23"
+    },
+    {
+      "node": "U3Jrbx",
+      "target": "J05",
+      "label": "Sélectionner la carte · Carte · Import CSV",
+      "origine": "J06"
+    },
+    {
+      "node": "Iepok",
+      "target": "J05",
+      "label": "Sélectionner la carte · Carte · Connecteur partenaire",
+      "origine": "J06"
+    },
+    {
+      "node": "ktIWX",
+      "target": "J05",
+      "label": "Sélectionner la carte · Carte · Connecteur sur mesure",
+      "origine": "J06"
+    },
+    {
+      "node": "TMWFw",
+      "target": "J07",
+      "label": "Sélectionner la carte · Carte · Petits périmètres utiles",
+      "origine": "J08"
+    },
+    {
+      "node": "JVyMj",
+      "target": "J16",
+      "label": "Sélectionner la carte · Carte · Préparer l’ensemble",
+      "origine": "J08"
+    },
+    {
+      "node": "R4VdN",
+      "target": "J13",
+      "label": "Sélectionner la carte · Carte · Alex",
+      "origine": "J12"
+    },
+    {
+      "node": "JcNGn",
+      "target": "J13",
+      "label": "Sélectionner la carte · Carte · Maya",
+      "origine": "J12"
+    },
+    {
+      "node": "X1g92",
+      "target": "J15",
+      "label": "Sélectionner la carte · Carte · Tableau partagé",
+      "origine": "J14"
+    },
+    {
+      "node": "Hlqgh",
+      "target": "J13",
+      "label": "Sélectionner la carte · Carte · Poste de travail",
+      "origine": "J14"
+    },
+    {
+      "node": "DhbFP",
+      "target": "J32",
+      "label": "Sélectionner la carte · Carte · Outillage de test",
+      "origine": "J14"
+    },
+    {
+      "node": "SEjSG",
+      "target": "J05",
+      "label": "Sélectionner la carte · Carte · Importer son catalogue",
+      "origine": "J24"
+    },
+    {
+      "node": "Pfh6v",
+      "target": "J35",
+      "label": "Sélectionner la carte · Carte · S’inscrire plus facilement",
+      "origine": "J24"
+    },
+    {
+      "node": "Mrzjq",
+      "target": "J02",
+      "label": "Sélectionner la carte · Carte · Ouvrir une catégorie",
+      "origine": "J28"
+    },
+    {
+      "node": "Cm917",
+      "target": "J02",
+      "label": "Sélectionner la carte · Carte · Mieux vendre l’existant",
+      "origine": "J28"
+    },
+    {
+      "node": "gblmE",
+      "target": "J02",
+      "label": "Sélectionner la carte · Carte · Fiabiliser le catalogue",
+      "origine": "J28"
+    },
+    {
+      "node": "relQI",
+      "target": "J04",
+      "label": "Confier à l’équipe",
+      "origine": "J02"
+    },
+    {
+      "node": "X5tNtD",
+      "target": "J17",
+      "label": "Installer",
+      "origine": "J14"
+    },
+    {
+      "node": "YVl2L",
+      "target": "J17",
+      "label": "Installer",
+      "origine": "J15"
+    },
+    {
+      "node": "X7QklY",
+      "target": "J17",
+      "label": "Installer",
+      "origine": "J16"
+    },
+    {
+      "node": "yU1Lq",
+      "target": "J12",
+      "label": "Recruter",
+      "origine": "J11"
+    },
+    {
+      "origine": "J01",
+      "label": "Sam",
+      "target": "J09",
+      "type": "geste direct"
+    },
+    {
+      "origine": "J01",
+      "label": "Lina",
+      "target": "J03",
+      "type": "geste direct"
+    },
+    {
+      "origine": "J01",
+      "label": "Noé",
+      "target": "J10",
+      "type": "geste direct"
+    },
+    {
+      "origine": "J01",
+      "label": "Sujets",
+      "target": "J04",
+      "type": "geste direct"
+    },
+    {
+      "origine": "J01",
+      "label": "Organisation",
+      "target": "J07",
+      "type": "geste direct"
+    },
+    {
+      "origine": "J01",
+      "label": "Équipe",
+      "target": "J11",
+      "type": "geste direct"
+    },
+    {
+      "origine": "J01",
+      "label": "Atelier",
+      "target": "J14",
+      "type": "geste direct"
+    },
+    {
+      "origine": "J01",
+      "label": "Solde d’Impact ou caisse",
+      "target": "J25",
+      "type": "geste direct"
+    },
+    {
+      "origine": "J02",
+      "label": "Confier à l’équipe",
+      "target": "J04",
+      "type": "cible de design"
+    },
+    {
+      "origine": "J02",
+      "label": "Survol de Stocks à jour",
+      "target": "J44",
+      "type": "cible de design"
+    },
+    {
+      "origine": "J11",
+      "label": "Sélectionner Lina",
+      "target": "J03",
+      "type": "cible de design"
+    },
+    {
+      "origine": "J11",
+      "label": "Recruter",
+      "target": "J12",
+      "type": "cible de design"
+    },
+    {
+      "origine": "J14",
+      "label": "Sélectionner le tableau",
+      "target": "J16",
+      "type": "cible de design"
+    },
+    {
+      "origine": "J14",
+      "label": "Installer le tableau sélectionné",
+      "target": "J17",
+      "type": "cible de design"
+    },
+    {
+      "origine": "J15",
+      "label": "Installer",
+      "target": "J17",
+      "type": "cible de design"
+    },
+    {
+      "origine": "J16",
+      "label": "Installer",
+      "target": "J17",
+      "type": "cible de design"
+    },
+    {
+      "origine": "J06",
+      "label": "Conserver le CSV",
+      "target": "J05",
+      "type": "cible de design"
+    },
+    {
+      "origine": "J06",
+      "label": "Examiner une autre solution",
+      "target": "J05",
+      "type": "cible de design"
+    },
+    {
+      "origine": "J08",
+      "label": "Sélectionner Préparer l’ensemble",
+      "target": "J36",
+      "type": "cible de design"
+    },
+    {
+      "origine": "J12",
+      "label": "Sélectionner Alex",
+      "target": "J13",
+      "type": "cible de design"
+    },
+    {
+      "origine": "J24",
+      "label": "Ouvrir le catalogue livré",
+      "target": "J05",
+      "type": "cible de design"
+    },
+    {
+      "origine": "J28",
+      "label": "Examiner une piste",
+      "target": "J02",
+      "type": "cible de design"
+    },
+    {
+      "origine": "J35",
+      "label": "Choisir une piste",
+      "target": "J04",
+      "type": "cible de design"
+    },
+    {
+      "origine": "J38",
+      "label": "Conserver l’ordre",
+      "target": "J23",
+      "type": "cible de design"
+    },
+    {
+      "origine": "J38",
+      "label": "Prioriser la technique",
+      "target": "J04",
+      "type": "cible de design"
+    },
+    {
+      "code": "J43",
+      "label": "Sélectionner les vendeurs actifs",
+      "target": "J05",
+      "origine": "J43",
+      "type": "cible de design"
+    },
+    {
+      "node": "q1kWjY",
+      "target": "J43",
+      "label": "Clients et charges",
+      "origine": "J25",
+      "type": "cible de design"
+    },
+    {
+      "node": "bzKjc",
+      "target": "J22",
+      "label": "Bilan de la journée",
+      "origine": "J21",
+      "type": "cible de design"
+    },
+    {
+      "code": "J21",
+      "label": "Sélectionner le combo",
+      "target": "J34",
+      "origine": "J21",
+      "type": "cible de design"
+    },
+    {
+      "node": "QjLyZ",
+      "target": "J23",
+      "label": "Préparer demain",
+      "origine": "J22",
+      "type": "cible de design"
+    },
+    {
+      "node": "Iafix",
+      "target": "J28",
+      "label": "Trimestre suivant",
+      "origine": "J26",
+      "type": "cible de design"
+    },
+    {
+      "node": "dh5L4",
+      "target": "J39",
+      "label": "Bilan du mandat",
+      "origine": "J27",
+      "type": "cible de design"
+    },
+    {
+      "node": "JqRUS",
+      "target": "J30",
+      "label": "Un autre mandat",
+      "origine": "J39",
+      "type": "cible de design"
+    },
+    {
+      "node": "Hpc6B",
+      "target": "J24",
+      "label": "Voir mon produit",
+      "origine": "J34",
+      "type": "cible de design"
+    },
+    {
+      "code": "J04",
+      "label": "Monter le paiement",
+      "target": "J41",
+      "origine": "J04",
+      "type": "cible de design"
+    },
+    {
+      "code": "J04",
+      "label": "Mettre en réserve",
+      "target": "J42",
+      "origine": "J04",
+      "type": "cible de design"
+    },
+    {
+      "node": "RhyEg",
+      "target": "J02",
+      "label": "Explorer les sujets",
+      "origine": "J04",
+      "type": "cible de design"
+    },
+    {
+      "node": "ZwGuW",
+      "target": "J02",
+      "label": "Explorer les sujets",
+      "origine": "J41",
+      "type": "cible de design"
+    },
+    {
+      "node": "YSSwz",
+      "target": "J11",
+      "label": "Accueillir Alex",
+      "origine": "J37",
+      "type": "cible de design"
+    },
+    {
+      "node": "sVKGX",
+      "target": "J07",
+      "label": "Adopter la pratique",
+      "origine": "J36",
+      "type": "cible de design"
+    },
+    {
+      "node": "EwuEG",
+      "target": "J04",
+      "label": "Mettre en réserve",
+      "origine": "J42",
+      "type": "cible de design"
+    },
+    {
+      "node": "Y7iZ4",
+      "target": "J01",
+      "label": "Reprendre · jour 6",
+      "origine": "J29",
+      "type": "cible de design"
+    },
+    {
+      "node": "YSCFE",
+      "target": "J30",
+      "label": "Nouveau mandat",
+      "origine": "J29",
+      "type": "cible de design"
+    },
+    {
+      "node": "Bo916",
+      "target": "J31",
+      "label": "Réglages",
+      "origine": "J29",
+      "type": "cible de design"
+    },
+    {
+      "node": "DyCpB",
+      "target": "J31",
+      "label": "Standard",
+      "origine": "J31",
+      "type": "cible de design"
+    },
+    {
+      "node": "UnjMW",
+      "target": "J31",
+      "label": "Grande",
+      "origine": "J31",
+      "type": "cible de design"
+    },
+    {
+      "node": "zJ1z5",
+      "target": "J31",
+      "label": "Complètes",
+      "origine": "J31",
+      "type": "cible de design"
+    },
+    {
+      "node": "py24f",
+      "target": "J31",
+      "label": "Réduites",
+      "origine": "J31",
+      "type": "cible de design"
+    },
+    {
+      "code": "J31",
+      "label": "Sauvegarder et quitter",
+      "target": "J29",
+      "origine": "J31",
+      "type": "cible de design"
+    },
+    {
+      "node": "xULzR",
+      "target": "J25",
+      "label": "Voir la caisse",
+      "origine": "J40",
+      "type": "cible de design"
+    },
+    {
+      "node": "sI3WK",
+      "target": "J37",
+      "label": "Équiper puis recruter",
+      "origine": "J13",
+      "type": "cible de design"
+    },
+    {
+      "node": "j9BcD",
+      "target": "J18",
+      "label": "Placer ici",
+      "origine": "J17",
+      "type": "cible de design"
+    },
+    {
+      "node": "HrY5W",
+      "target": "J02",
+      "label": "Voir les sujets",
+      "origine": "J30",
+      "type": "cible de design"
+    },
+    {
+      "code": "J33",
+      "label": "Sélectionner la pile de sujets",
+      "target": "J02",
+      "origine": "J33",
+      "type": "cible de design"
+    }
+  ],
+  "composants_ressources": {
+    "impact": "D9DRl",
+    "iv": "Ou84U",
+    "iq": "tjqTX",
+    "ib": "mqiOp",
+    "cash": "cHSCW",
+    "cv": "qo4cr",
+    "time": "N6wKPg",
+    "dn": "BBckf",
+    "dl": "aFjF7",
+    "qt": "mqFgc",
+    "ph": "G3PSP"
+  },
+  "revision": "Emblèmes et harmonisation des écrans secondaires"
+}
