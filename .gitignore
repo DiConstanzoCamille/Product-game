@@ -7,3 +7,11 @@ game/.godot/
 
 # Worktrees des agents de dev lancés depuis le dépôt — scratch, pas du code.
 .claude/worktrees/
+
+# Archives de distribution régénérables et explorations antérieures du rework.
+docs/maquettes/product-tycoon-jeu.zip
+docs/maquettes/product-tycoon-ui.zip
+docs/maquettes/product-tycoon-ui/*
+!docs/maquettes/product-tycoon-ui/README.md
+docs/maquettes/bureau-vivant.html
+docs/maquettes/bureau-vivant-roadmap.html

@@ -1,5 +1,11 @@
 # Product Tycoon — projet Godot
 
+**Ce document décrit le jeu implémenté.** Pour un nouveau développement UI ou
+le prochain rework, lire le [contrat de cible](../docs/contrat-rework-bureau.md)
+et le [plan d’intégration](../docs/plan-integration-rework.md), en commençant par
+R0. Le bureau FPS, le thème et les écrans présentés ci-dessous ne sont pas la
+direction des nouveaux écrans ; leur migration reste progressive et vérifiée.
+
 Projet [Godot 4.3+](https://godotengine.org/) (GDScript). Voir [`docs/tech-stack.md`](../docs/tech-stack.md) pour le choix du moteur et [`docs/data-schema.md`](../docs/data-schema.md) pour le contenu des données consommées ici.
 
 La boucle complète d'un sprint est jouable de bout en bout (Accueil → **choix du scénario** → **choix de l'entreprise** → Inbox → Roadmap → Investissements → Résolution → sprint suivant), avec des données réelles issues de `data/*.json`. Le mandat se joue par trimestres de 3 sprints jusqu'à une vraie fin — quota manqué, faillite, exode d'équipe, sortie réussie après T4, etc. — les cinq jauges et les deux monnaies (💥 Impact, 💰 Revenue) persistent et évoluent réellement d'un sprint à l'autre, avec des abonnements récurrents selon le modèle économique du scénario. Après T4, le joueur peut sortir ou poursuivre un mandat long aux quotas croissants. Ce n'est pas encore un jeu *équilibré* (voir `docs/carnet-de-regles.md` §14-16 pour les décisions de conception, et `data/balance.json` pour tous les nombres ajustables), mais la boucle cœur fonctionne de bout en bout.

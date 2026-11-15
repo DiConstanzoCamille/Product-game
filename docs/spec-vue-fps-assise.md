@@ -1,5 +1,10 @@
 # Vue FPS assise — caméra, visée et focus d'interface
 
+**Cadrage du jeu existant, conservé comme historique technique.** La cible du
+prochain rework est le bureau vu du dessus du [contrat](contrat-rework-bureau.md).
+Ne pas réintroduire la visée FPS pour un nouvel écran du rework sur la seule
+base de cette ancienne spec.
+
 > Spec de cadrage du 23/08/2026, mise en œuvre autorisée par Camille le
 > 05/09/2026 avec la refonte globale des assets. Lot implémenté et recette
 > automatisée terminée le 07/09/2026 ; détails et limites au §11.

@@ -1,0 +1,22 @@
+{
+  "format": "2.22",
+  "vues": 44,
+  "calques": 1586,
+  "composants_reutilisables": [
+    "Composant · Commande de jeu",
+    "Composant · Sujet confié",
+    "Composant · Compteur Impact illustré",
+    "Composant · Compteur trésorerie illustré",
+    "Composant · Calendrier du bureau"
+  ],
+  "references_valides": 189,
+  "assets_presents": [
+    "assets/cartes-atelier.png",
+    "assets/cartes-roadmap.png",
+    "assets/emblemes-ressources.png",
+    "assets/emblemes-travail.png",
+    "assets/studio-jeu.png"
+  ],
+  "debordements_natifs": 0,
+  "jeu_modifie": false
+}

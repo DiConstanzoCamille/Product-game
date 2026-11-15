@@ -1,5 +1,10 @@
 # Le bureau en volume — direction 3D
 
+**Référence technique de l’existant.** Pour le prochain rework, suivre le
+[contrat de cible](contrat-rework-bureau.md). Le partage monde / lecture et les
+pièges techniques restent utiles ; le cadrage et l’habillage ci-dessous ne
+doivent pas réinstaller l’ancienne interface par défaut.
+
 > Spec de direction (05/08/2026), validée avec Camille. Elle décrit **comment le
 > bureau du Lot A (#54) passe en volume** sans que le jeu change de nature.
 > La mise en œuvre est l'issue #59.

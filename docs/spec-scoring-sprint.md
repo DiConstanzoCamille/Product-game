@@ -1,5 +1,12 @@
 # Spécification — Le score du sprint : Traction, Levier, Impact
 
+**Référence du moteur actuel, dont les statuts datés ci-dessous sont historiques.**
+Le [carnet](carnet-de-regles.md) décrit ce qui a été implémenté. Le raccord au
+nouveau flux de travail suit le [contrat du rework](contrat-rework-bureau.md) ;
+ni le calendrier en sprints ni les anciennes interfaces ne s’imposent à la cible.
+Le moteur et ses invariants restent en place tant qu’un lot ne les remplace
+pas explicitement.
+
 > Document de travail issu de la demande du 30/07/2026 : *« on survit, mais on
 > n'a pas le côté satisfaisant d'un Balatro à combo en gagnant plein de sous ».*
 > **v2 (31/07/2026)** — intègre les arbitrages de Camille et deux

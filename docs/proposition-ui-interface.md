@@ -1,5 +1,9 @@
 # Proposition UI — Objet unifié, panneau permanent, feedback live, direction artistique
 
+**Historique de l’interface existante.** Le panneau permanent, le thème clair
+et les cartes à six zones ne constituent plus la cible des nouveaux écrans.
+Lire le [contrat du rework](contrat-rework-bureau.md) et les maquettes actuelles.
+
 > Document de proposition (30/07/2026), en réponse aux retours de Camille sur
 > l'état post-Phase B. C'est une cible d'interface et de direction artistique,
 > à trancher avant la Phase C — la roadmap profonde ajoutera un troisième
